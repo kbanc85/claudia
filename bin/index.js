@@ -30,6 +30,7 @@ const bannerArt = `
 const banner = `
 ${colors.yellow}${bannerArt}${colors.reset}
 ${colors.dim}Agentic executive assistant — learns and adapts to how you work.${colors.reset}
+${colors.dim}by Kamil Banc${colors.reset}
 `;
 
 function main() {
@@ -76,7 +77,7 @@ function main() {
   const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
   console.log(`
 ${colors.bold}Next:${colors.reset}
-${cdStep}  ${colors.cyan}claudia${colors.reset}
+${cdStep}  ${colors.cyan}claude${colors.reset}
 
 ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 `);

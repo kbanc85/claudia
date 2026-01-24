@@ -34,7 +34,7 @@ She's not a chatbot. She's a thinking partner with memory.
 ```bash
 npx get-claudia
 cd claudia
-claudia
+claude
 ```
 
 She'll introduce herself and set things up for you.
@@ -61,7 +61,7 @@ She'll introduce herself and set things up for you.
 <img src="assets/demo.gif" alt="Claudia onboarding conversation" width="700">
 </p>
 
-When you first run `claudia`, she introduces herself and learns about you:
+When you first run `claude`, she introduces herself and learns about you:
 
 ```
 Claudia: Hey there. I'm Claudia. Before we dive into anything, I'd love
