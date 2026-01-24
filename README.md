@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-Created by <a href="https://github.com/kbanc85">Kamil Banc</a>
+Created by <a href="https://github.com/kbanc85">Kamil Banc</a> · <a href="https://x.com/kamilbanc">@kamilbanc</a> · <a href="https://aiadopters.club">AI Adopters Club</a>
 </p>
 
 ---
