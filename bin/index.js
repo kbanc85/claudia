@@ -19,25 +19,26 @@ const colors = {
   bold: '\x1b[1m',
 };
 
-// Pixel art banner - "CLAUDIA" text + portrait
+// Pixel art banner - "CLAUDIA" text + portrait (double-width for square pixels)
 const b = colors.cyan;    // blue pixels
 const y = colors.yellow;  // yellow pixels (hair)
 const w = colors.white;   // white pixels (face)
 const r = colors.reset;
-const px = '█';           // block character
+const px = '██';          // double-width block for square pixels
+const _ = '  ';           // double-width space
 
 const bannerArt = `
-${b}${px}${px}${r} ${b}${px}${r}   ${b}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${px}${r}  ${b}${px}${r}  ${b}${px}${r}
-${b}${px}${r}  ${b}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r}
-${b}${px}${px}${r} ${b}${px}${px}${r} ${b}${px}${r} ${b}${px}${r}  ${b}${px}${r}  ${b}${px}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${r}
+${b}${px}${px}${r}${_}${b}${px}${r}${_}${_}${_}${b}${px}${r}${_}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${px}${r}${_}${_}${b}${px}${r}${_}${_}${b}${px}${r}
+${b}${px}${r}${_}${_}${b}${px}${r}${_}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}
+${b}${px}${px}${r}${_}${b}${px}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${_}${b}${px}${r}${_}${_}${b}${px}${px}${r}${_}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}
 
-        ${y}${px}${px}${px}${px}${b}${px}${r}
-       ${y}${px}${w}${px}${px}${px}${px}${px}${b}${px}${r}
-       ${y}${px}${w}${px}${r} ${w}${px}${r} ${w}${px}${y}${px}${r}
-        ${w}${px}${px}${px}${px}${px}${r}
-         ${b}${px}${px}${px}${r}
-        ${b}${px}${px}${px}${px}${px}${r}
-         ${w}${px}${r} ${w}${px}${r}
+                ${y}${px}${px}${px}${px}${b}${px}${r}
+              ${y}${px}${w}${px}${px}${px}${px}${px}${b}${px}${r}
+              ${y}${px}${w}${px}${r}${_}${w}${px}${r}${_}${w}${px}${y}${px}${r}
+                ${w}${px}${px}${px}${px}${px}${r}
+                  ${b}${px}${px}${px}${r}
+                ${b}${px}${px}${px}${px}${px}${r}
+                  ${w}${px}${r}${_}${w}${px}${r}
 `;
 
 const banner = `
