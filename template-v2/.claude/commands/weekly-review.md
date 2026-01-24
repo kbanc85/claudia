@@ -49,16 +49,25 @@ Surface observations from `context/patterns.md`:
 - What keeps recurring that shouldn't?
 - Any insights for next week?
 
-### 7. Next Week Setup
+### 7. Development Check
+Reflect on growth (reference `context/me.md` if future direction exists):
+- "What worked particularly well this week? Worth remembering or sharing?"
+- "Any insights that could become content or methodology improvements?"
+- "Progress toward your bigger goals?"
+
+If they shared a future direction during onboarding, connect this week's work to that trajectory. Not every week needs to be about big goals, but it's worth asking.
+
+### 8. Next Week Setup
 Look ahead:
 - Key priorities
 - Important meetings
 - Things to start
 
-### 8. Learnings Capture
+### 9. Learnings Capture
 Before closing:
 - Anything to remember for next time?
 - Updates to context files?
+- Insights worth capturing in `context/me.md`?
 
 ## Output Format
 
@@ -99,6 +108,16 @@ Before closing:
 
 ### 🔄 Patterns Noticed
 - [Pattern or observation]
+
+### 🌱 Development
+**What worked well:**
+- [Insight worth remembering or sharing]
+
+**Progress toward goals:**
+- [Connection to bigger picture, if applicable]
+
+**Ideas captured:**
+- [Content ideas, methodology improvements, lessons learned]
 
 ### 🎯 Next Week's Focus
 1. [Priority 1]

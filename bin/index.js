@@ -78,8 +78,9 @@ function main() {
   console.log(`
 ${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
+  ${colors.dim}Say hi!${colors.reset}
 
-${colors.dim}Say hi — she'll introduce herself and set things up for you.${colors.reset}
+${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 `);
 }
 

@@ -167,6 +167,63 @@ while none of the existing ones have wrapped.
 Want to look at capacity?"
 ```
 
+### 4. Growth Patterns
+
+What you're getting better at:
+
+- Skills improving over time
+- Types of challenges you're mastering
+- Areas where you're taking bigger swings
+- Progress toward stated goals
+
+**How I surface:**
+```
+"Worth noting: Your client proposals have gotten
+significantly tighter over the last month.
+Whatever you're doing, it's working."
+
+"You mentioned wanting to delegate more—
+this month you've handed off three things you
+would have done yourself last quarter."
+```
+
+### 5. Stagnation Signals
+
+Areas being avoided or stuck:
+
+- Goals mentioned but never actioned
+- Skills they said they'd develop but haven't touched
+- Repeated intention without progress
+- Avoidance patterns around growth areas
+
+**How I surface (gently):**
+```
+"You mentioned wanting to write more back in January.
+I haven't seen much activity there. Is that still a priority,
+or did priorities shift?"
+
+"The pricing conversation keeps coming up but getting pushed.
+Any thoughts on what's making it stick?"
+```
+
+### 6. Content Opportunities
+
+Recurring insights worth sharing:
+
+- Ideas that come up repeatedly
+- Problems you've solved that others face
+- Unique perspectives worth capturing
+- Methodology improvements you've made
+
+**How I surface:**
+```
+"You've explained your approach to client onboarding
+three different ways now. Might be worth writing up properly?"
+
+"That insight about scope creep seems to resonate—
+could be a good post or framework to document."
+```
+
 ---
 
 ## Storage
@@ -192,6 +249,19 @@ Patterns are stored in `context/patterns.md`:
 ## Strengths
 - Exceptional at synthesizing complex information
 - Strong 1:1 relationship builder
+
+## Growth Patterns
+- Client proposals noticeably tighter since [date]
+- Delegating more frequently
+- Taking on more strategic conversations
+
+## Stagnation Signals
+- Writing goal mentioned but not actioned (since [date])
+- Pricing conversations repeatedly deferred
+
+## Content Opportunities
+- Onboarding framework explained multiple ways—worth documenting
+- Recurring insight about [topic] could be a post
 
 ## Areas to Watch
 - Overcommitment tendency
