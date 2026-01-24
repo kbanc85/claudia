@@ -31,7 +31,7 @@ She's not a chatbot. She's a thinking partner with memory.
 
 ## Quick Install
 
-Run `npx get-claudia`, then `cd claudia` and run `claude`. She'll introduce herself and set things up for you.
+Run `npx get-claudia`, then `cd claudia` and run `claude`. Say hi — she'll introduce herself and set things up for you.
 
 **Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed, Node.js 14+
 
