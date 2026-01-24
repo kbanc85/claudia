@@ -14,22 +14,35 @@ const colors = {
   cyan: '\x1b[36m',
   yellow: '\x1b[33m',
   magenta: '\x1b[35m',
+  white: '\x1b[97m',
   dim: '\x1b[2m',
   bold: '\x1b[1m',
 };
 
+// Pixel art banner - "CLAUDIA" text + portrait
+const b = colors.cyan;    // blue pixels
+const y = colors.yellow;  // yellow pixels (hair)
+const w = colors.white;   // white pixels (face)
+const r = colors.reset;
+const px = '█';           // block character
+
 const bannerArt = `
- ██████╗██╗      █████╗ ██╗   ██╗██████╗ ██╗ █████╗
-██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██║██╔══██╗
-██║     ██║     ███████║██║   ██║██║  ██║██║███████║
-██║     ██║     ██╔══██║██║   ██║██║  ██║██║██╔══██║
-╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝██║██║  ██║
- ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═╝
+${b}${px}${px}${r} ${b}${px}${r}   ${b}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${px}${r}  ${b}${px}${r}  ${b}${px}${r}
+${b}${px}${r}  ${b}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r}
+${b}${px}${px}${r} ${b}${px}${px}${r} ${b}${px}${r} ${b}${px}${r}  ${b}${px}${r}  ${b}${px}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${r}
+
+                  ${y}${px}${px}${px}${px}${b}${px}${r}
+                 ${y}${px}${w}${px}${px}${px}${px}${px}${b}${px}${r}
+                 ${y}${px}${w}${px}${r} ${w}${px}${r} ${w}${px}${y}${px}${r}
+                  ${w}${px}${px}${px}${px}${px}${r}
+                   ${b}${px}${px}${px}${r}
+                  ${b}${px}${px}${px}${px}${px}${r}
+                   ${w}${px}${r} ${w}${px}${r}
 `;
 
 const banner = `
-${colors.yellow}${bannerArt}${colors.reset}
-${colors.dim}Agentic executive assistant — learns and adapts to how you work.${colors.reset}
+${bannerArt}
+${colors.dim}Agentic executive assistant. Learns and adapts to how you work.${colors.reset}
 ${colors.dim}by Kamil Banc${colors.reset}
 `;
 
