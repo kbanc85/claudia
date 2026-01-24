@@ -2,7 +2,32 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## 2.0.0 (2026-01-23)
+## 1.0.0 (2026-01-23) - get-claudia
+
+### Package Rename
+
+The npm package has been renamed from `create-claudia` to `get-claudia` for a cleaner install experience:
+
+```bash
+npx get-claudia
+```
+
+### README Overhaul
+
+- Character-authentic README that reflects Claudia's personality
+- ASCII banner header
+- "Busy work is my job. Judgment is yours." tagline
+- Clear comparison table (Traditional AI vs Claudia)
+- Sample onboarding conversation showing her personality
+- 5 archetype icons (Consultant, Executive, Founder, Solo, Creator)
+- "Adapt and create" philosophy section
+- Created by Kamil Banc attribution
+
+### Includes all features from 2.0.0-beta.1
+
+---
+
+## 2.0.0-beta.1 (2026-01-23)
 
 ### Complete Rebuild: Adaptive, Learning AI Executive Assistant
 

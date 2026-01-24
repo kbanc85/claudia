@@ -1,16 +1,18 @@
 {
-  "name": "create-claudia",
-  "version": "2.0.0-beta.1",
-  "description": "Create Claudia, an agentic executive assistant that learns and adapts to how you work",
+  "name": "get-claudia",
+  "version": "1.0.0",
+  "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
     "claude",
+    "claude-code",
     "ai",
     "assistant",
+    "executive-assistant",
     "chief-of-staff",
     "productivity",
     "cli",
-    "onboarding",
+    "agentic",
     "adaptive"
   ],
   "author": "Kamil Banc",
@@ -24,11 +26,12 @@
     "url": "https://github.com/kbanc85/claudia/issues"
   },
   "bin": {
-    "create-claudia": "./bin/index.js"
+    "get-claudia": "./bin/index.js"
   },
   "files": [
     "bin",
-    "template-v2"
+    "template-v2",
+    "assets"
   ],
   "engines": {
     "node": ">=14.0.0"
