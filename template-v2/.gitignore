@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sensitive files
+credentials.json
+*.pem
+*.key
+
+# Build artifacts
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp

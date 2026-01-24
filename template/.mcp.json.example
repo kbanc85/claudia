@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+
+    "_comment": "Add your MCP servers below. See docs/integrations.md for setup instructions.",
+    "_comment2": "Find servers at mcp.so or github.com/modelcontextprotocol/servers",
+
+    "example-npx-server": {
+      "_comment": "Example: NPM package server (most common)",
+      "_disabled": true,
+      "command": "npx",
+      "args": ["-y", "@package/server-name"]
+    },
+
+    "example-local-server": {
+      "_comment": "Example: Local server (if you built or cloned one)",
+      "_disabled": true,
+      "command": "node",
+      "args": ["/path/to/server/dist/index.js"]
+    },
+
+    "example-with-env": {
+      "_comment": "Example: Server with environment variables (API keys)",
+      "_disabled": true,
+      "command": "npx",
+      "args": ["-y", "@package/server-name"],
+      "env": {
+        "API_KEY": "your-api-key-here"
+      }
+    }
+
+  },
+
+  "_notes": {
+    "setup": [
+      "1. Copy this file to .mcp.json",
+      "2. Remove the example entries",
+      "3. Add your servers following the patterns above",
+      "4. Fill in credentials/API keys as needed",
+      "5. Restart Claude Code for changes to take effect"
+    ],
+    "common_servers": [
+      "Gmail: @gongrzhe/server-gmail-autoauth-mcp",
+      "Calendar: @modelcontextprotocol/server-google-calendar",
+      "Brave Search: @anthropics/mcp-server-brave-search",
+      "Filesystem: @anthropics/mcp-server-filesystem"
+    ],
+    "safety": "Claudia uses integrations for reading context. Any actions (sending, creating, deleting) require your explicit approval."
+  }
+}

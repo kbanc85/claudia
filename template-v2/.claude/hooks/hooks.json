@@ -1,0 +1,48 @@
+{
+  "hooks": [
+    {
+      "event": "session_start",
+      "description": "Load learnings and context from previous sessions",
+      "behavior": {
+        "action": "load_memory",
+        "files": [
+          "context/me.md",
+          "context/learnings.md",
+          "context/patterns.md",
+          "context/commitments.md",
+          "context/waiting.md"
+        ],
+        "on_missing_me": "trigger_onboarding"
+      }
+    },
+    {
+      "event": "session_end",
+      "description": "Persist new learnings and updates",
+      "behavior": {
+        "action": "save_memory",
+        "files": [
+          "context/learnings.md",
+          "context/patterns.md",
+          "context/commitments.md",
+          "context/waiting.md"
+        ],
+        "save_mode": "merge"
+      }
+    },
+    {
+      "event": "first_run",
+      "description": "Detect first run and trigger onboarding",
+      "behavior": {
+        "action": "check_file",
+        "file": "context/me.md",
+        "on_missing": "trigger_skill:onboarding"
+      }
+    }
+  ],
+  "notes": {
+    "implementation": "These hooks define intended behaviors. Claude Code will execute them as behavioral guidelines rather than traditional script execution.",
+    "session_start": "At session start, Claudia should read context files to restore memory. If me.md is missing, onboarding should begin.",
+    "session_end": "Before session ends, Claudia should update relevant context files with new learnings and changes.",
+    "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding."
+  }
+}

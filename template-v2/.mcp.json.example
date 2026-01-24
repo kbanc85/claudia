@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "gmail": {
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
+      "comment": "Gmail integration for email management"
+    },
+    "google-calendar": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
+      "comment": "Google Calendar integration for scheduling"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-filesystem-server", "/path/to/allowed/directory"],
+      "comment": "File system access (update path as needed)"
+    }
+  },
+  "notes": {
+    "setup": "Rename this file to .mcp.json to enable MCP integrations",
+    "gmail": "Requires OAuth setup - see gmail server documentation",
+    "calendar": "Requires Google Cloud project with Calendar API enabled",
+    "more-servers": "Find more at https://github.com/modelcontextprotocol/servers"
+  }
+}

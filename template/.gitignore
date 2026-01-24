@@ -1,0 +1,40 @@
+# MCP Server Configuration (contains API keys)
+.mcp.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node modules (if any scripts are added)
+node_modules/
+
+# Personal data (these should never be committed)
+# Users will add their own people and context
+# Uncomment these if you want to track your data in a private fork:
+# people/*.md
+# !people/_template.md
+# context/*.md
+# projects/*
+# !projects/_template/
+
+# Meeting notes (personal data - user's actual meeting notes)
+# Note: expansions/meetings/ is NOT ignored (it's a template)
+/meetings/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
