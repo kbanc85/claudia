@@ -37,50 +37,48 @@ function main() {
 
   // Determine target directory
   const args = process.argv.slice(2);
-  const targetDir = args[0] || 'claudia';
-  const targetPath = join(process.cwd(), targetDir);
+  const arg = args[0];
 
-  // Check if directory already exists
+  // Support "." for current directory
+  const isCurrentDir = arg === '.';
+  const targetDir = isCurrentDir ? '.' : (arg || 'claudia');
+  const targetPath = isCurrentDir ? process.cwd() : join(process.cwd(), targetDir);
+  const displayDir = isCurrentDir ? 'current directory' : targetDir;
+
+  // Check if directory already exists and has conflicting files
   if (existsSync(targetPath)) {
     const contents = readdirSync(targetPath);
-    if (contents.length > 0) {
-      console.log(`\n${colors.yellow}⚠${colors.reset}  Directory '${targetDir}' already exists and is not empty.`);
-      console.log(`   Please choose a different name or remove the existing directory.\n`);
+    const hasConflict = contents.some(f => f === 'CLAUDE.md' || f === '.claude');
+    if (hasConflict) {
+      console.log(`\n${colors.yellow}⚠${colors.reset}  Claudia files already exist in ${displayDir}.`);
+      console.log(`   Remove CLAUDE.md and .claude/ first, or choose a different location.\n`);
       process.exit(1);
     }
   }
 
-  // Create target directory
-  mkdirSync(targetPath, { recursive: true });
-  console.log(`${colors.green}✓${colors.reset} Created ${targetDir}/ directory`);
+  // Create target directory if not current dir
+  if (!isCurrentDir) {
+    mkdirSync(targetPath, { recursive: true });
+  }
 
   // Copy template files (v2 - minimal seed)
   const templatePath = join(__dirname, '..', 'template-v2');
 
   try {
     cpSync(templatePath, targetPath, { recursive: true });
-    console.log(`${colors.green}✓${colors.reset} Copied Claudia 2.0 seed files`);
+    console.log(`${colors.green}✓${colors.reset} Installed in ${displayDir}`);
   } catch (error) {
     console.error(`\n${colors.yellow}⚠${colors.reset}  Error copying files: ${error.message}`);
     process.exit(1);
   }
 
   // Show next steps
+  const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
   console.log(`
-${colors.bold}What's different in Claudia 2.0:${colors.reset}
-${colors.dim}• Ultra-minimal install — just the essentials
-• Conversational onboarding — Claudia learns about you first
-• Personalized structure — folders and commands tailored to your work
-• Cross-session memory — she remembers and learns over time${colors.reset}
+${colors.bold}Next:${colors.reset}
+${cdStep}  ${colors.cyan}claudia${colors.reset}
 
-${colors.bold}Next steps:${colors.reset}
-  ${colors.cyan}cd ${targetDir}${colors.reset}
-  ${colors.cyan}claudia${colors.reset}
-
-${colors.dim}When you start, Claudia will introduce herself and ask a few questions
-to understand how you work. Then she'll create a personalized setup just for you.${colors.reset}
-
-${colors.green}Claudia is ready to meet you!${colors.reset}
+${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 `);
 }
 
