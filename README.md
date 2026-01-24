@@ -1,17 +1,5 @@
 <p align="center">
-<pre>
-████  ██      ██    ██  ██  ████    ██    ██
-██    ██    ██  ██  ██  ██  ██  ██  ██  ██  ██
-████  ████  ██  ██    ██    ████    ██  ██  ██
-
-                ████████░░
-              ░░██████████░░
-              ░░██  ██  ██░░
-                ██████████
-                  ██████
-                ██████████
-                  ██  ██
-</pre>
+<img src="assets/claudia-banner.gif" alt="Claudia" width="500">
 </p>
 
 <h3 align="center">An AI assistant who learns how you work.</h3>
@@ -222,6 +210,16 @@ See what she surfaces. Then tell her about a person you work with.
 ## License
 
 Apache 2.0 — Use it, modify it, make it yours.
+
+---
+
+## Credits
+
+Created by [Kamil Banc](https://github.com/kbanc85) · [@kamilbanc](https://x.com/kamilbanc)
+
+Part of the [AI Adopters Club](https://aiadopters.club) — helping teams build AI-first reflexes.
+
+If Claudia helps you, a ⭐ on GitHub means a lot.
 
 ---
 
