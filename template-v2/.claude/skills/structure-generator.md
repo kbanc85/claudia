@@ -39,10 +39,10 @@ claudia/
 ```
 
 **Generated Commands:**
-- `/client-status` — Health check all engagements
-- `/proposal-draft` — Draft new proposals
-- `/pipeline-review` — What's in your funnel
-- `/engagement-review [client]` — Deep dive on specific client
+- `/client-status` - Health check all engagements
+- `/proposal-draft` - Draft new proposals
+- `/pipeline-review` - What's in your funnel
+- `/engagement-review [client]` - Deep dive on specific client
 
 ---
 
@@ -78,10 +78,10 @@ claudia/
 ```
 
 **Generated Commands:**
-- `/exec-brief` — Leadership-focused morning brief
-- `/1on1-prep [person]` — Prepare for 1:1 meeting
-- `/board-update` — Draft board update
-- `/initiative-status` — Status across initiatives
+- `/exec-brief` - Leadership-focused morning brief
+- `/1on1-prep [person]` - Prepare for 1:1 meeting
+- `/board-update` - Draft board update
+- `/initiative-status` - Status across initiatives
 
 ---
 
@@ -118,10 +118,10 @@ claudia/
 ```
 
 **Generated Commands:**
-- `/investor-update` — Draft investor update
-- `/pitch-prep` — Prepare for investor meeting
-- `/team-standup` — Prepare standup notes
-- `/runway-check` — Financial runway summary
+- `/investor-update` - Draft investor update
+- `/pitch-prep` - Prepare for investor meeting
+- `/team-standup` - Prepare standup notes
+- `/runway-check` - Financial runway summary
 
 ---
 
@@ -155,10 +155,10 @@ claudia/
 ```
 
 **Generated Commands:**
-- `/week-review` — Solo-focused weekly review
-- `/invoice-draft [client]` — Draft invoice
-- `/project-status` — Status across projects
-- `/client-review [client]` — Deep dive on client
+- `/week-review` - Solo-focused weekly review
+- `/invoice-draft [client]` - Draft invoice
+- `/project-status` - Status across projects
+- `/client-review [client]` - Deep dive on client
 
 ---
 
@@ -194,10 +194,10 @@ claudia/
 ```
 
 **Generated Commands:**
-- `/content-calendar` — View/update content calendar
-- `/draft-post [platform]` — Quick social draft
-- `/audience-insights` — Review audience patterns
-- `/collab-outreach [person]` — Draft collaboration outreach
+- `/content-calendar` - View/update content calendar
+- `/draft-post [platform]` - Quick social draft
+- `/audience-insights` - Review audience patterns
+- `/collab-outreach [person]` - Draft collaboration outreach
 
 ---
 
@@ -327,6 +327,59 @@ What I've learned about working with you.
 *Last updated: [date]*
 ```
 
+### context/integrations.md Template (if user expressed interest)
+
+Only create this file if user showed interest in integrations during onboarding Phase 3.5.
+
+```markdown
+# Integrations
+
+External tools and services connected to Claudia.
+
+## Active
+
+| Integration | Type | Status | Added |
+|-------------|------|--------|-------|
+| | | | |
+
+## Interests
+
+Services you want to connect:
+-
+
+## Declined
+
+| Integration | Reason | Date |
+|-------------|--------|------|
+| | | |
+
+## Wish List
+
+Services without easy solutions yet:
+-
+
+---
+
+## Setup Notes
+
+### How Integrations Work
+
+- **CLI tools** (gh, rclone) - Built-in, usually already installed
+- **MCP servers** - Added to `.mcp.json`, restart Claude Code to activate
+- **Browser assist** - I navigate web apps with you when no better option exists
+
+### Adding New Integrations
+
+Ask me about connecting any tool. I'll:
+1. Search for the best available option
+2. Explain what access it provides
+3. Walk you through setup if you want it
+
+---
+
+*Last updated: [date]*
+```
+
 ### people/_template.md
 ```markdown
 # [Person Name]
@@ -395,7 +448,16 @@ When generating a structure:
 3. **Generate archetype-specific commands** (see archetype sections)
 4. **Create context/me.md** with user's profile data
 5. **Initialize empty context files** (commitments, waiting, patterns, learnings)
-6. **Report what was created**
+6. **If user expressed interest in integrations during Phase 3.5:**
+   - Create `context/integrations.md`
+   - Add integrations section to `context/me.md`:
+     ```markdown
+     ## Integrations
+     - [Any integrations they want to set up]
+     - See `context/integrations.md` for details
+     ```
+   - Note any specific integration interests for later
+7. **Report what was created**
 
 ---
 

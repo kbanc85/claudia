@@ -72,6 +72,45 @@ have a dedicated folder. Should we create partnerships/ ?"
 work-patterns.md and relationship-patterns.md?"
 ```
 
+### Integration Needs
+
+**Detection:**
+- User mentions checking external tools frequently
+- User pastes content from external services
+- User asks "can you see my X" type questions
+- User manually copies information that could be automated
+- References to specific services (Gmail, Notion, Slack, etc.)
+
+**Trigger Phrases:**
+- "Can you check my email/calendar/Notion..."
+- "Let me paste this from [service]..."
+- "I need to go look at [service] for..."
+- "Here's what [service] says..."
+- "Can you see my [service]?"
+
+**Response:**
+Invoke the `connector-discovery` skill with context about what they were trying to do.
+
+**Examples:**
+```
+"I notice you often paste content from Notion. Want me to see
+if I can connect directly? That way I could search and read
+your pages without the copy-paste."
+
+"You've asked about your email a few times. I can't see it yet,
+but I can help you set that up. Takes about 5 minutes for Gmail.
+Interested?"
+
+"I see you check your calendar separately before our morning briefs.
+Want me to include your schedule automatically? I can connect to
+Google Calendar if you'd like."
+```
+
+**Guardrails:**
+- Only suggest once per service (check declined list in learnings.md)
+- Don't interrupt workflow-suggest at natural pause points
+- If they said "maybe later" during onboarding, wait at least a week
+
 ---
 
 ## Suggestion Flow

@@ -1,25 +1,58 @@
 {
   "mcpServers": {
+
+    "_comment": "Claudia prefers CLI tools when available (faster, simpler), then MCP servers.",
+    "_comment2": "Find more servers at mcp.so or github.com/modelcontextprotocol/servers",
+
     "gmail": {
+      "_disabled": true,
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "comment": "Gmail integration for email management"
+      "_description": "Read, draft, and search emails (~5 min setup)"
     },
+
     "google-calendar": {
+      "_disabled": true,
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
-      "comment": "Google Calendar integration for scheduling"
+      "_description": "See your schedule in morning briefs (~5 min setup)"
     },
+
     "filesystem": {
+      "_disabled": true,
       "command": "npx",
-      "args": ["-y", "@anthropics/mcp-filesystem-server", "/path/to/allowed/directory"],
-      "comment": "File system access (update path as needed)"
+      "args": ["-y", "@anthropics/mcp-server-filesystem", "/path/to/allowed/folder"],
+      "_description": "Read files in specific folders you choose (~2 min setup)"
+    },
+
+    "brave-search": {
+      "_disabled": true,
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "your-api-key-here"
+      },
+      "_description": "Search the web for research (~3 min setup, free tier available)"
     }
+
   },
-  "notes": {
-    "setup": "Rename this file to .mcp.json to enable MCP integrations",
-    "gmail": "Requires OAuth setup - see gmail server documentation",
-    "calendar": "Requires Google Cloud project with Calendar API enabled",
-    "more-servers": "Find more at https://github.com/modelcontextprotocol/servers"
+
+  "_notes": {
+    "setup": [
+      "1. Rename this file to .mcp.json",
+      "2. Remove _disabled from servers you want to use",
+      "3. Update paths and API keys as needed",
+      "4. Restart Claude Code for changes to take effect"
+    ],
+    "priority_order": [
+      "1. CLI tools (gh, rclone) - Already installed, most reliable",
+      "2. MCP servers - Feature-rich, requires setup",
+      "3. Browser assist - Last resort for web-only tools"
+    ],
+    "cli_alternatives": {
+      "github": "Use `gh` CLI instead (brew install gh)",
+      "cloud_storage": "Use `rclone` CLI instead (brew install rclone)"
+    },
+    "safety": "Claudia uses integrations for reading context. Any actions (sending, creating, deleting) require your explicit approval."
   }
 }
