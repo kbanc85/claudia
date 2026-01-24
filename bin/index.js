@@ -31,13 +31,13 @@ ${b}${px}${px}${r} ${b}${px}${r}   ${b}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${
 ${b}${px}${r}  ${b}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r} ${b}${px}${r}
 ${b}${px}${px}${r} ${b}${px}${px}${r} ${b}${px}${r} ${b}${px}${r}  ${b}${px}${r}  ${b}${px}${px}${r}  ${b}${px}${r} ${b}${px}${r} ${b}${px}${r}
 
-                  ${y}${px}${px}${px}${px}${b}${px}${r}
-                 ${y}${px}${w}${px}${px}${px}${px}${px}${b}${px}${r}
-                 ${y}${px}${w}${px}${r} ${w}${px}${r} ${w}${px}${y}${px}${r}
-                  ${w}${px}${px}${px}${px}${px}${r}
-                   ${b}${px}${px}${px}${r}
-                  ${b}${px}${px}${px}${px}${px}${r}
-                   ${w}${px}${r} ${w}${px}${r}
+        ${y}${px}${px}${px}${px}${b}${px}${r}
+       ${y}${px}${w}${px}${px}${px}${px}${px}${b}${px}${r}
+       ${y}${px}${w}${px}${r} ${w}${px}${r} ${w}${px}${y}${px}${r}
+        ${w}${px}${px}${px}${px}${px}${r}
+         ${b}${px}${px}${px}${r}
+        ${b}${px}${px}${px}${px}${px}${r}
+         ${w}${px}${r} ${w}${px}${r}
 `;
 
 const banner = `
