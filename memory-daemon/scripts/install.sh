@@ -93,16 +93,34 @@ random_message() {
     echo "${MESSAGES[$RANDOM % ${#MESSAGES[@]}]}"
 }
 
-# Check Python
+# Check Python - prefer Homebrew Python on macOS (supports SQLite extensions)
 echo -e "${BOLD}Step 1/8: Environment Check${NC}"
 echo
-if command -v python3 &> /dev/null; then
-    PYTHON=$(command -v python3)
+PYTHON=""
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # Homebrew Python supports SQLite extension loading (needed for vector search)
+    if [ -x "/opt/homebrew/bin/python3" ]; then
+        PYTHON="/opt/homebrew/bin/python3"
+        echo -e "  ${GREEN}✓${NC} Using Homebrew Python (vector search supported)"
+    elif [ -x "/usr/local/bin/python3" ]; then
+        PYTHON="/usr/local/bin/python3"
+        echo -e "  ${GREEN}✓${NC} Using Homebrew Python (vector search supported)"
+    fi
+fi
+
+if [ -z "$PYTHON" ]; then
+    if command -v python3 &> /dev/null; then
+        PYTHON=$(command -v python3)
+    fi
+fi
+
+if [ -n "$PYTHON" ]; then
     PYTHON_VERSION=$($PYTHON --version 2>&1 | awk '{print $2}')
-    echo -e "  ${GREEN}✓${NC} Python $PYTHON_VERSION"
+    echo -e "  ${GREEN}✓${NC} Python $PYTHON_VERSION ($PYTHON)"
 else
     echo -e "  ${RED}✗${NC} Python 3 not found"
     echo -e "    Please install Python 3.10 or later"
+    echo -e "    ${DIM}On macOS: brew install python${NC}"
     exit 1
 fi
 
