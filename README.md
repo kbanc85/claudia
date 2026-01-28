@@ -43,13 +43,26 @@ Say hi. She'll introduce herself and set things up for you.
 
 ---
 
+## What's New in v1.2.5
+
+**Fully automatic memory system** - No more manual steps after install:
+
+- **Works after reboot** - Ollama and the memory daemon auto-start on login (macOS LaunchAgent)
+- **Python 3.13 support** - sqlite-vec now works on all Python versions
+- **Boot resilience** - Daemon waits for Ollama to start instead of failing silently
+- **Better diagnostics** - Run `~/.claudia/diagnose.sh` to check all services
+
+The memory system just works now. Install, reboot, and everything comes back up.
+
+---
+
 ## Already Have Claudia? Add Memory.
 
 If you installed Claudia before the memory system existed, you can upgrade:
 
 ```bash
 # Clone the repo (or pull latest if you have it)
-git clone https://github.com/kbanc/claudia.git
+git clone https://github.com/kbanc85/claudia.git
 cd claudia/memory-daemon
 
 # Run the installer
@@ -59,7 +72,9 @@ cd claudia/memory-daemon
 The installer will:
 - Set up the memory daemon at `~/.claudia/daemon/`
 - Install Ollama for local embeddings (optional but recommended)
-- Configure auto-start so the daemon runs on login
+- Configure auto-start so Ollama and the daemon run on login
+- Pull the embedding model automatically
+- Verify all services are working
 - Show you what to add to your `.mcp.json`
 
 After installing, add this to your Claudia project's `.mcp.json`:
@@ -83,11 +98,12 @@ Restart Claude Code, and Claudia now has persistent memory.
 
 | Traditional AI | Claudia |
 |----------------|---------|
-| Forgets everything between sessions | **Persistent memory** — SQLite + vector search, never forgets |
+| Forgets everything between sessions | **Persistent memory** — SQLite + vector search, survives reboots |
 | Treats conversations as isolated | **Tracks relationships** — People files, not just tasks |
 | Waits for instructions | **Proactive** — Surfaces risks before they become problems |
 | One-size-fits-all | **Personalized** — Structure generated for your work style |
 | Cloud-based, data harvested | **Local** — Runs on your machine, your context stays yours |
+| Breaks after system updates | **Resilient** — Auto-starts on boot, retries on failure |
 
 ---
 
@@ -253,6 +269,44 @@ After install, run:
 ```
 
 See what she surfaces. Then tell her about a person you work with.
+
+---
+
+## Troubleshooting
+
+**Memory tools not appearing?**
+```bash
+# Check all services
+~/.claudia/diagnose.sh
+
+# Common fixes:
+# 1. Restart Claude Code in a NEW terminal (it reads .mcp.json at startup)
+# 2. Check daemon health: curl http://localhost:3848/health
+# 3. View logs: tail -f ~/.claudia/daemon-stderr.log
+```
+
+**Ollama not running after reboot?**
+```bash
+# Load the LaunchAgent
+launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist
+
+# Or start manually
+ollama serve
+```
+
+**Vector search not working?**
+```bash
+# Check if sqlite-vec is installed
+~/.claudia/daemon/venv/bin/python -c "import sqlite_vec; print('ok')"
+
+# If not, install it
+~/.claudia/daemon/venv/bin/pip install sqlite-vec
+```
+
+**Pull the embedding model**
+```bash
+ollama pull all-minilm:l6-v2
+```
 
 ---
 
