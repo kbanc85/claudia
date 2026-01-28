@@ -24,9 +24,58 @@ She's not a chatbot. She's a thinking partner with memory.
 
 ## Quick Install
 
-Run `npx get-claudia`, then `cd claudia` and run `claude`. Say hi — she'll introduce herself and set things up for you.
+```bash
+npx get-claudia
+```
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed, Node.js 14+
+That's it. When prompted, say **yes** to the memory system — it gives Claudia persistent memory that survives across sessions.
+
+Then:
+
+```bash
+cd claudia
+claude
+```
+
+Say hi. She'll introduce herself and set things up for you.
+
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+
+
+---
+
+## Already Have Claudia? Add Memory.
+
+If you installed Claudia before the memory system existed, you can upgrade:
+
+```bash
+# Clone the repo (or pull latest if you have it)
+git clone https://github.com/kbanc/claudia.git
+cd claudia/memory-daemon
+
+# Run the installer
+./scripts/install.sh
+```
+
+The installer will:
+- Set up the memory daemon at `~/.claudia/daemon/`
+- Install Ollama for local embeddings (optional but recommended)
+- Configure auto-start so the daemon runs on login
+- Show you what to add to your `.mcp.json`
+
+After installing, add this to your Claudia project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "claudia-memory": {
+      "command": "~/.claudia/daemon/venv/bin/python",
+      "args": ["-m", "claudia_memory.mcp.server"]
+    }
+  }
+}
+```
+
+Restart Claude Code, and Claudia now has persistent memory.
 
 ---
 
@@ -34,7 +83,7 @@ Run `npx get-claudia`, then `cd claudia` and run `claude`. Say hi — she'll int
 
 | Traditional AI | Claudia |
 |----------------|---------|
-| Forgets everything between sessions | **Learns you** — Remembers preferences, patterns, what works |
+| Forgets everything between sessions | **Persistent memory** — SQLite + vector search, never forgets |
 | Treats conversations as isolated | **Tracks relationships** — People files, not just tasks |
 | Waits for instructions | **Proactive** — Surfaces risks before they become problems |
 | One-size-fits-all | **Personalized** — Structure generated for your work style |
