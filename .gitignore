@@ -1,3 +1,18 @@
 node_modules/
 .DS_Store
 *.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Local
+.claude/settings.local.json
+tmp/
+
+# Tarballs
+*.tgz
