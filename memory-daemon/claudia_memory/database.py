@@ -46,46 +46,54 @@ class Database:
             conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA foreign_keys = ON")
 
-            # Try to load sqlite-vec extension
+            # Try to load sqlite-vec for vector search
+            # Priority: sqlite_vec Python package first (works on Python 3.13+),
+            # then fall back to native extension loading
+            loaded = False
+
+            # Method 1: Try sqlite_vec Python package (recommended, works everywhere)
             try:
-                conn.enable_load_extension(True)
-                # Try common locations for sqlite-vec
-                sqlite_vec_paths = [
-                    "vec0",  # If installed system-wide
-                    "/usr/local/lib/sqlite-vec/vec0",
-                    "/opt/homebrew/lib/sqlite-vec/vec0",
-                    str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
-                ]
-
-                loaded = False
-                for path in sqlite_vec_paths:
-                    try:
-                        conn.load_extension(path)
-                        loaded = True
-                        logger.debug(f"Loaded sqlite-vec from {path}")
-                        break
-                    except sqlite3.OperationalError:
-                        continue
-
-                if not loaded:
-                    # Try loading via sqlite_vec Python package
-                    try:
-                        import sqlite_vec
-                        sqlite_vec.load(conn)
-                        loaded = True
-                        logger.debug("Loaded sqlite-vec via Python package")
-                    except ImportError:
-                        pass
-
-                if not loaded:
-                    logger.warning(
-                        "sqlite-vec extension not found. Vector search will be unavailable. "
-                        "Install with: pip install sqlite-vec"
-                    )
-
-                conn.enable_load_extension(False)
+                import sqlite_vec
+                sqlite_vec.load(conn)
+                loaded = True
+                logger.debug("Loaded sqlite-vec via Python package")
+            except ImportError:
+                logger.debug("sqlite_vec package not installed")
             except Exception as e:
-                logger.warning(f"Could not load sqlite-vec: {e}")
+                logger.debug(f"sqlite_vec package failed: {e}")
+
+            # Method 2: Try native extension loading (for systems with pre-installed sqlite-vec)
+            if not loaded:
+                try:
+                    conn.enable_load_extension(True)
+                    sqlite_vec_paths = [
+                        "vec0",  # If installed system-wide
+                        "/usr/local/lib/sqlite-vec/vec0",
+                        "/opt/homebrew/lib/sqlite-vec/vec0",
+                        str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
+                    ]
+
+                    for path in sqlite_vec_paths:
+                        try:
+                            conn.load_extension(path)
+                            loaded = True
+                            logger.debug(f"Loaded sqlite-vec from {path}")
+                            break
+                        except sqlite3.OperationalError:
+                            continue
+
+                    conn.enable_load_extension(False)
+                except AttributeError:
+                    # Python 3.13+ may not have enable_load_extension
+                    logger.debug("enable_load_extension not available (Python 3.13+)")
+                except Exception as e:
+                    logger.debug(f"Extension loading failed: {e}")
+
+            if not loaded:
+                logger.warning(
+                    "sqlite-vec not available. Vector search will be disabled. "
+                    "Install with: pip install sqlite-vec"
+                )
 
             self._local.connection = conn
 

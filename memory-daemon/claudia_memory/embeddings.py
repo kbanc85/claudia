@@ -3,10 +3,13 @@ Embedding service for Claudia Memory System
 
 Connects to local Ollama for generating text embeddings.
 Uses all-minilm:l6-v2 model (384 dimensions) for semantic search.
+
+Includes retry logic to wait for Ollama to start (e.g., after system boot).
 """
 
 import asyncio
 import logging
+import time
 from typing import List, Optional
 
 import httpx
@@ -14,6 +17,10 @@ import httpx
 from .config import get_config
 
 logger = logging.getLogger(__name__)
+
+# Retry configuration for waiting on Ollama
+OLLAMA_RETRY_ATTEMPTS = 5
+OLLAMA_RETRY_DELAY = 2  # seconds
 
 
 class EmbeddingService:
@@ -40,9 +47,50 @@ class EmbeddingService:
             self._sync_client = httpx.Client(timeout=30.0)
         return self._sync_client
 
+    async def _wait_for_ollama(self, max_retries: int = OLLAMA_RETRY_ATTEMPTS, delay: float = OLLAMA_RETRY_DELAY) -> bool:
+        """Wait for Ollama to be available with retries (async)"""
+        client = await self._get_client()
+        for i in range(max_retries):
+            try:
+                response = await client.get(f"{self.host}/api/tags", timeout=5.0)
+                if response.status_code == 200:
+                    logger.debug(f"Ollama available after {i + 1} attempt(s)")
+                    return True
+            except Exception:
+                pass
+            if i < max_retries - 1:
+                logger.debug(f"Waiting for Ollama (attempt {i + 1}/{max_retries})...")
+                await asyncio.sleep(delay)
+        return False
+
+    def _wait_for_ollama_sync(self, max_retries: int = OLLAMA_RETRY_ATTEMPTS, delay: float = OLLAMA_RETRY_DELAY) -> bool:
+        """Wait for Ollama to be available with retries (sync)"""
+        client = self._get_sync_client()
+        for i in range(max_retries):
+            try:
+                response = client.get(f"{self.host}/api/tags", timeout=5.0)
+                if response.status_code == 200:
+                    logger.debug(f"Ollama available after {i + 1} attempt(s)")
+                    return True
+            except Exception:
+                pass
+            if i < max_retries - 1:
+                logger.debug(f"Waiting for Ollama (attempt {i + 1}/{max_retries})...")
+                time.sleep(delay)
+        return False
+
     async def is_available(self) -> bool:
-        """Check if Ollama is running and model is available"""
+        """Check if Ollama is running and model is available.
+
+        Uses retry logic to wait for Ollama if it's starting up (e.g., after boot).
+        """
         if self._available is not None:
+            return self._available
+
+        # Wait for Ollama to be available (with retries)
+        if not await self._wait_for_ollama():
+            logger.warning("Ollama not available after retries. Vector search disabled.")
+            self._available = False
             return self._available
 
         try:
@@ -65,14 +113,23 @@ class EmbeddingService:
             else:
                 self._available = False
         except Exception as e:
-            logger.warning(f"Ollama not available: {e}")
+            logger.warning(f"Ollama error: {e}")
             self._available = False
 
         return self._available
 
     def is_available_sync(self) -> bool:
-        """Synchronous check if Ollama is available"""
+        """Synchronous check if Ollama is available.
+
+        Uses retry logic to wait for Ollama if it's starting up (e.g., after boot).
+        """
         if self._available is not None:
+            return self._available
+
+        # Wait for Ollama to be available (with retries)
+        if not self._wait_for_ollama_sync():
+            logger.warning("Ollama not available after retries. Vector search disabled.")
+            self._available = False
             return self._available
 
         try:
@@ -88,7 +145,7 @@ class EmbeddingService:
             else:
                 self._available = False
         except Exception as e:
-            logger.warning(f"Ollama not available: {e}")
+            logger.warning(f"Ollama error: {e}")
             self._available = False
 
         return self._available

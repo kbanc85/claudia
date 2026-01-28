@@ -137,6 +137,45 @@ else
     fi
 fi
 
+# Configure Ollama to auto-start on boot (macOS)
+if [[ "$OSTYPE" == "darwin"* ]] && [ "$OLLAMA_AVAILABLE" = true ]; then
+    OLLAMA_PLIST="$HOME/Library/LaunchAgents/com.ollama.serve.plist"
+
+    if [ ! -f "$OLLAMA_PLIST" ]; then
+        # Find Ollama binary location
+        OLLAMA_BIN=$(command -v ollama)
+
+        mkdir -p "$HOME/Library/LaunchAgents"
+        cat > "$OLLAMA_PLIST" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ollama.serve</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$OLLAMA_BIN</string>
+        <string>serve</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/ollama.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/ollama.err</string>
+</dict>
+</plist>
+PLIST
+        launchctl load "$OLLAMA_PLIST" 2>/dev/null || true
+        echo -e "  ${GREEN}✓${NC} Ollama configured to auto-start on boot"
+    else
+        echo -e "  ${GREEN}✓${NC} Ollama LaunchAgent already configured"
+    fi
+fi
+
 echo
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
@@ -145,14 +184,41 @@ echo
 echo -e "${BOLD}Step 2/7: AI Models${NC}"
 echo
 if [ "$OLLAMA_AVAILABLE" = true ]; then
+    # Ensure Ollama is running before pulling model
+    if ! curl -s http://localhost:11434/api/tags &>/dev/null; then
+        echo -e "  ${CYAN}◐${NC} Starting Ollama server..."
+        ollama serve &>/dev/null &
+        OLLAMA_PID=$!
+
+        # Wait for Ollama to be ready (up to 10 seconds)
+        for i in {1..10}; do
+            if curl -s http://localhost:11434/api/tags &>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+
+        if curl -s http://localhost:11434/api/tags &>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} Ollama server running"
+        else
+            echo -e "  ${YELLOW}!${NC} Could not start Ollama (will retry on boot)"
+        fi
+    else
+        echo -e "  ${GREEN}✓${NC} Ollama server already running"
+    fi
+
+    # Pull embedding model
     if ollama list 2>/dev/null | grep -q "all-minilm"; then
         echo -e "  ${GREEN}✓${NC} Embedding model ready"
     else
         echo -e "  ${CYAN}◐${NC} Downloading embedding model (45MB)..."
         echo -e "    ${DIM}This gives Claudia semantic understanding${NC}"
         echo
-        ollama pull all-minilm:l6-v2 2>/dev/null || echo -e "  ${YELLOW}!${NC} Model pull failed, continuing"
-        echo -e "  ${GREEN}✓${NC} Model downloaded"
+        if ollama pull all-minilm:l6-v2 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} Model downloaded"
+        else
+            echo -e "  ${YELLOW}!${NC} Model pull failed (will retry when Ollama runs)"
+        fi
     fi
 else
     echo -e "  ${YELLOW}○${NC} Skipping (Ollama not available)"
@@ -309,18 +375,56 @@ echo
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
 
-# Verify
+# Verify all services
 echo -e "${BOLD}Step 7/7: Verification${NC}"
 echo
-echo -e "  ${CYAN}◐${NC} Waiting for daemon to start..."
+echo -e "  ${CYAN}◐${NC} Checking all services..."
 sleep 3
 
+# Check 1: Ollama running
+if curl -s http://localhost:11434/api/tags &>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Ollama running"
+else
+    echo -e "  ${YELLOW}○${NC} Ollama not running (will start on next boot)"
+fi
+
+# Check 2: Ollama LaunchAgent (macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [ -f "$HOME/Library/LaunchAgents/com.ollama.serve.plist" ]; then
+        echo -e "  ${GREEN}✓${NC} Ollama auto-start configured"
+    else
+        echo -e "  ${YELLOW}○${NC} Ollama auto-start not configured"
+    fi
+fi
+
+# Check 3: Embedding model
+if [ "$OLLAMA_AVAILABLE" = true ] && ollama list 2>/dev/null | grep -q "minilm"; then
+    echo -e "  ${GREEN}✓${NC} Embedding model ready"
+else
+    echo -e "  ${YELLOW}○${NC} Embedding model pending"
+fi
+
+# Check 4: sqlite-vec (vector search)
+if "$VENV_DIR/bin/python" -c "import sqlite_vec" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Vector search available (sqlite-vec)"
+else
+    echo -e "  ${YELLOW}○${NC} Vector search unavailable (keyword search only)"
+fi
+
+# Check 5: Memory daemon health
 if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
-    echo -e "  ${GREEN}✓${NC} Health check passed"
+    echo -e "  ${GREEN}✓${NC} Memory daemon running"
     HEALTH_OK=true
 else
-    echo -e "  ${YELLOW}○${NC} Health check pending (daemon still starting)"
+    echo -e "  ${YELLOW}○${NC} Memory daemon starting..."
     HEALTH_OK=false
+fi
+
+# Check 6: Claudia LaunchAgent (macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [ -f "$HOME/Library/LaunchAgents/com.claudia.memory.plist" ]; then
+        echo -e "  ${GREEN}✓${NC} Claudia auto-start configured"
+    fi
 fi
 
 echo

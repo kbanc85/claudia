@@ -94,18 +94,73 @@ else
     echo -e "   ${DIM}Database will be created on first use.${NC}"
 fi
 
-# Check 7: Ollama (optional)
-echo -n "7. Ollama for vectors... "
+# Check 7: Ollama installed
+echo -n "7. Ollama installed... "
 if command -v ollama &> /dev/null; then
-    if ollama list 2>/dev/null | grep -q "minilm"; then
-        echo -e "${GREEN}✓ Available with embedding model${NC}"
-    else
-        echo -e "${YELLOW}○ Installed but no embedding model${NC}"
-        echo -e "   ${DIM}Run: ollama pull all-minilm:l6-v2${NC}"
-    fi
+    echo -e "${GREEN}✓ OK${NC}"
 else
     echo -e "${YELLOW}○ Not installed (keyword search will be used)${NC}"
     echo -e "   ${DIM}Optional: brew install ollama${NC}"
+fi
+
+# Check 8: Ollama running
+echo -n "8. Ollama running... "
+if curl -s http://localhost:11434/api/tags &>/dev/null; then
+    echo -e "${GREEN}✓ Running${NC}"
+else
+    echo -e "${YELLOW}○ Not running${NC}"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        if [ -f "$HOME/Library/LaunchAgents/com.ollama.serve.plist" ]; then
+            echo -e "   ${DIM}LaunchAgent exists - try: launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist${NC}"
+        else
+            echo -e "   ${DIM}Start with: ollama serve${NC}"
+        fi
+    else
+        echo -e "   ${DIM}Start with: ollama serve${NC}"
+    fi
+    ISSUES_FOUND=$((ISSUES_FOUND + 1))
+fi
+
+# Check 9: Ollama auto-start (macOS only)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo -n "9. Ollama auto-start... "
+    if [ -f "$HOME/Library/LaunchAgents/com.ollama.serve.plist" ]; then
+        echo -e "${GREEN}✓ LaunchAgent configured${NC}"
+    else
+        echo -e "${YELLOW}○ No LaunchAgent${NC}"
+        echo -e "   ${DIM}Ollama won't start on boot. Re-run memory installer to configure.${NC}"
+    fi
+else
+    echo -e "9. Ollama auto-start... ${DIM}(Linux - check systemd if needed)${NC}"
+fi
+
+# Check 10: Embedding model
+echo -n "10. Embedding model... "
+if command -v ollama &> /dev/null; then
+    if ollama list 2>/dev/null | grep -q "minilm"; then
+        echo -e "${GREEN}✓ all-minilm model available${NC}"
+    else
+        echo -e "${YELLOW}○ No embedding model${NC}"
+        echo -e "   ${DIM}Run: ollama pull all-minilm:l6-v2${NC}"
+        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+    fi
+else
+    echo -e "${DIM}○ Skipped (Ollama not installed)${NC}"
+fi
+
+# Check 11: sqlite-vec (vector search)
+echo -n "11. Vector search (sqlite-vec)... "
+VENV_PYTHON="$HOME/.claudia/daemon/venv/bin/python"
+if [ -f "$VENV_PYTHON" ]; then
+    if $VENV_PYTHON -c "import sqlite_vec; print('ok')" 2>/dev/null | grep -q "ok"; then
+        echo -e "${GREEN}✓ sqlite-vec available${NC}"
+    else
+        echo -e "${YELLOW}○ sqlite-vec not working${NC}"
+        echo -e "   ${DIM}Fix: $HOME/.claudia/daemon/venv/bin/pip install sqlite-vec${NC}"
+        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+    fi
+else
+    echo -e "${RED}✗ Virtual environment missing${NC}"
 fi
 
 # Summary
