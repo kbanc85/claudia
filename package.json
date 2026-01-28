@@ -1,6 +1,6 @@
 {
   "name": "get-claudia",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
@@ -31,6 +31,7 @@
   "files": [
     "bin",
     "template-v2",
+    "memory-daemon",
     "assets"
   ],
   "engines": {
