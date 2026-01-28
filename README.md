@@ -61,7 +61,7 @@ The memory system just works now. Install, reboot, and everything comes back up.
 If you installed Claudia before the memory system existed, just run the installer again:
 
 ```bash
-npx get-claudia@latest
+npx get-claudia
 ```
 
 When prompted, say **yes** to install the memory system. The installer will:
