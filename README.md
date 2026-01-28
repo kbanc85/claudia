@@ -258,6 +258,12 @@ See what she surfaces. Then tell her about a person you work with.
 
 ---
 
+## Under the Hood
+
+Want to understand how Claudia works? The [Architecture Guide](ARCHITECTURE.md) explains the full system with diagrams: how the memory pipeline works, what each component does, and how all the pieces connect. Written in plain English.
+
+---
+
 ## Troubleshooting
 
 **Memory tools not appearing?**
