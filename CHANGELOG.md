@@ -2,6 +2,41 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.4.0 (2026-01-28)
+
+### Per-Turn Memory Capture & Session Narratives
+
+Claudia now captures every meaningful conversation turn and generates rich narrative summaries at session end. If a session ends abruptly, the next session catches up automatically.
+
+### Added
+
+- **Turn buffering** - `memory.buffer_turn` stores raw conversation turns without expensive embedding generation. Lightweight, crash-safe via SQLite WAL mode.
+- **Session narratives** - `memory.end_session` lets Claude write a free-form narrative that enhances structured data with tone, emotional context, unresolved threads, reasons behind decisions, and half-formed ideas.
+- **Orphan session catch-up** - `memory.unsummarized` detects sessions that ended without a summary. Next session start generates retroactive summaries from buffered turns.
+- **Episode semantic search** - `recall_episodes()` searches session narratives by vector similarity, giving Claude access to the texture of past conversations.
+- **Database migration system** - Version-tracked schema migrations in `database.py` so existing databases upgrade automatically.
+- **Architecture documentation** - `ARCHITECTURE.md` with mermaid diagrams showing memory pipeline, data flow, and system components.
+
+### Changed
+
+- **CLAUDE.md** - Elevated memory system as core architecture alongside the template layer. Added development workflow for the memory daemon.
+- **Memory manager skill** - Rewritten to use per-turn buffering instead of auto-remembering. Added detailed guidance on writing session narratives that enhance rather than compress information.
+- **Session hooks** - Updated to include catch-up behavior at session start and narrative summarization at session end.
+- **`recall_about()`** - Now includes recent session narratives mentioning the entity.
+
+### Schema Changes
+
+- `episodes` table: added `narrative`, `turn_count`, `is_summarized` columns
+- New `turn_buffer` table for raw conversation turn storage
+- New `episode_embeddings` virtual table for narrative semantic search
+- Migration v2 applied automatically on existing databases
+
+### Rollback
+
+Tag `pre-memory-capture` on commit `834fb5e` (v1.3.2) provides a clean rollback point.
+
+---
+
 ## 1.3.2 (2026-01-28)
 
 ### Fixed
