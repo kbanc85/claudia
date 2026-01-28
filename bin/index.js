@@ -164,13 +164,13 @@ async function main() {
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
     if (memoryInstalled) {
-      // Memory was installed - emphasize restart requirement
+      // Memory was installed
       console.log(`
-${colors.bold}${colors.yellow}IMPORTANT: Open a NEW terminal before running claude${colors.reset}
-
+${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
-  ${colors.dim}Memory tools need a fresh terminal to activate.${colors.reset}
+  ${colors.dim}Memory system ready!${colors.reset}
 
+${colors.dim}If Claude was already running elsewhere, restart it to activate memory tools.${colors.reset}
 ${colors.dim}Troubleshooting: ~/.claudia/diagnose.sh${colors.reset}
 `);
     } else {

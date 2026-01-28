@@ -338,18 +338,15 @@ cat << 'EOF'
 EOF
 echo -e "${NC}"
 
-# CRITICAL: Restart warning in a box
-echo -e "${YELLOW}${BOLD}"
+# Note about running claude
+echo -e "${CYAN}${BOLD}"
 cat << 'EOF'
   ┌─────────────────────────────────────────────────────────────┐
   │                                                             │
-  │   ⚠️  IMPORTANT: Restart Claude Code to activate memory    │
+  │   Ready! Run 'claude' in a new terminal to start.          │
   │                                                             │
-  │   Close this terminal and open a new one, then run:        │
-  │                                                             │
-  │       claude                                                │
-  │                                                             │
-  │   Memory tools won't work until you restart!               │
+  │   If Claude was already running, restart it to activate    │
+  │   the memory tools.                                         │
   │                                                             │
   └─────────────────────────────────────────────────────────────┘
 EOF
