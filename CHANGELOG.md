@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.3.2 (2026-01-28)
+
+### Fixed
+
+- **MCP schema validation** - Moved `_comment` and `_comment2` out of `mcpServers` in `.mcp.json.example`. Claude Code's validator rejected these string values as invalid server definitions, causing parse errors when users renamed the file to `.mcp.json`.
+
+---
+
 ## 1.3.1 (2026-01-28)
 
 ### Per-Project Memory Isolation
