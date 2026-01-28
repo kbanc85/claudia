@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execSync, spawn } from 'child_process';
+import { createInterface } from 'readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -87,15 +89,86 @@ function main() {
     process.exit(1);
   }
 
-  // Show next steps
-  const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
-  console.log(`
+  // Ask about enhanced memory system
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  const askMemory = () => {
+    return new Promise((resolve) => {
+      rl.question(`\n${colors.yellow}?${colors.reset} Set up enhanced memory system? (recommended) [y/n]: `, (answer) => {
+        resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+      });
+    });
+  };
+
+  const setupMemory = await askMemory();
+  rl.close();
+
+  if (setupMemory) {
+    console.log(`\n${colors.cyan}Setting up enhanced memory system...${colors.reset}`);
+
+    const memoryDaemonPath = join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
+
+    if (existsSync(memoryDaemonPath)) {
+      try {
+        // Run the install script
+        const result = spawn('bash', [memoryDaemonPath], {
+          stdio: 'inherit',
+          shell: true
+        });
+
+        result.on('close', (code) => {
+          if (code === 0) {
+            console.log(`${colors.green}✓${colors.reset} Memory system installed`);
+
+            // Update .mcp.json if it exists
+            const mcpPath = join(targetPath, '.mcp.json');
+            const mcpExamplePath = join(targetPath, '.mcp.json.example');
+
+            if (existsSync(mcpExamplePath) && !existsSync(mcpPath)) {
+              // Read example and add memory server
+              let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
+              mcpConfig.mcpServers = mcpConfig.mcpServers || {};
+              mcpConfig.mcpServers['claudia-memory'] = {
+                command: `${process.env.HOME}/.claudia/daemon/venv/bin/python`,
+                args: ['-m', 'claudia_memory.mcp.server'],
+                _description: 'Claudia memory system with vector search'
+              };
+              writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
+              console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
+            }
+          } else {
+            console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
+            console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
+          }
+          showNextSteps();
+        });
+
+        return; // Wait for spawn to complete
+      } catch (error) {
+        console.log(`${colors.yellow}!${colors.reset} Could not set up memory system: ${error.message}`);
+        console.log(`  You can set it up later manually.`);
+      }
+    } else {
+      console.log(`${colors.yellow}!${colors.reset} Memory daemon files not found. Skipping.`);
+    }
+  }
+
+  showNextSteps();
+
+  function showNextSteps() {
+    // Show next steps
+    const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
+    console.log(`
 ${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
   ${colors.dim}Say hi!${colors.reset}
 
 ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 `);
+  }
 }
 
 main();

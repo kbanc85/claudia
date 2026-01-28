@@ -1,0 +1,279 @@
+"""
+Database management for Claudia Memory System
+
+Handles SQLite connection with:
+- WAL mode for crash safety
+- sqlite-vec extension for vector similarity search
+- Connection pooling for multi-threaded access
+- Schema migration system
+"""
+
+import hashlib
+import json
+import logging
+import sqlite3
+import threading
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Dict, Generator, List, Optional, Tuple
+
+from .config import get_config
+
+logger = logging.getLogger(__name__)
+
+
+class Database:
+    """Thread-safe SQLite database with sqlite-vec support"""
+
+    def __init__(self, db_path: Optional[Path] = None):
+        self.db_path = db_path or get_config().db_path
+        self._local = threading.local()
+        self._lock = threading.Lock()
+        self._initialized = False
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get thread-local database connection"""
+        if not hasattr(self._local, "connection") or self._local.connection is None:
+            conn = sqlite3.connect(
+                str(self.db_path),
+                check_same_thread=False,
+                timeout=30.0,
+            )
+            conn.row_factory = sqlite3.Row
+
+            # Enable WAL mode for crash safety
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+            conn.execute("PRAGMA foreign_keys = ON")
+
+            # Try to load sqlite-vec extension
+            try:
+                conn.enable_load_extension(True)
+                # Try common locations for sqlite-vec
+                sqlite_vec_paths = [
+                    "vec0",  # If installed system-wide
+                    "/usr/local/lib/sqlite-vec/vec0",
+                    "/opt/homebrew/lib/sqlite-vec/vec0",
+                    str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
+                ]
+
+                loaded = False
+                for path in sqlite_vec_paths:
+                    try:
+                        conn.load_extension(path)
+                        loaded = True
+                        logger.debug(f"Loaded sqlite-vec from {path}")
+                        break
+                    except sqlite3.OperationalError:
+                        continue
+
+                if not loaded:
+                    # Try loading via sqlite_vec Python package
+                    try:
+                        import sqlite_vec
+                        sqlite_vec.load(conn)
+                        loaded = True
+                        logger.debug("Loaded sqlite-vec via Python package")
+                    except ImportError:
+                        pass
+
+                if not loaded:
+                    logger.warning(
+                        "sqlite-vec extension not found. Vector search will be unavailable. "
+                        "Install with: pip install sqlite-vec"
+                    )
+
+                conn.enable_load_extension(False)
+            except Exception as e:
+                logger.warning(f"Could not load sqlite-vec: {e}")
+
+            self._local.connection = conn
+
+        return self._local.connection
+
+    @contextmanager
+    def connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Context manager for database connection"""
+        conn = self._get_connection()
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        else:
+            conn.commit()
+
+    @contextmanager
+    def cursor(self) -> Generator[sqlite3.Cursor, None, None]:
+        """Context manager for database cursor"""
+        with self.connection() as conn:
+            cursor = conn.cursor()
+            try:
+                yield cursor
+            finally:
+                cursor.close()
+
+    def initialize(self) -> None:
+        """Initialize database schema"""
+        if self._initialized:
+            return
+
+        with self._lock:
+            if self._initialized:
+                return
+
+            # Ensure directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Read and execute schema
+            schema_path = Path(__file__).parent / "schema.sql"
+            if schema_path.exists():
+                with open(schema_path) as f:
+                    schema_sql = f.read()
+
+                with self.connection() as conn:
+                    # Split by semicolons but handle virtual table creation specially
+                    statements = []
+                    current = []
+
+                    for line in schema_sql.split("\n"):
+                        stripped = line.strip()
+                        # Skip comments
+                        if stripped.startswith("--"):
+                            continue
+                        current.append(line)
+                        if stripped.endswith(";"):
+                            stmt = "\n".join(current).strip()
+                            if stmt:
+                                statements.append(stmt)
+                            current = []
+
+                    for stmt in statements:
+                        if stmt.strip():
+                            try:
+                                conn.execute(stmt)
+                            except sqlite3.OperationalError as e:
+                                # Virtual tables may fail if sqlite-vec not loaded
+                                if "no such module: vec0" in str(e):
+                                    logger.warning(f"Skipping vector table: {e}")
+                                else:
+                                    raise
+
+                logger.info(f"Database initialized at {self.db_path}")
+            else:
+                logger.warning(f"Schema file not found at {schema_path}")
+
+            self._initialized = True
+
+    def execute(
+        self, sql: str, params: Tuple = (), fetch: bool = False
+    ) -> Optional[List[sqlite3.Row]]:
+        """Execute SQL statement with optional fetch"""
+        with self.cursor() as cursor:
+            cursor.execute(sql, params)
+            if fetch:
+                return cursor.fetchall()
+            return None
+
+    def execute_many(self, sql: str, params_list: List[Tuple]) -> None:
+        """Execute SQL statement with multiple parameter sets"""
+        with self.cursor() as cursor:
+            cursor.executemany(sql, params_list)
+
+    def insert(self, table: str, data: Dict[str, Any]) -> int:
+        """Insert a row and return the ID"""
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(["?" for _ in data])
+        sql = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+
+        with self.cursor() as cursor:
+            cursor.execute(sql, tuple(data.values()))
+            return cursor.lastrowid
+
+    def update(
+        self, table: str, data: Dict[str, Any], where: str, where_params: Tuple = ()
+    ) -> int:
+        """Update rows and return count of affected rows"""
+        set_clause = ", ".join([f"{k} = ?" for k in data.keys()])
+        sql = f"UPDATE {table} SET {set_clause} WHERE {where}"
+
+        with self.cursor() as cursor:
+            cursor.execute(sql, tuple(data.values()) + where_params)
+            return cursor.rowcount
+
+    def delete(self, table: str, where: str, where_params: Tuple = ()) -> int:
+        """Delete rows and return count of affected rows"""
+        sql = f"DELETE FROM {table} WHERE {where}"
+
+        with self.cursor() as cursor:
+            cursor.execute(sql, where_params)
+            return cursor.rowcount
+
+    def query(
+        self,
+        table: str,
+        columns: List[str] = None,
+        where: str = None,
+        where_params: Tuple = (),
+        order_by: str = None,
+        limit: int = None,
+        offset: int = None,
+    ) -> List[sqlite3.Row]:
+        """Query rows from a table"""
+        cols = ", ".join(columns) if columns else "*"
+        sql = f"SELECT {cols} FROM {table}"
+
+        if where:
+            sql += f" WHERE {where}"
+        if order_by:
+            sql += f" ORDER BY {order_by}"
+        if limit:
+            sql += f" LIMIT {limit}"
+        if offset:
+            sql += f" OFFSET {offset}"
+
+        return self.execute(sql, where_params, fetch=True) or []
+
+    def get_one(
+        self,
+        table: str,
+        columns: List[str] = None,
+        where: str = None,
+        where_params: Tuple = (),
+    ) -> Optional[sqlite3.Row]:
+        """Get a single row from a table"""
+        rows = self.query(table, columns, where, where_params, limit=1)
+        return rows[0] if rows else None
+
+    def close(self) -> None:
+        """Close the thread-local connection"""
+        if hasattr(self._local, "connection") and self._local.connection:
+            self._local.connection.close()
+            self._local.connection = None
+
+
+# Content hash utility
+def content_hash(content: str) -> str:
+    """Generate SHA256 hash of content for deduplication"""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+# Global database instance
+_db: Optional[Database] = None
+
+
+def get_db() -> Database:
+    """Get or create the global database instance"""
+    global _db
+    if _db is None:
+        _db = Database()
+        _db.initialize()
+    return _db
+
+
+def reset_db() -> None:
+    """Reset the global database instance (for testing)"""
+    global _db
+    if _db:
+        _db.close()
+    _db = None

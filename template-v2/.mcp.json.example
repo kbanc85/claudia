@@ -4,6 +4,13 @@
     "_comment": "Claudia prefers CLI tools when available (faster, simpler), then MCP servers.",
     "_comment2": "Find more servers at mcp.so or github.com/modelcontextprotocol/servers",
 
+    "claudia-memory": {
+      "_disabled": true,
+      "command": "~/.claudia/daemon/venv/bin/python",
+      "args": ["-m", "claudia_memory.mcp.server"],
+      "_description": "Enhanced memory with vector search. Install with: ~/.claudia/memory-daemon/scripts/install.sh"
+    },
+
     "gmail": {
       "_disabled": true,
       "command": "npx",
