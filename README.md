@@ -58,39 +58,21 @@ The memory system just works now. Install, reboot, and everything comes back up.
 
 ## Already Have Claudia? Add Memory.
 
-If you installed Claudia before the memory system existed, you can upgrade:
+If you installed Claudia before the memory system existed, just run the installer again:
 
 ```bash
-# Clone the repo (or pull latest if you have it)
-git clone https://github.com/kbanc85/claudia.git
-cd claudia/memory-daemon
-
-# Run the installer
-./scripts/install.sh
+npx get-claudia@latest
 ```
 
-The installer will:
+When prompted, say **yes** to install the memory system. The installer will:
 - Set up the memory daemon at `~/.claudia/daemon/`
-- Install Ollama for local embeddings (optional but recommended)
-- Configure auto-start so Ollama and the daemon run on login
+- Install Ollama for semantic search (optional but recommended)
+- Configure auto-start so everything runs on login
 - Pull the embedding model automatically
 - Verify all services are working
-- Show you what to add to your `.mcp.json`
+- Update your `.mcp.json` automatically
 
-After installing, add this to your Claudia project's `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "claudia-memory": {
-      "command": "~/.claudia/daemon/venv/bin/python",
-      "args": ["-m", "claudia_memory.mcp.server"]
-    }
-  }
-}
-```
-
-Restart Claude Code, and Claudia now has persistent memory.
+Restart Claude Code in a new terminal, and Claudia now has persistent memory.
 
 ---
 
