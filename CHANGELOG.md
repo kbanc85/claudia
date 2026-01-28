@@ -2,6 +2,31 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.3.0 (2026-01-28)
+
+### Business Operating System
+
+Claudia now generates business-grade folder structures for all archetypes, with depth that users choose during onboarding.
+
+### Added
+
+- **Business Depth Selection** - During onboarding, users choose between Full, Starter, or Minimal structure
+- **Universal Business Modules** - Pipeline tracking, financial management, accountability, templates, and insights available to all archetypes
+- **Deep Per-Client Structure** (Consultant) - Milestone plans, stakeholder maps, blockers, decision logs, wins documentation
+- **Enhanced Archetypes** - All 5 archetypes upgraded with business depth variations
+- **Structure Evolution Skill** - Claudia proactively suggests structural improvements as she observes your workflow
+- **4 New Commands**:
+  - `/pipeline-review` - Review active pipeline, deals, capacity
+  - `/financial-snapshot` - Revenue, expenses, invoicing status
+  - `/client-health` - Health check across all clients (Consultant/Solo)
+  - `/accountability-check` - Surface commitments, overdue items, waiting-on
+
+### Philosophy
+
+Structure grows organically from actual needs. Users who want minimal setup get minimal setup. Power users get full business operating systems. Claudia watches for friction and offers targeted additions over time.
+
+---
+
 ## 1.2.5 (2026-01-28)
 
 ### Memory System: Fully Automatic Installation
