@@ -12,6 +12,10 @@
 
 ## Folder Structure
 
+Structure adapts based on `business_depth` setting from onboarding.
+
+### Full Business Depth
+
 ```
 claudia/
 ├── CLAUDE.md
@@ -28,7 +32,10 @@ claudia/
 │   │   ├── summarize-doc.md
 │   │   ├── client-status.md        ← Archetype-specific
 │   │   ├── proposal-draft.md       ← Archetype-specific
-│   │   ├── pipeline-review.md      ← Archetype-specific
+│   │   ├── pipeline-review.md      ← Business command
+│   │   ├── financial-snapshot.md   ← Business command
+│   │   ├── client-health.md        ← Archetype-specific
+│   │   ├── accountability-check.md ← Business command
 │   │   └── engagement-review.md    ← Archetype-specific
 │   ├── skills/
 │   ├── hooks/
@@ -42,15 +49,96 @@ claudia/
 ├── people/
 │   └── _template.md
 ├── clients/
+│   └── [client-name]/             ← Deep per-client structure
+│       ├── overview.md            ← Engagement snapshot, health, relationships
+│       ├── milestone-plan.md      ← Phase-based milestone tracking
+│       ├── stakeholders.md        ← Relationship map with stance tracking
+│       ├── blockers.md            ← Active blockers, resolution tracking
+│       ├── decision-log.md        ← Historical decisions
+│       ├── wins.md                ← Successes documented
+│       ├── meetings/              ← Meeting notes folder
+│       ├── deliverables/          ← Work product folder
+│       └── documents/             ← Ingested client docs
+├── pipeline/
+│   ├── active.md                  ← Current engagements/deals
+│   ├── prospecting.md             ← Sales funnel
+│   └── completed.md               ← Historical record
+├── accountability/
+│   ├── commitments.md             ← What I owe, what they owe me
+│   └── overdue.md                 ← Escalation visibility
+├── finances/
+│   ├── overview.md                ← Revenue summary, capacity
+│   ├── expenses.md                ← Expense tracking
+│   ├── invoicing.md               ← Invoice log
+│   └── tax-planning.md            ← Quarterly tax notes
+├── templates/
+│   ├── new-client-intake.md       ← Comprehensive intake questionnaire
+│   ├── meeting-prep.md            ← Pre-meeting brief template
+│   ├── meeting-capture.md         ← Post-meeting documentation
+│   ├── milestone-plan.md          ← Engagement/project milestone tracker
+│   ├── stakeholder-map.md         ← Relationship intelligence template
+│   └── weekly-review.md           ← Guided review template
+├── insights/
+│   ├── patterns.md                ← Cross-client patterns
+│   └── methodology.md             ← Your approach (if provided)
+└── content/                       ← Optional, if thought leadership mentioned
+    └── calendar.md
+```
+
+### Starter Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                  ← Base + archetype commands
+│   │   └── pipeline-review.md     ← Only business command
+│   ├── skills/
+│   ├── hooks/
+│   └── rules/
+├── context/
+│   ├── me.md
+│   ├── commitments.md
+│   ├── waiting.md
+│   ├── patterns.md
+│   └── learnings.md
+├── people/
+│   └── _template.md
+├── clients/
 │   └── _template/
-│       ├── overview.md
+│       ├── overview.md            ← Simplified overview
 │       ├── meetings/
 │       └── deliverables/
 ├── pipeline/
-│   ├── active.md
-│   └── prospects/
-└── content/                  ← Optional, if thought leadership mentioned
-    └── calendar.md
+│   └── active.md
+├── finances/
+│   └── overview.md
+└── templates/
+    └── meeting-capture.md
+```
+
+### Minimal Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                  ← Base + archetype commands only
+│   ├── skills/
+│   ├── hooks/
+│   └── rules/
+├── context/
+│   ├── me.md
+│   ├── commitments.md
+│   ├── waiting.md
+│   ├── patterns.md
+│   └── learnings.md
+├── people/
+│   └── _template.md
+└── clients/
+    └── _template/
+        ├── overview.md
+        └── meetings/
 ```
 
 ---
@@ -279,9 +367,459 @@ Deep dive on a specific client engagement.
 ```
 ```
 
+### /client-health
+
+```markdown
+# Client Health
+
+Health check across all active client engagements at once.
+
+## What to Check
+
+For each client folder in `clients/`:
+
+1. **Engagement Health**
+   - Current phase (discovery, active, winding down)
+   - Milestone progress (from milestone-plan.md if exists)
+   - Any overdue deliverables
+
+2. **Relationship Health**
+   - Last contact date
+   - Stakeholder sentiment (from stakeholders.md if exists)
+   - Any blockers (from blockers.md if exists)
+
+3. **Commitment Status**
+   - Open commitments from overview.md
+   - Overdue items
+   - Items waiting on client
+
+4. **Financial Health** (if finances tracked)
+   - Outstanding invoices
+   - Upcoming billing
+
+## Output Format
+
+```
+## Client Health — [Date]
+
+### Summary
+- X clients on track 🟢
+- Y need attention 🟡
+- Z at risk 🔴
+- Total open commitments: X
+- Total overdue: Y
+
+### By Client
+
+#### [Client Name] — 🟢 On Track
+**Phase:** [Current phase]
+**Last Contact:** [Date]
+**Open Items:** [Count]
+- [Key item 1]
+- [Key item 2]
+
+#### [Client Name] — 🟡 Attention Needed
+**Phase:** [Current phase]
+**Last Contact:** [Date] (X days ago)
+**Concerns:**
+- [Issue 1]
+- [Issue 2]
+**Suggested Action:** [What to do]
+
+#### [Client Name] — 🔴 At Risk
+**Phase:** [Current phase]
+**Issues:**
+- [Critical issue]
+**Immediate Action:** [What to do now]
+
+### Cross-Client Patterns
+- [Pattern noticed across clients]
+
+### Capacity Check
+- Current active clients: X
+- Available bandwidth:
+- Upcoming endings:
+```
+
+## Tone
+- Factual, scannable
+- Lead with concerns
+- Specific action suggestions
+- Don't sugarcoat problems
+```
+
 ---
 
-## Client Template
+## Client Templates (Full Business Depth)
+
+The full business depth creates a comprehensive client operating system with multiple specialized files per client.
+
+### clients/[client-name]/overview.md
+
+```markdown
+# [Client Name]
+
+## Snapshot
+
+| Field | Value |
+|-------|-------|
+| Status | Active / Paused / Completed |
+| Phase | Discovery / Active / Delivery / Winding Down |
+| Started | [Date] |
+| Health | 🟢 On Track / 🟡 Attention Needed / 🔴 At Risk |
+| Engagement Type | Retainer / Project / Advisory |
+| Value | $X |
+| Primary Contact | [Name] |
+
+## The Situation
+
+[What's really going on - context, not just facts. What problem are we solving? What's at stake for them?]
+
+## What Success Looks Like
+
+[Their version, translated to measurable outcomes]
+-
+-
+
+## Current Focus
+
+1.
+2.
+3.
+
+## Key Relationships
+
+| Name | Role | Stance | Notes |
+|------|------|--------|-------|
+| | | Champion/Supporter/Neutral/Skeptic | |
+
+See `stakeholders.md` for full relationship map.
+
+## Open Loops
+
+- [ ]
+- [ ]
+
+## My Commitments
+
+| What | Due | Status |
+|------|-----|--------|
+| | | Pending/In Progress/Done |
+
+## Their Commitments
+
+| What | From | Due | Status |
+|------|------|-----|--------|
+| | | | |
+
+## Quick Links
+
+- Milestone Plan: `./milestone-plan.md`
+- Stakeholders: `./stakeholders.md`
+- Blockers: `./blockers.md`
+- Decision Log: `./decision-log.md`
+- Wins: `./wins.md`
+
+---
+
+*Created: [Date]*
+*Last updated: [Date]*
+```
+
+### clients/[client-name]/milestone-plan.md
+
+```markdown
+# Milestone Plan: [Client Name]
+
+## Engagement Overview
+
+**Type:** [Retainer / Project / Advisory]
+**Start:** [Date]
+**Target End:** [Date or Ongoing]
+**Value:** $X
+
+## Success Criteria
+
+What does "done well" look like?
+-
+-
+
+## Current Phase: [Phase Name]
+
+**Status:** 🟢 / 🟡 / 🔴
+**Target Completion:** [Date]
+
+| Deliverable | Owner | Due | Status | Notes |
+|-------------|-------|-----|--------|-------|
+| | | | Not Started/In Progress/Complete/Blocked | |
+
+---
+
+## All Phases
+
+### Phase 1: [Name] (e.g., Discovery)
+**Target:** [Date]
+**Status:** Complete / In Progress / Not Started
+
+| Deliverable | Due | Status |
+|-------------|-----|--------|
+| | | |
+
+**Lessons/Notes:**
+
+
+---
+
+### Phase 2: [Name] (e.g., Strategy)
+**Target:** [Date]
+**Status:** Complete / In Progress / Not Started
+
+| Deliverable | Due | Status |
+|-------------|-----|--------|
+| | | |
+
+---
+
+### Phase 3: [Name] (e.g., Implementation)
+[Same structure]
+
+---
+
+## Check-in Schedule
+
+| Date | Type | Focus | Notes |
+|------|------|-------|-------|
+| | Weekly / Milestone / Ad-hoc | | |
+
+## Budget/Hours
+
+| Phase | Estimated | Actual | Variance |
+|-------|-----------|--------|----------|
+| | | | |
+
+**Total:** X / Y hours (Z%)
+
+---
+
+*Last updated: [Date]*
+```
+
+### clients/[client-name]/stakeholders.md
+
+```markdown
+# Stakeholders: [Client Name]
+
+## Decision Makers
+
+| Name | Role | Stance | Influence | Communication Style | Notes |
+|------|------|--------|-----------|---------------------|-------|
+| | | Champion/Supporter/Neutral/Skeptic/Blocker | High/Medium/Low | | |
+
+## Influencers
+
+| Name | Role | Stance | Influence | Notes |
+|------|------|--------|-----------|-------|
+| | | | | |
+
+## Day-to-Day Contacts
+
+| Name | Role | Working Relationship | Preferred Channel | Notes |
+|------|------|---------------------|-------------------|-------|
+| | | Excellent/Good/Developing | Email/Slack/Phone | |
+
+## Political Landscape
+
+**Power dynamics:**
+
+
+**Alliances to leverage:**
+
+
+**Tensions to navigate:**
+
+
+## Strategy by Stakeholder
+
+| Stakeholder | Current Stance | Target Stance | Approach |
+|-------------|----------------|---------------|----------|
+| | Skeptic | Supporter | |
+
+## Relationship Actions
+
+| Person | Action Needed | By When | Status |
+|--------|---------------|---------|--------|
+| | | | |
+
+---
+
+*Last updated: [Date]*
+```
+
+### clients/[client-name]/blockers.md
+
+```markdown
+# Blockers: [Client Name]
+
+## Active Blockers
+
+### Blocker 1: [Title]
+
+| Field | Value |
+|-------|-------|
+| Status | Active / Being Addressed / Escalated |
+| Impact | High / Medium / Low |
+| Blocking | [What deliverable or milestone] |
+| Owner | [Who's resolving] |
+| Since | [Date identified] |
+
+**Description:**
+[What's the blocker]
+
+**Root Cause:**
+[Why is this happening]
+
+**Resolution Plan:**
+-
+
+**Dependencies:**
+[What/who is needed to resolve]
+
+**Updates:**
+| Date | Update |
+|------|--------|
+| | |
+
+---
+
+### Blocker 2: [Title]
+[Same structure]
+
+---
+
+## Resolved Blockers
+
+| Blocker | Resolved | Days Blocked | Lesson |
+|---------|----------|--------------|--------|
+| | [Date] | X | |
+
+## Escalation Path
+
+If a blocker persists:
+1. Day 3: [Action]
+2. Day 7: [Action]
+3. Day 14: [Escalation]
+
+---
+
+*Last updated: [Date]*
+```
+
+### clients/[client-name]/decision-log.md
+
+```markdown
+# Decision Log: [Client Name]
+
+## Recent Decisions
+
+### [Date]: [Decision Title]
+
+**Decision:** [What was decided]
+
+**Context:** [Why this decision was needed]
+
+**Options Considered:**
+1. [Option A] - [Pros/Cons]
+2. [Option B] - [Pros/Cons]
+3. [Option C] - [Pros/Cons]
+
+**Decided By:** [Who made the call]
+
+**Rationale:** [Why this option]
+
+**Impact:** [What changed as a result]
+
+---
+
+### [Date]: [Decision Title]
+[Same structure]
+
+---
+
+## Decision History
+
+| Date | Decision | Made By | Outcome |
+|------|----------|---------|---------|
+| | | | Positive/Neutral/Revisit |
+
+## Decisions Pending
+
+| Decision | Due | Owner | Blocker? |
+|----------|-----|-------|----------|
+| | | | Yes/No |
+
+---
+
+*Last updated: [Date]*
+```
+
+### clients/[client-name]/wins.md
+
+```markdown
+# Wins: [Client Name]
+
+Document successes to reference in reviews, testimonials, and case studies.
+
+## Major Wins
+
+### [Date]: [Win Title]
+
+**What happened:**
+[Description of the achievement]
+
+**Impact:**
+- [Quantifiable result if possible]
+- [Qualitative impact]
+
+**Who contributed:**
+[Your role, client team involvement]
+
+**Client reaction:**
+[Quote or observation about their response]
+
+**Reusable for:**
+- [ ] Case study
+- [ ] Testimonial request
+- [ ] Proposal reference
+
+---
+
+### [Date]: [Win Title]
+[Same structure]
+
+---
+
+## Quick Wins Log
+
+| Date | Win | Impact |
+|------|-----|--------|
+| | | |
+
+## Testimonial Opportunities
+
+| Win | Potential Quote | Asked? | Status |
+|-----|-----------------|--------|--------|
+| | | Yes/No | |
+
+---
+
+*Last updated: [Date]*
+```
+
+---
+
+## Client Template (Starter/Minimal)
+
+For starter and minimal business depth, use a simplified client overview.
 
 `clients/_template/overview.md`:
 

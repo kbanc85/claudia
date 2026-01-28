@@ -12,6 +12,10 @@
 
 ## Folder Structure
 
+Structure adapts based on `business_depth` setting from onboarding.
+
+### Full Business Depth
+
 ```
 claudia/
 ├── CLAUDE.md
@@ -29,7 +33,11 @@ claudia/
 │   │   ├── week-review.md          ← Archetype-specific
 │   │   ├── invoice-draft.md        ← Archetype-specific
 │   │   ├── project-status.md       ← Archetype-specific
-│   │   └── client-review.md        ← Archetype-specific
+│   │   ├── client-review.md        ← Archetype-specific
+│   │   ├── client-health.md        ← Archetype-specific
+│   │   ├── pipeline-review.md      ← Business command
+│   │   ├── financial-snapshot.md   ← Business command
+│   │   └── accountability-check.md ← Business command
 │   ├── skills/
 │   ├── hooks/
 │   └── rules/
@@ -41,6 +49,74 @@ claudia/
 │   └── learnings.md
 ├── people/
 │   └── _template.md
+├── clients/
+│   └── [client-name]/              ← Per-client structure
+│       ├── overview.md             ← Status, scope, rate, deliverables
+│       ├── meetings/               ← Meeting notes
+│       └── deliverables/           ← Work product
+├── projects/
+│   └── [project-name]/
+│       └── overview.md
+├── pipeline/
+│   ├── active.md                   ← Current work
+│   ├── prospecting.md              ← Leads and opportunities
+│   └── completed.md                ← Historical record
+├── accountability/
+│   ├── commitments.md              ← What I owe, what they owe me
+│   └── overdue.md                  ← Escalation visibility
+├── finances/
+│   ├── overview.md                 ← Revenue summary, capacity
+│   ├── invoices/                   ← Invoice files
+│   ├── tracking.md                 ← Detailed tracking
+│   ├── expenses.md                 ← Expense tracking
+│   └── tax-planning.md             ← Quarterly tax notes
+├── templates/
+│   ├── new-client-intake.md        ← Client onboarding checklist
+│   ├── meeting-capture.md          ← Post-meeting documentation
+│   ├── invoice.md                  ← Invoice template
+│   └── weekly-review.md            ← Guided review template
+└── insights/
+    └── patterns.md                 ← Business patterns
+```
+
+### Starter Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands
+│   │   └── pipeline-review.md      ← Only business command
+│   ├── skills/
+│   ├── hooks/
+│   └── rules/
+├── context/
+├── people/
+├── clients/
+│   └── _template/
+│       └── overview.md
+├── projects/
+│   └── _template/
+│       └── overview.md
+├── pipeline/
+│   └── active.md
+├── finances/
+│   ├── overview.md
+│   ├── invoices/
+│   └── tracking.md
+└── templates/
+    └── meeting-capture.md
+```
+
+### Minimal Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands only
+├── context/
+├── people/
 ├── clients/
 │   └── _template/
 │       └── overview.md
@@ -337,9 +413,188 @@ Deep dive on a specific client relationship.
 ```
 ```
 
+### /client-health
+
+```markdown
+# Client Health
+
+Health check across all active clients at once.
+
+## What to Check
+
+For each client folder in `clients/`:
+
+1. **Engagement Health**
+   - Current status (active, paused, wrapping up)
+   - Any overdue deliverables
+   - Last contact date
+
+2. **Financial Health**
+   - Outstanding invoices
+   - Payment status
+   - Rate/scope alignment
+
+3. **Relationship Signals**
+   - Communication frequency
+   - Satisfaction indicators
+   - Any red flags
+
+## Output Format
+
+```
+## Client Health — [Date]
+
+### Summary
+- X clients active 🟢
+- Y need attention 🟡
+- Z at risk 🔴
+- Outstanding invoices: $X
+- Overdue deliverables: Y
+
+### By Client
+
+#### [Client Name] — 🟢 Healthy
+**Status:** Active
+**Last Contact:** [Date]
+**Outstanding:** $X
+**Notes:** [Brief status]
+
+#### [Client Name] — 🟡 Attention Needed
+**Status:** [Status]
+**Last Contact:** [Date] (X days ago)
+**Concerns:**
+- [Issue]
+**Action:** [What to do]
+
+#### [Client Name] — 🔴 At Risk
+**Status:** [Status]
+**Issues:**
+- [Critical issue]
+**Immediate Action:** [What to do now]
+
+### Financial Summary
+- Total outstanding: $X
+- Overdue invoices: $X
+- Expected this month: $X
+
+### Capacity
+- Current active clients: X
+- Projects in flight: Y
+- Availability:
+```
+
+## Tone
+- Practical, scannable
+- Focus on actionable items
+- Financial health prominent
+```
+
 ---
 
-## Client Template (Solo)
+## Client Templates (Full Business Depth)
+
+### clients/[client-name]/overview.md
+
+```markdown
+# [Client Name]
+
+## Quick Stats
+
+| Field | Value |
+|-------|-------|
+| Status | Active / Paused / Completed |
+| Since | [Start date] |
+| Contact | [Primary contact name] |
+| Health | 🟢 / 🟡 / 🔴 |
+| Last Contact | [Date] |
+
+## Engagement
+
+**Type:** [Retainer / Project-based / Hourly]
+**Rate:** $X / [hour / project / month]
+**Typical Scope:** [What you usually do for them]
+**Contract End:** [Date if applicable]
+
+## Contact
+
+| Channel | Details |
+|---------|---------|
+| Email | |
+| Phone | |
+| Preferred | |
+| Best Times | |
+
+## Active Work
+
+| Project/Task | Status | Deadline | Value |
+|--------------|--------|----------|-------|
+| | In Progress / Blocked / Review | | $X |
+
+## Deliverables Due
+
+| What | Due | Status |
+|------|-----|--------|
+| | | |
+
+## My Commitments
+
+| What | Due | Status |
+|------|-----|--------|
+| | | Pending / Done |
+
+## Their Commitments
+
+| What | Due | Status |
+|------|-----|--------|
+| | | |
+
+## History
+
+| Project | Dates | Value | Notes |
+|---------|-------|-------|-------|
+| | | | |
+
+**Total Revenue:** $X
+**Average Project:** $X
+**Projects Completed:** X
+
+## Financial
+
+- **Last Invoice:** [Date] — $X — [Status: Paid/Outstanding]
+- **Outstanding:** $X
+- **Payment Terms:** Net [X]
+- **Payment History:** Prompt / Slow / Varies
+
+## What They Value
+
+[What keeps them coming back, what they've praised]
+
+## How to Work With Them
+
+- **Communication:** [Style preferences]
+- **Feedback:** [How they give it]
+- **Decisions:** [How they make them]
+- **Quirks:** [Things to remember]
+
+## Opportunities
+
+- [Potential upsell]
+- [Additional service]
+- [Referral potential]
+
+## Notes
+
+[Important context, history, sensitivities]
+
+---
+
+*Created: [Date]*
+*Last updated: [Date]*
+```
+
+---
+
+## Client Template (Starter/Minimal)
 
 `clients/_template/overview.md`:
 

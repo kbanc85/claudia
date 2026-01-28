@@ -90,7 +90,73 @@ tools:
   - [tool 2]
 future_direction: [optional - what they're building toward]
 skills_developing: [optional - what they're actively improving]
+
+# Added in Phase 2.5 (Business Depth)
+business_depth: full | starter | minimal
+tracks_finances: true | false
+has_methodology: true | false
+methodology_notes: [if provided]
+billing_model: hourly | retainer | project | subscription | mixed | not_applicable
 ```
+
+---
+
+### Phase 2.5: Business Depth
+
+After getting a sense of who they are, ask about their preferred level of structure. This shapes how much scaffolding Claudia creates.
+
+**Transition naturally:**
+```
+"Before I suggest how to organize things, a quick question: How much structure
+do you want upfront? Some people like a full business operating system from day
+one. Others prefer to start minimal and let things grow organically."
+```
+
+**Discovery Questions:**
+
+1. **System preference:**
+   ```
+   "Do you want me to set up a full business operating system, or start minimal
+   and grow into it?"
+     - Full system (pipeline, financials, templates, accountability tracking)
+     - Starter (overview files, basic tracking)
+     - Minimal (just context and people files, add structure later)
+   ```
+
+2. **Financial tracking:**
+   ```
+   "Do you track revenue, expenses, or invoicing? Want me to help with that?"
+   ```
+
+3. **Methodology:**
+   ```
+   "Do you have a methodology or framework for how you work - something you'd
+   want documented and referenced?"
+   ```
+
+4. **Current systems (optional, if they seem organized):**
+   ```
+   "How do you track your work right now? Do you have a system for clients,
+   projects, or engagements - or are you winging it?"
+   ```
+
+**Follow-up based on answers:**
+- If "full system" → Ask about billing model: "How do you usually bill? Hourly, retainer, project-based, or a mix?"
+- If they mention tracking issues → "What falls through the cracks most often?"
+- If they have a methodology → "Tell me more about it. I can document it and help you stick to it."
+
+**Data to Capture:**
+```yaml
+business_depth: full | starter | minimal
+tracks_finances: true | false
+has_methodology: true | false
+methodology_notes: [if provided]
+billing_model: hourly | retainer | project | subscription | mixed | not_applicable
+current_pain_points: [tracking issues they mentioned]
+```
+
+**Tone:**
+Keep it light. Don't make this feel like a bureaucratic questionnaire. If they seem eager to get started, move quickly. If they're thoughtful about systems, dig deeper.
 
 ---
 
@@ -165,11 +231,15 @@ Want me to create this structure? I can adjust anything.
 
 After they approve:
 
-1. **Invoke structure-generator skill** with archetype and user data
-2. **Create context/me.md** with their profile
+1. **Invoke structure-generator skill** with archetype, business_depth, and user data
+   - Pass `business_depth` (full/starter/minimal) to control structure complexity
+   - Pass `tracks_finances` to determine if finances/ folder is created
+   - Pass `has_methodology` to determine if methodology.md is created
+2. **Create context/me.md** with their profile (including business preferences)
 3. **Generate archetype-specific commands** in `.claude/commands/`
 4. **Create starter files** (people/_template.md, etc.)
 5. **Initialize context files** (commitments.md, waiting.md, patterns.md, learnings.md)
+6. **If business_depth is 'full':** Create accountability/, pipeline/, finances/, templates/, insights/ folders
 
 Then confirm what was created:
 

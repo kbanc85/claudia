@@ -12,6 +12,10 @@
 
 ## Folder Structure
 
+Structure adapts based on `business_depth` setting from onboarding.
+
+### Full Business Depth
+
 ```
 claudia/
 ├── CLAUDE.md
@@ -29,7 +33,10 @@ claudia/
 │   │   ├── content-calendar.md     ← Archetype-specific
 │   │   ├── draft-post.md           ← Archetype-specific
 │   │   ├── audience-insights.md    ← Archetype-specific
-│   │   └── collab-outreach.md      ← Archetype-specific
+│   │   ├── collab-outreach.md      ← Archetype-specific
+│   │   ├── pipeline-review.md      ← Business command
+│   │   ├── financial-snapshot.md   ← Business command
+│   │   └── accountability-check.md ← Business command
 │   ├── skills/
 │   ├── hooks/
 │   └── rules/
@@ -41,6 +48,90 @@ claudia/
 │   └── learnings.md
 ├── people/
 │   └── _template.md
+├── content/
+│   ├── calendar.md
+│   ├── ideas/
+│   ├── drafts/
+│   └── published/
+├── audience/
+│   ├── insights.md
+│   └── feedback/
+├── partnerships/
+│   └── [brand-name]/               ← Per-partnership structure
+│       ├── overview.md             ← Deal terms, deliverables, timeline
+│       └── content/                ← Sponsored content drafts
+├── collaborations/
+│   └── [creator-name]/
+│       └── overview.md
+├── revenue/
+│   ├── overview.md                 ← Income streams summary
+│   ├── sponsorships.md             ← Brand deal tracking
+│   ├── products.md                 ← Digital products/courses
+│   └── affiliate.md                ← Affiliate income tracking
+├── pipeline/
+│   ├── active.md                   ← Current deals/partnerships
+│   ├── prospecting.md              ← Potential sponsors
+│   └── completed.md                ← Historical partnerships
+├── accountability/
+│   ├── commitments.md              ← Content deadlines, sponsor deliverables
+│   └── overdue.md                  ← Missed deadlines visibility
+├── finances/
+│   ├── overview.md                 ← Revenue summary
+│   ├── expenses.md                 ← Business expenses
+│   ├── invoicing.md                ← Invoice tracking
+│   └── tax-planning.md             ← Quarterly tax notes
+├── templates/
+│   ├── brand-pitch.md              ← Outreach template
+│   ├── meeting-capture.md
+│   ├── content-brief.md            ← Sponsored content planning
+│   └── weekly-review.md
+└── insights/
+    └── patterns.md                 ← Content & business patterns
+```
+
+### Starter Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands
+│   │   └── pipeline-review.md      ← Only business command
+│   ├── skills/
+│   ├── hooks/
+│   └── rules/
+├── context/
+├── people/
+├── content/
+│   ├── calendar.md
+│   ├── ideas/
+│   ├── drafts/
+│   └── published/
+├── audience/
+│   ├── insights.md
+│   └── feedback/
+├── collaborations/
+│   └── _template/
+│       └── overview.md
+├── revenue/
+│   └── overview.md
+├── pipeline/
+│   └── active.md
+├── finances/
+│   └── overview.md
+└── templates/
+    └── meeting-capture.md
+```
+
+### Minimal Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands only
+├── context/
+├── people/
 ├── content/
 │   ├── calendar.md
 │   ├── ideas/
@@ -466,7 +557,277 @@ Hey [Name],
 
 ---
 
-## Collaboration Template
+## Partnership Templates (Full Business Depth)
+
+### partnerships/[brand-name]/overview.md
+
+```markdown
+# [Brand Name] Partnership
+
+## Deal Summary
+
+| Field | Value |
+|-------|-------|
+| Status | Prospecting / Negotiating / Active / Completed |
+| Deal Type | Sponsored Post / Campaign / Ambassador / Affiliate |
+| Total Value | $X |
+| Start Date | |
+| End Date | |
+| Primary Contact | |
+
+## Deal Terms
+
+**Compensation:**
+- Base fee: $X
+- Performance bonus: [If applicable]
+- Payment terms: [Net 30, etc.]
+
+**Deliverables:**
+
+| Deliverable | Platform | Due | Status | Notes |
+|-------------|----------|-----|--------|-------|
+| | | | Draft / Review / Approved / Published | |
+
+**Usage Rights:**
+- Duration: [How long they can use content]
+- Platforms: [Where they can use it]
+- Exclusivity: [Any exclusivity clauses]
+
+## Content Requirements
+
+**Brand Guidelines:**
+- Must include: [Required elements]
+- Cannot include: [Restrictions]
+- Hashtags: [Required tags]
+- Disclosure: [FTC requirements]
+
+**Approval Process:**
+1. [Step 1]
+2. [Step 2]
+3. [Timeline for approvals]
+
+## Campaign Goals
+
+**Their Goals:**
+- [What success looks like for them]
+
+**Metrics Tracking:**
+| Metric | Target | Actual |
+|--------|--------|--------|
+| | | |
+
+## Relationship
+
+**Contact:**
+| Role | Name | Email |
+|------|------|-------|
+| Brand Contact | | |
+| Agency (if any) | | |
+
+**Communication History:**
+| Date | Topic | Outcome |
+|------|-------|---------|
+| | | |
+
+## Financial
+
+- **Invoice Status:** [Not sent / Sent / Paid]
+- **Amount Invoiced:** $X
+- **Amount Received:** $X
+- **Outstanding:** $X
+
+## Content Drafts
+
+See `content/` folder for:
+- Draft versions
+- Feedback received
+- Approved final versions
+
+## Notes
+
+[Important details, preferences, lessons learned]
+
+---
+
+*Created: [Date]*
+*Last updated: [Date]*
+```
+
+---
+
+## Revenue Templates (Full Business Depth)
+
+### revenue/overview.md
+
+```markdown
+# Revenue Overview
+
+## This Month: [Month Year]
+
+| Revenue Stream | Amount | vs Last Month | Notes |
+|----------------|--------|---------------|-------|
+| Sponsorships | $X | +/-X% | |
+| Products | $X | +/-X% | |
+| Affiliate | $X | +/-X% | |
+| Other | $X | +/-X% | |
+| **Total** | **$X** | **+/-X%** | |
+
+## Revenue by Stream
+
+### Sponsorships
+See `sponsorships.md` for details.
+- Active deals: X
+- Pipeline value: $X
+- Average deal size: $X
+
+### Products
+See `products.md` for details.
+- Active products: X
+- Monthly recurring: $X
+- One-time sales: $X
+
+### Affiliate
+See `affiliate.md` for details.
+- Active programs: X
+- Monthly average: $X
+
+## Year to Date
+
+| Month | Sponsorships | Products | Affiliate | Total |
+|-------|--------------|----------|-----------|-------|
+| Jan | $X | $X | $X | $X |
+| Feb | $X | $X | $X | $X |
+...
+
+**YTD Total:** $X
+
+## Trends
+
+**What's Growing:**
+-
+
+**What's Declining:**
+-
+
+**Seasonal Patterns:**
+-
+
+## Goals
+
+| Metric | Current | Target | Gap |
+|--------|---------|--------|-----|
+| Monthly Revenue | $X | $X | |
+| Sponsorship Rate | $X | $X | |
+| Product Revenue | $X | $X | |
+
+---
+
+*Last updated: [Date]*
+```
+
+### revenue/sponsorships.md
+
+```markdown
+# Sponsorship Tracking
+
+## Active Partnerships
+
+| Brand | Deal Type | Value | Start | End | Status |
+|-------|-----------|-------|-------|-----|--------|
+| | | $X | | | Active / Pending Deliverable |
+
+**Total Active Value:** $X
+
+## Pipeline
+
+| Brand | Stage | Est. Value | Next Step | Due |
+|-------|-------|------------|-----------|-----|
+| | Outreach / Negotiating / Contract | $X | | |
+
+**Pipeline Value:** $X
+
+## Completed This Year
+
+| Brand | Type | Value | Delivered | Paid |
+|-------|------|-------|-----------|------|
+| | | $X | [Date] | Yes/No |
+
+**YTD Sponsorship Revenue:** $X
+
+## Rate Card
+
+| Platform | Format | Rate | Notes |
+|----------|--------|------|-------|
+| YouTube | Integrated (60s) | $X | |
+| YouTube | Dedicated | $X | |
+| Instagram | Story (3 frames) | $X | |
+| Instagram | Post | $X | |
+| Newsletter | Dedicated | $X | |
+| Podcast | Read (60s) | $X | |
+
+## Brand Wishlist
+
+Brands I'd love to work with:
+- [Brand] - [Why, approach idea]
+
+## Learnings
+
+**What converts:**
+-
+
+**What to avoid:**
+-
+
+---
+
+*Last updated: [Date]*
+```
+
+### revenue/products.md
+
+```markdown
+# Product Revenue
+
+## Active Products
+
+| Product | Type | Price | Monthly Revenue | Status |
+|---------|------|-------|-----------------|--------|
+| | Course / Digital / Membership / Template | $X | $X | Active / Paused |
+
+## Sales This Month
+
+| Product | Units | Revenue | Notes |
+|---------|-------|---------|-------|
+| | | $X | |
+
+**Monthly Total:** $X
+
+## Product Performance
+
+| Product | Lifetime Revenue | Units Sold | Avg. Rating |
+|---------|------------------|------------|-------------|
+| | $X | | |
+
+## Launch Calendar
+
+| Product | Launch Date | Target Revenue | Status |
+|---------|-------------|----------------|--------|
+| | | $X | Planning / Building / Pre-launch / Live |
+
+## Product Ideas
+
+| Idea | Target Audience | Est. Price | Priority |
+|------|-----------------|------------|----------|
+| | | $X | High/Med/Low |
+
+---
+
+*Last updated: [Date]*
+```
+
+---
+
+## Collaboration Template (All Business Depths)
 
 `collaborations/_template/overview.md`:
 

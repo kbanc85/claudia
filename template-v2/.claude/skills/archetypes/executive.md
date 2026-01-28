@@ -12,6 +12,10 @@
 
 ## Folder Structure
 
+Structure adapts based on `business_depth` setting from onboarding.
+
+### Full Business Depth
+
 ```
 claudia/
 ├── CLAUDE.md
@@ -29,7 +33,10 @@ claudia/
 │   │   ├── exec-brief.md           ← Archetype-specific
 │   │   ├── 1on1-prep.md            ← Archetype-specific
 │   │   ├── board-update.md         ← Archetype-specific
-│   │   └── initiative-status.md    ← Archetype-specific
+│   │   ├── initiative-status.md    ← Archetype-specific
+│   │   ├── pipeline-review.md      ← Business command
+│   │   ├── financial-snapshot.md   ← Business command
+│   │   └── accountability-check.md ← Business command
 │   ├── skills/
 │   ├── hooks/
 │   └── rules/
@@ -42,6 +49,53 @@ claudia/
 ├── people/
 │   └── _template.md
 ├── direct-reports/
+│   └── [name]/                     ← Deep per-report structure
+│       ├── overview.md             ← Role, goals, development areas
+│       ├── 1on1s/                  ← 1:1 meeting notes
+│       └── development-plan.md     ← Growth tracking
+├── initiatives/
+│   └── [initiative-name]/          ← Deep per-initiative structure
+│       ├── overview.md             ← Status, owner, milestones, stakeholders
+│       ├── milestone-plan.md       ← Timeline and deliverables
+│       ├── decision-log.md         ← Key decisions
+│       └── meetings/               ← Related meeting notes
+├── board/
+│   ├── updates/
+│   └── materials/
+├── pipeline/
+│   ├── active.md                   ← Current initiatives/projects
+│   ├── prospecting.md              ← Planned initiatives
+│   └── completed.md                ← Historical record
+├── accountability/
+│   ├── commitments.md              ← Leadership commitments
+│   └── overdue.md                  ← Escalation visibility
+├── finances/
+│   ├── overview.md                 ← Budget summary (if applicable)
+│   └── budget-tracking.md          ← Department/initiative budgets
+├── templates/
+│   ├── meeting-prep.md
+│   ├── meeting-capture.md
+│   ├── milestone-plan.md
+│   ├── weekly-review.md
+│   └── 1on1-template.md
+└── insights/
+    └── patterns.md                 ← Leadership patterns
+```
+
+### Starter Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands
+│   │   └── pipeline-review.md      ← Only business command
+│   ├── skills/
+│   ├── hooks/
+│   └── rules/
+├── context/
+├── people/
+├── direct-reports/
 │   └── _template/
 │       ├── overview.md
 │       ├── 1on1s/
@@ -49,9 +103,32 @@ claudia/
 ├── initiatives/
 │   └── _template/
 │       └── overview.md
+├── board/
+├── pipeline/
+│   └── active.md
+├── finances/
+│   └── overview.md
+└── templates/
+    └── meeting-capture.md
+```
+
+### Minimal Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands only
+├── context/
+├── people/
+├── direct-reports/
+│   └── _template/
+│       ├── overview.md
+│       └── 1on1s/
+├── initiatives/
+│   └── _template/
+│       └── overview.md
 └── board/
-    ├── updates/
-    └── materials/
 ```
 
 ---
@@ -305,7 +382,172 @@ Blockers:
 
 ---
 
-## Direct Report Template
+## Direct Report Templates (Full Business Depth)
+
+### direct-reports/[name]/overview.md
+
+```markdown
+# [Person Name]
+
+## Quick Stats
+
+| Field | Value |
+|-------|-------|
+| Role | [Title] |
+| Started | [Date] |
+| Reports To | [You] |
+| 1:1 Cadence | [Weekly/Biweekly] |
+| Next 1:1 | [Date/Time] |
+
+## Current Focus
+
+**Primary Projects:**
+- [Project 1] - [Status/Notes]
+- [Project 2] - [Status/Notes]
+
+**Development Focus:**
+- [Skill or goal they're working on]
+
+## Performance
+
+**Strengths:**
+- [Strength 1]
+- [Strength 2]
+
+**Growth Areas:**
+- [Area 1]
+- [Area 2]
+
+**Recent Wins:**
+- [Win 1] - [Date]
+- [Win 2] - [Date]
+
+## Engagement & Retention
+
+| Indicator | Status | Trend | Notes |
+|-----------|--------|-------|-------|
+| Energy | High / Medium / Low | ↑/→/↓ | |
+| Engagement | Engaged / Coasting / Concerned | ↑/→/↓ | |
+| Flight Risk | Low / Medium / High | ↑/→/↓ | |
+
+**Last Engagement Check:** [Date]
+
+## Communication
+
+**Style:** [How they prefer to receive feedback/info]
+**Best times:** [When they're most receptive]
+**What to avoid:** [Communication pitfalls]
+
+## My Commitments to Them
+
+| What | Due | Status |
+|------|-----|--------|
+| | | |
+
+## 1:1 History
+
+See `1on1s/` folder for detailed notes.
+
+| Date | Key Topics | Follow-ups | Mood |
+|------|------------|------------|------|
+| | | | |
+
+## Personal Context
+
+[Birthday, family situation, interests, things to remember]
+
+---
+
+*Created: [Date]*
+*Last updated: [Date]*
+```
+
+### direct-reports/[name]/development-plan.md
+
+```markdown
+# Development Plan: [Person Name]
+
+## Career Snapshot
+
+**Current Role:** [Title]
+**Time in Role:** [Duration]
+**Career Aspiration:** [Where they want to go]
+**Timeline:** [When they want to get there]
+
+## Development Goals
+
+### Goal 1: [Goal Name]
+
+| Field | Value |
+|-------|-------|
+| Target Date | [Date] |
+| Priority | High / Medium |
+| Progress | Not Started / In Progress / Nearly There |
+
+**Why This Matters:**
+[Connection to career goals and current work]
+
+**Success Criteria:**
+- [ ] [Measurable outcome 1]
+- [ ] [Measurable outcome 2]
+
+**Action Plan:**
+| Action | Due | Status | Notes |
+|--------|-----|--------|-------|
+| | | | |
+
+**Support Needed From Me:**
+-
+
+**Progress Notes:**
+| Date | Update |
+|------|--------|
+| | |
+
+---
+
+### Goal 2: [Goal Name]
+[Same structure]
+
+---
+
+## Skills Assessment
+
+| Skill | Current (1-5) | Target (1-5) | Priority | Development Method |
+|-------|---------------|--------------|----------|-------------------|
+| | | | High/Med/Low | Training/Stretch/Coaching/Exposure |
+
+## Stretch Assignments
+
+| Assignment | Purpose | Timeline | Status |
+|------------|---------|----------|--------|
+| | What skill this develops | | |
+
+## Feedback History
+
+| Date | Topic | Type | Received Well? |
+|------|-------|------|----------------|
+| | | Positive / Constructive | Yes / Partially / No |
+
+## Career Conversation Notes
+
+[Notes from career discussions, aspirations mentioned, concerns raised]
+
+## Development Resources
+
+- [ ] [Course/Book/Conference]
+- [ ] [Mentor/Coach recommendation]
+- [ ] [Project exposure]
+
+---
+
+*Last updated: [Date]*
+*Next formal review: [Date]*
+```
+
+---
+
+## Direct Report Template (Starter/Minimal)
 
 `direct-reports/_template/overview.md`:
 
@@ -412,7 +654,211 @@ See `1on1s/` folder for detailed notes.
 
 ---
 
-## Initiative Template
+## Initiative Templates (Full Business Depth)
+
+### initiatives/[initiative-name]/overview.md
+
+```markdown
+# [Initiative Name]
+
+## Quick Stats
+
+| Field | Value |
+|-------|-------|
+| Status | 🟢 On Track / 🟡 Attention / 🔴 At Risk |
+| Phase | [Current phase] |
+| Owner | [Person] |
+| Sponsor | [Executive sponsor] |
+| Started | [Date] |
+| Target Completion | [Date] |
+| Budget | $X (if applicable) |
+
+## Objective
+
+[What this initiative is trying to achieve - be specific]
+
+## Why Now
+
+[Business driver, urgency, opportunity cost of delay]
+
+## Success Metrics
+
+| Metric | Baseline | Target | Current | Status |
+|--------|----------|--------|---------|--------|
+| | | | | 🟢/🟡/🔴 |
+
+## Key Milestones
+
+| Milestone | Target Date | Status | Notes |
+|-----------|-------------|--------|-------|
+| | | Done / In Progress / Not Started / At Risk | |
+
+See `milestone-plan.md` for detailed breakdown.
+
+## Team & Stakeholders
+
+| Role | Person | Commitment Level |
+|------|--------|------------------|
+| Owner | | Full-time |
+| Key Contributors | | [Hours/week] |
+| Stakeholders | | Informed/Consulted |
+
+## Current Status
+
+**This Week:**
+[What's happening now]
+
+**Last Week:**
+[What happened]
+
+## Blockers
+
+| Blocker | Impact | Owner | Resolution Plan |
+|---------|--------|-------|-----------------|
+| | High/Med/Low | | |
+
+## Decisions Pending
+
+| Decision | Needed By | Decision Maker | Context |
+|----------|-----------|----------------|---------|
+| | | | |
+
+See `decision-log.md` for decision history.
+
+## Dependencies
+
+| Dependency | Team/Person | Status | Risk |
+|------------|-------------|--------|------|
+| | | Resolved / Pending / At Risk | |
+
+## Quick Links
+
+- Milestone Plan: `./milestone-plan.md`
+- Decision Log: `./decision-log.md`
+- Meetings: `./meetings/`
+
+---
+
+*Created: [Date]*
+*Last updated: [Date]*
+```
+
+### initiatives/[initiative-name]/milestone-plan.md
+
+```markdown
+# Milestone Plan: [Initiative Name]
+
+## Timeline Overview
+
+**Start:** [Date]
+**Target End:** [Date]
+**Current Phase:** [Phase Name]
+
+## Phases
+
+### Phase 1: [Name]
+**Timeline:** [Start] - [End]
+**Status:** 🟢/🟡/🔴
+
+| Deliverable | Owner | Due | Status | Notes |
+|-------------|-------|-----|--------|-------|
+| | | | | |
+
+**Phase Exit Criteria:**
+- [ ]
+- [ ]
+
+**Dependencies:**
+-
+
+---
+
+### Phase 2: [Name]
+**Timeline:** [Start] - [End]
+**Status:** Not Started / In Progress / Complete
+
+[Same structure]
+
+---
+
+### Phase 3: [Name]
+[Same structure]
+
+---
+
+## Resource Allocation
+
+| Resource | Phase 1 | Phase 2 | Phase 3 |
+|----------|---------|---------|---------|
+| [Person] | X% | X% | X% |
+
+## Risk Register
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| | High/Med/Low | High/Med/Low | |
+
+## Budget Tracking (if applicable)
+
+| Phase | Budgeted | Actual | Variance |
+|-------|----------|--------|----------|
+| | $X | $X | |
+
+---
+
+*Last updated: [Date]*
+```
+
+### initiatives/[initiative-name]/decision-log.md
+
+```markdown
+# Decision Log: [Initiative Name]
+
+## Recent Decisions
+
+### [Date]: [Decision Title]
+
+**Decision:** [What was decided]
+
+**Context:** [Why this decision was needed]
+
+**Options Considered:**
+1. [Option A] - [Pros/Cons]
+2. [Option B] - [Pros/Cons]
+
+**Decided By:** [Who made the call]
+
+**Rationale:** [Why this option]
+
+**Impact:** [What changed as a result]
+
+---
+
+### [Date]: [Decision Title]
+[Same structure]
+
+---
+
+## Decision Summary
+
+| Date | Decision | Made By | Outcome |
+|------|----------|---------|---------|
+| | | | Positive/Neutral/Revisit |
+
+## Decisions Pending
+
+| Decision | Due | Owner | Blocker? |
+|----------|-----|-------|----------|
+| | | | |
+
+---
+
+*Last updated: [Date]*
+```
+
+---
+
+## Initiative Template (Starter/Minimal)
 
 `initiatives/_template/overview.md`:
 

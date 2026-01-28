@@ -12,6 +12,10 @@
 
 ## Folder Structure
 
+Structure adapts based on `business_depth` setting from onboarding.
+
+### Full Business Depth
+
 ```
 claudia/
 ├── CLAUDE.md
@@ -29,7 +33,10 @@ claudia/
 │   │   ├── investor-update.md      ← Archetype-specific
 │   │   ├── pitch-prep.md           ← Archetype-specific
 │   │   ├── team-standup.md         ← Archetype-specific
-│   │   └── runway-check.md         ← Archetype-specific
+│   │   ├── runway-check.md         ← Archetype-specific
+│   │   ├── pipeline-review.md      ← Business command
+│   │   ├── financial-snapshot.md   ← Business command
+│   │   └── accountability-check.md ← Business command
 │   ├── skills/
 │   ├── hooks/
 │   └── rules/
@@ -42,6 +49,55 @@ claudia/
 ├── people/
 │   └── _template.md
 ├── investors/
+│   └── [investor-name]/            ← Deep per-investor structure
+│       ├── overview.md             ← Relationship status, investment details
+│       ├── updates/                ← Investor update drafts sent to them
+│       └── meetings/               ← Meeting notes
+├── team/
+│   └── [name]/
+│       ├── overview.md
+│       └── 1on1s/
+├── product/
+│   ├── roadmap.md                  ← Product roadmap
+│   ├── decision-log.md             ← Product decisions
+│   └── metrics.md                  ← Key metrics tracking
+├── fundraising/
+│   ├── overview.md                 ← Current round status
+│   └── materials/                  ← Pitch deck, data room docs
+├── pipeline/
+│   ├── active.md                   ← Current investor conversations
+│   ├── prospecting.md              ← Target investors
+│   └── completed.md                ← Historical rounds
+├── accountability/
+│   ├── commitments.md              ← Founder commitments
+│   └── overdue.md                  ← Escalation visibility
+├── finances/
+│   ├── overview.md                 ← Cash position, runway
+│   ├── burn-tracking.md            ← Monthly burn analysis
+│   └── projections.md              ← Financial projections
+├── templates/
+│   ├── investor-update.md          ← Monthly update template
+│   ├── meeting-prep.md
+│   ├── meeting-capture.md
+│   └── weekly-review.md
+└── insights/
+    └── patterns.md                 ← Business patterns
+```
+
+### Starter Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands
+│   │   └── pipeline-review.md      ← Only business command
+│   ├── skills/
+│   ├── hooks/
+│   └── rules/
+├── context/
+├── people/
+├── investors/
 │   ├── relationships/
 │   ├── updates/
 │   └── materials/
@@ -51,6 +107,33 @@ claudia/
 ├── product/
 │   ├── roadmap.md
 │   └── decisions/
+├── fundraising/
+│   └── overview.md
+├── pipeline/
+│   └── active.md
+├── finances/
+│   └── overview.md
+└── templates/
+    └── meeting-capture.md
+```
+
+### Minimal Business Depth
+
+```
+claudia/
+├── CLAUDE.md
+├── .claude/
+│   ├── commands/                   ← Base + archetype commands only
+├── context/
+├── people/
+├── investors/
+│   ├── relationships/
+│   └── updates/
+├── team/
+│   └── _template/
+│       └── overview.md
+├── product/
+│   └── roadmap.md
 └── fundraising/
     └── overview.md
 ```
@@ -323,7 +406,118 @@ Financial runway and burn rate summary.
 
 ---
 
-## Investor Template
+## Investor Templates (Full Business Depth)
+
+### investors/[investor-name]/overview.md
+
+```markdown
+# [Investor Name]
+
+## Quick Stats
+
+| Field | Value |
+|-------|-------|
+| Firm | [Fund name] |
+| Role | [Partner / Principal / Associate] |
+| Stage Focus | [Pre-seed / Seed / Series A / etc.] |
+| Check Size | $X - $Y |
+| Relationship Status | Prospecting / Warm / In Conversation / Committed / Passed / Existing Investor |
+| Investment Amount | $X (if committed/invested) |
+
+## About Them
+
+**Investment Thesis:**
+[What they invest in, what excites them]
+
+**Sweet Spot:**
+- Stage: [Preferred stage]
+- Sectors: [Focus areas]
+- Geography: [Where they invest]
+
+**Relevant Portfolio:**
+| Company | What They Do | Why Relevant |
+|---------|--------------|--------------|
+| | | |
+
+**Known Preferences:**
+- [What they like in founders/companies]
+- [Red flags for them]
+
+**Decision Process:**
+- Timeline: [Typical decision timeframe]
+- Partners involved: [Who else needs to approve]
+
+## Our Relationship
+
+**Intro Source:** [Who connected you, or how you met]
+**First Contact:** [Date]
+**Relationship Strength:** Cold / Warming / Warm / Strong
+
+### Interaction History
+
+| Date | Type | Key Topics | Outcome | Follow-up |
+|------|------|------------|---------|-----------|
+| | Meeting / Email / Event | | | |
+
+## Their View of Us
+
+**What they like:**
+-
+
+**Concerns/Questions:**
+-
+
+**Feedback received:**
+[Specific feedback from conversations]
+
+## Investment Status (if relevant)
+
+| Field | Value |
+|-------|-------|
+| Amount Invested | $X |
+| Instrument | SAFE / Convertible / Priced |
+| Date | |
+| Board seat? | Yes/No/Observer |
+
+## Communication Preferences
+
+- **Update frequency:** Monthly / Quarterly
+- **Preferred format:** Email / Deck / Call
+- **Best contact method:** [Email/Text/etc.]
+- **Assistant/EA:** [Name and contact if relevant]
+
+## Value-Add
+
+**How they can help:**
+- [Intro network]
+- [Expertise areas]
+- [Portfolio connections]
+
+**Help requested:**
+| Ask | Date | Outcome |
+|-----|------|---------|
+| | | |
+
+## Next Steps
+
+**Current status:** [Where things stand]
+**Next action:** [What needs to happen]
+**Timeline:** [When]
+**Owner:** [You or them]
+
+## Notes
+
+[Personal details, conversation style, things to remember]
+
+---
+
+*Created: [Date]*
+*Last updated: [Date]*
+```
+
+---
+
+## Investor Template (Starter/Minimal)
 
 `investors/relationships/_template.md`:
 
@@ -384,7 +578,203 @@ Financial runway and burn rate summary.
 
 ---
 
-## Product Template
+## Product Templates (Full Business Depth)
+
+### product/roadmap.md
+
+```markdown
+# Product Roadmap
+
+## Vision
+[Where the product is going - the end state]
+
+## Current Focus
+[What we're building now and why - the strategic bet]
+
+## Key Metrics
+
+| Metric | Current | Target | Timeline |
+|--------|---------|--------|----------|
+| | | | |
+
+See `metrics.md` for detailed tracking.
+
+## Roadmap
+
+### Now (This Month)
+
+| Feature/Project | Owner | Status | Target | Notes |
+|-----------------|-------|--------|--------|-------|
+| | | Not Started/In Progress/Testing/Done | [Date] | |
+
+**Monthly Goal:**
+[What success looks like this month]
+
+### Next (Next Month)
+
+| Feature/Project | Owner | Priority | Dependencies |
+|-----------------|-------|----------|--------------|
+| | | P0/P1/P2 | |
+
+### Later (This Quarter)
+
+| Feature/Project | Why | Rough Size |
+|-----------------|-----|------------|
+| | | S/M/L/XL |
+
+### Backlog (Ideas)
+
+| Idea | Source | Potential Impact |
+|------|--------|------------------|
+| | Customer/Internal/Market | High/Med/Low |
+
+## Recently Shipped
+
+| Feature | Date | Impact | Learnings |
+|---------|------|--------|-----------|
+| | | | |
+
+## Key Decisions
+
+See `decision-log.md` for detailed decision records.
+
+| Date | Decision | Outcome |
+|------|----------|---------|
+| | | |
+
+## Technical Debt
+
+| Item | Impact | When to Address |
+|------|--------|-----------------|
+| | | |
+
+---
+
+*Last updated: [Date]*
+```
+
+### product/decision-log.md
+
+```markdown
+# Product Decision Log
+
+## Recent Decisions
+
+### [Date]: [Decision Title]
+
+**Decision:** [What was decided]
+
+**Context:** [Why this decision was needed]
+
+**Options Considered:**
+1. [Option A] - [Pros/Cons]
+2. [Option B] - [Pros/Cons]
+
+**Decided By:** [Who made the call]
+
+**Rationale:** [Why this option]
+
+**Impact:** [What changed as a result]
+
+**Revisit Date:** [If applicable]
+
+---
+
+### [Date]: [Decision Title]
+[Same structure]
+
+---
+
+## Decision Summary
+
+| Date | Decision | Made By | Impact |
+|------|----------|---------|--------|
+| | | | Positive/Neutral/Revisit |
+
+## Decisions We Might Revisit
+
+| Decision | Original Date | Trigger to Revisit |
+|----------|---------------|-------------------|
+| | | [When we should reconsider] |
+
+---
+
+*Last updated: [Date]*
+```
+
+### product/metrics.md
+
+```markdown
+# Product Metrics
+
+## Key Metrics Dashboard
+
+### North Star
+**[Primary Metric]:** [Current Value]
+- Target: [Target]
+- Trend: ↑/→/↓
+- Last updated: [Date]
+
+### Health Metrics
+
+| Metric | Current | Last Week | Last Month | Target | Status |
+|--------|---------|-----------|------------|--------|--------|
+| | | | | | 🟢/🟡/🔴 |
+
+## Growth Metrics
+
+| Metric | Value | WoW Change | MoM Change |
+|--------|-------|------------|------------|
+| Users | | | |
+| Signups | | | |
+| Activation | | | |
+| Retention | | | |
+
+## Engagement Metrics
+
+| Metric | Value | Trend | Notes |
+|--------|-------|-------|-------|
+| DAU | | | |
+| WAU | | | |
+| MAU | | | |
+| DAU/MAU | | | |
+
+## Revenue Metrics (if applicable)
+
+| Metric | Value | MoM Change |
+|--------|-------|------------|
+| MRR | $X | |
+| ARR | $X | |
+| ARPU | $X | |
+| Churn | X% | |
+
+## Cohort Analysis
+
+| Cohort | Week 1 | Week 2 | Week 4 | Week 8 |
+|--------|--------|--------|--------|--------|
+| [Month] | X% | X% | X% | X% |
+
+## What We're Learning
+
+**Working:**
+-
+
+**Not Working:**
+-
+
+**Experiments Running:**
+| Experiment | Hypothesis | Status | Results |
+|------------|------------|--------|---------|
+| | | | |
+
+---
+
+*Last updated: [Date]*
+```
+
+---
+
+## Product Template (Starter/Minimal)
 
 `product/roadmap.md`:
 
