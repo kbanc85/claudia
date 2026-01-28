@@ -2,6 +2,27 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.2.5 (2026-01-28)
+
+### Memory System: Fully Automatic Installation
+
+The memory system now works automatically after install with no manual intervention required.
+
+### Fixed
+
+- **sqlite-vec on Python 3.13+** - Now tries the Python package first before `enable_load_extension()`, which isn't available on Python 3.13
+- **Ollama auto-start on macOS** - Creates LaunchAgent so Ollama starts on boot
+- **Model pull reliability** - Ensures Ollama is running before attempting to pull the embedding model
+- **Boot resilience** - Daemon waits up to 10 seconds for Ollama to start after reboot
+
+### Added
+
+- Comprehensive verification step at end of install showing status of all services
+- 5 new checks in `diagnose.sh`: Ollama running, LaunchAgent configured, embedding model, sqlite-vec working
+- Retry logic in embeddings service (5 attempts, 2s delay) for Ollama connection
+
+---
+
 ## 1.0.0 (2026-01-23) - get-claudia
 
 ### Package Rename
