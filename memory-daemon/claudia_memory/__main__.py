@@ -9,12 +9,13 @@ Starts the memory daemon with:
 
 import argparse
 import asyncio
+import hashlib
 import logging
 import signal
 import sys
 from pathlib import Path
 
-from .config import get_config
+from .config import get_config, set_project_id
 from .daemon.health import start_health_server, stop_health_server
 from .daemon.scheduler import start_scheduler, stop_scheduler
 from .database import get_db
@@ -24,6 +25,17 @@ logger = logging.getLogger(__name__)
 
 # Flag for graceful shutdown
 _shutdown_requested = False
+
+
+def get_project_hash(project_dir: str) -> str:
+    """Generate consistent short hash from project directory path.
+
+    Uses SHA256 truncated to 12 characters for a good balance of:
+    - Uniqueness (12 hex chars = 48 bits = ~281 trillion combinations)
+    - Readability (short enough to see in file listings)
+    - Determinism (same path always produces same hash)
+    """
+    return hashlib.sha256(project_dir.encode()).hexdigest()[:12]
 
 
 def setup_logging(log_path: Path = None, debug: bool = False) -> None:
@@ -58,16 +70,23 @@ def signal_handler(signum, frame):
     _shutdown_requested = True
 
 
-def run_daemon(mcp_mode: bool = True, debug: bool = False) -> None:
+def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = None) -> None:
     """
     Run the Claudia Memory Daemon.
 
     Args:
         mcp_mode: If True, run as MCP server (stdio mode)
         debug: Enable debug logging
+        project_id: Optional project identifier for database isolation
     """
+    # Set project context before any config access
+    if project_id:
+        set_project_id(project_id)
+
     setup_logging(debug=debug)
     logger.info("Starting Claudia Memory Daemon")
+    if project_id:
+        logger.info(f"Project isolation enabled: {project_id}")
 
     # Set up signal handlers
     signal.signal(signal.SIGTERM, signal_handler)
@@ -137,8 +156,20 @@ def main():
         action="store_true",
         help="Check system health and exit",
     )
+    parser.add_argument(
+        "--project-dir",
+        type=str,
+        help="Project directory for database isolation (creates project-specific database)",
+    )
 
     args = parser.parse_args()
+
+    # Compute project ID from directory path if provided
+    project_id = None
+    if args.project_dir:
+        project_id = get_project_hash(args.project_dir)
+        # Set project context early for commands that don't call run_daemon
+        set_project_id(project_id)
 
     if args.consolidate:
         # One-shot consolidation
@@ -165,7 +196,7 @@ def main():
         return
 
     # Run the daemon
-    run_daemon(mcp_mode=not args.standalone, debug=args.debug)
+    run_daemon(mcp_mode=not args.standalone, debug=args.debug, project_id=project_id)
 
 
 if __name__ == "__main__":

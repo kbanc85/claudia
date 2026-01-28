@@ -42,8 +42,14 @@ class MemoryConfig:
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
 
     @classmethod
-    def load(cls) -> "MemoryConfig":
-        """Load configuration from ~/.claudia/config.json, with defaults"""
+    def load(cls, project_id: Optional[str] = None) -> "MemoryConfig":
+        """Load configuration from ~/.claudia/config.json, with defaults.
+
+        Args:
+            project_id: Optional project identifier for database isolation.
+                        When provided, the database path is overridden to
+                        ~/.claudia/memory/{project_id}.db for per-project isolation.
+        """
         config_path = Path.home() / ".claudia" / "config.json"
         config = cls()
 
@@ -80,6 +86,11 @@ class MemoryConfig:
                 # Use defaults on error
                 pass
 
+        # Override database path for project isolation
+        # This ensures each project gets its own isolated database
+        if project_id:
+            config.db_path = Path.home() / ".claudia" / "memory" / f"{project_id}.db"
+
         # Ensure directories exist
         config.db_path.parent.mkdir(parents=True, exist_ok=True)
         config.log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,13 +120,36 @@ class MemoryConfig:
             json.dump(data, f, indent=2)
 
 
-# Global config instance
+# Global config instance and project context
 _config: Optional[MemoryConfig] = None
+_project_id: Optional[str] = None
+
+
+def set_project_id(project_id: Optional[str]) -> None:
+    """Set the project ID for database isolation.
+
+    This must be called before any access to get_config() to ensure
+    the correct project-specific database path is used.
+
+    Args:
+        project_id: Hash of the project directory path, or None for global database.
+    """
+    global _config, _project_id
+
+    # If project_id changes, invalidate cached config so it reloads
+    if project_id != _project_id:
+        _config = None
+        _project_id = project_id
 
 
 def get_config() -> MemoryConfig:
-    """Get or load the global configuration"""
-    global _config
+    """Get or load the global configuration.
+
+    The configuration is project-aware. If set_project_id() was called,
+    the database path will be project-specific. Otherwise, the global
+    claudia.db is used for backward compatibility.
+    """
+    global _config, _project_id
     if _config is None:
-        _config = MemoryConfig.load()
+        _config = MemoryConfig.load(project_id=_project_id)
     return _config

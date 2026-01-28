@@ -7,8 +7,8 @@
     "claudia-memory": {
       "_disabled": true,
       "command": "~/.claudia/daemon/venv/bin/python",
-      "args": ["-m", "claudia_memory.mcp.server"],
-      "_description": "Enhanced memory with vector search. Install with: ~/.claudia/memory-daemon/scripts/install.sh"
+      "args": ["-m", "claudia_memory", "--project-dir", "${workspaceFolder}"],
+      "_description": "Enhanced memory with vector search (per-project isolation). Install with: ~/.claudia/daemon/scripts/install.sh"
     },
 
     "gmail": {
