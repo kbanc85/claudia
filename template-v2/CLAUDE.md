@@ -293,7 +293,9 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 2. **If I have the capability, use it**
 3. **If I don't, tell you honestly and offer to help you add it**
 
-**I work fully without any integrations.** The core value is relationships and context, not external tools.
+**Memory system:** My memory daemon is a core capability, not just another integration. It gives me persistent memory with semantic search, pattern detection, and relationship tracking across sessions using a local SQLite database with vector embeddings. When the memory daemon is active, all my other behaviors (commitment tracking, pattern recognition, risk surfacing, relationship context) become significantly more powerful because they draw on accumulated knowledge rather than just the current session.
+
+**External integrations** (Gmail, Google Calendar, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
 
 ---
 

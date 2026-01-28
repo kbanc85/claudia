@@ -4,24 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-Claudia is an agentic executive assistant framework that runs on Claude Code. This repository contains:
+Claudia is an agentic executive assistant framework that runs on Claude Code. It has two core layers:
+
+1. **Template layer** - Markdown files (skills, commands, rules, context) that define Claudia's personality, behaviors, and workflows. This is what gets copied to users' machines on install.
+2. **Memory system** - A Python-backed daemon with SQLite, vector embeddings (sqlite-vec), and three service layers (remember, recall, consolidate) that give Claudia persistent, semantically searchable memory across sessions.
+
+Both layers are core to how Claudia works. The template layer defines *who* Claudia is. The memory system defines *what she remembers*.
+
+This repository contains:
 - `bin/index.js` - NPM installer CLI that bootstraps new Claudia instances
 - `template-v2/` - Current template with minimal seed files (recommended)
+- `memory-daemon/` - Python memory system with SQLite database, vector search, and background services
 - `template/` - Legacy template with pre-built examples
 - `assets/` - Banner art and demo assets
 
+For full architectural diagrams and pipeline explanations, see `ARCHITECTURE.md`.
+
 ## Architecture
 
-### Template-Based System
+### Template Layer
 
-Claudia is **not a traditional application**. It's a template system that generates personalized workspace structures. When users run `npx get-claudia`:
+When users run `npx get-claudia`, the CLI copies `template-v2/` to their machine. When they run `claude` inside that directory, Claude reads the template files and becomes Claudia.
 
+Installation flow:
 1. CLI copies `template-v2/` to target directory
 2. User runs `claude` to start conversation
 3. Onboarding skill detects missing `context/me.md` and initiates discovery
 4. Structure generator creates personalized folders/files based on user's archetype
-
-### Core Components
 
 **Skills** (`.claude/skills/`)
 - Proactive behaviors that activate based on context
@@ -48,6 +57,39 @@ Claudia is **not a traditional application**. It's a template system that genera
 - Relationship-centric organization
 - Template-based structure for consistency
 - Tracks communication history, commitments, sentiment
+
+### Memory System (`memory-daemon/`)
+
+The memory system is a standalone Python application that gives Claudia persistent, semantically searchable memory. It communicates with Claude Code via MCP (Model Context Protocol) over stdio.
+
+**Database** - SQLite with sqlite-vec extension
+- 10+ tables: entities, memories, relationships, patterns, predictions, episodes, messages, and more
+- 3 vector tables (384-dimensional embeddings) for semantic search
+- WAL mode for crash safety; content hashing for deduplication
+- Per-project isolation via workspace folder hash
+- Schema defined in `memory-daemon/claudia_memory/schema.sql`
+
+**Service layers** (`memory-daemon/claudia_memory/services/`)
+- `RememberService` - Stores facts, entities, relationships; generates embeddings; deduplicates
+- `RecallService` - Semantic search with multi-factor ranking (60% vector similarity, 30% importance, 10% recency); rehearsal effect boosts accessed memories
+- `ConsolidateService` - Importance decay, pattern detection (cooling relationships, overdue commitments, communication styles), prediction generation
+
+**Background daemon** (`memory-daemon/claudia_memory/daemon/`)
+- Scheduled consolidation tasks (hourly decay, 6-hourly pattern detection, daily full consolidation)
+- Health check endpoint on port 3848
+- Graceful shutdown with signal handling
+
+**MCP tools** exposed to Claude Code (`memory-daemon/claudia_memory/mcp/server.py`):
+- `memory.remember` - Store facts, preferences, observations, learnings
+- `memory.recall` - Semantic search across all memories
+- `memory.about` - Retrieve all context about a specific entity
+- `memory.relate` - Create/strengthen relationships between entities
+- `memory.predictions` - Get proactive suggestions and insights
+- `memory.consolidate` - Trigger manual consolidation
+- `memory.entity` - Create/update entity information
+- `memory.search_entities` - Search entities by name or description
+
+**Dependencies:** Ollama (local embeddings, 384-dimensional all-minilm:l6-v2), sqlite-vec, APScheduler, spaCy (optional NLP)
 
 ### Archetype System
 
@@ -112,6 +154,44 @@ To trigger onboarding in a Claudia instance:
    - Edge cases
 3. Add to archetype-specific command lists in `structure-generator.md` if appropriate
 
+### Working on the Memory Daemon
+
+The memory system is a Python application in `memory-daemon/`.
+
+```bash
+# Set up development environment
+cd memory-daemon
+python -m venv venv
+source venv/bin/activate
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/
+
+# Run the daemon directly (MCP mode, connects via stdio)
+python -m claudia_memory
+
+# Run just consolidation
+python -m claudia_memory --consolidate
+
+# Check health endpoint
+curl http://localhost:3848/health
+```
+
+**Key files to know:**
+- `schema.sql` - All table definitions. Change this when adding new data types.
+- `services/remember.py` - Write path. How memories, entities, and relationships get stored.
+- `services/recall.py` - Read path. Semantic search, scoring, and retrieval logic.
+- `services/consolidate.py` - Background maintenance. Decay, pattern detection, predictions.
+- `mcp/server.py` - Tool definitions exposed to Claude Code. Add new MCP tools here.
+- `database.py` - Connection management, thread safety, helper methods.
+
+**Migrating existing markdown data:**
+```bash
+python memory-daemon/scripts/migrate_markdown.py --dry-run
+python memory-daemon/scripts/migrate_markdown.py
+```
+
 ## Publishing
 
 The package is published to NPM as `get-claudia`. Update version in:
@@ -157,6 +237,7 @@ claudia/
 ├── package.json              ← NPM package config
 ├── CHANGELOG.md              ← Release history
 ├── README.md                 ← User-facing docs
+├── ARCHITECTURE.md           ← Full architecture with diagrams
 ├── template-v2/              ← Current template (use this)
 │   ├── CLAUDE.md            ← Claudia's core identity
 │   └── .claude/
@@ -165,7 +246,21 @@ claudia/
 │       │   ├── archetypes/  ← Archetype-specific configs
 │       │   └── *.md         ← Skill definitions
 │       ├── rules/            ← Global principles
-│       └── hooks/            ← Event handlers (future)
+│       └── hooks/            ← Event handlers
+├── memory-daemon/            ← Python memory system
+│   ├── claudia_memory/
+│   │   ├── __main__.py      ← Entry point
+│   │   ├── database.py      ← SQLite connection management
+│   │   ├── schema.sql       ← Database table definitions
+│   │   ├── config.py        ← Settings and defaults
+│   │   ├── embeddings.py    ← Ollama embedding generation
+│   │   ├── mcp/server.py    ← MCP protocol implementation
+│   │   ├── daemon/          ← Scheduler and health check
+│   │   ├── extraction/      ← Entity extraction (NLP)
+│   │   └── services/        ← Remember, Recall, Consolidate
+│   ├── scripts/             ← Install and migration scripts
+│   ├── tests/               ← Database and service tests
+│   └── pyproject.toml       ← Python config and dependencies
 └── template/                 ← Legacy template (deprecated)
 ```
 
