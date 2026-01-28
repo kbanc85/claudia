@@ -49,7 +49,7 @@ ${colors.dim}Agentic executive assistant. Learns and adapts to how you work.${co
 ${colors.dim}by Kamil Banc${colors.reset}
 `;
 
-function main() {
+async function main() {
   console.log(banner);
 
   // Determine target directory
