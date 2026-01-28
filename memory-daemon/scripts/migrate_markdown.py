@@ -346,13 +346,22 @@ def main():
         action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Non-interactive mode (for automated migration)",
+    )
 
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.DEBUG if args.debug else logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+    if args.quiet:
+        # Suppress all logging in quiet mode
+        logging.basicConfig(level=logging.ERROR)
+    else:
+        logging.basicConfig(
+            level=logging.DEBUG if args.debug else logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
 
     # Initialize database
     db = get_db()
@@ -363,8 +372,24 @@ def main():
         if not args.path.exists():
             logger.error(f"Path not found: {args.path}")
             sys.exit(1)
+
+        if not args.quiet:
+            print(f"Migrating: {args.path}")
+
         stats = migrate_instance(args.path, args.dry_run)
-        print(f"\nMigrated: {stats}")
+
+        if args.quiet:
+            # Quiet mode - minimal output for automated migration
+            total = sum(stats.values())
+            if total > 0:
+                print(f"  - Migrated {stats['me']} items from context/me.md") if stats.get('me') else None
+                print(f"  - Migrated {stats['learnings']} items from context/learnings.md") if stats.get('learnings') else None
+                print(f"  - Migrated {stats['patterns']} items from context/patterns.md") if stats.get('patterns') else None
+                print(f"  - Migrated {stats['commitments']} items from context/commitments.md") if stats.get('commitments') else None
+                if stats.get('people'):
+                    print(f"  - Migrated {stats['people']} people with {stats.get('memories', 0)} facts")
+        else:
+            print(f"\nMigrated: {stats}")
 
     elif args.all:
         # Migrate all instances
@@ -373,11 +398,12 @@ def main():
             logger.info("No Claudia instances found")
             sys.exit(0)
 
-        print(f"Found {len(instances)} Claudia instance(s):\n")
-        for i, instance in enumerate(instances, 1):
-            print(f"  {i}. {instance}")
+        if not args.quiet:
+            print(f"Found {len(instances)} Claudia instance(s):\n")
+            for i, instance in enumerate(instances, 1):
+                print(f"  {i}. {instance}")
 
-        if not args.dry_run:
+        if not args.dry_run and not args.quiet:
             confirm = input("\nMigrate all? (y/n) ")
             if confirm.lower() != "y":
                 sys.exit(0)

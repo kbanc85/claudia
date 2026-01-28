@@ -56,37 +56,55 @@ async function main() {
   const args = process.argv.slice(2);
   const arg = args[0];
 
-  // Support "." for current directory
-  const isCurrentDir = arg === '.';
+  // Support "." or "upgrade" for current directory
+  const isCurrentDir = arg === '.' || arg === 'upgrade';
   const targetDir = isCurrentDir ? '.' : (arg || 'claudia');
   const targetPath = isCurrentDir ? process.cwd() : join(process.cwd(), targetDir);
   const displayDir = isCurrentDir ? 'current directory' : targetDir;
 
   // Check if directory already exists and has conflicting files
+  let isUpgrade = false;
+
   if (existsSync(targetPath)) {
     const contents = readdirSync(targetPath);
     const hasConflict = contents.some(f => f === 'CLAUDE.md' || f === '.claude');
+
     if (hasConflict) {
-      console.log(`\n${colors.yellow}⚠${colors.reset}  Claudia files already exist in ${displayDir}.`);
-      console.log(`   Remove CLAUDE.md and .claude/ first, or choose a different location.\n`);
-      process.exit(1);
+      // Check if this is an upgrade (existing memories to migrate)
+      const hasExistingMemories = existsSync(join(targetPath, 'context', 'me.md')) ||
+                                  existsSync(join(targetPath, 'context', 'learnings.md')) ||
+                                  existsSync(join(targetPath, 'context', 'patterns.md')) ||
+                                  existsSync(join(targetPath, 'people'));
+
+      if (hasExistingMemories) {
+        console.log(`\n${colors.cyan}✓${colors.reset} Found existing Claudia instance with memories.`);
+        isUpgrade = true;
+        // Don't exit - proceed to memory installation
+      } else {
+        // Fresh install conflict - exit as before
+        console.log(`\n${colors.yellow}⚠${colors.reset}  Claudia files already exist in ${displayDir}.`);
+        console.log(`   Remove CLAUDE.md and .claude/ first, or choose a different location.\n`);
+        process.exit(1);
+      }
     }
   }
 
-  // Create target directory if not current dir
-  if (!isCurrentDir) {
+  // Create target directory if not current dir (only for fresh installs)
+  if (!isCurrentDir && !isUpgrade) {
     mkdirSync(targetPath, { recursive: true });
   }
 
-  // Copy template files (v2 - minimal seed)
-  const templatePath = join(__dirname, '..', 'template-v2');
+  // Copy template files (v2 - minimal seed) - skip for upgrades
+  if (!isUpgrade) {
+    const templatePath = join(__dirname, '..', 'template-v2');
 
-  try {
-    cpSync(templatePath, targetPath, { recursive: true });
-    console.log(`${colors.green}✓${colors.reset} Installed in ${displayDir}`);
-  } catch (error) {
-    console.error(`\n${colors.yellow}⚠${colors.reset}  Error copying files: ${error.message}`);
-    process.exit(1);
+    try {
+      cpSync(templatePath, targetPath, { recursive: true });
+      console.log(`${colors.green}✓${colors.reset} Installed in ${displayDir}`);
+    } catch (error) {
+      console.error(`\n${colors.yellow}⚠${colors.reset}  Error copying files: ${error.message}`);
+      process.exit(1);
+    }
   }
 
   // Ask about enhanced memory system
@@ -113,10 +131,14 @@ async function main() {
 
     if (existsSync(memoryDaemonPath)) {
       try {
-        // Run the install script
+        // Run the install script, passing project path for upgrades
         const result = spawn('bash', [memoryDaemonPath], {
           stdio: 'inherit',
-          shell: true
+          shell: true,
+          env: {
+            ...process.env,
+            CLAUDIA_PROJECT_PATH: isUpgrade ? targetPath : ''
+          }
         });
 
         result.on('close', (code) => {

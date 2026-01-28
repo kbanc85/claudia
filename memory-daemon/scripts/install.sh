@@ -94,7 +94,7 @@ random_message() {
 }
 
 # Check Python
-echo -e "${BOLD}Step 1/7: Environment Check${NC}"
+echo -e "${BOLD}Step 1/8: Environment Check${NC}"
 echo
 if command -v python3 &> /dev/null; then
     PYTHON=$(command -v python3)
@@ -181,7 +181,7 @@ echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 # Pull embedding model
-echo -e "${BOLD}Step 2/7: AI Models${NC}"
+echo -e "${BOLD}Step 2/8: AI Models${NC}"
 echo
 if [ "$OLLAMA_AVAILABLE" = true ]; then
     # Ensure Ollama is running before pulling model
@@ -230,7 +230,7 @@ echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 # Create directories
-echo -e "${BOLD}Step 3/7: Creating Home${NC}"
+echo -e "${BOLD}Step 3/8: Creating Home${NC}"
 echo
 mkdir -p "$DAEMON_DIR"
 mkdir -p "$MEMORY_DIR"
@@ -247,10 +247,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Copy daemon files
-echo -e "${BOLD}Step 4/7: Installing Core${NC}"
+echo -e "${BOLD}Step 4/8: Installing Core${NC}"
 echo
 echo -e "  ${CYAN}◐${NC} Copying memory system files..."
 cp -r "$SOURCE_DIR/claudia_memory" "$DAEMON_DIR/"
+cp -r "$SOURCE_DIR/scripts" "$DAEMON_DIR/"
 cp "$SOURCE_DIR/pyproject.toml" "$DAEMON_DIR/"
 cp "$SOURCE_DIR/requirements.txt" "$DAEMON_DIR/"
 echo -e "  ${GREEN}✓${NC} Core files installed"
@@ -265,7 +266,7 @@ echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 # Create virtual environment
-echo -e "${BOLD}Step 5/7: Python Environment${NC}"
+echo -e "${BOLD}Step 5/8: Python Environment${NC}"
 echo
 echo -e "  ${CYAN}◐${NC} Creating isolated environment..."
 $PYTHON -m venv "$VENV_DIR"
@@ -290,7 +291,7 @@ echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 # Configure auto-start
-echo -e "${BOLD}Step 6/7: Auto-Start Setup${NC}"
+echo -e "${BOLD}Step 6/8: Auto-Start Setup${NC}"
 echo
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -375,8 +376,40 @@ echo
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
 
+# Memory Migration (for upgrades)
+echo -e "${BOLD}Step 7/8: Memory Migration${NC}"
+echo
+
+if [ -n "$CLAUDIA_PROJECT_PATH" ]; then
+    # Check if there are memories to migrate
+    if [ -d "$CLAUDIA_PROJECT_PATH/context" ] || [ -d "$CLAUDIA_PROJECT_PATH/people" ]; then
+        echo -e "  ${CYAN}◐${NC} Found existing memories to migrate..."
+
+        # Wait a moment for daemon to start
+        sleep 2
+
+        # Run migration in quiet mode
+        "$VENV_DIR/bin/python" "$DAEMON_DIR/scripts/migrate_markdown.py" --quiet "$CLAUDIA_PROJECT_PATH"
+
+        if [ $? -eq 0 ]; then
+            echo -e "  ${GREEN}✓${NC} Memories migrated to database"
+        else
+            echo -e "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
+            echo -e "    ${DIM}You can retry manually: ~/.claudia/daemon/venv/bin/python -m claudia_memory.scripts.migrate_markdown $CLAUDIA_PROJECT_PATH${NC}"
+        fi
+    else
+        echo -e "  ${DIM}No existing memories found to migrate${NC}"
+    fi
+else
+    echo -e "  ${DIM}Fresh install - no migration needed${NC}"
+fi
+
+echo
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo
+
 # Verify all services
-echo -e "${BOLD}Step 7/7: Verification${NC}"
+echo -e "${BOLD}Step 8/8: Verification${NC}"
 echo
 echo -e "  ${CYAN}◐${NC} Checking all services..."
 sleep 3
