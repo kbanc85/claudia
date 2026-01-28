@@ -2,7 +2,7 @@
   "hooks": [
     {
       "event": "session_start",
-      "description": "Load learnings and context from previous sessions",
+      "description": "Load context and catch up on unsummarized sessions",
       "behavior": {
         "action": "load_memory",
         "files": [
@@ -12,12 +12,16 @@
           "context/commitments.md",
           "context/waiting.md"
         ],
-        "on_missing_me": "trigger_onboarding"
+        "on_missing_me": "trigger_onboarding",
+        "enhanced_memory": {
+          "catch_up": "Call memory.unsummarized to find sessions that ended without a summary. For each, review the buffered turns and call memory.end_session with a retroactive narrative and structured extractions.",
+          "recall_context": "Call memory.recall and memory.predictions to load relevant context and proactive suggestions."
+        }
       }
     },
     {
       "event": "session_end",
-      "description": "Persist new learnings and updates",
+      "description": "Generate session summary and persist updates",
       "behavior": {
         "action": "save_memory",
         "files": [
@@ -26,7 +30,10 @@
           "context/commitments.md",
           "context/waiting.md"
         ],
-        "save_mode": "merge"
+        "save_mode": "merge",
+        "enhanced_memory": {
+          "summarize": "Call memory.end_session with a narrative summary and structured extractions from the session's buffered turns. The narrative should enhance stored information with tone, context, unresolved threads, and nuance that structured fields cannot capture."
+        }
       }
     },
     {
@@ -41,8 +48,9 @@
   ],
   "notes": {
     "implementation": "These hooks define intended behaviors. Claude Code will execute them as behavioral guidelines rather than traditional script execution.",
-    "session_start": "At session start, Claudia should read context files to restore memory. If me.md is missing, onboarding should begin.",
-    "session_end": "Before session ends, Claudia should update relevant context files with new learnings and changes.",
-    "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding."
+    "session_start": "At session start, Claudia should read context files to restore memory. If me.md is missing, onboarding should begin. If enhanced memory is available, check for unsummarized sessions first and generate retroactive summaries before proceeding.",
+    "session_end": "Before session ends, Claudia should generate a session summary (enhanced memory) or update context files (markdown fallback). The summary includes both a free-form narrative and structured extractions.",
+    "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding.",
+    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via memory.buffer_turn. This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start."
   }
 }

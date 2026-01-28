@@ -365,6 +365,235 @@ class RememberService:
                 },
             )
 
+    def buffer_turn(
+        self,
+        user_content: Optional[str] = None,
+        assistant_content: Optional[str] = None,
+        episode_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Buffer a conversation turn for later summarization.
+
+        This is lightweight storage -- no embeddings, no extraction, no processing.
+        The raw exchange is held in turn_buffer until Claude summarizes the session.
+
+        Args:
+            user_content: What the user said
+            assistant_content: What the assistant said
+            episode_id: Episode to append to (creates one if None)
+
+        Returns:
+            Dict with episode_id and turn_number
+        """
+        if episode_id is None:
+            episode_id = self._get_or_create_episode()
+
+        # Get next turn number
+        row = self.db.execute(
+            "SELECT COALESCE(MAX(turn_number), 0) as max_turn FROM turn_buffer WHERE episode_id = ?",
+            (episode_id,),
+            fetch=True,
+        )
+        next_turn = (row[0]["max_turn"] + 1) if row else 1
+
+        self.db.insert(
+            "turn_buffer",
+            {
+                "episode_id": episode_id,
+                "turn_number": next_turn,
+                "user_content": user_content,
+                "assistant_content": assistant_content,
+                "created_at": datetime.utcnow().isoformat(),
+            },
+        )
+
+        # Update episode turn count
+        self.db.execute(
+            "UPDATE episodes SET turn_count = turn_count + 1 WHERE id = ?",
+            (episode_id,),
+        )
+
+        logger.debug(f"Buffered turn {next_turn} for episode {episode_id}")
+        return {"episode_id": episode_id, "turn_number": next_turn}
+
+    def end_session(
+        self,
+        episode_id: int,
+        narrative: str,
+        facts: Optional[List[Dict]] = None,
+        commitments: Optional[List[Dict]] = None,
+        entities: Optional[List[Dict]] = None,
+        relationships: Optional[List[Dict]] = None,
+        key_topics: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Finalize a session with Claude's narrative summary and structured extractions.
+
+        The narrative captures session texture that structured fields cannot:
+        tone, emotional undercurrents, half-formed ideas, reasons behind decisions,
+        unresolved threads, and context that enriches the structured data.
+
+        Args:
+            episode_id: The session episode to finalize
+            narrative: Free-form narrative summary written by Claude
+            facts: List of {"content": str, "type": str, "about": [str], "importance": float}
+            commitments: List of {"content": str, "about": [str], "importance": float}
+            entities: List of {"name": str, "type": str, "description": str, "aliases": [str]}
+            relationships: List of {"source": str, "target": str, "relationship": str}
+            key_topics: List of topic strings for the episode
+
+        Returns:
+            Dict with counts of what was stored
+        """
+        result = {
+            "episode_id": episode_id,
+            "narrative_stored": False,
+            "facts_stored": 0,
+            "commitments_stored": 0,
+            "entities_stored": 0,
+            "relationships_stored": 0,
+        }
+
+        # 1. Store narrative in episode
+        update_data = {
+            "narrative": narrative,
+            "ended_at": datetime.utcnow().isoformat(),
+            "is_summarized": 1,
+        }
+        if key_topics:
+            update_data["key_topics"] = json.dumps(key_topics)
+
+        self.db.update("episodes", update_data, "id = ?", (episode_id,))
+        result["narrative_stored"] = True
+
+        # 2. Generate and store embedding for narrative (for semantic search)
+        embedding = embed_sync(narrative)
+        if embedding:
+            try:
+                self.db.execute(
+                    "INSERT OR REPLACE INTO episode_embeddings (episode_id, embedding) VALUES (?, ?)",
+                    (episode_id, json.dumps(embedding)),
+                )
+            except Exception as e:
+                logger.warning(f"Could not store episode embedding: {e}")
+
+        # 3. Store structured facts
+        if facts:
+            for fact in facts:
+                memory_id = self.remember_fact(
+                    content=fact["content"],
+                    memory_type=fact.get("type", "fact"),
+                    about_entities=fact.get("about"),
+                    importance=fact.get("importance", 1.0),
+                    source="session_summary",
+                    source_id=str(episode_id),
+                )
+                if memory_id:
+                    result["facts_stored"] += 1
+
+        # 4. Store commitments
+        if commitments:
+            for commitment in commitments:
+                memory_id = self.remember_fact(
+                    content=commitment["content"],
+                    memory_type="commitment",
+                    about_entities=commitment.get("about"),
+                    importance=commitment.get("importance", 1.0),
+                    source="session_summary",
+                    source_id=str(episode_id),
+                )
+                if memory_id:
+                    result["commitments_stored"] += 1
+
+        # 5. Store entities
+        if entities:
+            for entity in entities:
+                entity_id = self.remember_entity(
+                    name=entity["name"],
+                    entity_type=entity.get("type", "person"),
+                    description=entity.get("description"),
+                    aliases=entity.get("aliases"),
+                )
+                if entity_id:
+                    result["entities_stored"] += 1
+
+        # 6. Store relationships
+        if relationships:
+            for rel in relationships:
+                rel_id = self.relate_entities(
+                    source_name=rel["source"],
+                    target_name=rel["target"],
+                    relationship_type=rel["relationship"],
+                    strength=rel.get("strength", 1.0),
+                )
+                if rel_id:
+                    result["relationships_stored"] += 1
+
+        # 7. Clear turn buffer for this episode
+        self.db.delete("turn_buffer", "episode_id = ?", (episode_id,))
+
+        logger.info(
+            f"Session {episode_id} summarized: {result['facts_stored']} facts, "
+            f"{result['commitments_stored']} commitments, "
+            f"{result['entities_stored']} entities, "
+            f"{result['relationships_stored']} relationships"
+        )
+        return result
+
+    def get_unsummarized_turns(self) -> List[Dict[str, Any]]:
+        """
+        Find episodes with buffered turns that were never summarized.
+
+        Called at session start to catch sessions where the user exited
+        without Claude generating a summary.
+
+        Returns:
+            List of dicts with episode_id, session_id, turn_count, turns, started_at
+        """
+        # Find episodes that have buffered turns but are not summarized
+        episodes = self.db.execute(
+            """
+            SELECT e.id, e.session_id, e.turn_count, e.started_at
+            FROM episodes e
+            WHERE e.is_summarized = 0
+              AND e.turn_count > 0
+            ORDER BY e.started_at DESC
+            """,
+            fetch=True,
+        ) or []
+
+        results = []
+        for ep in episodes:
+            turns = self.db.execute(
+                """
+                SELECT turn_number, user_content, assistant_content, created_at
+                FROM turn_buffer
+                WHERE episode_id = ?
+                ORDER BY turn_number ASC
+                """,
+                (ep["id"],),
+                fetch=True,
+            ) or []
+
+            if turns:
+                results.append({
+                    "episode_id": ep["id"],
+                    "session_id": ep["session_id"],
+                    "started_at": ep["started_at"],
+                    "turn_count": ep["turn_count"],
+                    "turns": [
+                        {
+                            "turn_number": t["turn_number"],
+                            "user": t["user_content"],
+                            "assistant": t["assistant_content"],
+                            "timestamp": t["created_at"],
+                        }
+                        for t in turns
+                    ],
+                })
+
+        return results
+
     def _ensure_entity(self, extracted: ExtractedEntity) -> Optional[int]:
         """Ensure an extracted entity exists in the database"""
         existing = self.db.get_one(
@@ -462,3 +691,18 @@ def remember_entity(name: str, **kwargs) -> int:
 def relate_entities(source: str, target: str, relationship: str, **kwargs) -> Optional[int]:
     """Create a relationship between entities"""
     return get_remember_service().relate_entities(source, target, relationship, **kwargs)
+
+
+def buffer_turn(user_content: str = None, assistant_content: str = None, **kwargs) -> Dict[str, Any]:
+    """Buffer a conversation turn for later summarization"""
+    return get_remember_service().buffer_turn(user_content, assistant_content, **kwargs)
+
+
+def end_session(episode_id: int, narrative: str, **kwargs) -> Dict[str, Any]:
+    """Finalize a session with narrative summary and structured extractions"""
+    return get_remember_service().end_session(episode_id, narrative, **kwargs)
+
+
+def get_unsummarized_turns() -> List[Dict[str, Any]]:
+    """Find episodes with buffered turns that were never summarized"""
+    return get_remember_service().get_unsummarized_turns()

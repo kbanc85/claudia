@@ -104,9 +104,12 @@ CREATE TABLE IF NOT EXISTS episodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT UNIQUE,  -- External session identifier
     summary TEXT,
+    narrative TEXT,  -- Free-form session narrative (tone, context, unresolved threads)
     started_at TEXT DEFAULT (datetime('now')),
     ended_at TEXT,
     message_count INTEGER DEFAULT 0,
+    turn_count INTEGER DEFAULT 0,  -- Buffered turns count
+    is_summarized INTEGER DEFAULT 0,  -- Whether session has been summarized by Claude
     key_topics TEXT,  -- JSON array of main topics
     metadata TEXT
 );
@@ -208,6 +211,27 @@ CREATE VIRTUAL TABLE IF NOT EXISTS message_embeddings USING vec0(
 );
 
 -- ============================================================================
+-- TURN BUFFER: Raw conversation turns awaiting session summary
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS turn_buffer (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    turn_number INTEGER NOT NULL,
+    user_content TEXT,
+    assistant_content TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_turn_buffer_episode ON turn_buffer(episode_id);
+
+-- Episode narrative embeddings (for semantic search across session summaries)
+CREATE VIRTUAL TABLE IF NOT EXISTS episode_embeddings USING vec0(
+    episode_id INTEGER PRIMARY KEY,
+    embedding FLOAT[384]
+);
+
+-- ============================================================================
 -- MIGRATION TRACKING
 -- ============================================================================
 
@@ -217,6 +241,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     description TEXT
 );
 
--- Record initial schema version
+-- Record schema versions
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (1, 'Initial schema with entities, memories, relationships, episodes, patterns, predictions');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (2, 'Add turn_buffer table, episode narrative/summary columns, episode_embeddings');

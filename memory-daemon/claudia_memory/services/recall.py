@@ -334,6 +334,30 @@ class RecallService:
             for row in rel_rows
         ]
 
+        # Get relevant episode narratives mentioning this entity
+        episode_rows = self.db.execute(
+            """
+            SELECT id, session_id, narrative, started_at, ended_at, key_topics
+            FROM episodes
+            WHERE is_summarized = 1
+              AND narrative LIKE ?
+            ORDER BY started_at DESC
+            LIMIT 5
+            """,
+            (f"%{entity['name']}%",),
+            fetch=True,
+        ) or []
+
+        recent_sessions = [
+            {
+                "episode_id": row["id"],
+                "narrative": row["narrative"],
+                "started_at": row["started_at"],
+                "key_topics": json.loads(row["key_topics"]) if row["key_topics"] else [],
+            }
+            for row in episode_rows
+        ]
+
         return {
             "entity": {
                 "id": entity["id"],
@@ -344,6 +368,7 @@ class RecallService:
             },
             "memories": memories,
             "relationships": relationships,
+            "recent_sessions": recent_sessions,
         }
 
     def search_entities(
@@ -445,6 +470,83 @@ class RecallService:
             for row in rows
         ]
 
+    def recall_episodes(
+        self,
+        query: str,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search episode narratives by semantic similarity.
+
+        Returns session summaries that match the query, giving Claude
+        access to the texture and context of past sessions.
+
+        Args:
+            query: What to search for
+            limit: Maximum number of episodes to return
+
+        Returns:
+            List of dicts with episode info and narrative
+        """
+        query_embedding = embed_sync(query)
+
+        if query_embedding:
+            try:
+                rows = self.db.execute(
+                    """
+                    SELECT e.*, (1.0 / (1.0 + ee.distance)) as relevance
+                    FROM episode_embeddings ee
+                    JOIN episodes e ON e.id = ee.episode_id
+                    WHERE ee.embedding MATCH ?
+                    AND e.is_summarized = 1
+                    ORDER BY relevance DESC
+                    LIMIT ?
+                    """,
+                    (json.dumps(query_embedding), limit),
+                    fetch=True,
+                ) or []
+            except Exception as e:
+                logger.warning(f"Episode vector search failed, falling back to keyword: {e}")
+                rows = self.db.execute(
+                    """
+                    SELECT e.*, 0.5 as relevance
+                    FROM episodes e
+                    WHERE e.narrative LIKE ?
+                    AND e.is_summarized = 1
+                    ORDER BY e.started_at DESC
+                    LIMIT ?
+                    """,
+                    (f"%{query}%", limit),
+                    fetch=True,
+                ) or []
+        else:
+            rows = self.db.execute(
+                """
+                SELECT e.*, 0.5 as relevance
+                FROM episodes e
+                WHERE e.narrative LIKE ?
+                AND e.is_summarized = 1
+                ORDER BY e.started_at DESC
+                LIMIT ?
+                """,
+                (f"%{query}%", limit),
+                fetch=True,
+            ) or []
+
+        return [
+            {
+                "episode_id": row["id"],
+                "session_id": row["session_id"],
+                "narrative": row["narrative"],
+                "summary": row["summary"],
+                "started_at": row["started_at"],
+                "ended_at": row["ended_at"],
+                "key_topics": json.loads(row["key_topics"]) if row["key_topics"] else [],
+                "relevance": row["relevance"],
+            }
+            for row in rows
+        ]
+
     def _keyword_search(
         self,
         query: str,
@@ -503,3 +605,8 @@ def recall_about(entity_name: str, **kwargs) -> Dict[str, Any]:
 def search_entities(query: str, **kwargs) -> List[EntityResult]:
     """Search for entities"""
     return get_recall_service().search_entities(query, **kwargs)
+
+
+def recall_episodes(query: str, **kwargs) -> List[Dict[str, Any]]:
+    """Search episode narratives"""
+    return get_recall_service().recall_episodes(query, **kwargs)

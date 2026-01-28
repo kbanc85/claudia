@@ -68,6 +68,29 @@ Claude Code reads `.mcp.json` at startup. If the memory system is installed whil
 
 When the enhanced memory system is available:
 
+### 0. Catch Up on Unsummarized Sessions
+
+Before anything else, check for sessions that ended without a summary:
+
+```
+Call memory.unsummarized:
+├── If results returned → Previous session(s) ended without summary
+│   For each unsummarized session:
+│   ├── Review the buffered turns
+│   ├── Write a retroactive narrative summary
+│   ├── Extract structured facts, commitments, entities, relationships
+│   └── Call memory.end_session to finalize
+├── If no results → Clean slate, proceed normally
+```
+
+This handles the case where the user closed the terminal, lost connection, or simply forgot to let Claude wrap up. The raw turn data is preserved, so Claude can reconstruct what happened and generate a proper summary retroactively.
+
+**When writing a retroactive summary:**
+- Be honest that this is reconstructed from turn fragments, not live context
+- Focus on extracting the signal: what decisions were made, what was discussed, what was left unresolved
+- Still write the narrative with full context and texture, not just bullet points
+- Include a note like "Reconstructed from N buffered turns from [date]"
+
 ### 1. Recall Context
 
 ```
@@ -94,6 +117,7 @@ When someone is mentioned:
 Call memory.about with the person's name:
 ├── Get all memories about them
 ├── Get relationship graph
+├── Get recent session narratives mentioning them
 └── Surface relevant context naturally
 ```
 
@@ -132,28 +156,41 @@ Acknowledge the gap warmly, surface what matters from predictions:
 
 ## During Session (Enhanced Memory)
 
-### Auto-Remembering
+### Per-Turn Capture
 
-As the session progresses, automatically call `memory.remember` for:
-
-1. **New learnings** - Preferences discovered, what works/doesn't
-2. **Pattern observations** - New patterns noticed
-3. **Commitment changes** - Added, completed, or updated
-4. **Relationship updates** - People mentioned, context shared
-5. **Entity information** - New facts about people/projects
+After each meaningful exchange, buffer the turn for later summarization:
 
 ```
-When user shares preference:
-└── Call memory.remember with type="preference"
-
-When commitment detected:
-└── Call memory.remember with type="commitment", about=[entity names]
-
-When pattern noticed:
-└── Call memory.remember with type="pattern"
+After each substantive turn:
+└── Call memory.buffer_turn with:
+    ├── user_content: What the user said (summarized if very long)
+    ├── assistant_content: What I said (key points, not full response)
+    └── episode_id: Reuse the ID from the first buffer_turn call
 ```
 
-### Entity Tracking
+**What counts as "meaningful":**
+- Substantive discussions, decisions, or discoveries
+- Commitment-related exchanges
+- Anything involving people, projects, or relationships
+- Emotional or tonal shifts worth noting
+
+**Skip buffering for:**
+- Quick clarifications or typo corrections
+- Pure tool output with no discussion
+- Trivial back-and-forth
+
+The first `memory.buffer_turn` call creates an episode and returns an `episode_id`. Reuse that ID for all subsequent turns in the session.
+
+### Immediate Memory (Still Active)
+
+For high-importance items, still call `memory.remember` immediately in addition to buffering:
+- Explicit commitments ("I'll send the proposal by Friday")
+- Critical facts the user explicitly asks you to remember
+- Urgent relationship updates
+
+This ensures critical items survive even if the session ends abruptly before summarization.
+
+### Entity and Relationship Tracking
 
 When a person or project is mentioned:
 ```
@@ -163,8 +200,6 @@ Call memory.entity to create/update:
 ├── description: What we learned
 └── aliases: Alternative names mentioned
 ```
-
-### Relationship Tracking
 
 When relationships between entities are mentioned:
 ```
@@ -200,16 +235,40 @@ Session Changes:
 
 ### Enhanced Memory
 
-No explicit save needed - all `memory.remember` calls are immediately persisted (crash-safe).
+Before wrapping up, generate a session summary by calling `memory.end_session`:
 
-If significant session:
 ```
-"Before we wrap, here's what I remembered:
-- [Key learnings stored]
-- [Commitments tracked]
-- [Patterns noted]
+Call memory.end_session with:
+├── episode_id: The episode from buffer_turn calls
+├── narrative: Free-form summary of the session (see below)
+├── facts: Structured facts extracted [{content, type, about, importance}]
+├── commitments: Promises made [{content, about, importance}]
+├── entities: New/updated entities [{name, type, description, aliases}]
+├── relationships: Observed relationships [{source, target, relationship}]
+└── key_topics: Main topics discussed ["topic1", "topic2"]
+```
 
-All safely stored for next time."
+**Writing the narrative:**
+
+The narrative is NOT a compression of the session. It ENHANCES the structured data by capturing what structured fields cannot:
+
+- The **tone and energy** of the conversation ("User was excited about the rebrand but anxious about timeline")
+- **Reasons behind decisions** ("Chose to delay the launch not because of technical issues but because the marketing team wasn't ready")
+- **Unresolved threads** ("Started discussing hiring a PM but pivoted away -- may be avoiding the topic")
+- **Emotional undercurrents** ("Third session in a row mentioning burnout, though always framed as joking")
+- **Half-formed ideas** ("Floated the idea of a podcast but didn't commit -- seemed to be thinking out loud")
+- **Context for future sessions** ("Left off mid-draft on the investor update, needs to finish before Thursday")
+- **What felt important** even if it wasn't explicit ("Spent 20 minutes on a topic they said was 'no big deal' -- probably matters more than they let on")
+
+The narrative and structured extractions are stored together. Both are searchable in future sessions. The narrative gives Claude context that makes structured data meaningful.
+
+```
+"Before we wrap, here's what I captured from this session:
+- [Summary of narrative highlights]
+- [Key facts and commitments stored]
+- [Entities and relationships noted]
+
+All stored for next time."
 ```
 
 ### Markdown Fallback

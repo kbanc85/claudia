@@ -171,7 +171,74 @@ class Database:
             else:
                 logger.warning(f"Schema file not found at {schema_path}")
 
+            # Run migrations for existing databases
+            self._run_migrations(conn)
+
             self._initialized = True
+
+    def _run_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run database migrations for schema changes."""
+        try:
+            # Check current schema version
+            cursor = conn.execute(
+                "SELECT MAX(version) as v FROM schema_migrations"
+            )
+            row = cursor.fetchone()
+            current_version = row["v"] if row and row["v"] else 0
+        except sqlite3.OperationalError:
+            # schema_migrations table doesn't exist yet, schema.sql will create it
+            return
+
+        if current_version < 2:
+            # Migration 2: Add turn_buffer, episode narrative columns, episode_embeddings
+            migration_stmts = [
+                "ALTER TABLE episodes ADD COLUMN narrative TEXT",
+                "ALTER TABLE episodes ADD COLUMN turn_count INTEGER DEFAULT 0",
+                "ALTER TABLE episodes ADD COLUMN is_summarized INTEGER DEFAULT 0",
+                """CREATE TABLE IF NOT EXISTS turn_buffer (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+                    turn_number INTEGER NOT NULL,
+                    user_content TEXT,
+                    assistant_content TEXT,
+                    created_at TEXT DEFAULT (datetime('now'))
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_turn_buffer_episode ON turn_buffer(episode_id)",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower() and "already exists" not in str(e).lower():
+                        logger.warning(f"Migration 2 statement failed: {e}")
+
+            # Try to create episode_embeddings virtual table
+            try:
+                conn.execute(
+                    """CREATE VIRTUAL TABLE IF NOT EXISTS episode_embeddings USING vec0(
+                        episode_id INTEGER PRIMARY KEY,
+                        embedding FLOAT[384]
+                    )"""
+                )
+            except sqlite3.OperationalError as e:
+                if "no such module: vec0" in str(e):
+                    logger.warning("Skipping episode_embeddings virtual table: sqlite-vec not available")
+                else:
+                    logger.warning(f"Could not create episode_embeddings: {e}")
+
+            # Mark existing episodes as summarized if they have a summary
+            try:
+                conn.execute(
+                    "UPDATE episodes SET is_summarized = 1 WHERE summary IS NOT NULL AND summary != ''"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (2, 'Add turn_buffer table, episode narrative/summary columns, episode_embeddings')"
+            )
+            conn.commit()
+            logger.info("Applied migration 2: turn buffer and session narratives")
 
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False

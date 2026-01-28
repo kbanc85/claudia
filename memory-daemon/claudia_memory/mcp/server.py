@@ -29,10 +29,14 @@ from ..services.recall import (
     get_recall_service,
     recall,
     recall_about,
+    recall_episodes,
     search_entities,
 )
 from ..services.remember import (
+    buffer_turn,
+    end_session,
     get_remember_service,
+    get_unsummarized_turns,
     relate_entities,
     remember_entity,
     remember_fact,
@@ -233,6 +237,150 @@ async def list_tools() -> ListToolsResult:
                 "required": ["query"],
             },
         ),
+        Tool(
+            name="memory.buffer_turn",
+            description="Buffer a conversation turn for end-of-session summarization. Call this after each meaningful exchange. Lightweight -- no embedding generation or extraction, just raw storage. Returns an episode_id to reuse on subsequent calls within the same session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_content": {
+                        "type": "string",
+                        "description": "What the user said in this turn",
+                    },
+                    "assistant_content": {
+                        "type": "string",
+                        "description": "What the assistant said in this turn",
+                    },
+                    "episode_id": {
+                        "type": "integer",
+                        "description": "Episode ID from a previous buffer_turn call (omit on first call to create new episode)",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="memory.end_session",
+            description=(
+                "Finalize a session with a narrative summary and structured extractions. "
+                "Call at session end. The narrative should ENHANCE stored information -- capture "
+                "tone, emotional context, unresolved threads, reasons behind decisions, half-formed "
+                "ideas, and anything that doesn't fit structured categories. The structured fields "
+                "(facts, commitments, entities, relationships) are stored alongside the narrative, "
+                "not replaced by it. Both are searchable in future sessions."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "episode_id": {
+                        "type": "integer",
+                        "description": "Episode ID from buffer_turn calls during the session",
+                    },
+                    "narrative": {
+                        "type": "string",
+                        "description": (
+                            "Free-form narrative summary of the session. Capture the texture: "
+                            "what was discussed, what felt important, what was unresolved, "
+                            "emotional undercurrents, reasons behind decisions, context that "
+                            "enriches the structured data. This is NOT a compression -- it adds "
+                            "dimensions that structured fields cannot capture."
+                        ),
+                    },
+                    "facts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": {"type": "string"},
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["fact", "preference", "observation", "learning", "pattern"],
+                                    "default": "fact",
+                                },
+                                "about": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Entity names this fact relates to",
+                                },
+                                "importance": {"type": "number", "default": 1.0},
+                            },
+                            "required": ["content"],
+                        },
+                        "description": "Structured facts, preferences, observations, learnings extracted from the session",
+                    },
+                    "commitments": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": {"type": "string"},
+                                "about": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "importance": {"type": "number", "default": 1.0},
+                            },
+                            "required": ["content"],
+                        },
+                        "description": "Commitments or promises made during the session",
+                    },
+                    "entities": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["person", "organization", "project", "concept", "location"],
+                                    "default": "person",
+                                },
+                                "description": {"type": "string"},
+                                "aliases": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                            "required": ["name"],
+                        },
+                        "description": "New or updated entities mentioned during the session",
+                    },
+                    "relationships": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "source": {"type": "string"},
+                                "target": {"type": "string"},
+                                "relationship": {"type": "string"},
+                                "strength": {"type": "number", "default": 1.0},
+                            },
+                            "required": ["source", "target", "relationship"],
+                        },
+                        "description": "Relationships between entities observed during the session",
+                    },
+                    "key_topics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Main topics discussed in the session",
+                    },
+                },
+                "required": ["episode_id", "narrative"],
+            },
+        ),
+        Tool(
+            name="memory.unsummarized",
+            description=(
+                "Check for previous sessions that ended without a summary. "
+                "Call at session start. If results are returned, Claude should "
+                "review the buffered turns and generate a retroactive summary "
+                "by calling memory.end_session for each orphaned episode."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -399,6 +547,54 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                                 ]
                             }
                         ),
+                    )
+                ]
+            )
+
+        elif name == "memory.buffer_turn":
+            result = buffer_turn(
+                user_content=arguments.get("user_content"),
+                assistant_content=arguments.get("assistant_content"),
+                episode_id=arguments.get("episode_id"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.end_session":
+            result = end_session(
+                episode_id=arguments["episode_id"],
+                narrative=arguments["narrative"],
+                facts=arguments.get("facts"),
+                commitments=arguments.get("commitments"),
+                entities=arguments.get("entities"),
+                relationships=arguments.get("relationships"),
+                key_topics=arguments.get("key_topics"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.unsummarized":
+            results = get_unsummarized_turns()
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "unsummarized_sessions": results,
+                            "count": len(results),
+                        }),
                     )
                 ]
             )
