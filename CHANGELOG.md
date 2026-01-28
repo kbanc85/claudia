@@ -2,6 +2,35 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.3.1 (2026-01-28)
+
+### Per-Project Memory Isolation
+
+Each Claudia installation now gets its own isolated memory database, so memories from work projects don't mix with personal projects.
+
+### Added
+
+- **--project-dir argument** - Memory daemon accepts project directory for database isolation
+- **Automatic isolation** - `.mcp.json.example` uses `${workspaceFolder}` to auto-isolate per project
+- **Deterministic hashing** - Same project directory always maps to same database file
+
+### How It Works
+
+When Claude Code launches the MCP server, it passes the workspace folder. The daemon hashes the path to create a unique database:
+
+```
+~/.claudia/memory/
+├── claudia.db          ← Global fallback (backward compatible)
+├── a1b2c3d4.db         ← Project A's memories
+├── e5f6g7h8.db         ← Project B's memories
+```
+
+### Backward Compatible
+
+Existing installations without `--project-dir` continue using the global database.
+
+---
+
 ## 1.3.0 (2026-01-28)
 
 ### Business Operating System
