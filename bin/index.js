@@ -139,11 +139,12 @@ async function main() {
               writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
               console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
             }
+            showNextSteps(true); // Memory installed - emphasize restart
           } else {
             console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
             console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
+            showNextSteps(false);
           }
-          showNextSteps();
         });
 
         return; // Wait for spawn to complete
@@ -156,18 +157,32 @@ async function main() {
     }
   }
 
-  showNextSteps();
+  showNextSteps(false);
 
-  function showNextSteps() {
-    // Show next steps
+  function showNextSteps(memoryInstalled) {
+    // Show next steps - different message if memory was installed
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
-    console.log(`
+
+    if (memoryInstalled) {
+      // Memory was installed - emphasize restart requirement
+      console.log(`
+${colors.bold}${colors.yellow}IMPORTANT: Open a NEW terminal before running claude${colors.reset}
+
+${cdStep}  ${colors.cyan}claude${colors.reset}
+  ${colors.dim}Memory tools need a fresh terminal to activate.${colors.reset}
+
+${colors.dim}Troubleshooting: ~/.claudia/diagnose.sh${colors.reset}
+`);
+    } else {
+      // No memory - standard message
+      console.log(`
 ${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
   ${colors.dim}Say hi!${colors.reset}
 
 ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 `);
+    }
   }
 }
 

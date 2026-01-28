@@ -17,8 +17,50 @@ At session start, check which memory system is available:
 Session Start:
 ├── Check if memory.recall tool exists
 │   ├── YES → Use enhanced memory system
-│   └── NO → Fall back to markdown files
+│   └── NO → Check if this might be a restart issue
+│       ├── Check daemon health: curl -s localhost:3848/health
+│       │   ├── Healthy but no MCP tools → User needs to restart Claude Code
+│       │   └── Not healthy → Fall back to markdown files
 ```
+
+---
+
+## Troubleshooting MCP Connection
+
+When enhanced memory SHOULD be available but isn't detected:
+
+### Signs of Misconfiguration
+
+- Daemon is running (health check passes)
+- `.mcp.json` has claudia-memory entry
+- But `memory.recall` tool is not available
+
+### User Guidance
+
+If fallback to markdown occurs but the daemon appears healthy, guide the user:
+
+```
+"I notice the enhanced memory daemon is running (health check passed),
+but I can't access the memory tools. This usually means Claude Code
+needs to be restarted to pick up the MCP configuration.
+
+Try closing this terminal and running 'claude' in a new terminal.
+
+You can also run: ~/.claudia/diagnose.sh for a full diagnostic."
+```
+
+### Detection Flow
+
+Before silently falling back to markdown, if `.mcp.json` exists with claudia-memory:
+
+1. Quietly check daemon health: `curl -s localhost:3848/health`
+2. If healthy but no MCP tools available → Restart needed
+3. Surface the restart message to the user instead of silent fallback
+4. Only fall back to markdown if the daemon is genuinely not running
+
+### Why This Happens
+
+Claude Code reads `.mcp.json` at startup. If the memory system is installed while Claude Code is already running in the same terminal, the new MCP server won't be detected until Claude Code is restarted in a new terminal session.
 
 ---
 

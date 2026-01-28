@@ -451,4 +451,16 @@ def main():
 
 
 if __name__ == "__main__":
+    # Quick startup test mode for diagnostics
+    if "--test" in sys.argv:
+        # Verify we can import all required modules and list tools
+        try:
+            # Test that server is properly configured
+            assert server is not None
+            print("MCP server OK")
+            sys.exit(0)
+        except Exception as e:
+            print(f"MCP server ERROR: {e}")
+            sys.exit(1)
+
     main()

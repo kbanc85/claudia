@@ -189,6 +189,11 @@ cp "$SOURCE_DIR/pyproject.toml" "$DAEMON_DIR/"
 cp "$SOURCE_DIR/requirements.txt" "$DAEMON_DIR/"
 echo -e "  ${GREEN}✓${NC} Core files installed"
 
+# Copy diagnostic script to ~/.claudia for easy access
+cp "$SOURCE_DIR/scripts/diagnose.sh" "$CLAUDIA_DIR/diagnose.sh"
+chmod +x "$CLAUDIA_DIR/diagnose.sh"
+echo -e "  ${GREEN}✓${NC} Diagnostic script installed"
+
 echo
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
@@ -325,15 +330,28 @@ echo
 # Success banner
 echo -e "${GREEN}"
 cat << 'EOF'
-  ╔═══════════════════════════════════════════════════════╗
-  ║                                                       ║
-  ║   ✨ Claudia is ready. ✨                             ║
-  ║                                                       ║
-  ║   Your agentic executive assistant who learns         ║
-  ║   how you work, tracks your commitments, and          ║
-  ║   remembers the people and projects that matter.      ║
-  ║                                                       ║
-  ╚═══════════════════════════════════════════════════════╝
+  ╔═══════════════════════════════════════════════════════════╗
+  ║                                                           ║
+  ║   ✨ Memory system installed successfully! ✨             ║
+  ║                                                           ║
+  ╚═══════════════════════════════════════════════════════════╝
+EOF
+echo -e "${NC}"
+
+# CRITICAL: Restart warning in a box
+echo -e "${YELLOW}${BOLD}"
+cat << 'EOF'
+  ┌─────────────────────────────────────────────────────────────┐
+  │                                                             │
+  │   ⚠️  IMPORTANT: Restart Claude Code to activate memory    │
+  │                                                             │
+  │   Close this terminal and open a new one, then run:        │
+  │                                                             │
+  │       claude                                                │
+  │                                                             │
+  │   Memory tools won't work until you restart!               │
+  │                                                             │
+  └─────────────────────────────────────────────────────────────┘
 EOF
 echo -e "${NC}"
 
@@ -350,25 +368,15 @@ echo -e "  ${YELLOW}○${NC} Vector search      ${DIM}Disabled (install Ollama t
 fi
 echo
 
-echo -e "${BOLD}Quick commands:${NC}"
+echo -e "${BOLD}Troubleshooting:${NC}"
 echo
-echo -e "  ${DIM}Check status:${NC}  curl http://localhost:3848/status"
-echo -e "  ${DIM}View stats:${NC}    curl http://localhost:3848/stats"
+echo -e "  ${DIM}Run diagnostics:${NC}  ~/.claudia/diagnose.sh"
+echo -e "  ${DIM}Check health:${NC}     curl http://localhost:3848/health"
 if [[ "$OSTYPE" == "darwin"* ]]; then
-echo -e "  ${DIM}View logs:${NC}     tail -f ~/.claudia/daemon-stderr.log"
+echo -e "  ${DIM}View logs:${NC}        tail -f ~/.claudia/daemon-stderr.log"
 else
-echo -e "  ${DIM}View logs:${NC}     journalctl --user -u claudia-memory -f"
+echo -e "  ${DIM}View logs:${NC}        journalctl --user -u claudia-memory -f"
 fi
-echo
-
-echo -e "${BOLD}Next step:${NC}"
-echo
-echo -e "  Add this to your ${CYAN}.mcp.json${NC}:"
-echo
-echo -e "  ${DIM}\"claudia-memory\": {${NC}"
-echo -e "  ${DIM}  \"command\": \"$VENV_DIR/bin/python\",${NC}"
-echo -e "  ${DIM}  \"args\": [\"-m\", \"claudia_memory.mcp.server\"]${NC}"
-echo -e "  ${DIM}}${NC}"
 echo
 
 # Claudia says goodbye
