@@ -2,6 +2,14 @@
 <img src="assets/claudia-banner.gif" alt="Claudia" width="500">
 </p>
 
+<p align="center">
+  <a href="https://github.com/kbanc85/claudia/stargazers"><img src="https://img.shields.io/github/stars/kbanc85/claudia?style=flat-square" alt="GitHub stars"></a>
+  <a href="https://www.npmjs.com/package/get-claudia"><img src="https://img.shields.io/npm/v/get-claudia?style=flat-square" alt="npm version"></a>
+  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D14-brightgreen?style=flat-square" alt="Node.js"></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square" alt="Python"></a>
+</p>
+
 <h3 align="center">An AI assistant who learns how you work.</h3>
 
 <p align="center">
@@ -43,16 +51,16 @@ Say hi. She'll introduce herself and set things up for you.
 
 ---
 
-## What's New in v1.2.5
+## What's New in v1.3.1
 
-**Fully automatic memory system** - No more manual steps after install:
+**Per-project memory isolation** - Each Claudia installation now gets its own memories:
 
-- **Works after reboot** - Ollama and the memory daemon auto-start on login (macOS LaunchAgent)
-- **Python 3.13 support** - sqlite-vec now works on all Python versions
-- **Boot resilience** - Daemon waits for Ollama to start instead of failing silently
-- **Better diagnostics** - Run `~/.claudia/diagnose.sh` to check all services
+- **Automatic isolation** - Work project memories don't mix with personal projects
+- **Zero config required** - Uses `${workspaceFolder}` to auto-isolate per project
+- **Business Operating System** (v1.3.0) - Deep folder structures with pipeline tracking, financial management, accountability
+- **5 new commands** - `/pipeline-review`, `/financial-snapshot`, `/client-health`, `/accountability-check`
 
-The memory system just works now. Install, reboot, and everything comes back up.
+Memories stay where they belong. Each project is its own context.
 
 ---
 
@@ -90,10 +98,6 @@ Restart Claude Code in a new terminal, and Claudia now has persistent memory.
 ---
 
 ## Your First Conversation
-
-<p align="center">
-<img src="assets/demo.gif" alt="Claudia onboarding conversation" width="700">
-</p>
 
 When you first run `claude`, she introduces herself and learns about you:
 
