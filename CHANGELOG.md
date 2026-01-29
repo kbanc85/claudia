@@ -2,6 +2,24 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.5.0 (2026-01-29)
+
+### Windows Support
+
+Claudia's memory system now installs and runs on Windows.
+
+### Added
+
+- **Windows installer** (`install.ps1`) - Full 8-step PowerShell installer matching macOS/Linux functionality. Uses Windows Task Scheduler for auto-start instead of LaunchAgent/systemd.
+- **Windows diagnostics** (`diagnose.ps1`) - 11 diagnostic checks for troubleshooting on Windows.
+- **Platform detection** - `bin/index.js` detects Windows and spawns PowerShell with the correct full path (fixes Git Bash PATH issues). Uses Windows venv paths for `.mcp.json`.
+
+### Tested
+
+- Windows 10, Python 3.12, PowerShell 5.1
+
+---
+
 ## 1.4.1 (2026-01-28)
 
 ### Fixed
