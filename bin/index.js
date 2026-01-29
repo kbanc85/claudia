@@ -5,9 +5,17 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, spawn } from 'child_process';
 import { createInterface } from 'readline';
+import { homedir } from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const isWindows = process.platform === 'win32';
+
+// Resolve full PowerShell path on Windows (not always on PATH, e.g. Git Bash)
+const powershellPath = isWindows
+  ? join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  : null;
 
 // ANSI color codes
 const colors = {
@@ -127,14 +135,19 @@ async function main() {
   if (setupMemory) {
     console.log(`\n${colors.cyan}Setting up enhanced memory system...${colors.reset}`);
 
-    const memoryDaemonPath = join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
+    const memoryDaemonPath = isWindows
+      ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
+      : join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
 
     if (existsSync(memoryDaemonPath)) {
       try {
         // Run the install script, passing project path for upgrades
-        const result = spawn('bash', [memoryDaemonPath], {
+        const spawnCmd = isWindows ? powershellPath : 'bash';
+        const spawnArgs = isWindows
+          ? ['-ExecutionPolicy', 'Bypass', '-File', memoryDaemonPath]
+          : [memoryDaemonPath];
+        const result = spawn(spawnCmd, spawnArgs, {
           stdio: 'inherit',
-          shell: true,
           env: {
             ...process.env,
             CLAUDIA_PROJECT_PATH: isUpgrade ? targetPath : ''
@@ -153,8 +166,14 @@ async function main() {
               // Read example and add memory server
               let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
               mcpConfig.mcpServers = mcpConfig.mcpServers || {};
+
+              const home = homedir();
+              const pythonCmd = isWindows
+                ? join(home, '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
+                : `${process.env.HOME}/.claudia/daemon/venv/bin/python`;
+
               mcpConfig.mcpServers['claudia-memory'] = {
-                command: `${process.env.HOME}/.claudia/daemon/venv/bin/python`,
+                command: pythonCmd,
                 args: ['-m', 'claudia_memory.mcp.server'],
                 _description: 'Claudia memory system with vector search'
               };
@@ -164,7 +183,11 @@ async function main() {
             showNextSteps(true); // Memory installed - emphasize restart
           } else {
             console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
-            console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
+            if (isWindows) {
+              console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${memoryDaemonPath}"${colors.reset}`);
+            } else {
+              console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
+            }
             showNextSteps(false);
           }
         });
@@ -193,7 +216,7 @@ ${cdStep}  ${colors.cyan}claude${colors.reset}
   ${colors.dim}Memory system ready!${colors.reset}
 
 ${colors.dim}If Claude was already running elsewhere, restart it to activate memory tools.${colors.reset}
-${colors.dim}Troubleshooting: ~/.claudia/diagnose.sh${colors.reset}
+${colors.dim}Troubleshooting: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}
 `);
     } else {
       // No memory - standard message
