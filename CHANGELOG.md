@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.4.1 (2026-01-28)
+
+### Fixed
+
+- **spaCy crash on Python 3.14** - The entity extractor only caught `ImportError` when spaCy failed to load, but Python 3.14 triggers an internal `ConfigError` from Pydantic v1 instead. Broadened the exception handler so the daemon falls back to regex-based entity extraction gracefully instead of crashing on startup.
+
+---
+
 ## 1.4.0 (2026-01-28)
 
 ### Per-Turn Memory Capture & Session Narratives
