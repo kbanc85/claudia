@@ -137,20 +137,31 @@ if command -v ollama &> /dev/null; then
     echo -e "  ${GREEN}✓${NC} Ollama installed"
     OLLAMA_AVAILABLE=true
 else
-    echo -e "  ${YELLOW}○${NC} Ollama not found (optional)"
+    echo -e "  ${YELLOW}○${NC} Ollama not found"
     OLLAMA_AVAILABLE=false
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo
+    echo -e "  ${DIM}Ollama enables semantic vector search.${NC}"
+    echo -e "  ${DIM}Without it, Claudia falls back to keyword search.${NC}"
+    echo
+    read -p "  Install Ollama now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo
-        echo -e "  ${DIM}Ollama enables semantic vector search.${NC}"
-        echo -e "  ${DIM}Without it, Claudia falls back to keyword search.${NC}"
-        echo
-        read -p "  Install Ollama now? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo
+        if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &> /dev/null; then
             echo -e "  ${CYAN}Installing Ollama via Homebrew...${NC}"
-            brew install ollama 2>/dev/null && OLLAMA_AVAILABLE=true || echo -e "  ${YELLOW}!${NC} Brew install failed, continuing without"
+            brew install ollama 2>/dev/null && OLLAMA_AVAILABLE=true
+        fi
+
+        if [ "$OLLAMA_AVAILABLE" = false ]; then
+            echo -e "  ${CYAN}Installing Ollama...${NC}"
+            curl -fsSL https://ollama.com/install.sh | sh 2>/dev/null && OLLAMA_AVAILABLE=true
+        fi
+
+        if [ "$OLLAMA_AVAILABLE" = true ]; then
+            echo -e "  ${GREEN}✓${NC} Ollama installed"
+        else
+            echo -e "  ${YELLOW}!${NC} Ollama install failed, continuing without"
+            echo -e "  ${DIM}Install manually: https://ollama.com/download${NC}"
         fi
     fi
 fi

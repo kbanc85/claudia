@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.5.1 (2026-01-29)
+
+### Automatic Ollama Installation
+
+The installer now offers to install Ollama automatically on all platforms when it isn't already present.
+
+### Changed
+
+- **macOS/Linux** - Tries Homebrew first (macOS), then falls back to the official Ollama install script (`curl -fsSL https://ollama.com/install.sh | sh`). Works on both macOS and Linux now (previously macOS-only).
+- **Windows** - Tries `winget install Ollama.Ollama` first, then falls back to downloading and running `OllamaSetup.exe` directly. PATH is refreshed automatically so the installer can continue without restarting the terminal.
+
+---
+
 ## 1.5.0 (2026-01-29)
 
 ### Windows Support
