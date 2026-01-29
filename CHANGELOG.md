@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.5.2 (2026-01-29)
+
+### Fixed
+
+- **Windows** - Ollama installer now runs silently (`/S` flag) after the user confirms. Previously it opened the GUI installer requiring manual clicks.
+
+---
+
 ## 1.5.1 (2026-01-29)
 
 ### Automatic Ollama Installation

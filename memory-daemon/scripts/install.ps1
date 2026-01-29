@@ -131,8 +131,8 @@ try {
             $ollamaInstaller = "$env:TEMP\OllamaSetup.exe"
             try {
                 Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" -OutFile $ollamaInstaller -UseBasicParsing
-                Write-Host "  ${CYAN}Running Ollama installer (follow the prompts)...${NC}"
-                Start-Process -FilePath $ollamaInstaller -Wait
+                Write-Host "  ${CYAN}Installing Ollama...${NC}"
+                Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
                 # Refresh PATH
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
                 $null = & ollama --version 2>&1
