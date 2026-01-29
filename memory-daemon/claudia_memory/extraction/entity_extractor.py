@@ -34,9 +34,9 @@ try:
         return _nlp
 
     SPACY_AVAILABLE = True
-except ImportError:
+except (ImportError, Exception) as e:
     SPACY_AVAILABLE = False
-    logger.warning("spaCy not installed. Entity extraction will use regex only.")
+    logger.warning(f"spaCy not available ({type(e).__name__}: {e}). Entity extraction will use regex only.")
 
     def _get_nlp():
         return None
