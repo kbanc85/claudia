@@ -33,6 +33,7 @@ from ..services.recall import (
     search_entities,
     trace_memory,
 )
+from ..services.ingest import get_ingest_service
 from ..services.remember import (
     buffer_turn,
     end_session,
@@ -522,6 +523,40 @@ async def list_tools() -> ListToolsResult:
                 "required": ["memory_id"],
             },
         ),
+        Tool(
+            name="cognitive.ingest",
+            description=(
+                "Extract structured data from raw text using a local language model. "
+                "Use this when the user pastes a meeting transcript, email, document, or "
+                "any large block of text that needs entity extraction, fact identification, "
+                "and commitment detection. Returns structured JSON with entities, facts, "
+                "commitments, action items, and relationships. If no local language model "
+                "is available, returns the raw text so Claude can process it directly."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The raw text to extract structured data from",
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["meeting", "email", "document", "general"],
+                        "description": "Type of source text (affects extraction schema)",
+                        "default": "general",
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": (
+                            "Optional context about the text "
+                            "(e.g., 'Call between user and their investor Sarah')"
+                        ),
+                    },
+                },
+                "required": ["text"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -828,6 +863,22 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             "failed": failed,
                             "results": results,
                         }),
+                    )
+                ]
+            )
+
+        elif name == "cognitive.ingest":
+            svc = get_ingest_service()
+            result = await svc.ingest(
+                text=arguments["text"],
+                source_type=arguments.get("source_type", "general"),
+                context=arguments.get("context"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
                     )
                 ]
             )

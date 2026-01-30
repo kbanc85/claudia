@@ -249,6 +249,84 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
             echo -e "  ${YELLOW}!${NC} Model pull failed (will retry when Ollama runs)"
         fi
     fi
+
+    # Language model for cognitive tools (optional)
+    echo
+    echo -e "  ${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo
+    echo -e "  ${BOLD}Cognitive Tools (Optional)${NC}"
+    echo
+    echo -e "  ${DIM}A local language model lets Claudia extract entities,${NC}"
+    echo -e "  ${DIM}facts, and commitments from text locally -- no API keys.${NC}"
+    echo -e "  ${DIM}Without it, Claude handles extraction directly.${NC}"
+    echo
+    echo -e "  ${BOLD}Choose a model:${NC}"
+    echo -e "    ${CYAN}1)${NC} qwen3:4b    ${DIM}(~3GB, recommended, strong tool calling)${NC}"
+    echo -e "    ${CYAN}2)${NC} smollm3:3b  ${DIM}(~2GB, 95% JSON accuracy, Hugging Face)${NC}"
+    echo -e "    ${CYAN}3)${NC} llama3.2:3b ${DIM}(~2GB, solid general extraction)${NC}"
+    echo -e "    ${CYAN}4)${NC} Skip        ${DIM}(Claude handles everything, no extra download)${NC}"
+    echo
+    read -p "  Your choice [1-4, default=4]: " LLM_CHOICE
+    LLM_CHOICE=${LLM_CHOICE:-4}
+
+    LLM_MODEL=""
+    case "$LLM_CHOICE" in
+        1) LLM_MODEL="qwen3:4b" ;;
+        2) LLM_MODEL="smollm3:3b" ;;
+        3) LLM_MODEL="llama3.2:3b" ;;
+        4) LLM_MODEL="" ;;
+        *) LLM_MODEL="" ;;
+    esac
+
+    if [ -n "$LLM_MODEL" ]; then
+        if ollama list 2>/dev/null | grep -q "${LLM_MODEL%%:*}"; then
+            echo -e "  ${GREEN}✓${NC} Language model ${LLM_MODEL} already available"
+        else
+            echo -e "  ${CYAN}◐${NC} Downloading ${LLM_MODEL}..."
+            echo -e "    ${DIM}This may take a few minutes depending on your connection${NC}"
+            echo
+            if ollama pull "$LLM_MODEL" 2>/dev/null; then
+                echo -e "  ${GREEN}✓${NC} Language model downloaded"
+            else
+                echo -e "  ${YELLOW}!${NC} Download failed (you can pull it later: ollama pull ${LLM_MODEL})"
+                LLM_MODEL=""
+            fi
+        fi
+
+        # Write model choice to config
+        if [ -n "$LLM_MODEL" ]; then
+            CONFIG_FILE="$HOME/.claudia/config.json"
+            if [ -f "$CONFIG_FILE" ]; then
+                # Update existing config (simple key replacement)
+                "$PYTHON" -c "
+import json, sys
+with open('$CONFIG_FILE') as f:
+    cfg = json.load(f)
+cfg['language_model'] = '$LLM_MODEL'
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null || true
+            else
+                mkdir -p "$HOME/.claudia"
+                echo "{\"language_model\": \"$LLM_MODEL\"}" > "$CONFIG_FILE"
+            fi
+            echo -e "  ${GREEN}✓${NC} Config updated: language_model = ${LLM_MODEL}"
+        fi
+    else
+        echo -e "  ${DIM}Skipped. Claude will handle extraction directly.${NC}"
+        # Write empty string to disable cognitive tools
+        CONFIG_FILE="$HOME/.claudia/config.json"
+        if [ -f "$CONFIG_FILE" ]; then
+            "$PYTHON" -c "
+import json
+with open('$CONFIG_FILE') as f:
+    cfg = json.load(f)
+cfg['language_model'] = ''
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null || true
+        fi
+    fi
 else
     echo -e "  ${YELLOW}○${NC} Skipping (Ollama not available)"
     echo -e "    ${DIM}Claudia will use keyword search instead${NC}"
@@ -466,6 +544,13 @@ else
     echo -e "  ${YELLOW}○${NC} Embedding model pending"
 fi
 
+# Check 3b: Language model (cognitive tools)
+if [ -n "$LLM_MODEL" ] && [ "$OLLAMA_AVAILABLE" = true ] && ollama list 2>/dev/null | grep -q "${LLM_MODEL%%:*}"; then
+    echo -e "  ${GREEN}✓${NC} Language model ready (${LLM_MODEL})"
+else
+    echo -e "  ${DIM}○${NC} Language model not installed (cognitive tools disabled)"
+fi
+
 # Check 4: sqlite-vec (vector search)
 if "$VENV_DIR/bin/python" -c "import sqlite_vec" 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} Vector search available (sqlite-vec)"
@@ -528,6 +613,11 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
 echo -e "  ${CYAN}◆${NC} Vector search      ${DIM}Enabled (Ollama)${NC}"
 else
 echo -e "  ${YELLOW}○${NC} Vector search      ${DIM}Disabled (install Ollama to enable)${NC}"
+fi
+if [ -n "$LLM_MODEL" ]; then
+echo -e "  ${CYAN}◆${NC} Cognitive tools    ${DIM}Enabled (${LLM_MODEL})${NC}"
+else
+echo -e "  ${DIM}○${NC} Cognitive tools    ${DIM}Disabled (Claude handles extraction)${NC}"
 fi
 echo
 

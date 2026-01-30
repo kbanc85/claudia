@@ -23,6 +23,10 @@ class MemoryConfig:
     embedding_model: str = "all-minilm:l6-v2"
     embedding_dimensions: int = 384
 
+    # Language model settings (for cognitive tools like ingest/classify)
+    # Set to empty string "" to disable cognitive tools entirely
+    language_model: str = "qwen3:4b"
+
     # Decay and consolidation settings
     decay_rate_daily: float = 0.995  # Importance multiplier per day
     min_importance_threshold: float = 0.1  # Below this, excluded from default search
@@ -67,6 +71,8 @@ class MemoryConfig:
                     config.embedding_model = data["embedding_model"]
                 if "embedding_dimensions" in data:
                     config.embedding_dimensions = data["embedding_dimensions"]
+                if "language_model" in data:
+                    config.language_model = data["language_model"]
                 if "decay_rate_daily" in data:
                     config.decay_rate_daily = data["decay_rate_daily"]
                 if "min_importance_threshold" in data:
@@ -107,6 +113,7 @@ class MemoryConfig:
             "ollama_host": self.ollama_host,
             "embedding_model": self.embedding_model,
             "embedding_dimensions": self.embedding_dimensions,
+            "language_model": self.language_model,
             "decay_rate_daily": self.decay_rate_daily,
             "min_importance_threshold": self.min_importance_threshold,
             "consolidation_interval_hours": self.consolidation_interval_hours,
