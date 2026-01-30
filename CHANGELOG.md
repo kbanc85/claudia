@@ -2,6 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.7.0 (2026-01-30)
+
+### Episodic Memory Provenance
+
+Memories now carry source provenance, so Claudia can trace any fact back to the original email, transcript, document, or conversation it came from.
+
+### Added
+
+- **Source tracing on recall** - Every memory result now includes `source`, `source_id`, and `source_context` fields identifying where the information originated.
+- **`memory.trace` MCP tool** - On-demand provenance reconstruction. Returns the full chain: memory, source episode narrative, archived conversation turns, and source material file preview. Zero cost until invoked.
+- **Source material storage** - `memory.remember`, `memory.end_session`, and `memory.batch` accept `source_material` to save raw text (emails, transcripts, docs) to `~/.claudia/memory/sources/` as human-readable markdown files.
+- **Archived turn buffer** - Session conversation turns are now archived instead of deleted after summarization, preserving the raw exchange for later tracing.
+- **Schema migration v3** - Adds `source_context` to memories table and `is_archived` to turn_buffer. Fully backward compatible with existing databases.
+
+---
+
 ## 1.6.0 (2026-01-29)
 
 ### In-Place Upgrades
