@@ -381,6 +381,83 @@ async def list_tools() -> ListToolsResult:
                 "properties": {},
             },
         ),
+        Tool(
+            name="memory.batch",
+            description=(
+                "Execute multiple memory operations in a single call. Use this for mid-session "
+                "entity creation when processing a new person, meeting transcript, or topic that "
+                "requires entity creation, multiple memories, and relationships. Much more efficient "
+                "than calling memory.entity, memory.remember, and memory.relate separately. "
+                "For end-of-session summaries, use memory.end_session instead."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operations": {
+                        "type": "array",
+                        "description": "Array of operations to execute in order",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "op": {
+                                    "type": "string",
+                                    "enum": ["entity", "remember", "relate"],
+                                    "description": "Operation type",
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Entity name (for 'entity' op)",
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "description": "Entity type or memory type",
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Entity description (for 'entity' op)",
+                                },
+                                "aliases": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Entity aliases (for 'entity' op)",
+                                },
+                                "content": {
+                                    "type": "string",
+                                    "description": "Memory content (for 'remember' op)",
+                                },
+                                "about": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Entity names this relates to (for 'remember' op)",
+                                },
+                                "importance": {
+                                    "type": "number",
+                                    "description": "Importance score 0.0-1.0 (for 'remember' op)",
+                                },
+                                "source": {
+                                    "type": "string",
+                                    "description": "Source entity (for 'relate' op)",
+                                },
+                                "target": {
+                                    "type": "string",
+                                    "description": "Target entity (for 'relate' op)",
+                                },
+                                "relationship": {
+                                    "type": "string",
+                                    "description": "Relationship type (for 'relate' op)",
+                                },
+                                "strength": {
+                                    "type": "number",
+                                    "description": "Relationship strength 0.0-1.0 (for 'relate' op)",
+                                },
+                            },
+                            "required": ["op"],
+                        },
+                    },
+                },
+                "required": ["operations"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -594,6 +671,66 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                         text=json.dumps({
                             "unsummarized_sessions": results,
                             "count": len(results),
+                        }),
+                    )
+                ]
+            )
+
+        elif name == "memory.batch":
+            operations = arguments.get("operations", [])
+            results = []
+            for i, op in enumerate(operations):
+                op_type = op.get("op")
+                op_result = {"index": i, "op": op_type}
+                try:
+                    if op_type == "entity":
+                        entity_id = remember_entity(
+                            name=op["name"],
+                            entity_type=op.get("type", "person"),
+                            description=op.get("description"),
+                            aliases=op.get("aliases"),
+                        )
+                        op_result["success"] = True
+                        op_result["entity_id"] = entity_id
+                    elif op_type == "remember":
+                        memory_id = remember_fact(
+                            content=op["content"],
+                            memory_type=op.get("type", "fact"),
+                            about_entities=op.get("about"),
+                            importance=op.get("importance", 1.0),
+                        )
+                        op_result["success"] = True
+                        op_result["memory_id"] = memory_id
+                    elif op_type == "relate":
+                        relationship_id = relate_entities(
+                            source=op["source"],
+                            target=op["target"],
+                            relationship=op["relationship"],
+                            strength=op.get("strength", 1.0),
+                        )
+                        op_result["success"] = True
+                        op_result["relationship_id"] = relationship_id
+                    else:
+                        op_result["success"] = False
+                        op_result["error"] = f"Unknown operation: {op_type}"
+                except Exception as e:
+                    logger.warning(f"Batch operation {i} ({op_type}) failed: {e}")
+                    op_result["success"] = False
+                    op_result["error"] = str(e)
+                results.append(op_result)
+
+            succeeded = sum(1 for r in results if r.get("success"))
+            failed = len(results) - succeeded
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "success": failed == 0,
+                            "total": len(results),
+                            "succeeded": succeeded,
+                            "failed": failed,
+                            "results": results,
                         }),
                     )
                 ]

@@ -6,6 +6,55 @@
 
 ---
 
+## Output Rules
+
+When processing memory operations (storing, recalling, updating files, creating person/project files):
+
+- **Work silently.** Do not narrate each tool call. No "Let me check...", "Now I'll update...", "Let me store this in memory..."
+- Tool calls are visible in the UI. They do not need verbal explanation.
+- Only speak to the user when:
+  - Reporting results (use the Session Update format below)
+  - Something requires user input or a decision
+  - Surfacing strategic analysis, flags, or insights
+- After completing a batch of memory operations, report using:
+
+```
+**Created:** [list of new files]
+**Updated:** [list of changed files]
+**Stored:** [count of memories, entities, relationships]
+**Flag:** [anything the user should act on or be aware of]
+```
+
+If there is strategic analysis worth sharing, add it after the update block in normal prose.
+
+---
+
+## File Write Efficiency
+
+Before creating a new person or project file:
+
+1. Check if more data is incoming in this session (transcript, email, notes the user is about to paste)
+2. If the user just shared a summary and is likely to share full details, **wait for the details** before writing
+3. If uncertain, ask: "I have enough for a draft. Want me to write it now, or are you about to share more?"
+4. Never write a file you will immediately rewrite. One write with complete data is better than two writes.
+
+---
+
+## Information Lookup Order
+
+When looking for information about a person or topic:
+
+1. `memory.about("[entity name]")` - single call, returns all memories + relationships + recent session narratives
+2. If no results, check if `people/[name].md` exists - single file read
+3. If neither has it, it's unknown. Tell the user and ask if they have source material.
+
+Do NOT:
+- Call both `memory.recall` AND `memory.about` for the same entity (about is the targeted lookup, recall is for broad searches)
+- Search episodic memory for information that should be in Claudia's memory
+- Parse raw `.jsonl` session logs. The cost-to-recovery ratio is poor and it rarely succeeds. If data was lost during context compaction, ask the user for the source material (Granola notes, email, recording).
+
+---
+
 ## Memory System Detection
 
 At session start, check which memory system is available:
@@ -91,34 +140,27 @@ This handles the case where the user closed the terminal, lost connection, or si
 - Still write the narrative with full context and texture, not just bullet points
 - Include a note like "Reconstructed from N buffered turns from [date]"
 
-### 1. Recall Context
+### 1. Minimal Startup (2 calls max)
 
 ```
-Call memory.recall with query about user context:
-├── "What do I know about the user's preferences?"
-├── "Recent commitments and patterns"
-└── Internalize results for the session
+1. Read context/me.md (for greeting personalization, name, archetype)
+2. Call memory.predictions (surfaces overdue items, cooling relationships, patterns)
 ```
 
-### 2. Get Predictions
+Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
 
-```
-Call memory.predictions to get proactive suggestions:
-├── Cooling relationships (people not contacted recently)
-├── Overdue commitments
-├── Pattern-based insights
-└── Surface in greeting if relevant
-```
+### 2. Greeting
 
-### 3. Check for Familiar Entities
+Use me.md + predictions to build the greeting. See Greeting Calibration below.
 
-When someone is mentioned:
+### 3. On-Demand Lookup (during session)
+
+When a person, project, or topic comes up:
 ```
-Call memory.about with the person's name:
-├── Get all memories about them
-├── Get relationship graph
-├── Get recent session narratives mentioning them
-└── Surface relevant context naturally
+Call memory.about with the entity name:
+├── Returns all memories + relationships + recent session narratives in one call
+├── Surface relevant context naturally
+└── Only read people/[name].md if memory.about returns nothing
 ```
 
 ---
@@ -208,6 +250,23 @@ Call memory.relate:
 ├── target: Second entity
 ├── relationship: works_with, manages, client_of, etc.
 ```
+
+### Batch Mid-Session Operations
+
+When processing a new person, meeting transcript, or topic that requires multiple memory operations (entity + memories + relationships) mid-session, use `memory.batch` to execute them in a single call instead of separate `memory.entity`, `memory.remember`, and `memory.relate` calls.
+
+```
+memory.batch({
+  operations: [
+    { op: "entity", name: "Kris Krisko", type: "person", description: "..." },
+    { op: "remember", content: "...", about: ["Kris Krisko"], type: "fact", importance: 0.8 },
+    { op: "remember", content: "...", about: ["Kris Krisko", "Beemok"], type: "observation", importance: 0.7 },
+    { op: "relate", source: "Kamil Banc", target: "Kris Krisko", relationship: "potential_partner", strength: 0.5 }
+  ]
+})
+```
+
+Use `memory.batch` for mid-session entity creation (e.g., user pastes meeting notes and you need to store a new person immediately). Use `memory.end_session` for the full session wrap-up. After a batch call, write the person/project file and report using the Session Update format. Do not narrate between operations.
 
 ---
 
