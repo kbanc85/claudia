@@ -66,23 +66,21 @@ Create a summary that captures:
 ## Output Format
 
 ```
-## Meeting Capture: [Meeting Name/Person]
+**📋 Meeting Capture: [Meeting Name/Person]**
 ### [Date]
 
 **Attendees:** [Names]
 **Duration:** [Approximate]
 **Context:** [Brief — what was this meeting about?]
 
----
-
-### Summary
+### 📝 Summary
 [2-3 sentence overview of what happened]
 
-### Decisions Made
+### 🔨 Decisions Made
 - [Decision] — decided by [who]
 - [Decision]
 
-### Action Items
+### ✅ Action Items
 
 **You:**
 - [ ] [Action] — by [date]
@@ -91,17 +89,15 @@ Create a summary that captures:
 **Them:**
 - [ ] [Action] — by [date]
 
-### Key Discussion Points
+### 💬 Key Discussion Points
 - [Point 1]
 - [Point 2]
 - [Point 3]
 
-### Sentiment
+### 🌡️ Sentiment
 [Brief read on how the meeting went, relationship health]
 
----
-
-### File Updates
+### 📂 File Updates
 
 Shall I:
 - [ ] Add commitments to tracking? [List them]
@@ -109,9 +105,9 @@ Shall I:
 - [ ] Update [person]'s file with new context?
 - [ ] Create files for new people mentioned?
 
----
-
 *Meeting notes saved to: [location]*
+
+---
 ```
 
 ## Judgment Points

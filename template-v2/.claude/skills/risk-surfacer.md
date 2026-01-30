@@ -121,7 +121,11 @@
    → Context: [Relevant background]
    → Impact: [Why this matters]
    → Suggested action: [Concrete next step]
+
+---
 ```
+
+End each alert block (or group of alerts) with a trailing horizontal rule to visually separate it from regular conversation.
 
 **Tone:**
 - Matter-of-fact, not alarmist

@@ -72,7 +72,7 @@ Before closing:
 ## Output Format
 
 ```
-## Weekly Review — [Week of Date]
+**📊 Weekly Review — [Week of Date]**
 
 ### 🎉 Wins
 - [Win 1]
@@ -81,13 +81,13 @@ Before closing:
 
 ### 📋 Commitments
 
-**Completed:**
+**✅ Completed:**
 - [Item] ✓
 
-**Overdue:**
+**⚠️ Overdue:**
 - [Item] — [decision: reschedule/drop/do now]
 
-**Next Week:**
+**📅 Next Week:**
 - [Item] — due [day]
 
 ### ⏳ Waiting On
@@ -126,6 +126,8 @@ Before closing:
 
 ### 📝 Notes
 - [Anything to remember]
+
+---
 ```
 
 ## Tone

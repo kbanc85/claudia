@@ -47,10 +47,12 @@ When looking for information about a person or topic:
 1. `memory.about("[entity name]")` - single call, returns all memories + relationships + recent session narratives
 2. If no results, check if `people/[name].md` exists - single file read
 3. If neither has it, it's unknown. Tell the user and ask if they have source material.
+4. **Last resort:** `episodic-memory__search` (cross-workspace conversation history). Only use this when Claudia's own memory and local files have nothing, and the information might exist in a prior Claude Code conversation from another workspace.
 
 Do NOT:
 - Call both `memory.recall` AND `memory.about` for the same entity (about is the targeted lookup, recall is for broad searches)
 - Search episodic memory for information that should be in Claudia's memory
+- Jump to episodic-memory search before exhausting Claudia's own memory system
 - Parse raw `.jsonl` session logs. The cost-to-recovery ratio is poor and it rarely succeeds. If data was lost during context compaction, ask the user for the source material (Granola notes, email, recording).
 
 ---
@@ -110,6 +112,52 @@ Before silently falling back to markdown, if `.mcp.json` exists with claudia-mem
 ### Why This Happens
 
 Claude Code reads `.mcp.json` at startup. If the memory system is installed while Claude Code is already running in the same terminal, the new MCP server won't be detected until Claude Code is restarted in a new terminal session.
+
+---
+
+## Episodic Memory Plugin (Optional)
+
+The `episodic-memory` plugin (`episodic-memory__search`) is a separate Claude Code plugin, not part of Claudia's memory daemon. It provides cross-workspace conversation search (searching previous Claude Code sessions across all projects).
+
+### Detection
+
+At session start, check if `episodic-memory__search` tool is available alongside Claudia's own memory tools. These are independent systems:
+
+```
+Memory availability matrix:
+├── Claudia daemon + episodic plugin → Full capability
+├── Claudia daemon only → Normal operation (most common)
+├── Episodic plugin only → Cross-session search works, but no structured memory
+└── Neither → Markdown fallback only
+```
+
+### When Episodic Plugin Is Unavailable
+
+If `episodic-memory__search` is not available:
+- Cross-workspace context is limited to what Claudia's own memory has stored
+- If the user asks about something from a different project's conversation, inform them: "I don't have cross-workspace conversation search available. Can you point me to the relevant files or share the context?"
+- Do not suggest installing the plugin unprompted. Only mention it if the user is actively looking for cross-session data and hitting a wall.
+
+### When to Use Episodic Search
+
+Episodic memory is the **last resort** in the lookup order. Only reach for it when:
+- Claudia's own `memory.recall` and `memory.about` returned nothing
+- Local files (`people/`, `context/`) have no relevant data
+- The information likely exists in a prior Claude Code conversation (possibly from another workspace)
+
+Do not use episodic search for information that Claudia's own memory should have. If important context is missing from Claudia's memory, that's a signal to store it, not to search conversation logs.
+
+---
+
+## Efficiency Rules
+
+Avoid redundant memory calls within a session:
+
+- **Session-local awareness:** If you already called `memory.about` for an entity in this session, do not call it again. Use the results you already have.
+- **Recall dedup:** Do not call `memory.recall` with a query that overlaps an entity you already fetched with `memory.about`. The about call already returned that entity's full context.
+- **File-vs-memory rule:** If you just read a person file (`people/[name].md`), do not also call `memory.about` for the same person unless you need memories not in the file (e.g., cross-project context or recent session narratives).
+- **Batch preference:** When you need context on multiple entities at once, prefer `memory.batch` over sequential `memory.about` calls.
+- **Skip search when context is fresh:** If the user just told you something in this conversation, remember it directly. Don't search memory for what was just said.
 
 ---
 

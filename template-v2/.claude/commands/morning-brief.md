@@ -80,9 +80,9 @@ If any patterns from predictions or `context/patterns.md` are relevant to today:
 Keep it scannable. Lead with predictions and warnings.
 
 ```
-## Morning Brief - [Day, Date]
+**☀️ Morning Brief — [Day, Date]**
 
-### 🔮 Predictions (from memory system)
+### 🔮 Predictions
 - [Relationship] Sarah Chen: no contact in 45 days, consider reaching out
 - [Pattern] You've mentioned feeling stretched thin 3 times this week
 
@@ -91,23 +91,25 @@ Keep it scannable. Lead with predictions and warnings.
 - [DUE TODAY] [Commitment] to [person]
 - [WARNING] [Commitment] due in [X] hours
 
-### Today's Focus
+### 🎯 Today's Focus
 - [Key commitment or priority]
 - [Second priority if applicable]
 
-### Meetings
+### 📅 Meetings
 - **[Time]** [Who/What] - [One-line context]
   - Last talked: [date]
   - Open items: [any commitments/waiting]
 
-### Relationships to Reconnect
+### 👀 Relationships to Reconnect
 - [Person] - last contact [X] days ago
 
-### Waiting On
+### ⏳ Waiting On
 - [Item] from [Person] - expected [date], now [status]
 
-### Something to Consider
+### 💡 Something to Consider
 [Pattern or observation if relevant]
+
+---
 ```
 
 ---
