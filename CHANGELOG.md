@@ -2,6 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.8.1 (2026-01-30)
+
+### Memory Efficiency, Fallback Guidance, and Visual Formatting
+
+Template refinements for smarter memory usage and scannable structured output.
+
+### Added
+
+- **Episodic-memory plugin fallback** - Memory manager now detects whether the `episodic-memory` Claude Code plugin is installed and guides gracefully when it's missing. Covers all four availability states (daemon+plugin, daemon-only, plugin-only, neither).
+- **Memory efficiency rules** - New section preventing redundant memory calls: session-local dedup, recall/about overlap avoidance, file-vs-memory rule, batch preference, skip-fresh-context.
+- **Output formatting principle** (#11 in claudia-principles) - Structured output uses emoji section headers, bold titles, and trailing horizontal rules for visual distinction from regular conversation.
+- **Emoji formatting** for morning-brief, capture-meeting, and weekly-review output templates.
+- **Trailing `---`** on risk-surfacer alert blocks.
+
+---
+
 ## 1.8.0 (2026-01-30)
 
 ### Cognitive Tools: Local LLM Extraction
