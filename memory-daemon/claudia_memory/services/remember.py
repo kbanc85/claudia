@@ -9,6 +9,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..database import content_hash, get_db
@@ -127,6 +128,7 @@ class RememberService:
         confidence: float = 1.0,
         source: Optional[str] = None,
         source_id: Optional[str] = None,
+        source_context: Optional[str] = None,
         metadata: Optional[Dict] = None,
     ) -> Optional[int]:
         """
@@ -140,6 +142,7 @@ class RememberService:
             confidence: How confident we are (0.0-1.0)
             source: Where this came from
             source_id: Reference to source
+            source_context: One-line breadcrumb describing the source material
             metadata: Additional metadata
 
         Returns:
@@ -164,21 +167,22 @@ class RememberService:
             return existing["id"]
 
         # Insert new memory
-        memory_id = self.db.insert(
-            "memories",
-            {
-                "content": content,
-                "content_hash": mem_hash,
-                "type": memory_type,
-                "importance": importance,
-                "confidence": confidence,
-                "source": source,
-                "source_id": source_id,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
-                "metadata": json.dumps(metadata) if metadata else None,
-            },
-        )
+        insert_data = {
+            "content": content,
+            "content_hash": mem_hash,
+            "type": memory_type,
+            "importance": importance,
+            "confidence": confidence,
+            "source": source,
+            "source_id": source_id,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+            "metadata": json.dumps(metadata) if metadata else None,
+        }
+        if source_context:
+            insert_data["source_context"] = source_context
+
+        memory_id = self.db.insert("memories", insert_data)
 
         # Generate and store embedding
         embedding = embed_sync(content)
@@ -485,11 +489,22 @@ class RememberService:
                     memory_type=fact.get("type", "fact"),
                     about_entities=fact.get("about"),
                     importance=fact.get("importance", 1.0),
-                    source="session_summary",
+                    source=fact.get("source", "session_summary"),
                     source_id=str(episode_id),
+                    source_context=fact.get("source_context"),
                 )
                 if memory_id:
                     result["facts_stored"] += 1
+                    # Save source material to disk if provided
+                    if fact.get("source_material"):
+                        self.save_source_material(
+                            memory_id,
+                            fact["source_material"],
+                            metadata={
+                                "source": fact.get("source", "session_summary"),
+                                "source_context": fact.get("source_context"),
+                            },
+                        )
 
         # 4. Store commitments
         if commitments:
@@ -499,11 +514,21 @@ class RememberService:
                     memory_type="commitment",
                     about_entities=commitment.get("about"),
                     importance=commitment.get("importance", 1.0),
-                    source="session_summary",
+                    source=commitment.get("source", "session_summary"),
                     source_id=str(episode_id),
+                    source_context=commitment.get("source_context"),
                 )
                 if memory_id:
                     result["commitments_stored"] += 1
+                    if commitment.get("source_material"):
+                        self.save_source_material(
+                            memory_id,
+                            commitment["source_material"],
+                            metadata={
+                                "source": commitment.get("source", "session_summary"),
+                                "source_context": commitment.get("source_context"),
+                            },
+                        )
 
         # 5. Store entities
         if entities:
@@ -529,8 +554,11 @@ class RememberService:
                 if rel_id:
                     result["relationships_stored"] += 1
 
-        # 7. Clear turn buffer for this episode
-        self.db.delete("turn_buffer", "episode_id = ?", (episode_id,))
+        # 7. Archive turn buffer for this episode (preserve for provenance tracing)
+        self.db.execute(
+            "UPDATE turn_buffer SET is_archived = 1 WHERE episode_id = ?",
+            (episode_id,),
+        )
 
         logger.info(
             f"Session {episode_id} summarized: {result['facts_stored']} facts, "
@@ -568,7 +596,7 @@ class RememberService:
                 """
                 SELECT turn_number, user_content, assistant_content, created_at
                 FROM turn_buffer
-                WHERE episode_id = ?
+                WHERE episode_id = ? AND (is_archived = 0 OR is_archived IS NULL)
                 ORDER BY turn_number ASC
                 """,
                 (ep["id"],),
@@ -593,6 +621,55 @@ class RememberService:
                 })
 
         return results
+
+    def save_source_material(
+        self,
+        memory_id: int,
+        content: str,
+        metadata: Optional[Dict] = None,
+    ) -> Optional[Path]:
+        """
+        Save raw source material (email, transcript, document) to disk.
+
+        Files are plain markdown with a YAML frontmatter header, stored at
+        ~/.claudia/memory/sources/{memory_id}.md. The directory is created
+        lazily on first write.
+
+        Args:
+            memory_id: The memory this source material belongs to
+            content: Full raw text of the source material
+            metadata: Optional dict with source, source_context, etc.
+
+        Returns:
+            Path to the saved file, or None on failure
+        """
+        try:
+            sources_dir = self.db.db_path.parent / "sources"
+            sources_dir.mkdir(parents=True, exist_ok=True)
+
+            file_path = sources_dir / f"{memory_id}.md"
+
+            # Build frontmatter
+            header_lines = ["---"]
+            header_lines.append(f"memory_id: {memory_id}")
+            if metadata:
+                for key, value in metadata.items():
+                    if value is not None:
+                        # Quote strings that might contain YAML-special chars
+                        header_lines.append(f'{key}: "{value}"')
+            header_lines.append(f"saved_at: {datetime.utcnow().isoformat()}")
+            header_lines.append("---")
+            header_lines.append("")
+
+            file_content = "\n".join(header_lines) + content
+
+            file_path.write_text(file_content, encoding="utf-8")
+            logger.debug(f"Saved source material for memory {memory_id} to {file_path}")
+            return file_path
+
+        except Exception as e:
+            logger.warning(f"Could not save source material for memory {memory_id}: {e}")
+            return None
 
     def _ensure_entity(self, extracted: ExtractedEntity) -> Optional[int]:
         """Ensure an extracted entity exists in the database"""

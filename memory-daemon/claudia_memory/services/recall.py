@@ -10,6 +10,7 @@ import logging
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import get_config
@@ -32,6 +33,9 @@ class RecallResult:
     created_at: str
     entities: List[str]  # Related entity names
     metadata: Optional[Dict] = None
+    source: Optional[str] = None
+    source_id: Optional[str] = None
+    source_context: Optional[str] = None
 
 
 @dataclass
@@ -196,6 +200,12 @@ class RecallService:
             # Parse metadata
             metadata_val = row["metadata"] if "metadata" in row.keys() else None
 
+            # Extract source fields (may not exist in older DBs)
+            row_keys = row.keys()
+            source_val = row["source"] if "source" in row_keys else None
+            source_id_val = row["source_id"] if "source_id" in row_keys else None
+            source_context_val = row["source_context"] if "source_context" in row_keys else None
+
             results.append(
                 RecallResult(
                     id=row["id"],
@@ -206,6 +216,9 @@ class RecallService:
                     created_at=row["created_at"],
                     entities=entity_names,
                     metadata=json.loads(metadata_val) if metadata_val else None,
+                    source=source_val,
+                    source_id=source_id_val,
+                    source_context=source_context_val,
                 )
             )
 
@@ -288,19 +301,24 @@ class RecallService:
 
         memory_rows = self.db.execute(sql, tuple(params), fetch=True) or []
 
-        memories = [
-            RecallResult(
-                id=row["id"],
-                content=row["content"],
-                type=row["type"],
-                score=row["importance"],
-                importance=row["importance"],
-                created_at=row["created_at"],
-                entities=[entity["name"]],
-                metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+        memories = []
+        for row in memory_rows:
+            row_keys = row.keys()
+            memories.append(
+                RecallResult(
+                    id=row["id"],
+                    content=row["content"],
+                    type=row["type"],
+                    score=row["importance"],
+                    importance=row["importance"],
+                    created_at=row["created_at"],
+                    entities=[entity["name"]],
+                    metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+                    source=row["source"] if "source" in row_keys else None,
+                    source_id=row["source_id"] if "source_id" in row_keys else None,
+                    source_context=row["source_context"] if "source_context" in row_keys else None,
+                )
             )
-            for row in memory_rows
-        ]
 
         # Get relationships
         rel_sql = """
@@ -456,19 +474,25 @@ class RecallService:
 
         rows = self.db.execute(sql, tuple(params), fetch=True) or []
 
-        return [
-            RecallResult(
-                id=row["id"],
-                content=row["content"],
-                type=row["type"],
-                score=row["importance"],
-                importance=row["importance"],
-                created_at=row["created_at"],
-                entities=row["entity_names"].split(",") if row["entity_names"] else [],
-                metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+        results = []
+        for row in rows:
+            row_keys = row.keys()
+            results.append(
+                RecallResult(
+                    id=row["id"],
+                    content=row["content"],
+                    type=row["type"],
+                    score=row["importance"],
+                    importance=row["importance"],
+                    created_at=row["created_at"],
+                    entities=row["entity_names"].split(",") if row["entity_names"] else [],
+                    metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+                    source=row["source"] if "source" in row_keys else None,
+                    source_id=row["source_id"] if "source_id" in row_keys else None,
+                    source_context=row["source_context"] if "source_context" in row_keys else None,
+                )
             )
-            for row in rows
-        ]
+        return results
 
     def recall_episodes(
         self,
@@ -547,6 +571,129 @@ class RecallService:
             for row in rows
         ]
 
+    def trace_memory(self, memory_id: int) -> Dict[str, Any]:
+        """
+        Reconstruct full provenance for a memory.
+
+        Returns the memory with all fields, the source episode and its
+        archived turns (if the memory came from a session), and a preview
+        of any source material file saved to disk.
+
+        Args:
+            memory_id: The memory ID to trace
+
+        Returns:
+            Dict with memory, episode, archived_turns, source_file info
+        """
+        result: Dict[str, Any] = {
+            "memory": None,
+            "episode": None,
+            "archived_turns": None,
+            "source_file": None,
+            "source_file_preview": None,
+            "entities": [],
+        }
+
+        # 1. Fetch the memory row
+        memory_row = self.db.get_one(
+            "memories", where="id = ?", where_params=(memory_id,)
+        )
+        if not memory_row:
+            return result
+
+        row_keys = memory_row.keys()
+        result["memory"] = {
+            "id": memory_row["id"],
+            "content": memory_row["content"],
+            "type": memory_row["type"],
+            "importance": memory_row["importance"],
+            "confidence": memory_row["confidence"],
+            "source": memory_row["source"] if "source" in row_keys else None,
+            "source_id": memory_row["source_id"] if "source_id" in row_keys else None,
+            "source_context": memory_row["source_context"] if "source_context" in row_keys else None,
+            "created_at": memory_row["created_at"],
+            "updated_at": memory_row["updated_at"],
+            "access_count": memory_row["access_count"],
+        }
+
+        # 2. Fetch related entities
+        entity_rows = self.db.execute(
+            """
+            SELECT e.name, e.type FROM entities e
+            JOIN memory_entities me ON e.id = me.entity_id
+            WHERE me.memory_id = ?
+            """,
+            (memory_id,),
+            fetch=True,
+        ) or []
+        result["entities"] = [
+            {"name": row["name"], "type": row["type"]} for row in entity_rows
+        ]
+
+        # 3. If source_id points to an episode, fetch it with archived turns
+        source_id = result["memory"].get("source_id")
+        if source_id:
+            try:
+                episode_id = int(source_id)
+                episode_row = self.db.get_one(
+                    "episodes", where="id = ?", where_params=(episode_id,)
+                )
+                if episode_row:
+                    ep_keys = episode_row.keys()
+                    result["episode"] = {
+                        "id": episode_row["id"],
+                        "narrative": episode_row["narrative"] if "narrative" in ep_keys else None,
+                        "started_at": episode_row["started_at"],
+                        "ended_at": episode_row["ended_at"] if "ended_at" in ep_keys else None,
+                        "key_topics": json.loads(episode_row["key_topics"]) if episode_row.get("key_topics") else [],
+                    }
+
+                    # Fetch archived turns
+                    turn_rows = self.db.execute(
+                        """
+                        SELECT turn_number, user_content, assistant_content, created_at
+                        FROM turn_buffer
+                        WHERE episode_id = ? AND is_archived = 1
+                        ORDER BY turn_number ASC
+                        """,
+                        (episode_id,),
+                        fetch=True,
+                    ) or []
+                    if turn_rows:
+                        result["archived_turns"] = [
+                            {
+                                "turn": row["turn_number"],
+                                "user": row["user_content"],
+                                "assistant": row["assistant_content"],
+                                "timestamp": row["created_at"],
+                            }
+                            for row in turn_rows
+                        ]
+            except (ValueError, TypeError):
+                pass  # source_id wasn't a numeric episode ID
+
+        # 4. Check for source material file on disk
+        sources_dir = self.db.db_path.parent / "sources"
+        source_file = sources_dir / f"{memory_id}.md"
+        if source_file.exists():
+            result["source_file"] = str(source_file)
+            try:
+                file_text = source_file.read_text(encoding="utf-8")
+                # Skip frontmatter for preview
+                if file_text.startswith("---"):
+                    end_idx = file_text.find("---", 3)
+                    if end_idx != -1:
+                        body = file_text[end_idx + 3:].strip()
+                    else:
+                        body = file_text
+                else:
+                    body = file_text
+                result["source_file_preview"] = body[:200]
+            except Exception:
+                result["source_file_preview"] = "(could not read file)"
+
+        return result
+
     def _keyword_search(
         self,
         query: str,
@@ -610,3 +757,8 @@ def search_entities(query: str, **kwargs) -> List[EntityResult]:
 def recall_episodes(query: str, **kwargs) -> List[Dict[str, Any]]:
     """Search episode narratives"""
     return get_recall_service().recall_episodes(query, **kwargs)
+
+
+def trace_memory(memory_id: int) -> Dict[str, Any]:
+    """Reconstruct full provenance for a memory"""
+    return get_recall_service().trace_memory(memory_id)

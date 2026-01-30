@@ -31,6 +31,7 @@ from ..services.recall import (
     recall_about,
     recall_episodes,
     search_entities,
+    trace_memory,
 )
 from ..services.remember import (
     buffer_turn,
@@ -78,6 +79,18 @@ async def list_tools() -> ListToolsResult:
                         "type": "number",
                         "description": "Importance score from 0.0 to 1.0",
                         "default": 1.0,
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source type: email, transcript, document, conversation, user_input",
+                    },
+                    "source_context": {
+                        "type": "string",
+                        "description": "One-line breadcrumb describing origin (e.g., 'Email from Jim Ferry re: Forum V+, 2025-01-28')",
+                    },
+                    "source_material": {
+                        "type": "string",
+                        "description": "Full raw text of the source (email body, transcript, etc.). Saved to disk, not stored in DB.",
                     },
                 },
                 "required": ["content"],
@@ -303,6 +316,18 @@ async def list_tools() -> ListToolsResult:
                                     "description": "Entity names this fact relates to",
                                 },
                                 "importance": {"type": "number", "default": 1.0},
+                                "source": {
+                                    "type": "string",
+                                    "description": "Override source type (default: session_summary)",
+                                },
+                                "source_context": {
+                                    "type": "string",
+                                    "description": "One-line breadcrumb describing origin",
+                                },
+                                "source_material": {
+                                    "type": "string",
+                                    "description": "Full raw source text, saved to disk",
+                                },
                             },
                             "required": ["content"],
                         },
@@ -319,6 +344,18 @@ async def list_tools() -> ListToolsResult:
                                     "items": {"type": "string"},
                                 },
                                 "importance": {"type": "number", "default": 1.0},
+                                "source": {
+                                    "type": "string",
+                                    "description": "Override source type (default: session_summary)",
+                                },
+                                "source_context": {
+                                    "type": "string",
+                                    "description": "One-line breadcrumb describing origin",
+                                },
+                                "source_material": {
+                                    "type": "string",
+                                    "description": "Full raw source text, saved to disk",
+                                },
                             },
                             "required": ["content"],
                         },
@@ -436,7 +473,15 @@ async def list_tools() -> ListToolsResult:
                                 },
                                 "source": {
                                     "type": "string",
-                                    "description": "Source entity (for 'relate' op)",
+                                    "description": "Source entity (for 'relate' op) or source type (for 'remember' op)",
+                                },
+                                "source_context": {
+                                    "type": "string",
+                                    "description": "One-line breadcrumb (for 'remember' op)",
+                                },
+                                "source_material": {
+                                    "type": "string",
+                                    "description": "Full raw source text, saved to disk (for 'remember' op)",
                                 },
                                 "target": {
                                     "type": "string",
@@ -458,6 +503,25 @@ async def list_tools() -> ListToolsResult:
                 "required": ["operations"],
             },
         ),
+        Tool(
+            name="memory.trace",
+            description=(
+                "Reconstruct full provenance for a memory. Returns the memory with all fields, "
+                "the source episode narrative and archived conversation turns (if applicable), "
+                "related entities, and a preview of any source material file saved on disk. "
+                "Zero cost until invoked -- use when asked 'where did that come from?'"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "memory_id": {
+                        "type": "integer",
+                        "description": "The memory ID to trace provenance for",
+                    },
+                },
+                "required": ["memory_id"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -472,7 +536,20 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 memory_type=arguments.get("type", "fact"),
                 about_entities=arguments.get("about"),
                 importance=arguments.get("importance", 1.0),
+                source=arguments.get("source"),
+                source_context=arguments.get("source_context"),
             )
+            # Save source material to disk if provided
+            if memory_id and arguments.get("source_material"):
+                svc = get_remember_service()
+                svc.save_source_material(
+                    memory_id,
+                    arguments["source_material"],
+                    metadata={
+                        "source": arguments.get("source"),
+                        "source_context": arguments.get("source_context"),
+                    },
+                )
             return CallToolResult(
                 content=[
                     TextContent(
@@ -504,6 +581,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                                         "importance": r.importance,
                                         "entities": r.entities,
                                         "created_at": r.created_at,
+                                        "source": r.source,
+                                        "source_id": r.source_id,
+                                        "source_context": r.source_context,
                                     }
                                     for r in results
                                 ]
@@ -528,6 +608,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                         "type": m.type,
                         "importance": m.importance,
                         "created_at": m.created_at,
+                        "source": m.source,
+                        "source_id": m.source_id,
+                        "source_context": m.source_context,
                     }
                     for m in result["memories"]
                 ]
@@ -698,9 +781,22 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             memory_type=op.get("type", "fact"),
                             about_entities=op.get("about"),
                             importance=op.get("importance", 1.0),
+                            source=op.get("source"),
+                            source_context=op.get("source_context"),
                         )
                         op_result["success"] = True
                         op_result["memory_id"] = memory_id
+                        # Save source material to disk if provided
+                        if memory_id and op.get("source_material"):
+                            svc = get_remember_service()
+                            svc.save_source_material(
+                                memory_id,
+                                op["source_material"],
+                                metadata={
+                                    "source": op.get("source"),
+                                    "source_context": op.get("source_context"),
+                                },
+                            )
                     elif op_type == "relate":
                         relationship_id = relate_entities(
                             source=op["source"],
@@ -732,6 +828,17 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             "failed": failed,
                             "results": results,
                         }),
+                    )
+                ]
+            )
+
+        elif name == "memory.trace":
+            result = trace_memory(memory_id=arguments["memory_id"])
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
                     )
                 ]
             )

@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS memories (
     confidence REAL DEFAULT 1.0,  -- How sure we are about this
     source TEXT,  -- Where this came from (conversation, document, etc.)
     source_id TEXT,  -- Reference to source (episode_id, etc.)
+    source_context TEXT,  -- One-line breadcrumb (e.g., "Email from Jim re: Forum V+, 2025-01-28")
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     last_accessed_at TEXT,  -- For rehearsal-based importance boost
@@ -220,6 +221,7 @@ CREATE TABLE IF NOT EXISTS turn_buffer (
     turn_number INTEGER NOT NULL,
     user_content TEXT,
     assistant_content TEXT,
+    is_archived INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -247,3 +249,6 @@ VALUES (1, 'Initial schema with entities, memories, relationships, episodes, pat
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (2, 'Add turn_buffer table, episode narrative/summary columns, episode_embeddings');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (3, 'Add source_context to memories, is_archived to turn_buffer for episodic provenance');

@@ -240,6 +240,25 @@ class Database:
             conn.commit()
             logger.info("Applied migration 2: turn buffer and session narratives")
 
+        if current_version < 3:
+            # Migration 3: Add source_context to memories, is_archived to turn_buffer
+            migration_stmts = [
+                "ALTER TABLE memories ADD COLUMN source_context TEXT",
+                "ALTER TABLE turn_buffer ADD COLUMN is_archived INTEGER DEFAULT 0",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"Migration 3 statement failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (3, 'Add source_context to memories, is_archived to turn_buffer for episodic provenance')"
+            )
+            conn.commit()
+            logger.info("Applied migration 3: episodic memory provenance")
+
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
     ) -> Optional[List[sqlite3.Row]]:
