@@ -51,36 +51,18 @@ Say hi. She'll introduce herself and set things up for you.
 
 ---
 
-## What's New in v1.3.1
+## Upgrading
 
-**Per-project memory isolation** - Each Claudia installation now gets its own memories:
-
-- **Automatic isolation** - Work project memories don't mix with personal projects
-- **Zero config required** - Uses `${workspaceFolder}` to auto-isolate per project
-- **Business Operating System** (v1.3.0) - Deep folder structures with pipeline tracking, financial management, accountability
-- **5 new commands** - `/pipeline-review`, `/financial-snapshot`, `/client-health`, `/accountability-check`
-
-Memories stay where they belong. Each project is its own context.
-
----
-
-## Already Have Claudia? Add Memory.
-
-If you installed Claudia before the memory system existed, just run the installer again:
+Already have Claudia? Upgrade from any version:
 
 ```bash
-npx get-claudia
+cd your-claudia-directory
+npx get-claudia .
 ```
 
-When prompted, say **yes** to install the memory system. The installer will:
-- Set up the memory daemon at `~/.claudia/daemon/`
-- Install Ollama for semantic search (optional but recommended)
-- Configure auto-start so everything runs on login
-- Pull the embedding model automatically
-- Verify all services are working
-- Update your `.mcp.json` automatically
+This upgrades all framework files (skills, commands, rules, identity) while preserving your data (context/, people/, projects/). When prompted, say **yes** to install or update the memory system.
 
-Restart Claude Code in a new terminal, and Claudia now has persistent memory.
+Works for all previous versions, including v1.0 users who never had the memory daemon.
 
 ---
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, spawn } from 'child_process';
@@ -70,30 +70,16 @@ async function main() {
   const targetPath = isCurrentDir ? process.cwd() : join(process.cwd(), targetDir);
   const displayDir = isCurrentDir ? 'current directory' : targetDir;
 
-  // Check if directory already exists and has conflicting files
+  // Check if directory already exists with Claudia files
   let isUpgrade = false;
 
   if (existsSync(targetPath)) {
     const contents = readdirSync(targetPath);
-    const hasConflict = contents.some(f => f === 'CLAUDE.md' || f === '.claude');
+    const hasClaudioFiles = contents.some(f => f === 'CLAUDE.md' || f === '.claude');
 
-    if (hasConflict) {
-      // Check if this is an upgrade (existing memories to migrate)
-      const hasExistingMemories = existsSync(join(targetPath, 'context', 'me.md')) ||
-                                  existsSync(join(targetPath, 'context', 'learnings.md')) ||
-                                  existsSync(join(targetPath, 'context', 'patterns.md')) ||
-                                  existsSync(join(targetPath, 'people'));
-
-      if (hasExistingMemories) {
-        console.log(`\n${colors.cyan}✓${colors.reset} Found existing Claudia instance with memories.`);
-        isUpgrade = true;
-        // Don't exit - proceed to memory installation
-      } else {
-        // Fresh install conflict - exit as before
-        console.log(`\n${colors.yellow}⚠${colors.reset}  Claudia files already exist in ${displayDir}.`);
-        console.log(`   Remove CLAUDE.md and .claude/ first, or choose a different location.\n`);
-        process.exit(1);
-      }
+    if (hasClaudioFiles) {
+      isUpgrade = true;
+      console.log(`\n${colors.cyan}✓${colors.reset} Found existing Claudia instance. Upgrading framework files...`);
     }
   }
 
@@ -102,15 +88,43 @@ async function main() {
     mkdirSync(targetPath, { recursive: true });
   }
 
-  // Copy template files (v2 - minimal seed) - skip for upgrades
-  if (!isUpgrade) {
-    const templatePath = join(__dirname, '..', 'template-v2');
+  const templatePath = join(__dirname, '..', 'template-v2');
 
+  if (!isUpgrade) {
+    // Fresh install: copy everything
     try {
       cpSync(templatePath, targetPath, { recursive: true });
       console.log(`${colors.green}✓${colors.reset} Installed in ${displayDir}`);
     } catch (error) {
       console.error(`\n${colors.yellow}⚠${colors.reset}  Error copying files: ${error.message}`);
+      process.exit(1);
+    }
+  } else {
+    // Upgrade: copy framework files, preserve user data
+    // Framework = .claude/ (skills, commands, rules, hooks), CLAUDE.md, .gitignore,
+    //             .mcp.json.example, LICENSE, NOTICE
+    // User data = context/, people/, projects/, .mcp.json (has user's config)
+    const frameworkPaths = ['.claude', 'CLAUDE.md', '.gitignore', '.mcp.json.example', 'LICENSE', 'NOTICE'];
+    let upgraded = 0;
+
+    try {
+      for (const item of frameworkPaths) {
+        const src = join(templatePath, item);
+        const dest = join(targetPath, item);
+        if (!existsSync(src)) continue;
+
+        const srcStat = statSync(src);
+        if (srcStat.isDirectory()) {
+          cpSync(src, dest, { recursive: true, force: true });
+        } else {
+          cpSync(src, dest, { force: true });
+        }
+        upgraded++;
+      }
+      console.log(`${colors.green}✓${colors.reset} Updated ${upgraded} framework components (skills, commands, rules, identity)`);
+      console.log(`${colors.dim}  Your data (context/, people/, projects/) was preserved.${colors.reset}`);
+    } catch (error) {
+      console.error(`\n${colors.yellow}⚠${colors.reset}  Error upgrading files: ${error.message}`);
       process.exit(1);
     }
   }

@@ -2,6 +2,32 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.6.0 (2026-01-29)
+
+### In-Place Upgrades
+
+Running `npx get-claudia` in an existing Claudia directory now upgrades framework files (skills, commands, rules, hooks, identity) while preserving your data (context/, people/, projects/). Previously, the installer refused to run if Claudia files already existed, leaving existing users with no upgrade path.
+
+### Added
+
+- **Upgrade support** - Installer detects existing Claudia instances and selectively updates `.claude/` and `CLAUDE.md` without touching user data. Works for users on any previous version (v1.0+).
+- **`memory.batch` MCP tool** - Execute entity creation, memory storage, and relationship linking in a single call. Reduces mid-session memory operations from 3-5 tool calls to 1.
+- **Behavioral optimizations** in memory-manager skill:
+  - Silent processing with structured Session Update output format
+  - File write efficiency (wait for complete data before writing)
+  - Information lookup priority chain (memory.about > file read > ask user)
+  - Lazy startup (2 calls max instead of 5+ file reads)
+
+### Upgrade Instructions
+
+Existing users on any version:
+```bash
+cd your-claudia-directory
+npx get-claudia .
+```
+
+---
+
 ## 1.5.2 (2026-01-29)
 
 ### Fixed
