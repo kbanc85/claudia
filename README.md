@@ -10,7 +10,7 @@
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square" alt="Python"></a>
 </p>
 
-<h3 align="center">An AI executive assistant who learns how you work.</h3>
+<h3 align="center">An AI thinking partner who learns how you work.</h3>
 
 <p align="center">
 <em>"Busy work is my job. Judgment is yours."</em>
@@ -22,13 +22,58 @@ Created by <a href="https://github.com/kbanc85">Kamil Banc</a> · <a href="https
 
 ---
 
+## The Problem
+
+You finish a call and forget to follow up. You promise a deliverable on Friday and lose track of it by Wednesday. You meet someone important, and three weeks later you can't remember what you talked about. You juggle four clients, two projects, and a growing pipeline, and the context lives scattered across notes, emails, and your memory.
+
+AI tools can draft emails and summarize documents. But none of them actually *know* you. None of them remember last Tuesday's conversation, track the commitment you made to Sarah, or warn you that you haven't talked to your best client in three weeks.
+
+That's the gap Claudia fills.
+
+---
+
 ## What Is Claudia?
 
-Claudia is an open-source agentic executive assistant that runs on [Claude Code](https://docs.anthropic.com/en/docs/claude-code). She remembers your conversations, tracks your relationships, detects commitments you make, and adapts her workflow to match how you actually work.
+Claudia is an open-source AI thinking partner that runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). She remembers your conversations, tracks your relationships, catches commitments you make, and adapts to match how you actually work.
+
+Not a chatbot. Not a task manager. Not another inbox. She's a thinking partner with memory that compounds over time.
 
 Everything runs locally. Your data stays on your machine.
 
-**She is not a chatbot.** She's a thinking partner with persistent memory, proactive skills, and a personality that sharpens over time.
+---
+
+## See It in Action
+
+```
+Claudia: Hey there. I'm Claudia. What's your name?
+
+You:     Sarah
+
+Claudia: Nice to meet you, Sarah. What do you do?
+
+You:     I'm a fractional CMO. I work with 4 clients right now.
+
+Claudia: Got it. What are your top priorities?
+
+You:     Client deliverables, growing my pipeline, and not dropping balls
+
+Claudia: Based on what you've shared, here's how I'd organize things:
+
+         clients/         [one folder per client]
+         people/          [key relationships]
+         context/         [commitments, waiting-on items]
+
+         And I'll set up commands for your work:
+         /morning-brief, /client-status, /meeting-prep
+
+         Want me to create this?
+
+You:     Yes, do it
+
+Claudia: Done. Try '/morning-brief' tomorrow, or tell me about a client.
+```
+
+From here, every conversation builds on the last. She remembers.
 
 ---
 
@@ -38,16 +83,16 @@ Everything runs locally. Your data stays on your machine.
 npx get-claudia
 ```
 
-The installer walks you through everything: creates your workspace, installs the memory system, and optionally sets up a local language model for cognitive tools. Then:
+The installer walks you through everything: creates your workspace, installs the memory system, and optionally sets up a local language model. Then:
 
 ```bash
 cd claudia
 claude
 ```
 
-Say hi. She'll introduce herself and learn about you in a natural conversation. Within a few minutes, she'll generate a personalized workspace structure, commands, and workflows tailored to your role.
+Say hi. She'll introduce herself and learn about you in a natural conversation. Within a few sessions, she'll have a personalized workspace, commands, and workflows tailored to your role.
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+ (for memory system)
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+ (for memory)
 
 **Already have Claudia?** Upgrade from any version:
 ```bash
@@ -59,68 +104,51 @@ This upgrades framework files while preserving your data (context/, people/, pro
 
 ---
 
-## Key Features
+## What She Actually Does
 
-### Persistent Memory
+Claudia isn't a list of features. She's a set of outcomes:
 
-Claudia remembers across sessions. Not in a chat history sense, but semantically. She stores facts, preferences, commitments, and observations in a local SQLite database with vector embeddings. When you mention a person or topic, she recalls what she knows and surfaces what's relevant.
+- **Catches your commitments.** Say "I'll send that proposal by Friday" in conversation, and she'll track it. On Friday morning, she'll remind you.
+- **Remembers your relationships.** Mention Sarah from Acme, and Claudia surfaces what she knows: last conversation, open commitments, communication frequency, sentiment.
+- **Warns you before things slip.** Haven't talked to your best client in three weeks? Overdue on a deliverable? She surfaces it without being asked.
+- **Processes your meetings.** Paste a transcript. She pulls out decisions, action items, and follow-ups, then stores them where they belong.
+- **Adapts to how you work.** She notices patterns ("You draft LinkedIn posts almost daily. Want me to add a quick command for that?") and suggests improvements to her own workflow.
 
-- **Semantic search** with 60/30/10 scoring (vector similarity, importance, recency)
-- **Per-project isolation** so work memories don't mix with personal projects
-- **Session narratives** that capture tone, emotional context, and unresolved threads
-- **Source provenance** for tracing any fact back to the email, transcript, or conversation it came from
+---
 
-### Proactive Skills
+## Who It's For
 
-Eight built-in skills that activate automatically based on context:
+Claudia detects your work style during setup and generates structure that fits:
 
-| Skill | What It Does |
-|-------|-------------|
-| **Commitment Detector** | Catches promises in conversation. "I'll send that by Friday" triggers a tracking offer |
-| **Relationship Tracker** | Surfaces relevant context when people are mentioned. Tracks contact frequency, sentiment |
-| **Pattern Recognizer** | Notices recurring themes after 3+ observations. "You tend to overcommit on Mondays" |
-| **Risk Surfacer** | Proactively warns about overdue items, cooling relationships, capacity issues |
-| **Memory Manager** | Handles session startup, shutdown, and cross-session persistence |
-| **Capability Suggester** | Notices repeated tasks and offers to create commands for them |
-| **Onboarding** | First-run discovery that generates your personalized workspace |
-| **Structure Generator** | Creates folder structures and commands matched to your archetype |
+- **Consultant** -- Multiple clients, deliverables, proposals, pipeline tracking
+- **Executive** -- Direct reports, initiatives, leadership, board prep
+- **Founder** -- Investors, team, product, fundraising cycles
+- **Solo Professional** -- Mix of clients and projects, wearing many hats
+- **Creator** -- Audience growth, content calendar, collaborations
 
-### Cognitive Tools (New in v1.8)
+Each gets custom folder structures, commands, and templates.
 
-Paste a meeting transcript or email. Instead of Claude parsing it token by token, a local language model extracts structured data (entities, facts, commitments, action items) in seconds. Claude then reviews the structured output and applies judgment.
+---
 
-- Runs locally via Ollama, no API keys
-- Choose your model: Qwen3-4B (recommended), SmolLM3-3B, or Llama 3.2-3B
-- Falls back gracefully when no model is installed
+## How She Gets Smarter
 
-### Archetype System
+Claudia suggests improvements as she learns your patterns:
 
-During onboarding, Claudia detects your work style and generates structure that fits:
+> "I notice you draft LinkedIn posts almost daily. Want me to add a `/linkedin-quick` command?"
 
-| Archetype | Optimized For |
-|-----------|--------------|
-| **Consultant** | Multiple clients, deliverables, proposals, pipeline |
-| **Executive** | Direct reports, initiatives, leadership, board prep |
-| **Founder** | Investors, team, product, fundraising |
-| **Solo Professional** | Mix of clients and projects, wearing many hats |
-| **Creator** | Audience, content calendar, collaborations |
+> "You often ask about project status on Mondays. Should I add that to your morning brief?"
 
-Each archetype gets custom folder structures, commands, and templates. Structure grows organically from actual needs.
+> "You've mentioned being stretched thin in three conversations this week."
 
-### Commands
+She challenges constructively, surfaces what you might be missing, and adapts her structure to fit how your work actually evolves.
 
-| Command | What It Does |
-|---------|-------------|
-| `/morning-brief` | What needs attention today: commitments, meetings, warnings |
-| `/meeting-prep [person]` | One-page briefing before a call |
-| `/capture-meeting` | Process notes into decisions, commitments, action items |
-| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
-| `/weekly-review` | Guided reflection across relationships and projects |
-| `/draft-reply` | Email response drafts in your voice |
-| `/follow-up-draft [person]` | Post-meeting thank-you and summary |
-| `/new-person [name]` | Create a relationship file |
-| `/pipeline-review` | Active deals, capacity, pipeline health |
-| `/accountability-check` | Outstanding commitments and waiting-on items |
+---
+
+## Privacy and Safety
+
+- **Fully local.** Memory, embeddings, and cognitive tools run on your machine. No external APIs for data storage.
+- **No external actions without approval.** Every email, calendar event, and external action requires your explicit "yes." Non-negotiable, enforced at the framework level.
+- **Your data is yours.** Memories live in `~/.claudia/memory/` as SQLite databases. Context lives in readable markdown files. Delete anything, anytime.
 
 ---
 
@@ -130,11 +158,11 @@ Claudia has two layers:
 
 **Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup. This is what makes her Claudia rather than generic Claude.
 
-**Memory system** (Python) defines what she remembers. A daemon running locally with SQLite, vector embeddings (Ollama), and three service layers:
+**Memory system** (Python) defines what she remembers. A daemon running locally with SQLite, vector embeddings, and three service layers:
 
-- **Remember** stores facts, entities, and relationships with embeddings for semantic search
-- **Recall** retrieves memories using hybrid ranking (vector similarity + importance + recency)
-- **Consolidate** runs in the background: decaying old memories, detecting patterns, generating predictions
+- **Remember** -- stores facts, entities, and relationships with embeddings for semantic search
+- **Recall** -- retrieves memories using hybrid ranking (vector similarity + importance + recency)
+- **Consolidate** -- runs in the background: decaying old memories, detecting patterns, generating predictions
 
 ```
 You talk to Claude Code
@@ -155,73 +183,71 @@ Memory daemon processes locally: SQLite + vector search + Ollama
 Everything stays on your machine
 ```
 
-For the full technical picture with diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For full technical diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
-## Your First Conversation
+## Key Commands
 
-When you first run `claude`, she introduces herself:
+| Command | What It Does |
+|---------|-------------|
+| `/morning-brief` | What needs attention today: commitments, meetings, warnings |
+| `/meeting-prep [person]` | One-page briefing before a call |
+| `/capture-meeting` | Process notes into decisions, commitments, action items |
+| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
+| `/weekly-review` | Guided reflection across relationships and projects |
+| `/accountability-check` | Outstanding commitments and waiting-on items |
 
-```
-Claudia: Hey there. I'm Claudia. Before we dive into anything, I'd love
-         to know who I'm working with. What's your name?
+<details>
+<summary>All commands</summary>
 
-You:     Sarah
+| Command | What It Does |
+|---------|-------------|
+| `/draft-reply` | Email response drafts in your voice |
+| `/follow-up-draft [person]` | Post-meeting thank-you and summary |
+| `/new-person [name]` | Create a relationship file |
+| `/pipeline-review` | Active deals, capacity, pipeline health |
 
-Claudia: Nice to meet you, Sarah. What do you do? I'm curious about
-         your role, industry, what a typical week looks like.
-
-You:     I'm a fractional CMO. I work with 4 clients right now.
-
-Claudia: Got it. What are your top priorities right now?
-
-You:     Client deliverables, growing my pipeline, and not dropping balls
-
-Claudia: Based on what you've shared, here's how I'd organize things:
-
-         clients/
-            [one folder per client]
-         people/
-            [key relationships]
-         context/
-            commitments.md
-            waiting.md
-
-         And I'll set up commands for your work:
-         /morning-brief, /client-status, /meeting-prep
-
-         Want me to create this?
-
-You:     Yes, do it
-
-Claudia: Done. Try '/morning-brief' to see what needs attention,
-         or tell me about one of your clients.
-```
-
-From here, every conversation builds on the last. She remembers.
+</details>
 
 ---
 
-## Self-Evolution
+## Advanced: Memory System
 
-Claudia suggests improvements as she learns your patterns:
+Claudia's memory goes beyond chat history. She stores facts, preferences, commitments, and observations in a local SQLite database with 384-dimensional vector embeddings (via [Ollama](https://ollama.com) and the all-minilm:l6-v2 model).
 
-> "I notice you draft LinkedIn posts almost daily. Want me to add a `/linkedin-quick` command?"
+**Semantic search** uses a 60/30/10 scoring formula: 60% vector similarity, 30% importance weighting, 10% recency. Accessing a memory boosts it (rehearsal effect), so frequently referenced facts stay prominent.
 
-> "You often ask about project status on Mondays. Should I add that to your morning brief?"
+**Per-project isolation** keeps work memories separate from personal projects. Each workspace gets its own database, keyed by folder path hash.
 
-> "You've mentioned being stretched thin in three conversations this week."
+**Session narratives** capture tone, emotional context, and unresolved threads, so Claudia understands not just what happened but how the conversation felt.
 
-She challenges constructively, surfaces what you might be missing, and adapts her structure to fit how your work actually evolves.
+**Source provenance** traces any fact back to the email, transcript, or conversation it came from.
+
+**Eight built-in skills** activate automatically based on context:
+
+| Skill | What It Does |
+|-------|-------------|
+| **Commitment Detector** | Catches promises in conversation. "I'll send that by Friday" triggers tracking |
+| **Relationship Tracker** | Surfaces context when people are mentioned. Tracks contact frequency, sentiment |
+| **Pattern Recognizer** | Notices recurring themes after 3+ observations |
+| **Risk Surfacer** | Warns about overdue items, cooling relationships, capacity issues |
+| **Memory Manager** | Handles session startup, shutdown, and cross-session persistence |
+| **Capability Suggester** | Notices repeated tasks and offers to create commands for them |
+| **Onboarding** | First-run discovery that generates your personalized workspace |
+| **Structure Generator** | Creates folder structures and commands matched to your archetype |
 
 ---
 
-## Privacy and Safety
+## Advanced: Cognitive Tools
 
-- **Fully local.** Memory, embeddings, and cognitive tools run on your machine. No external APIs (unless you choose to use Claude Code's cloud connection for the main conversation).
-- **No external actions without approval.** Every email, calendar event, and external action requires your explicit "yes." This is non-negotiable and enforced at the framework level.
-- **Your data is yours.** Memories live in `~/.claudia/memory/` as SQLite databases. Context lives in readable markdown files. Delete anything, anytime.
+Paste a meeting transcript or email. Instead of Claude parsing it token by token, a local language model extracts structured data (entities, facts, commitments, action items) in seconds. Claude then reviews the output and applies judgment.
+
+- Runs locally via [Ollama](https://ollama.com), no API keys needed
+- Choose your model during install: Qwen3-4B (recommended), SmolLM3-3B, or Llama 3.2-3B
+- Falls back gracefully when no model is installed (Claude handles extraction directly)
+
+Four specialized extraction modes: **meeting** (participants, decisions, action items), **email** (sender, recipients, tone, action items), **document** (key points, entities, relationships), and **general** (facts, commitments, entities).
 
 ---
 
