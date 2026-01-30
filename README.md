@@ -83,6 +83,10 @@ From here, every conversation builds on the last. She remembers.
 npx get-claudia
 ```
 
+<p align="center">
+<img src="assets/claudia-install.gif" alt="Installing Claudia" width="600">
+</p>
+
 The installer walks you through everything: creates your workspace, installs the memory system, and optionally sets up a local language model. Then:
 
 ```bash
