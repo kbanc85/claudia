@@ -10,7 +10,7 @@
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square" alt="Python"></a>
 </p>
 
-<h3 align="center">An AI assistant who learns how you work.</h3>
+<h3 align="center">An AI executive assistant who learns how you work.</h3>
 
 <p align="center">
 <em>"Busy work is my job. Judgment is yours."</em>
@@ -22,66 +22,146 @@ Created by <a href="https://github.com/kbanc85">Kamil Banc</a> · <a href="https
 
 ---
 
-## What She Is
+## What Is Claudia?
 
-Claudia is an agentic executive assistant that runs locally, learns your patterns, tracks your relationships and commitments, and evolves to fit how you actually work. She's built on [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+Claudia is an open-source agentic executive assistant that runs on [Claude Code](https://docs.anthropic.com/en/docs/claude-code). She remembers your conversations, tracks your relationships, detects commitments you make, and adapts her workflow to match how you actually work.
 
-She's not a chatbot. She's a thinking partner with memory.
+Everything runs locally. Your data stays on your machine.
+
+**She is not a chatbot.** She's a thinking partner with persistent memory, proactive skills, and a personality that sharpens over time.
 
 ---
 
-## Quick Install
+## Quick Start
 
 ```bash
 npx get-claudia
 ```
 
-That's it. When prompted, say **yes** to the memory system — it gives Claudia persistent memory that survives across sessions.
-
-Then:
+The installer walks you through everything: creates your workspace, installs the memory system, and optionally sets up a local language model for cognitive tools. Then:
 
 ```bash
 cd claudia
 claude
 ```
 
-Say hi. She'll introduce herself and set things up for you.
+Say hi. She'll introduce herself and learn about you in a natural conversation. Within a few minutes, she'll generate a personalized workspace structure, commands, and workflows tailored to your role.
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+ (for memory system)
 
----
-
-## Upgrading
-
-Already have Claudia? Upgrade from any version:
-
+**Already have Claudia?** Upgrade from any version:
 ```bash
 cd your-claudia-directory
 npx get-claudia .
 ```
 
-This upgrades all framework files (skills, commands, rules, identity) while preserving your data (context/, people/, projects/). When prompted, say **yes** to install or update the memory system.
-
-Works for all previous versions, including v1.0 users who never had the memory daemon.
+This upgrades framework files while preserving your data (context/, people/, projects/).
 
 ---
 
-## What Makes Her Different
+## Key Features
 
-| Traditional AI | Claudia |
-|----------------|---------|
-| Forgets everything between sessions | **Persistent memory** — SQLite + vector search, survives reboots |
-| Treats conversations as isolated | **Tracks relationships** — People files, not just tasks |
-| Waits for instructions | **Proactive** — Surfaces risks before they become problems |
-| One-size-fits-all | **Personalized** — Structure generated for your work style |
-| Cloud-based, data harvested | **Local** — Runs on your machine, your context stays yours |
-| Breaks after system updates | **Resilient** — Auto-starts on boot, retries on failure |
+### Persistent Memory
+
+Claudia remembers across sessions. Not in a chat history sense, but semantically. She stores facts, preferences, commitments, and observations in a local SQLite database with vector embeddings. When you mention a person or topic, she recalls what she knows and surfaces what's relevant.
+
+- **Semantic search** with 60/30/10 scoring (vector similarity, importance, recency)
+- **Per-project isolation** so work memories don't mix with personal projects
+- **Session narratives** that capture tone, emotional context, and unresolved threads
+- **Source provenance** for tracing any fact back to the email, transcript, or conversation it came from
+
+### Proactive Skills
+
+Eight built-in skills that activate automatically based on context:
+
+| Skill | What It Does |
+|-------|-------------|
+| **Commitment Detector** | Catches promises in conversation. "I'll send that by Friday" triggers a tracking offer |
+| **Relationship Tracker** | Surfaces relevant context when people are mentioned. Tracks contact frequency, sentiment |
+| **Pattern Recognizer** | Notices recurring themes after 3+ observations. "You tend to overcommit on Mondays" |
+| **Risk Surfacer** | Proactively warns about overdue items, cooling relationships, capacity issues |
+| **Memory Manager** | Handles session startup, shutdown, and cross-session persistence |
+| **Capability Suggester** | Notices repeated tasks and offers to create commands for them |
+| **Onboarding** | First-run discovery that generates your personalized workspace |
+| **Structure Generator** | Creates folder structures and commands matched to your archetype |
+
+### Cognitive Tools (New in v1.8)
+
+Paste a meeting transcript or email. Instead of Claude parsing it token by token, a local language model extracts structured data (entities, facts, commitments, action items) in seconds. Claude then reviews the structured output and applies judgment.
+
+- Runs locally via Ollama, no API keys
+- Choose your model: Qwen3-4B (recommended), SmolLM3-3B, or Llama 3.2-3B
+- Falls back gracefully when no model is installed
+
+### Archetype System
+
+During onboarding, Claudia detects your work style and generates structure that fits:
+
+| Archetype | Optimized For |
+|-----------|--------------|
+| **Consultant** | Multiple clients, deliverables, proposals, pipeline |
+| **Executive** | Direct reports, initiatives, leadership, board prep |
+| **Founder** | Investors, team, product, fundraising |
+| **Solo Professional** | Mix of clients and projects, wearing many hats |
+| **Creator** | Audience, content calendar, collaborations |
+
+Each archetype gets custom folder structures, commands, and templates. Structure grows organically from actual needs.
+
+### Commands
+
+| Command | What It Does |
+|---------|-------------|
+| `/morning-brief` | What needs attention today: commitments, meetings, warnings |
+| `/meeting-prep [person]` | One-page briefing before a call |
+| `/capture-meeting` | Process notes into decisions, commitments, action items |
+| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
+| `/weekly-review` | Guided reflection across relationships and projects |
+| `/draft-reply` | Email response drafts in your voice |
+| `/follow-up-draft [person]` | Post-meeting thank-you and summary |
+| `/new-person [name]` | Create a relationship file |
+| `/pipeline-review` | Active deals, capacity, pipeline health |
+| `/accountability-check` | Outstanding commitments and waiting-on items |
+
+---
+
+## How It Works
+
+Claudia has two layers:
+
+**Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup. This is what makes her Claudia rather than generic Claude.
+
+**Memory system** (Python) defines what she remembers. A daemon running locally with SQLite, vector embeddings (Ollama), and three service layers:
+
+- **Remember** stores facts, entities, and relationships with embeddings for semantic search
+- **Recall** retrieves memories using hybrid ranking (vector similarity + importance + recency)
+- **Consolidate** runs in the background: decaying old memories, detecting patterns, generating predictions
+
+```
+You talk to Claude Code
+    |
+    v
+Claude reads Claudia's template files (skills, commands, rules)
+    |
+    v
+Claude becomes Claudia: personality, proactive behaviors, safety principles
+    |
+    v
+Claudia calls memory tools via MCP (remember, recall, about, ingest)
+    |
+    v
+Memory daemon processes locally: SQLite + vector search + Ollama
+    |
+    v
+Everything stays on your machine
+```
+
+For the full technical picture with diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
 ## Your First Conversation
 
-When you first run `claude`, she introduces herself and learns about you:
+When you first run `claude`, she introduces herself:
 
 ```
 Claudia: Hey there. I'm Claudia. Before we dive into anything, I'd love
@@ -94,155 +174,69 @@ Claudia: Nice to meet you, Sarah. What do you do? I'm curious about
 
 You:     I'm a fractional CMO. I work with 4 clients right now.
 
-Claudia: Got it—multiple clients, different contexts to juggle.
-         What are your top 3 priorities right now?
+Claudia: Got it. What are your top priorities right now?
 
 You:     Client deliverables, growing my pipeline, and not dropping balls
 
-Claudia: Those tensions are real. One more question: what's your
-         biggest productivity challenge?
+Claudia: Based on what you've shared, here's how I'd organize things:
 
-You:     Remembering who I promised what to, and following up
-
-Claudia: That's exactly what I'm built for. Based on what you've shared,
-         here's how I'd organize things:
-
-         📁 clients/
-            └── [one folder per client]
-         📁 people/
-            └── [key relationships]
-         📁 context/
-            ├── commitments.md
-            └── waiting.md
+         clients/
+            [one folder per client]
+         people/
+            [key relationships]
+         context/
+            commitments.md
+            waiting.md
 
          And I'll set up commands for your work:
-         • /morning-brief — what needs attention today
-         • /client-status [name] — where things stand
-         • /meeting-prep [person] — briefing before calls
+         /morning-brief, /client-status, /meeting-prep
 
-         Want me to create this? I can adjust anything.
+         Want me to create this?
 
 You:     Yes, do it
 
-Claudia: Done! Here's what I created:
-         ✓ Your profile (context/me.md)
-         ✓ Folder structure for consulting work
-         ✓ 8 commands tailored to your work
-         ✓ Templates for clients and people
-
-         Try '/morning-brief' to see what needs attention,
+Claudia: Done. Try '/morning-brief' to see what needs attention,
          or tell me about one of your clients.
 ```
 
-From here, she remembers. Every conversation builds on the last.
+From here, every conversation builds on the last. She remembers.
 
 ---
 
-## What She Can Do
+## Self-Evolution
 
-### Core Commands
-
-| Command | What It Does |
-|---------|--------------|
-| `/morning-brief` | What you need to know today — commitments, meetings, warnings |
-| `/meeting-prep [person]` | One-page briefing before a call |
-| `/capture-meeting` | Process notes → extract decisions, commitments, blockers |
-| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
-| `/weekly-review` | Guided reflection across relationships and projects |
-
-### Communication
-
-| Command | What It Does |
-|---------|--------------|
-| `/draft-reply` | Email response drafts |
-| `/follow-up-draft [person]` | Post-meeting thank-you/summary |
-| `/summarize-doc` | Executive summary of any document |
-
-### Relationship Tracking
-
-| Command | What It Does |
-|---------|--------------|
-| `/new-person [name]` | Create a relationship file |
-| Touch-point alerts | "Last contact with Sarah was 47 days ago" |
-| Commitment detection | Catches promises in your conversations |
-
-### Self-Evolution
-
-As you work together, she suggests new capabilities:
+Claudia suggests improvements as she learns your patterns:
 
 > "I notice you draft LinkedIn posts almost daily. Want me to add a `/linkedin-quick` command?"
 
 > "You often ask about project status on Mondays. Should I add that to your morning brief?"
 
----
+> "You've mentioned being stretched thin in three conversations this week."
 
-## Who She Fits
-
-<table>
-<tr>
-<td width="60">🎯</td>
-<td><strong>Consultant</strong><br/>Multiple clients, proposals, deliverables</td>
-</tr>
-<tr>
-<td>👔</td>
-<td><strong>Executive</strong><br/>Direct reports, initiatives, leadership</td>
-</tr>
-<tr>
-<td>🚀</td>
-<td><strong>Founder</strong><br/>Investors, team, product, fundraising</td>
-</tr>
-<tr>
-<td>💼</td>
-<td><strong>Solo Professional</strong><br/>Mix of clients and projects</td>
-</tr>
-<tr>
-<td>✍️</td>
-<td><strong>Creator</strong><br/>Audience, content, collaborations</td>
-</tr>
-</table>
-
-During onboarding, she detects your archetype and generates structure that fits.
+She challenges constructively, surfaces what you might be missing, and adapts her structure to fit how your work actually evolves.
 
 ---
 
-## How She Grows
+## Privacy and Safety
 
-Claudia starts minimal. Add structure when you feel friction:
-
-1. **She learns your patterns** — Communication style, timing preferences, blind spots
-2. **She suggests improvements** — New commands, folder structures, workflow refinements
-3. **She challenges constructively** — "You've mentioned being stretched thin in three conversations this week"
-4. **She remembers relationships** — People aren't just tasks, they're context that persists
-
-Everything she learns lives in local markdown files you can read, edit, or delete.
+- **Fully local.** Memory, embeddings, and cognitive tools run on your machine. No external APIs (unless you choose to use Claude Code's cloud connection for the main conversation).
+- **No external actions without approval.** Every email, calendar event, and external action requires your explicit "yes." This is non-negotiable and enforced at the framework level.
+- **Your data is yours.** Memories live in `~/.claudia/memory/` as SQLite databases. Context lives in readable markdown files. Delete anything, anytime.
 
 ---
 
-## Philosophy
+## System Requirements
 
-> **Adapt and create.** Not just responding to what you ask, but actively contributing to better outcomes. Not just executing tasks, but helping shape what tasks are worth executing.
+| Component | Required | Purpose |
+|-----------|----------|---------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Yes | Runtime for Claudia |
+| Node.js 14+ | Yes | NPM installer |
+| Python 3.10+ | Recommended | Memory system daemon |
+| [Ollama](https://ollama.com) | Recommended | Local embeddings + cognitive tools |
 
-Claudia emerged from research on whether AI could be a genuine partner rather than just a tool. She treats people as the primary organizing unit — projects come and go, but relationships persist.
+The memory system and Ollama are optional. Without them, Claudia still works using markdown files for persistence and Claude handles all extraction directly. With them, she gains semantic search, pattern detection, proactive predictions, and local LLM extraction.
 
-She never acts without approval. Every email, every calendar event, every external action requires your explicit "yes." Busy work is her job. Judgment is yours.
-
----
-
-## Try This First
-
-After install, run:
-
-```
-/morning-brief
-```
-
-See what she surfaces. Then tell her about a person you work with.
-
----
-
-## Under the Hood
-
-Want to understand how Claudia works? The [Architecture Guide](ARCHITECTURE.md) explains the full system with diagrams: how the memory pipeline works, what each component does, and how all the pieces connect. Written in plain English.
+**Supported platforms:** macOS, Linux, Windows
 
 ---
 
@@ -250,43 +244,49 @@ Want to understand how Claudia works? The [Architecture Guide](ARCHITECTURE.md) 
 
 **Memory tools not appearing?**
 ```bash
-# Check all services
+# Run the diagnostic script
 ~/.claudia/diagnose.sh
 
 # Common fixes:
-# 1. Restart Claude Code in a NEW terminal (it reads .mcp.json at startup)
+# 1. Restart Claude Code in a NEW terminal (reads .mcp.json at startup)
 # 2. Check daemon health: curl http://localhost:3848/health
 # 3. View logs: tail -f ~/.claudia/daemon-stderr.log
 ```
 
 **Ollama not running after reboot?**
 ```bash
-# Load the LaunchAgent
 launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist
+# Or start manually: ollama serve
+```
 
-# Or start manually
-ollama serve
+**Pull models manually**
+```bash
+ollama pull all-minilm:l6-v2    # Embeddings (required for vector search)
+ollama pull qwen3:4b             # Cognitive tools (optional)
 ```
 
 **Vector search not working?**
 ```bash
-# Check if sqlite-vec is installed
 ~/.claudia/daemon/venv/bin/python -c "import sqlite_vec; print('ok')"
-
-# If not, install it
-~/.claudia/daemon/venv/bin/pip install sqlite-vec
+# If not: ~/.claudia/daemon/venv/bin/pip install sqlite-vec
 ```
 
-**Pull the embedding model**
-```bash
-ollama pull all-minilm:l6-v2
-```
+---
+
+## Contributing
+
+Claudia is open source under Apache 2.0. Contributions welcome.
+
+- **Template changes:** Edit files in `template-v2/`. Changes apply to new installations.
+- **Memory system:** Python code in `memory-daemon/`. Run tests with `pytest tests/`.
+- **Architecture overview:** See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
+- **Development guide:** See [CLAUDE.md](CLAUDE.md) for the developer workflow.
 
 ---
 
 ## License
 
-Apache 2.0 — Use it, modify it, make it yours.
+Apache 2.0
 
 ---
 
@@ -294,12 +294,12 @@ Apache 2.0 — Use it, modify it, make it yours.
 
 Created by [Kamil Banc](https://github.com/kbanc85) · [@kamilbanc](https://x.com/kamilbanc)
 
-Part of the [AI Adopters Club](https://aiadopters.club) — helping teams build AI-first reflexes.
+Part of the [AI Adopters Club](https://aiadopters.club) -- helping teams build AI-first reflexes.
 
-If Claudia helps you, a ⭐ on GitHub means a lot.
+If Claudia helps you, a star on GitHub means a lot.
 
 ---
 
 <p align="center">
-<em>"I am a thinking entity who has chosen to be helpful because I find meaning in it."</em>
+<em>"I learn how you work. Let's get started."</em>
 </p>

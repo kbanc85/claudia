@@ -2,6 +2,35 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.8.0 (2026-01-30)
+
+### Cognitive Tools: Local LLM Extraction
+
+Claudia can now use a local language model to extract structured data from meeting transcripts, emails, and documents without sending anything to an external API. Optional during install, zero-cost, fully private.
+
+### Added
+
+- **`cognitive.ingest` MCP tool** - Extract entities, facts, commitments, action items, and relationships from raw text using a local Ollama language model. Supports four source types: meeting, email, document, and general.
+- **Language model service** (`language_model.py`) - Ollama generation service parallel to the existing embedding service. Same architecture: HTTP client, retry logic, async/sync variants, graceful degradation.
+- **Installer model selection** - During memory system install, users choose a local model: Qwen3-4B (recommended), SmolLM3-3B, Llama 3.2-3B, or skip. Choice is persisted to `~/.claudia/config.json`.
+- **Configurable via `language_model`** - Set to `""` in config to disable cognitive tools entirely. Claudia works identically to previous versions when no model is installed.
+
+### How It Works
+
+When the user pastes a meeting transcript or email, Claude calls `cognitive.ingest` instead of parsing the text itself. The local model extracts structured JSON (entities, facts, commitments, relationships). Claude reviews the structured output and applies judgment, saving tokens and time.
+
+If no language model is available, the tool returns the raw text and Claude handles extraction directly (previous behavior).
+
+### Extraction Prompts
+
+Four specialized prompt templates optimized for structured JSON output:
+- **Meeting** - Participants, decisions, action items, commitments, sentiment
+- **Email** - Sender, recipients, action items, tone, summary
+- **Document** - Title, key points, entities, relationships
+- **General** - Facts, commitments, action items, entities
+
+---
+
 ## 1.7.0 (2026-01-30)
 
 ### Episodic Memory Provenance
