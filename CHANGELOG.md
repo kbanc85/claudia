@@ -2,7 +2,7 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## 1.4.0 (2026-01-28)
+## 1.10.0 (2026-01-31)
 
 ### Per-Turn Memory Capture & Session Narratives
 
