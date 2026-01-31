@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS memories (
     updated_at TEXT DEFAULT (datetime('now')),
     last_accessed_at TEXT,  -- For rehearsal-based importance boost
     access_count INTEGER DEFAULT 0,
+    verified_at TEXT,  -- When this memory was verified
+    verification_status TEXT DEFAULT 'pending',  -- pending, verified, flagged, contradicts
     metadata TEXT  -- JSON blob for flexible attributes
 );
 
@@ -65,6 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
 CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(content_hash);
+CREATE INDEX IF NOT EXISTS idx_memories_verification ON memories(verification_status);
 
 -- Junction table linking memories to entities
 CREATE TABLE IF NOT EXISTS memory_entities (
@@ -171,6 +174,7 @@ CREATE TABLE IF NOT EXISTS predictions (
     is_acted_on INTEGER DEFAULT 0,  -- Whether user acted on this
     created_at TEXT DEFAULT (datetime('now')),
     shown_at TEXT,
+    prediction_pattern_name TEXT,  -- Links to pattern for feedback loop
     metadata TEXT
 );
 
@@ -256,3 +260,6 @@ VALUES (3, 'Add source_context to memories, is_archived to turn_buffer for episo
 -- NOTE: FTS5 full-text search (migration v4) is created by database.py migration code
 -- rather than here, because CREATE TRIGGER statements contain internal semicolons
 -- that the schema.sql line-based parser cannot handle.
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (5, 'Add verification columns to memories, prediction_pattern_name to predictions');

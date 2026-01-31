@@ -19,6 +19,7 @@ from ..services.consolidate import (
     run_decay,
     run_full_consolidation,
 )
+from ..services.verify import run_verification
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,15 @@ class MemoryScheduler:
             CronTrigger(hour=6, minute=0),
             id="daily_predictions",
             name="Daily prediction generation",
+            replace_existing=True,
+        )
+
+        # Periodic: Memory verification
+        self.scheduler.add_job(
+            self._run_memory_verification,
+            IntervalTrigger(minutes=self.config.verify_interval_minutes),
+            id="memory_verification",
+            name="Background memory verification",
             replace_existing=True,
         )
 
@@ -135,6 +145,15 @@ class MemoryScheduler:
             logger.info(f"Prediction generation complete: {len(predictions)} predictions")
         except Exception as e:
             logger.exception("Error in prediction generation")
+
+    def _run_memory_verification(self) -> None:
+        """Run background memory verification"""
+        try:
+            logger.debug("Running memory verification")
+            result = run_verification()
+            logger.debug(f"Memory verification complete: {result}")
+        except Exception as e:
+            logger.exception("Error in memory verification")
 
 
 # Global scheduler instance

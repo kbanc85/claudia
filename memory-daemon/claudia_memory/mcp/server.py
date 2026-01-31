@@ -571,6 +571,24 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.prediction_feedback",
+            description="Provide feedback on a prediction -- mark whether the user acted on it. This trains future prediction priority.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "prediction_id": {
+                        "type": "integer",
+                        "description": "The prediction ID to provide feedback for",
+                    },
+                    "acted_on": {
+                        "type": "boolean",
+                        "description": "Whether the user acted on this prediction",
+                    },
+                },
+                "required": ["prediction_id", "acted_on"],
+            },
+        ),
+        Tool(
             name="cognitive.ingest",
             description=(
                 "Extract structured data from raw text using a local language model. "
@@ -1017,6 +1035,21 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     TextContent(
                         type="text",
                         text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.prediction_feedback":
+            svc = get_consolidate_service()
+            svc.mark_prediction_acted_on(
+                prediction_id=arguments["prediction_id"],
+                acted_on=arguments["acted_on"],
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"success": True, "prediction_id": arguments["prediction_id"]}),
                     )
                 ]
             )

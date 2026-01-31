@@ -40,6 +40,14 @@ class MemoryConfig:
     recency_weight: float = 0.10  # Weight for recency
     fts_weight: float = 0.15  # Weight for FTS5 full-text search match
 
+    # Memory merging
+    similarity_merge_threshold: float = 0.92  # Cosine similarity threshold for merging
+    enable_memory_merging: bool = True  # Toggle memory merging during consolidation
+
+    # Verification
+    verify_interval_minutes: int = 60  # How often to run background verification
+    verify_batch_size: int = 20  # Max memories to verify per run
+
     # Health check
     health_port: int = 3848
 

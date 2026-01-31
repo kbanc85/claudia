@@ -303,6 +303,43 @@ class Database:
                 logger.warning(f"Migration 4 (FTS5) failed: {e}. FTS5 may not be available.")
                 # FTS5 is optional; the system degrades gracefully without it
 
+        if current_version < 5:
+            # Migration 5: Add verification columns to memories, pattern_name to predictions
+            migration_stmts = [
+                "ALTER TABLE memories ADD COLUMN verified_at TEXT",
+                "ALTER TABLE memories ADD COLUMN verification_status TEXT DEFAULT 'pending'",
+                "ALTER TABLE predictions ADD COLUMN prediction_pattern_name TEXT",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"Migration 5 statement failed: {e}")
+
+            # Index for verification queries
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memories_verification ON memories(verification_status)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 5 index failed: {e}")
+
+            # Grandfather existing memories as verified
+            try:
+                conn.execute(
+                    """UPDATE memories SET verification_status = 'verified', verified_at = datetime('now')
+                       WHERE verification_status = 'pending' OR verification_status IS NULL"""
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 5 grandfather failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (5, 'Add verification columns to memories, prediction_pattern_name to predictions')"
+            )
+            conn.commit()
+            logger.info("Applied migration 5: memory verification and prediction feedback")
+
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
     ) -> Optional[List[sqlite3.Row]]:

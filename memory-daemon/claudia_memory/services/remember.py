@@ -20,6 +20,7 @@ from ..extraction.entity_extractor import (
     extract_all,
     get_extractor,
 )
+from .guards import validate_entity, validate_memory, validate_relationship
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,16 @@ class RememberService:
             )
             return existing["id"]
 
+        # Run deterministic guards
+        guard_result = validate_memory(content, memory_type, importance, metadata)
+        if guard_result.warnings:
+            for w in guard_result.warnings:
+                logger.warning(f"Memory guard: {w}")
+        if "content" in guard_result.adjustments:
+            content = guard_result.adjustments["content"]
+        if "importance" in guard_result.adjustments:
+            importance = guard_result.adjustments["importance"]
+
         # Insert new memory
         insert_data = {
             "content": content,
@@ -236,6 +247,18 @@ class RememberService:
         Returns:
             Entity ID
         """
+        # Run deterministic guards
+        existing_names = [
+            row["canonical_name"]
+            for row in self.db.query("entities", columns=["canonical_name"])
+        ]
+        guard_result = validate_entity(name, entity_type, existing_names)
+        if guard_result.warnings:
+            for w in guard_result.warnings:
+                logger.warning(f"Entity guard: {w}")
+        if "entity_type" in guard_result.adjustments:
+            entity_type = guard_result.adjustments["entity_type"]
+
         canonical = self.extractor.canonical_name(name)
 
         # Check for existing
@@ -327,6 +350,14 @@ class RememberService:
         Returns:
             Relationship ID or None
         """
+        # Run deterministic guards
+        guard_result = validate_relationship(strength)
+        if guard_result.warnings:
+            for w in guard_result.warnings:
+                logger.warning(f"Relationship guard: {w}")
+        if "strength" in guard_result.adjustments:
+            strength = guard_result.adjustments["strength"]
+
         source_id = self._find_or_create_entity(source_name)
         target_id = self._find_or_create_entity(target_name)
 
