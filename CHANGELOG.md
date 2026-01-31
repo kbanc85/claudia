@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.9.3 (2026-01-31)
+
+### Fixed
+
+- **Upgrade crash on memory migration** - Existing databases failed with `no such column: verification_status` during upgrade because `schema.sql` tried to create an index on a migration-added column before migrations ran. The schema initializer now tolerates missing-column errors, letting migrations add the columns first.
+
+---
+
 ## 1.9.1 (2026-01-31)
 
 ### Concierge: Context-Aware Web Research
