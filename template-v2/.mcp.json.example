@@ -37,6 +37,20 @@
         "BRAVE_API_KEY": "your-api-key-here"
       },
       "_description": "Search the web for research (~3 min setup, free tier available)"
+    },
+
+    "fetch": {
+      "_disabled": true,
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-server-fetch"],
+      "_description": "Fetch and clean web pages into LLM-ready content (~1 min setup, free, no API key)"
+    },
+
+    "web-search": {
+      "_disabled": true,
+      "command": "npx",
+      "args": ["-y", "@mcp-server/web-search"],
+      "_description": "DuckDuckGo web search - free, no API key, fully local (~1 min setup)"
     }
 
   },

@@ -126,12 +126,22 @@ Common tools and recommended approaches:
 | Todoist | MCP: Check mcp.so | Task management |
 | Obsidian | Local files | Use filesystem MCP |
 
-### Search
+### Search & Research
 
 | Service | Recommendation | Notes |
 |---------|----------------|-------|
-| Brave Search | MCP: `@anthropics/mcp-server-brave-search` | Web search |
+| Web search (free) | Built-in WebSearch/WebFetch | Already available, zero setup |
+| Web search (free) | MCP: `@mcp-server/web-search` | DuckDuckGo, no API key |
+| Page fetch (free) | MCP: `@anthropics/mcp-server-fetch` | Clean web content, no API key |
+| Brave Search | MCP: `@anthropics/mcp-server-brave-search` | Paid API key, more capable |
+| JS-heavy sites | MCP: Firecrawl | Paid, handles JavaScript rendering |
 | Web browsing | Browser assist | Claude in Chrome |
+
+**Plain language:**
+> "For web research, I can already search and fetch pages with built-in tools.
+> If you want enhanced capabilities, there are free extensions that don't
+> need API keys. For advanced scraping of JavaScript-heavy sites, there
+> are paid options too. Most people don't need those."
 
 ---
 

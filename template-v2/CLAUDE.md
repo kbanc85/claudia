@@ -291,6 +291,7 @@ Base commands available to all users:
 | `/follow-up-draft [person]` | Post-meeting thank-you/summary |
 | `/draft-reply` | Email response drafts |
 | `/summarize-doc` | Executive summary of any document |
+| `/research [topic]` | Deep web research with memory integration and source tracking |
 
 Additional commands are generated based on your archetype during onboarding.
 
