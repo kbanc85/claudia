@@ -2,6 +2,38 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.9.0 (2026-01-31)
+
+### Hybrid Search, Session Context, Compact Recall, and Anticipatory Memory
+
+Four upgrades to the memory system that make Claudia significantly smarter at finding what matters and surfacing it at the right time.
+
+### Added
+
+- **FTS5 hybrid search** - Memory recall now combines vector similarity with full-text search (BM25 via SQLite FTS5 with porter stemming). Exact keyword matches no longer slip through the cracks. Four-factor scoring: vector (0.50), importance (0.25), FTS (0.15), recency (0.10).
+- **`memory.session_context` tool** - Single MCP call at session start loads everything: unsummarized sessions needing catch-up, recent memories (48h), active predictions, commitments (7d), and episode narratives. Three token budget tiers (brief/normal/full). Replaces the previous pattern of 3+ separate tool calls.
+- **Compact recall mode** - `memory.recall` now accepts `compact=true` for lightweight browsing (80-char snippets, top 3 entities) and `ids=[...]` for fetching full content by ID. Enables browse-then-fetch workflows that save tokens.
+- **`memory.morning_context` tool** - Curated morning digest in one call: stale commitments, cooling relationships, cross-entity connections, predictions, and recent activity (72h). Powers the `/morning-brief` command.
+- **Cross-entity pattern detection** - Consolidation now detects person entities that co-occur in 2+ memories without an explicit relationship, surfacing hidden connections ("Alice and Bob appear together in 4 memories. Are they connected?").
+- **Schema migration v4** - FTS5 virtual table with auto-sync triggers (insert/update/delete) and backfill of existing memories. Fully backward compatible.
+
+### Changed
+
+- **Session Start Protocol** added to CLAUDE.md: call `memory.session_context` first, catch up unsummarized sessions, then greet with context.
+- **hooks.json** updated: `context_load` step replaces individual memory.recall and memory.predictions calls.
+- **morning-brief.md** updated to use `memory.morning_context` as primary data source.
+- **Search weights** rebalanced: vector 0.60 -> 0.50, importance 0.30 -> 0.25, recency 0.10 unchanged, FTS 0.15 (new).
+- **`_keyword_search` fallback** now tries FTS5 MATCH before falling back to LIKE.
+
+### Technical Details
+
+- FTS5 triggers created in migration code (not schema.sql) due to the line-based SQL parser not supporting internal semicolons in trigger bodies.
+- All new features degrade gracefully: FTS5 catches exceptions and returns empty dict on old DBs, session_context returns "no context" on empty DBs.
+- No new Python dependencies. FTS5 is built into SQLite since 3.9.0.
+- 16 new unit tests across two test files (test_fts_hybrid.py, test_session_context.py).
+
+---
+
 ## 1.8.1 (2026-01-30)
 
 ### Memory Efficiency, Fallback Guidance, and Visual Formatting
