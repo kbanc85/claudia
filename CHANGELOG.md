@@ -2,6 +2,25 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.9.1 (2026-01-31)
+
+### Concierge: Context-Aware Web Research
+
+Claudia can now research topics using whatever web tools are available, connect findings to her memory graph, and track when information gets stale.
+
+### Added
+
+- **Concierge skill** (`concierge.md`) - Tool-agnostic research behavior that detects available tools (built-in WebFetch/WebSearch, free MCP servers, or paid options) and adapts. Checks memory before searching, builds context-aware queries using entity knowledge, and stores key findings with source provenance.
+- **`/research [topic]` command** - Deep research workflow supporting factual, exploratory, comparative, and competitive research. Synthesizes across multiple sources and connects findings to known relationships and projects.
+- **Free MCP server recommendations** - `.mcp.json.example` now includes `@anthropics/mcp-server-fetch` and `@mcp-server/web-search` (DuckDuckGo) as optional no-API-key power-ups alongside the existing Brave Search option.
+- **Updated connector-discovery** - Search & Research section expanded to show the full spectrum from free built-in tools to paid options with plain-language guidance.
+
+### How It Works
+
+Claudia checks memory first (avoiding redundant fetches), uses whatever tools are available, and stores key facts with `source:web:` provenance. On future queries, she surfaces previously researched information and flags when it might be stale. No new dependencies, no API keys required for base functionality.
+
+---
+
 ## 1.9.0 (2026-01-31)
 
 ### Hybrid Search, Session Context, Compact Recall, and Anticipatory Memory
