@@ -73,7 +73,7 @@ class RecallService:
         date_before: Optional[datetime] = None,
     ) -> List[RecallResult]:
         """
-        Search memories using semantic similarity and filters.
+        Search memories using hybrid vector + FTS5 similarity and filters.
 
         Args:
             query: Search query text
@@ -97,14 +97,13 @@ class RecallService:
         # Get query embedding
         query_embedding = embed_sync(query)
 
-        # Build base query
-        sql_parts = ["SELECT m.*, GROUP_CONCAT(e.name) as entity_names"]
-        params = []
+        # --- Vector search ---
+        vector_scores: Dict[int, float] = {}
+        vector_rows: Dict[int, Any] = {}
 
-        # Add vector similarity if embeddings available
         if query_embedding:
-            # sqlite-vec similarity search
-            sql_parts[0] += ", (1.0 / (1.0 + me.distance)) as vector_score"
+            sql_parts = ["SELECT m.*, GROUP_CONCAT(e.name) as entity_names, (1.0 / (1.0 + me.distance)) as vector_score"]
+            params: list = []
             sql_parts.append(
                 """
                 FROM memory_embeddings me
@@ -115,118 +114,153 @@ class RecallService:
                 """
             )
             params.append(json.dumps(query_embedding))
-        else:
-            # Fallback to keyword search
-            sql_parts.append(
-                """
+
+            self._apply_filters(sql_parts, params, memory_types, min_importance, date_after, date_before, about_entity)
+            sql_parts.append("GROUP BY m.id ORDER BY vector_score DESC LIMIT ?")
+            params.append(limit * 2)
+
+            try:
+                rows = self.db.execute("\n".join(sql_parts), tuple(params), fetch=True) or []
+                for row in rows:
+                    mid = row["id"]
+                    vector_scores[mid] = row["vector_score"] if "vector_score" in row.keys() else 0.0
+                    vector_rows[mid] = row
+            except Exception as e:
+                logger.warning(f"Vector search failed: {e}")
+
+        # --- FTS5 search ---
+        fts_scores = self._fts_search(query, limit * 2, memory_types, min_importance)
+
+        # --- Fallback: if neither vector nor FTS returned results, use keyword LIKE ---
+        if not vector_scores and not fts_scores:
+            rows = self._keyword_search(query, limit, memory_types, min_importance)
+            # Process keyword fallback rows the same way
+            now = datetime.utcnow()
+            results = []
+            for row in rows:
+                results.append(self._row_to_result(row, 0.5, 0.0, now))
+            results.sort(key=lambda r: r.score, reverse=True)
+            results = results[:limit]
+            self._update_access_counts(results, now)
+            return results
+
+        # --- Merge: collect all memory IDs from both sources ---
+        all_ids = set(vector_scores.keys()) | set(fts_scores.keys())
+
+        # Fetch full rows for FTS-only results not already in vector_rows
+        fts_only_ids = set(fts_scores.keys()) - set(vector_rows.keys())
+        if fts_only_ids:
+            placeholders = ", ".join(["?" for _ in fts_only_ids])
+            fts_rows = self.db.execute(
+                f"""
+                SELECT m.*, GROUP_CONCAT(e.name) as entity_names
                 FROM memories m
                 LEFT JOIN memory_entities me2 ON m.id = me2.memory_id
                 LEFT JOIN entities e ON me2.entity_id = e.id
-                WHERE m.content LIKE ?
-                """
-            )
-            params.append(f"%{query}%")
+                WHERE m.id IN ({placeholders})
+                GROUP BY m.id
+                """,
+                tuple(fts_only_ids),
+                fetch=True,
+            ) or []
+            for row in fts_rows:
+                vector_rows[row["id"]] = row
 
-        # Apply filters
-        if memory_types:
-            placeholders = ", ".join(["?" for _ in memory_types])
-            sql_parts.append(f"AND m.type IN ({placeholders})")
-            params.extend(memory_types)
-
-        if min_importance is not None:
-            sql_parts.append("AND m.importance >= ?")
-            params.append(min_importance)
-
-        if date_after:
-            sql_parts.append("AND m.created_at >= ?")
-            params.append(date_after.isoformat())
-
-        if date_before:
-            sql_parts.append("AND m.created_at <= ?")
-            params.append(date_before.isoformat())
-
-        if about_entity:
-            canonical = self.extractor.canonical_name(about_entity)
-            sql_parts.append("AND e.canonical_name = ?")
-            params.append(canonical)
-
-        # Group and order
-        sql_parts.append("GROUP BY m.id")
-
-        if query_embedding:
-            sql_parts.append("ORDER BY vector_score DESC")
-        else:
-            sql_parts.append("ORDER BY m.importance DESC, m.created_at DESC")
-
-        sql_parts.append("LIMIT ?")
-        params.append(limit * 2)  # Get more for re-ranking
-
-        sql = "\n".join(sql_parts)
-
-        try:
-            rows = self.db.execute(sql, tuple(params), fetch=True) or []
-        except Exception as e:
-            logger.warning(f"Vector search failed, falling back to keyword: {e}")
-            # Fallback to simple keyword search
-            rows = self._keyword_search(query, limit, memory_types, min_importance)
-
-        # Re-rank with combined scoring
-        results = []
+        # --- Score and build results ---
         now = datetime.utcnow()
-
-        for row in rows:
-            # Calculate combined score
-            vector_score = (row["vector_score"] if "vector_score" in row.keys() else 0.5) if query_embedding else 0.5
-            importance_score = row["importance"]
-
-            # Recency score (decay over 30 days)
-            created = datetime.fromisoformat(row["created_at"])
-            days_old = (now - created).days
-            recency_score = math.exp(-days_old / 30)
-
-            # Combined weighted score
-            combined_score = (
-                self.config.vector_weight * vector_score
-                + self.config.importance_weight * importance_score
-                + self.config.recency_weight * recency_score
-            )
-
-            # Parse entity names
-            entity_names = []
-            entity_names_val = row["entity_names"] if "entity_names" in row.keys() else None
-            if entity_names_val:
-                entity_names = [n.strip() for n in entity_names_val.split(",")]
-
-            # Parse metadata
-            metadata_val = row["metadata"] if "metadata" in row.keys() else None
-
-            # Extract source fields (may not exist in older DBs)
-            row_keys = row.keys()
-            source_val = row["source"] if "source" in row_keys else None
-            source_id_val = row["source_id"] if "source_id" in row_keys else None
-            source_context_val = row["source_context"] if "source_context" in row_keys else None
-
-            results.append(
-                RecallResult(
-                    id=row["id"],
-                    content=row["content"],
-                    type=row["type"],
-                    score=combined_score,
-                    importance=row["importance"],
-                    created_at=row["created_at"],
-                    entities=entity_names,
-                    metadata=json.loads(metadata_val) if metadata_val else None,
-                    source=source_val,
-                    source_id=source_id_val,
-                    source_context=source_context_val,
-                )
-            )
+        results = []
+        for mid in all_ids:
+            row = vector_rows.get(mid)
+            if not row:
+                continue
+            vs = vector_scores.get(mid, 0.0)
+            fs = fts_scores.get(mid, 0.0)
+            results.append(self._row_to_result(row, vs, fs, now))
 
         # Sort by combined score and limit
         results.sort(key=lambda r: r.score, reverse=True)
         results = results[:limit]
 
-        # Update access counts for rehearsal effect
+        self._update_access_counts(results, now)
+        return results
+
+    def _apply_filters(
+        self,
+        sql_parts: list,
+        params: list,
+        memory_types: Optional[List[str]],
+        min_importance: Optional[float],
+        date_after: Optional[datetime],
+        date_before: Optional[datetime],
+        about_entity: Optional[str] = None,
+    ) -> None:
+        """Apply common filters to SQL query parts."""
+        if memory_types:
+            placeholders = ", ".join(["?" for _ in memory_types])
+            sql_parts.append(f"AND m.type IN ({placeholders})")
+            params.extend(memory_types)
+        if min_importance is not None:
+            sql_parts.append("AND m.importance >= ?")
+            params.append(min_importance)
+        if date_after:
+            sql_parts.append("AND m.created_at >= ?")
+            params.append(date_after.isoformat())
+        if date_before:
+            sql_parts.append("AND m.created_at <= ?")
+            params.append(date_before.isoformat())
+        if about_entity:
+            canonical = self.extractor.canonical_name(about_entity)
+            sql_parts.append("AND e.canonical_name = ?")
+            params.append(canonical)
+
+    def _row_to_result(self, row: Any, vector_score: float, fts_score: float, now: datetime) -> RecallResult:
+        """Convert a database row + scores into a RecallResult with combined scoring."""
+        importance_score = row["importance"]
+
+        # Recency score (decay over 30 days)
+        created = datetime.fromisoformat(row["created_at"])
+        days_old = (now - created).days
+        recency_score = math.exp(-days_old / 30)
+
+        # Combined weighted score (vector + FTS + importance + recency)
+        combined_score = (
+            self.config.vector_weight * vector_score
+            + self.config.fts_weight * fts_score
+            + self.config.importance_weight * importance_score
+            + self.config.recency_weight * recency_score
+        )
+
+        # Parse entity names
+        entity_names = []
+        entity_names_val = row["entity_names"] if "entity_names" in row.keys() else None
+        if entity_names_val:
+            entity_names = [n.strip() for n in entity_names_val.split(",")]
+
+        # Parse metadata
+        metadata_val = row["metadata"] if "metadata" in row.keys() else None
+
+        # Extract source fields (may not exist in older DBs)
+        row_keys = row.keys()
+        source_val = row["source"] if "source" in row_keys else None
+        source_id_val = row["source_id"] if "source_id" in row_keys else None
+        source_context_val = row["source_context"] if "source_context" in row_keys else None
+
+        return RecallResult(
+            id=row["id"],
+            content=row["content"],
+            type=row["type"],
+            score=combined_score,
+            importance=row["importance"],
+            created_at=row["created_at"],
+            entities=entity_names,
+            metadata=json.loads(metadata_val) if metadata_val else None,
+            source=source_val,
+            source_id=source_id_val,
+            source_context=source_context_val,
+        )
+
+    def _update_access_counts(self, results: List[RecallResult], now: datetime) -> None:
+        """Update access counts for rehearsal effect."""
         for result in results:
             self.db.execute(
                 """
@@ -237,7 +271,93 @@ class RecallService:
                 (now.isoformat(), result.id),
             )
 
-        return results
+    def _fts_search(
+        self,
+        query: str,
+        limit: int,
+        memory_types: Optional[List[str]] = None,
+        min_importance: Optional[float] = None,
+    ) -> Dict[int, float]:
+        """
+        Full-text search using FTS5 with BM25 scoring.
+
+        Returns:
+            Dict mapping memory_id -> normalized FTS score (0-1, 1 = best)
+        """
+        try:
+            sql = """
+                SELECT m.id, fts.rank
+                FROM memories_fts fts
+                JOIN memories m ON m.id = fts.rowid
+                WHERE memories_fts MATCH ?
+            """
+            params: list = [query]
+
+            if memory_types:
+                placeholders = ", ".join(["?" for _ in memory_types])
+                sql += f" AND m.type IN ({placeholders})"
+                params.extend(memory_types)
+
+            if min_importance is not None:
+                sql += " AND m.importance >= ?"
+                params.append(min_importance)
+
+            sql += " ORDER BY fts.rank LIMIT ?"
+            params.append(limit)
+
+            rows = self.db.execute(sql, tuple(params), fetch=True) or []
+            if not rows:
+                return {}
+
+            # Normalize FTS5 rank scores to 0-1 range
+            # FTS5 rank is BM25: negative float, closer to 0 = better match
+            ranks = [row["rank"] for row in rows]
+            min_rank = min(ranks)  # best match (most negative)
+            max_rank = max(ranks)  # worst match (closest to 0)
+
+            result = {}
+            for row in rows:
+                if min_rank == max_rank:
+                    score = 1.0  # single result
+                else:
+                    score = (row["rank"] - max_rank) / (min_rank - max_rank)
+                result[row["id"]] = score
+
+            return result
+
+        except Exception as e:
+            logger.debug(f"FTS5 search failed (table may not exist): {e}")
+            return {}
+
+    def fetch_by_ids(self, memory_ids: List[int]) -> List[RecallResult]:
+        """
+        Fetch specific memories by their IDs.
+
+        Args:
+            memory_ids: List of memory IDs to fetch
+
+        Returns:
+            List of RecallResult objects
+        """
+        if not memory_ids:
+            return []
+
+        placeholders = ", ".join(["?" for _ in memory_ids])
+        rows = self.db.execute(
+            f"""
+            SELECT m.*, GROUP_CONCAT(e.name) as entity_names
+            FROM memories m
+            LEFT JOIN memory_entities me2 ON m.id = me2.memory_id
+            LEFT JOIN entities e ON me2.entity_id = e.id
+            WHERE m.id IN ({placeholders})
+            GROUP BY m.id
+            """,
+            tuple(memory_ids),
+            fetch=True,
+        ) or []
+
+        now = datetime.utcnow()
+        return [self._row_to_result(row, 0.0, 0.0, now) for row in rows]
 
     def recall_about(
         self,
@@ -701,7 +821,38 @@ class RecallService:
         memory_types: Optional[List[str]] = None,
         min_importance: Optional[float] = None,
     ) -> List[Dict]:
-        """Fallback keyword-based search"""
+        """Fallback keyword-based search. Tries FTS5 MATCH first, then LIKE."""
+        # Try FTS5 first for better keyword matching
+        try:
+            sql = """
+                SELECT m.*, GROUP_CONCAT(e.name) as entity_names
+                FROM memories_fts fts
+                JOIN memories m ON m.id = fts.rowid
+                LEFT JOIN memory_entities me ON m.id = me.memory_id
+                LEFT JOIN entities e ON me.entity_id = e.id
+                WHERE memories_fts MATCH ?
+            """
+            params: list = [query]
+
+            if memory_types:
+                placeholders = ", ".join(["?" for _ in memory_types])
+                sql += f" AND m.type IN ({placeholders})"
+                params.extend(memory_types)
+
+            if min_importance is not None:
+                sql += " AND m.importance >= ?"
+                params.append(min_importance)
+
+            sql += " GROUP BY m.id ORDER BY fts.rank LIMIT ?"
+            params.append(limit)
+
+            rows = self.db.execute(sql, tuple(params), fetch=True) or []
+            if rows:
+                return rows
+        except Exception:
+            pass  # FTS5 not available, fall through to LIKE
+
+        # Final fallback: LIKE search
         sql = """
             SELECT m.*, GROUP_CONCAT(e.name) as entity_names
             FROM memories m
@@ -757,6 +908,11 @@ def search_entities(query: str, **kwargs) -> List[EntityResult]:
 def recall_episodes(query: str, **kwargs) -> List[Dict[str, Any]]:
     """Search episode narratives"""
     return get_recall_service().recall_episodes(query, **kwargs)
+
+
+def fetch_by_ids(memory_ids: List[int]) -> List[RecallResult]:
+    """Fetch specific memories by ID"""
+    return get_recall_service().fetch_by_ids(memory_ids)
 
 
 def trace_memory(memory_id: int) -> Dict[str, Any]:

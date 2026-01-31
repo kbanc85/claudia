@@ -88,8 +88,23 @@ The memory system is a standalone Python application that gives Claudia persiste
 - `memory.consolidate` - Trigger manual consolidation
 - `memory.entity` - Create/update entity information
 - `memory.search_entities` - Search entities by name or description
+- `memory.buffer_turn` - Buffer a conversation turn for session capture
+- `memory.end_session` - End session and create episode summary
+- `memory.unsummarized` - Get buffered turns not yet summarized
+- `memory.batch` - Batch multiple memory operations in one call
+- `memory.trace` - Trace provenance and source history of a memory
 
-**Dependencies:** Ollama (local embeddings, 384-dimensional all-minilm:l6-v2), sqlite-vec, APScheduler, spaCy (optional NLP)
+**Dependencies:** Ollama (local embeddings via all-minilm:l6-v2 + optional cognitive models like Qwen3/SmolLM3), sqlite-vec, APScheduler, spaCy (optional NLP)
+
+### Cognitive Tools (`memory-daemon/claudia_memory/extraction/` and `language_model.py`)
+
+Optional local LLM pipeline for structured extraction from unstructured text. Uses Ollama models (Qwen3, SmolLM3, Llama 3.2) to extract entities and memories from meetings, emails, and documents.
+
+- `LanguageModelService` (`language_model.py`) - Async/sync Ollama client for local LLM generation
+- `EntityExtractor` (`extraction/entity_extractor.py`) - NLP extraction using spaCy (preferred) or regex fallback
+- `IngestService` (`services/ingest.py`) - Orchestrates extraction: text goes in, structured entities/memories come out. Claude applies judgment to results.
+
+Four extraction modes: meeting, email, document, general. All processing is local.
 
 ### Archetype System
 
@@ -165,8 +180,12 @@ python -m venv venv
 source venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests
+# Run unit tests (uses asyncio_mode = auto via pyproject.toml)
 pytest tests/
+pytest tests/test_database.py -v     # Single test file
+
+# One-click full test suite (unit + integration + daemon startup)
+./test.sh
 
 # Run the daemon directly (MCP mode, connects via stdio)
 python -m claudia_memory
@@ -183,7 +202,9 @@ curl http://localhost:3848/health
 - `services/remember.py` - Write path. How memories, entities, and relationships get stored.
 - `services/recall.py` - Read path. Semantic search, scoring, and retrieval logic.
 - `services/consolidate.py` - Background maintenance. Decay, pattern detection, predictions.
+- `services/ingest.py` - Cognitive tool pipeline. Local LLM extraction of entities/memories from text.
 - `mcp/server.py` - Tool definitions exposed to Claude Code. Add new MCP tools here.
+- `language_model.py` - Ollama LLM client used by IngestService for cognitive extraction.
 - `database.py` - Connection management, thread safety, helper methods.
 
 **Migrating existing markdown data:**
@@ -234,33 +255,31 @@ Don't overwhelm users with structure upfront. Let complexity emerge from actual 
 ```
 claudia/
 ├── bin/index.js              ← CLI installer
-├── package.json              ← NPM package config
-├── CHANGELOG.md              ← Release history
-├── README.md                 ← User-facing docs
-├── ARCHITECTURE.md           ← Full architecture with diagrams
+├── package.json              ← NPM package config (name: get-claudia)
 ├── template-v2/              ← Current template (use this)
 │   ├── CLAUDE.md            ← Claudia's core identity
 │   └── .claude/
 │       ├── commands/         ← User-invocable workflows
 │       ├── skills/           ← Proactive behaviors
-│       │   ├── archetypes/  ← Archetype-specific configs
-│       │   └── *.md         ← Skill definitions
+│       │   └── archetypes/  ← Archetype-specific configs
 │       ├── rules/            ← Global principles
 │       └── hooks/            ← Event handlers
 ├── memory-daemon/            ← Python memory system
 │   ├── claudia_memory/
 │   │   ├── __main__.py      ← Entry point
-│   │   ├── database.py      ← SQLite connection management
+│   │   ├── database.py      ← SQLite + sqlite-vec connection management
 │   │   ├── schema.sql       ← Database table definitions
 │   │   ├── config.py        ← Settings and defaults
-│   │   ├── embeddings.py    ← Ollama embedding generation
-│   │   ├── mcp/server.py    ← MCP protocol implementation
-│   │   ├── daemon/          ← Scheduler and health check
-│   │   ├── extraction/      ← Entity extraction (NLP)
-│   │   └── services/        ← Remember, Recall, Consolidate
+│   │   ├── embeddings.py    ← Ollama embedding generation (384-dim)
+│   │   ├── language_model.py ← Local LLM client for cognitive tools
+│   │   ├── mcp/server.py    ← MCP tool definitions (13 tools)
+│   │   ├── daemon/          ← Scheduler and health check (port 3848)
+│   │   ├── extraction/      ← Entity extraction (spaCy or regex)
+│   │   └── services/        ← Remember, Recall, Consolidate, Ingest
 │   ├── scripts/             ← Install and migration scripts
-│   ├── tests/               ← Database and service tests
-│   └── pyproject.toml       ← Python config and dependencies
+│   ├── tests/               ← Pytest suite (asyncio_mode = auto)
+│   ├── test.sh              ← One-click test runner (unit + integration + daemon)
+│   └── pyproject.toml       ← Python config (requires Python 3.10+)
 └── template/                 ← Legacy template (deprecated)
 ```
 

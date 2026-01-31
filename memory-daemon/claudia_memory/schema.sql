@@ -252,3 +252,7 @@ VALUES (2, 'Add turn_buffer table, episode narrative/summary columns, episode_em
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (3, 'Add source_context to memories, is_archived to turn_buffer for episodic provenance');
+
+-- NOTE: FTS5 full-text search (migration v4) is created by database.py migration code
+-- rather than here, because CREATE TRIGGER statements contain internal semicolons
+-- that the schema.sql line-based parser cannot handle.

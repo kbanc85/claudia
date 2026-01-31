@@ -144,6 +144,10 @@ class ConsolidateService:
         comm_patterns = self._detect_communication_patterns()
         patterns.extend(comm_patterns)
 
+        # Detect cross-entity patterns (co-mentioned people without explicit relationships)
+        cross_patterns = self._detect_cross_entity_patterns()
+        patterns.extend(cross_patterns)
+
         # Store detected patterns
         for pattern in patterns:
             self._store_pattern(pattern)
@@ -223,6 +227,58 @@ class ConsolidateService:
                     evidence=["Multiple old commitments detected"],
                 )
             )
+
+        return patterns
+
+    def _detect_cross_entity_patterns(self) -> List[DetectedPattern]:
+        """Detect person entities that co-occur in memories but have no explicit relationship."""
+        patterns = []
+
+        try:
+            # Find pairs of person entities that appear together in 2+ memories
+            co_mentions = self.db.execute(
+                """
+                SELECT
+                    e1.id as id1, e1.name as name1,
+                    e2.id as id2, e2.name as name2,
+                    COUNT(DISTINCT me1.memory_id) as co_count
+                FROM memory_entities me1
+                JOIN memory_entities me2 ON me1.memory_id = me2.memory_id AND me1.entity_id < me2.entity_id
+                JOIN entities e1 ON me1.entity_id = e1.id AND e1.type = 'person'
+                JOIN entities e2 ON me2.entity_id = e2.id AND e2.type = 'person'
+                GROUP BY me1.entity_id, me2.entity_id
+                HAVING co_count >= 2
+                ORDER BY co_count DESC
+                LIMIT 20
+                """,
+                fetch=True,
+            ) or []
+
+            for row in co_mentions:
+                # Check if a relationship already exists between them
+                existing = self.db.get_one(
+                    "relationships",
+                    where="(source_entity_id = ? AND target_entity_id = ?) OR (source_entity_id = ? AND target_entity_id = ?)",
+                    where_params=(row["id1"], row["id2"], row["id2"], row["id1"]),
+                )
+                if existing:
+                    continue
+
+                co_count = row["co_count"]
+                confidence = min(0.9, 0.4 + co_count * 0.1)
+
+                patterns.append(
+                    DetectedPattern(
+                        name=f"cross_entity_{row['id1']}_{row['id2']}",
+                        description=f"{row['name1']} and {row['name2']} appear together in {co_count} memories. Are they connected?",
+                        pattern_type="relationship",
+                        confidence=confidence,
+                        evidence=[f"Co-mentioned in {co_count} memories"],
+                    )
+                )
+
+        except Exception as e:
+            logger.debug(f"Cross-entity detection failed: {e}")
 
         return patterns
 

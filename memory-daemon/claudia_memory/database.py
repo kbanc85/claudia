@@ -259,6 +259,50 @@ class Database:
             conn.commit()
             logger.info("Applied migration 3: episodic memory provenance")
 
+        if current_version < 4:
+            # Migration 4: Add FTS5 full-text search table and auto-sync triggers
+            try:
+                conn.execute(
+                    """CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+                        content,
+                        content=memories,
+                        content_rowid=id,
+                        tokenize='porter unicode61'
+                    )"""
+                )
+
+                # Auto-sync triggers
+                conn.execute(
+                    """CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+                        INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
+                    END"""
+                )
+                conn.execute(
+                    """CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+                        INSERT INTO memories_fts(memories_fts, rowid, content) VALUES ('delete', old.id, old.content);
+                    END"""
+                )
+                conn.execute(
+                    """CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+                        INSERT INTO memories_fts(memories_fts, rowid, content) VALUES ('delete', old.id, old.content);
+                        INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
+                    END"""
+                )
+
+                # Backfill existing memories into FTS5 index
+                conn.execute(
+                    "INSERT INTO memories_fts(rowid, content) SELECT id, content FROM memories"
+                )
+
+                conn.execute(
+                    "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (4, 'Add FTS5 full-text search table and auto-sync triggers for hybrid search')"
+                )
+                conn.commit()
+                logger.info("Applied migration 4: FTS5 hybrid search")
+            except Exception as e:
+                logger.warning(f"Migration 4 (FTS5) failed: {e}. FTS5 may not be available.")
+                # FTS5 is optional; the system degrades gracefully without it
+
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
     ) -> Optional[List[sqlite3.Row]]:

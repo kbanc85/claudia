@@ -26,6 +26,7 @@ from ..services.consolidate import (
     run_full_consolidation,
 )
 from ..services.recall import (
+    fetch_by_ids,
     get_recall_service,
     recall,
     recall_about,
@@ -99,13 +100,17 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.recall",
-            description="Search Claudia's memory for relevant information. Uses semantic similarity to find related memories.",
+            description=(
+                "Search Claudia's memory for relevant information. Uses hybrid vector + full-text "
+                "similarity. Use compact=true for lightweight browsing (snippets), then fetch full "
+                "content with ids=[...] for the interesting results."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "What to search for",
+                        "description": "What to search for (required unless ids is provided)",
                     },
                     "limit": {
                         "type": "integer",
@@ -121,8 +126,17 @@ async def list_tools() -> ListToolsResult:
                         "type": "string",
                         "description": "Filter to memories about a specific entity",
                     },
+                    "compact": {
+                        "type": "boolean",
+                        "description": "Return compact results: {id, snippet (80 chars), type, score, entities (max 3)}",
+                        "default": False,
+                    },
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Fetch specific memories by ID (skips search). Use after a compact search to get full content.",
+                    },
                 },
-                "required": ["query"],
             },
         ),
         Tool(
@@ -524,6 +538,39 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.session_context",
+            description=(
+                "Load relevant context at session start. Call this FIRST at the beginning of every session "
+                "(after confirming context/me.md exists). Returns a pre-formatted context block with: "
+                "unsummarized sessions needing catch-up, recent memories (48h), active predictions, "
+                "active commitments, and recent episode narratives. If unsummarized sessions are "
+                "reported, generate retroactive summaries using memory.end_session."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "token_budget": {
+                        "type": "string",
+                        "enum": ["brief", "normal", "full"],
+                        "description": "How much context to load. brief=minimal, normal=standard, full=comprehensive",
+                        "default": "normal",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.morning_context",
+            description=(
+                "Curated morning digest: stale commitments, cooling relationships, "
+                "cross-entity connections, active predictions, and recent activity (72h). "
+                "Use this when generating the morning brief to get all relevant data in one call."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
             name="cognitive.ingest",
             description=(
                 "Extract structured data from raw text using a local language model. "
@@ -595,12 +642,80 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.recall":
+            # Direct fetch by IDs (skip search)
+            if "ids" in arguments and arguments["ids"]:
+                results = fetch_by_ids(arguments["ids"])
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {
+                                    "results": [
+                                        {
+                                            "id": r.id,
+                                            "content": r.content,
+                                            "type": r.type,
+                                            "score": r.score,
+                                            "importance": r.importance,
+                                            "entities": r.entities,
+                                            "created_at": r.created_at,
+                                            "source": r.source,
+                                            "source_id": r.source_id,
+                                            "source_context": r.source_context,
+                                        }
+                                        for r in results
+                                    ]
+                                }
+                            ),
+                        )
+                    ]
+                )
+
+            # Search mode
+            query = arguments.get("query", "")
+            if not query:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"error": "Either 'query' or 'ids' is required"}),
+                        )
+                    ],
+                    isError=True,
+                )
+
             results = recall(
-                query=arguments["query"],
+                query=query,
                 limit=arguments.get("limit", 10),
                 memory_types=arguments.get("types"),
                 about_entity=arguments.get("about"),
             )
+
+            compact = arguments.get("compact", False)
+            if compact:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {
+                                    "results": [
+                                        {
+                                            "id": r.id,
+                                            "snippet": r.content[:80] + ("..." if len(r.content) > 80 else ""),
+                                            "type": r.type,
+                                            "score": round(r.score, 3),
+                                            "entities": r.entities[:3],
+                                        }
+                                        for r in results
+                                    ]
+                                }
+                            ),
+                        )
+                    ]
+                )
+
             return CallToolResult(
                 content=[
                     TextContent(
@@ -867,6 +982,29 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 ]
             )
 
+        elif name == "memory.session_context":
+            budget = arguments.get("token_budget", "normal")
+            context_text = _build_session_context(budget)
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=context_text,
+                    )
+                ]
+            )
+
+        elif name == "memory.morning_context":
+            morning_text = _build_morning_context()
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=morning_text,
+                    )
+                ]
+            )
+
         elif name == "cognitive.ingest":
             svc = get_ingest_service()
             result = await svc.ingest(
@@ -916,6 +1054,222 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             ],
             isError=True,
         )
+
+
+def _build_session_context(token_budget: str = "normal") -> str:
+    """
+    Assemble a pre-formatted session context block for session start.
+
+    Token budget tiers control how much data is returned:
+    - brief:  5 memories, 3 predictions, 2 episodes, 3 commitments
+    - normal: 10 memories, 5 predictions, 3 episodes, 5 commitments
+    - full:   20 memories, 10 predictions, 5 episodes, 10 commitments
+    """
+    budgets = {
+        "brief":  {"memories": 5,  "predictions": 3,  "episodes": 2, "commitments": 3},
+        "normal": {"memories": 10, "predictions": 5,  "episodes": 3, "commitments": 5},
+        "full":   {"memories": 20, "predictions": 10, "episodes": 5, "commitments": 10},
+    }
+    limits = budgets.get(token_budget, budgets["normal"])
+
+    sections = []
+    sections.append("# Session Context\n")
+
+    # 1. Unsummarized sessions
+    try:
+        unsummarized = get_unsummarized_turns()
+        if unsummarized:
+            sections.append(f"## Unsummarized Sessions ({len(unsummarized)})\n")
+            sections.append("**Action needed:** Generate retroactive summaries using `memory.end_session` for each.\n")
+            for session in unsummarized:
+                ep_id = session.get("episode_id", "?")
+                turn_count = session.get("turn_count", 0)
+                started = session.get("started_at", "unknown")
+                sections.append(f"- Episode {ep_id}: {turn_count} turns (started {started})")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch unsummarized sessions: {e}")
+
+    # 2. Recent memories (48h)
+    try:
+        recall_svc = get_recall_service()
+        recent = recall_svc.get_recent_memories(
+            limit=limits["memories"],
+            hours=48,
+        )
+        if recent:
+            sections.append(f"## Recent Context (48h) — {len(recent)} memories\n")
+            for m in recent:
+                entities_str = ", ".join(m.entities[:3]) if m.entities else ""
+                prefix = f"[{m.type}]"
+                if entities_str:
+                    prefix += f" [{entities_str}]"
+                sections.append(f"- {prefix} {m.content}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch recent memories: {e}")
+
+    # 3. Active predictions
+    try:
+        predictions = get_predictions(limit=limits["predictions"])
+        if predictions:
+            sections.append(f"## Predictions & Insights\n")
+            for p in predictions:
+                ptype = p.get("prediction_type", "insight")
+                content = p.get("content", "")
+                sections.append(f"- **{ptype}**: {content}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch predictions: {e}")
+
+    # 4. Active commitments (7 days)
+    try:
+        commitments = recall_svc.get_recent_memories(
+            limit=limits["commitments"],
+            memory_types=["commitment"],
+            hours=168,  # 7 days
+        )
+        if commitments:
+            sections.append(f"## Active Commitments (7d)\n")
+            for c in commitments:
+                entities_str = ", ".join(c.entities[:3]) if c.entities else ""
+                prefix = f"[{entities_str}]" if entities_str else ""
+                sections.append(f"- {prefix} {c.content} (created {c.created_at[:10]})")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch commitments: {e}")
+
+    # 5. Recent episode narratives
+    try:
+        db = get_db()
+        episode_rows = db.execute(
+            """
+            SELECT id, session_id, narrative, started_at, key_topics
+            FROM episodes
+            WHERE is_summarized = 1
+            ORDER BY started_at DESC
+            LIMIT ?
+            """,
+            (limits["episodes"],),
+            fetch=True,
+        ) or []
+        if episode_rows:
+            sections.append(f"## Recent Sessions\n")
+            for ep in episode_rows:
+                narrative = ep["narrative"] or ""
+                preview = narrative[:150] + "..." if len(narrative) > 150 else narrative
+                topics = json.loads(ep["key_topics"]) if ep["key_topics"] else []
+                topic_str = ", ".join(topics[:4]) if topics else "no topics"
+                sections.append(f"- **Session {ep['id']}** ({ep['started_at'][:10]}) [{topic_str}]")
+                if preview:
+                    sections.append(f"  {preview}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch episodes: {e}")
+
+    if len(sections) <= 1:
+        sections.append("No context available yet. This appears to be a fresh workspace.\n")
+
+    return "\n".join(sections)
+
+
+def _build_morning_context() -> str:
+    """
+    Build a curated morning digest with stale commitments, cooling relationships,
+    cross-entity connections, predictions, and recent activity.
+    """
+    from datetime import datetime, timedelta
+
+    sections = []
+    sections.append("# Morning Context Digest\n")
+
+    consolidate_svc = get_consolidate_service()
+    recall_svc = get_recall_service()
+    db = get_db()
+
+    # 1. Stale commitments (importance > 0.3, created > 3 days ago)
+    try:
+        cutoff = (datetime.utcnow() - timedelta(days=3)).isoformat()
+        stale = db.execute(
+            """
+            SELECT m.id, m.content, m.importance, m.created_at,
+                   GROUP_CONCAT(e.name) as entity_names
+            FROM memories m
+            LEFT JOIN memory_entities me ON m.id = me.memory_id
+            LEFT JOIN entities e ON me.entity_id = e.id
+            WHERE m.type = 'commitment' AND m.importance > 0.3 AND m.created_at < ?
+            GROUP BY m.id
+            ORDER BY m.created_at ASC
+            LIMIT 10
+            """,
+            (cutoff,),
+            fetch=True,
+        ) or []
+
+        if stale:
+            sections.append(f"## Stale Commitments ({len(stale)})\n")
+            for c in stale:
+                days_old = (datetime.utcnow() - datetime.fromisoformat(c["created_at"])).days
+                entities = c["entity_names"] or ""
+                prefix = f"[{entities}] " if entities else ""
+                sections.append(f"- {prefix}{c['content'][:100]} ({days_old}d old, importance: {c['importance']:.1f})")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch stale commitments: {e}")
+
+    # 2. Cooling relationships
+    try:
+        cooling = consolidate_svc._detect_cooling_relationships()
+        if cooling:
+            sections.append(f"## Cooling Relationships ({len(cooling)})\n")
+            for p in cooling:
+                sections.append(f"- {p.description} (confidence: {p.confidence:.1f})")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not detect cooling relationships: {e}")
+
+    # 3. Cross-entity connections
+    try:
+        cross = consolidate_svc._detect_cross_entity_patterns()
+        if cross:
+            sections.append(f"## Potential Connections ({len(cross)})\n")
+            for p in cross:
+                sections.append(f"- {p.description} (confidence: {p.confidence:.1f})")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not detect cross-entity patterns: {e}")
+
+    # 4. Active predictions
+    try:
+        predictions = get_predictions(limit=10)
+        if predictions:
+            sections.append(f"## Predictions & Insights\n")
+            for p in predictions:
+                ptype = p.get("prediction_type", "insight")
+                sections.append(f"- **{ptype}**: {p.get('content', '')}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch predictions: {e}")
+
+    # 5. Recent activity (72h)
+    try:
+        recent = recall_svc.get_recent_memories(limit=15, hours=72)
+        if recent:
+            sections.append(f"## Recent Activity (72h) - {len(recent)} memories\n")
+            for m in recent:
+                entities_str = ", ".join(m.entities[:3]) if m.entities else ""
+                prefix = f"[{m.type}]"
+                if entities_str:
+                    prefix += f" [{entities_str}]"
+                sections.append(f"- {prefix} {m.content[:100]}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch recent activity: {e}")
+
+    if len(sections) <= 1:
+        sections.append("No data available yet. Start by telling me about your work and the people you interact with.\n")
+
+    return "\n".join(sections)
 
 
 async def run_server():

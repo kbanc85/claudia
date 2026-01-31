@@ -35,9 +35,10 @@ class MemoryConfig:
 
     # Search settings
     max_recall_results: int = 20
-    vector_weight: float = 0.6  # Weight for vector similarity in ranking
-    importance_weight: float = 0.3  # Weight for importance score
-    recency_weight: float = 0.1  # Weight for recency
+    vector_weight: float = 0.50  # Weight for vector similarity in ranking
+    importance_weight: float = 0.25  # Weight for importance score
+    recency_weight: float = 0.10  # Weight for recency
+    fts_weight: float = 0.15  # Weight for FTS5 full-text search match
 
     # Health check
     health_port: int = 3848
@@ -83,6 +84,14 @@ class MemoryConfig:
                     config.pattern_detection_interval_hours = data["pattern_detection_interval_hours"]
                 if "max_recall_results" in data:
                     config.max_recall_results = data["max_recall_results"]
+                if "vector_weight" in data:
+                    config.vector_weight = data["vector_weight"]
+                if "importance_weight" in data:
+                    config.importance_weight = data["importance_weight"]
+                if "recency_weight" in data:
+                    config.recency_weight = data["recency_weight"]
+                if "fts_weight" in data:
+                    config.fts_weight = data["fts_weight"]
                 if "health_port" in data:
                     config.health_port = data["health_port"]
                 if "log_path" in data:
@@ -119,6 +128,10 @@ class MemoryConfig:
             "consolidation_interval_hours": self.consolidation_interval_hours,
             "pattern_detection_interval_hours": self.pattern_detection_interval_hours,
             "max_recall_results": self.max_recall_results,
+            "vector_weight": self.vector_weight,
+            "importance_weight": self.importance_weight,
+            "recency_weight": self.recency_weight,
+            "fts_weight": self.fts_weight,
             "health_port": self.health_port,
             "log_path": str(self.log_path),
         }

@@ -6,14 +6,14 @@ Provide a concise morning brief to start the day with clarity. Surface what matt
 
 ### Enhanced Memory System (if available)
 
-1. **Call `memory.predictions`** to get proactive suggestions:
+1. **Call `memory.morning_context`** to get a curated morning digest in a single call:
+   - Stale commitments (3+ days old, importance > 0.3)
    - Cooling relationships (people not contacted in 30+ days)
-   - Overdue commitments
-   - Pattern-based insights and warnings
+   - Cross-entity connections (people who co-appear but have no explicit relationship)
+   - Active predictions and insights
+   - Recent activity (72h)
 
-2. **Call `memory.recall`** with query "today's commitments and urgent items":
-   - Due today or overdue items
-   - Recent commitments
+2. **Call `memory.recall`** for specific follow-up queries as needed
 
 ### Markdown Fallback
 
