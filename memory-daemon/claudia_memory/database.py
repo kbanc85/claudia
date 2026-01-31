@@ -161,9 +161,14 @@ class Database:
                             try:
                                 conn.execute(stmt)
                             except sqlite3.OperationalError as e:
+                                err_msg = str(e)
                                 # Virtual tables may fail if sqlite-vec not loaded
-                                if "no such module: vec0" in str(e):
+                                if "no such module: vec0" in err_msg:
                                     logger.warning(f"Skipping vector table: {e}")
+                                # Indexes on columns added by migrations will fail on
+                                # existing databases; _run_migrations() will create them
+                                elif "no such column" in err_msg:
+                                    logger.debug(f"Skipping index for not-yet-migrated column: {e}")
                                 else:
                                     raise
 
