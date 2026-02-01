@@ -1,0 +1,25 @@
+{
+  "name": "@claudia/gateway",
+  "version": "0.1.0",
+  "description": "Multi-channel messaging gateway for Claudia - Telegram, Slack, and more",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "claudia-gateway": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js start",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "grammy": "^1.35.0",
+    "@slack/bolt": "^4.3.0",
+    "@slack/web-api": "^7.9.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}
