@@ -433,16 +433,23 @@ if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
                 # Export the token for this session
                 export TELEGRAM_BOT_TOKEN="$BOT_TOKEN"
 
-                echo -e "  ${BOLD}To start the gateway now:${NC}"
-                echo
-                echo -e "    ${CYAN}export TELEGRAM_BOT_TOKEN=\"$BOT_TOKEN\"${NC}"
-                echo -e "    ${CYAN}claudia-gateway start${NC}"
-                echo
-                echo -e "  ${DIM}To make the token persistent, add the export line to"
-                echo -e "  your ~/.zshrc or ~/.bashrc${NC}"
-                echo
-                echo -e "  ${CYAN}Step 5:${NC} Open your bot in Telegram and send a message!"
-                echo -e "          ${DIM}(start the gateway first)${NC}"
+                # Auto-persist token to shell rc file
+                TOKEN_LINE="export TELEGRAM_BOT_TOKEN=\"$BOT_TOKEN\""
+                if [ -n "$SHELL_RC" ]; then
+                    if [ -f "$SHELL_RC" ] && grep -q 'TELEGRAM_BOT_TOKEN' "$SHELL_RC" 2>/dev/null; then
+                        # Replace existing line
+                        sed -i.bak "s|^export TELEGRAM_BOT_TOKEN=.*|$TOKEN_LINE|" "$SHELL_RC" && rm -f "${SHELL_RC}.bak"
+                        echo -e "  ${GREEN}✓${NC} Bot token updated in ~/${SHELL_RC##*/}"
+                    else
+                        echo "" >> "$SHELL_RC"
+                        echo "# Claudia Gateway - Telegram" >> "$SHELL_RC"
+                        echo "$TOKEN_LINE" >> "$SHELL_RC"
+                        echo -e "  ${GREEN}✓${NC} Bot token saved to ~/${SHELL_RC##*/}"
+                    fi
+                else
+                    echo -e "  ${YELLOW}!${NC} Add this to your shell profile to persist the token:"
+                    echo -e "    ${DIM}${TOKEN_LINE}${NC}"
+                fi
             else
                 echo
                 echo -e "  ${YELLOW}!${NC} Skipped user ID. You'll need to add it manually:"
@@ -499,19 +506,34 @@ if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
               fs.writeFileSync(path, JSON.stringify(c, null, 2));
             " 2>/dev/null
 
+            # Export tokens for this session
+            export SLACK_BOT_TOKEN="$SLACK_BOT"
+            export SLACK_APP_TOKEN="$SLACK_APP"
+
             echo
             echo -e "  ${GREEN}✓${NC} Slack configured in gateway.json"
             echo -e "  ${GREEN}✓${NC} User ${SLACK_USER} added to allowlist"
-            echo
-            echo -e "  ${BOLD}To start the gateway:${NC}"
-            echo
-            echo -e "    ${CYAN}export SLACK_BOT_TOKEN=\"$SLACK_BOT\"${NC}"
-            echo -e "    ${CYAN}export SLACK_APP_TOKEN=\"$SLACK_APP\"${NC}"
-            echo -e "    ${CYAN}claudia-gateway start${NC}"
-            echo
-            echo -e "  ${DIM}Add those export lines to your ~/.zshrc or ~/.bashrc to persist them.${NC}"
-            echo
-            echo -e "  ${CYAN}Step 7:${NC} DM the bot or @mention it in a channel!"
+
+            # Auto-persist tokens to shell rc file
+            SBOT_LINE="export SLACK_BOT_TOKEN=\"$SLACK_BOT\""
+            SAPP_LINE="export SLACK_APP_TOKEN=\"$SLACK_APP\""
+            if [ -n "$SHELL_RC" ]; then
+                if [ -f "$SHELL_RC" ] && grep -q 'SLACK_BOT_TOKEN' "$SHELL_RC" 2>/dev/null; then
+                    sed -i.bak "s|^export SLACK_BOT_TOKEN=.*|$SBOT_LINE|" "$SHELL_RC" && rm -f "${SHELL_RC}.bak"
+                    sed -i.bak "s|^export SLACK_APP_TOKEN=.*|$SAPP_LINE|" "$SHELL_RC" && rm -f "${SHELL_RC}.bak"
+                    echo -e "  ${GREEN}✓${NC} Slack tokens updated in ~/${SHELL_RC##*/}"
+                else
+                    echo "" >> "$SHELL_RC"
+                    echo "# Claudia Gateway - Slack" >> "$SHELL_RC"
+                    echo "$SBOT_LINE" >> "$SHELL_RC"
+                    echo "$SAPP_LINE" >> "$SHELL_RC"
+                    echo -e "  ${GREEN}✓${NC} Slack tokens saved to ~/${SHELL_RC##*/}"
+                fi
+            else
+                echo -e "  ${YELLOW}!${NC} Add these to your shell profile to persist the tokens:"
+                echo -e "    ${DIM}${SBOT_LINE}${NC}"
+                echo -e "    ${DIM}${SAPP_LINE}${NC}"
+            fi
         else
             echo
             echo -e "  ${DIM}Missing some values. When you have all tokens, run:${NC}"
@@ -524,6 +546,29 @@ if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
     echo
     echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo
+
+    # Show the "How to Use" box if a platform was configured
+    if [ "$PLATFORM_CHOICE" = "1" ] || [ "$PLATFORM_CHOICE" = "2" ]; then
+        echo -e "  ${BOLD}${CYAN}How It Works: Two Terminals${NC}"
+        echo
+        echo -e "  The gateway is a separate program that connects your"
+        echo -e "  chat app (Telegram/Slack) to Claudia. It needs to run"
+        echo -e "  in its own terminal window while you use Claude in another."
+        echo
+        echo -e "  ${BOLD}Terminal 1 (gateway):${NC}"
+        echo -e "    ${CYAN}claudia-gateway start${NC}"
+        echo -e "    ${DIM}Keep this running. It connects to your bot.${NC}"
+        echo
+        echo -e "  ${BOLD}Terminal 2 (Claude):${NC}"
+        echo -e "    ${CYAN}cd your-project && claude${NC}"
+        echo -e "    ${DIM}Your normal Claude Code sessions.${NC}"
+        echo
+        echo -e "  ${YELLOW}!${NC} The gateway must be running before you message the bot."
+        echo -e "    If the gateway is stopped, your bot won't respond."
+        echo
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo
+    fi
 fi
 
 echo -e "${BOLD}Security reminders:${NC}"

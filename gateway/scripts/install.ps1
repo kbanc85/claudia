@@ -374,15 +374,24 @@ if ($showGuide -match "^[Yy]") {
 
                 $env:TELEGRAM_BOT_TOKEN = $botToken
 
-                Write-Host "  ${BOLD}To start the gateway now:${NC}"
-                Write-Host ""
-                Write-Host "    ${CYAN}`$env:TELEGRAM_BOT_TOKEN = '$botToken'${NC}"
-                Write-Host "    ${CYAN}claudia-gateway start${NC}"
-                Write-Host ""
-                Write-Host "  ${DIM}To make the token persistent, add to your PowerShell profile.${NC}"
-                Write-Host ""
-                Write-Host "  ${CYAN}Step 5:${NC} Open your bot in Telegram and send a message!"
-                Write-Host "          ${DIM}(start the gateway first)${NC}"
+                # Auto-persist token to PowerShell profile
+                $profilePath = $PROFILE.CurrentUserAllHosts
+                $profileDir = Split-Path $profilePath -Parent
+                if (-not (Test-Path $profileDir)) { New-Item -ItemType Directory -Force -Path $profileDir | Out-Null }
+                if (-not (Test-Path $profilePath)) { New-Item -ItemType File -Force -Path $profilePath | Out-Null }
+
+                $profileContent = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+                $tokenLine = "`$env:TELEGRAM_BOT_TOKEN = '$botToken'"
+
+                if ($profileContent -match 'TELEGRAM_BOT_TOKEN') {
+                    # Replace existing line
+                    $profileContent = $profileContent -replace '(?m)^\$env:TELEGRAM_BOT_TOKEN\s*=.*$', $tokenLine
+                    Set-Content -Path $profilePath -Value $profileContent
+                    Write-Host "  ${GREEN}✓${NC} Bot token updated in PowerShell profile"
+                } else {
+                    Add-Content -Path $profilePath -Value "`n# Claudia Gateway - Telegram`n$tokenLine"
+                    Write-Host "  ${GREEN}✓${NC} Bot token saved to PowerShell profile"
+                }
             } else {
                 Write-Host ""
                 Write-Host "  ${YELLOW}!${NC} Skipped user ID. You'll need to add it manually:"
@@ -438,19 +447,33 @@ if ($showGuide -match "^[Yy]") {
             } -Force
             $cfgData | ConvertTo-Json -Depth 10 | Set-Content $CONFIG_FILE
 
+            # Export tokens for this session
+            $env:SLACK_BOT_TOKEN = $slackBot
+            $env:SLACK_APP_TOKEN = $slackApp
+
             Write-Host ""
             Write-Host "  ${GREEN}✓${NC} Slack configured in gateway.json"
             Write-Host "  ${GREEN}✓${NC} User $slackUser added to allowlist"
-            Write-Host ""
-            Write-Host "  ${BOLD}To start the gateway:${NC}"
-            Write-Host ""
-            Write-Host "    ${CYAN}`$env:SLACK_BOT_TOKEN = '$slackBot'${NC}"
-            Write-Host "    ${CYAN}`$env:SLACK_APP_TOKEN = '$slackApp'${NC}"
-            Write-Host "    ${CYAN}claudia-gateway start${NC}"
-            Write-Host ""
-            Write-Host "  ${DIM}Add those to your PowerShell profile to persist them.${NC}"
-            Write-Host ""
-            Write-Host "  ${CYAN}Step 7:${NC} DM the bot or @mention it in a channel!"
+
+            # Auto-persist tokens to PowerShell profile
+            $profilePath = $PROFILE.CurrentUserAllHosts
+            $profileDir = Split-Path $profilePath -Parent
+            if (-not (Test-Path $profileDir)) { New-Item -ItemType Directory -Force -Path $profileDir | Out-Null }
+            if (-not (Test-Path $profilePath)) { New-Item -ItemType File -Force -Path $profilePath | Out-Null }
+
+            $profileContent = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+            $sbotLine = "`$env:SLACK_BOT_TOKEN = '$slackBot'"
+            $sappLine = "`$env:SLACK_APP_TOKEN = '$slackApp'"
+
+            if ($profileContent -match 'SLACK_BOT_TOKEN') {
+                $profileContent = $profileContent -replace '(?m)^\$env:SLACK_BOT_TOKEN\s*=.*$', $sbotLine
+                $profileContent = $profileContent -replace '(?m)^\$env:SLACK_APP_TOKEN\s*=.*$', $sappLine
+                Set-Content -Path $profilePath -Value $profileContent
+                Write-Host "  ${GREEN}✓${NC} Slack tokens updated in PowerShell profile"
+            } else {
+                Add-Content -Path $profilePath -Value "`n# Claudia Gateway - Slack`n$sbotLine`n$sappLine"
+                Write-Host "  ${GREEN}✓${NC} Slack tokens saved to PowerShell profile"
+            }
         } else {
             Write-Host ""
             Write-Host "  ${DIM}Missing some values. When you have all tokens, run:${NC}"
@@ -463,6 +486,29 @@ if ($showGuide -match "^[Yy]") {
     Write-Host ""
     Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     Write-Host ""
+
+    # Show the "How to Use" box if a platform was configured
+    if ($platformChoice -eq "1" -or $platformChoice -eq "2") {
+        Write-Host "  ${BOLD}${CYAN}How It Works: Two Terminals${NC}"
+        Write-Host ""
+        Write-Host "  The gateway is a separate program that connects your"
+        Write-Host "  chat app (Telegram/Slack) to Claudia. It needs to run"
+        Write-Host "  in its own terminal window while you use Claude in another."
+        Write-Host ""
+        Write-Host "  ${BOLD}Terminal 1 (gateway):${NC}"
+        Write-Host "    ${CYAN}claudia-gateway start${NC}"
+        Write-Host "    ${DIM}Keep this running. It connects to your bot.${NC}"
+        Write-Host ""
+        Write-Host "  ${BOLD}Terminal 2 (Claude):${NC}"
+        Write-Host "    ${CYAN}cd your-project && claude${NC}"
+        Write-Host "    ${DIM}Your normal Claude Code sessions.${NC}"
+        Write-Host ""
+        Write-Host "  ${YELLOW}!${NC} The gateway must be running before you message the bot."
+        Write-Host "    If the gateway is stopped, your bot won't respond."
+        Write-Host ""
+        Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        Write-Host ""
+    }
 }
 
 Write-Host "${BOLD}Security reminders:${NC}"
