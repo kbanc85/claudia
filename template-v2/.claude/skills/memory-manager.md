@@ -213,6 +213,8 @@ If unread Telegram/Slack messages are returned:
 
 The `memory.session_context` call automatically includes a Telegram Inbox section when unread gateway messages exist. If the user asks "any new messages?" or "check telegram" mid-session, call `memory.telegram_inbox` directly to fetch and display any messages that arrived since session start.
 
+If the user asks about Telegram messages but the gateway isn't running (no messages returned and no gateway process detected), suggest: "The gateway doesn't seem to be running. You can start it with `/gateway start`."
+
 ### 2. Greeting
 
 Use me.md + predictions to build the greeting. See Greeting Calibration below.
