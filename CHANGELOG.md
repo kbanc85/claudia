@@ -2,6 +2,33 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.9.4 (2026-02-01)
+
+### Messaging Gateway: Talk to Claudia from Your Phone
+
+The gateway lets you message Claudia from Telegram or Slack. Messages flow through the gateway running on your machine to the Anthropic API, with full access to Claudia's memory system. Everything stays local except the API call itself.
+
+### Added
+
+- **Gateway bundled in `npx get-claudia`** - The installer now asks whether to set up the messaging gateway after the memory system question. Gateway source, install scripts, and CLI wrapper are all included in the NPM package.
+- **`gateway/scripts/install.sh`** - macOS/Linux installer: checks Node 18+, copies source to `~/.claudia/gateway/`, runs `npm install`, generates config, creates CLI wrapper and LaunchAgent/systemd unit (disabled by default, requires API keys first).
+- **`gateway/scripts/install.ps1`** - Windows PowerShell equivalent using Task Scheduler.
+- **`gateway/README.md`** - Setup guides for Telegram and Slack, full config reference, security documentation (deny-by-default allowlist, API key stripping, data flow diagram), CLI commands, proactive notifications, and troubleshooting.
+- **`.npmignore`** - Keeps `node_modules/` and `package-lock.json` out of the NPM tarball.
+
+### Changed
+
+- **`bin/index.js`** - Both setup questions (memory + gateway) are now asked upfront before spawning any child processes. Gateway setup chains after memory via continuation-passing. `showNextSteps` displays gateway-specific instructions when applicable.
+- **`package.json`** - Added `gateway` to the `files` array.
+
+### Security Model
+
+- **Deny-by-default**: No `allowedUsers` entries means nobody can message your Claudia
+- **Secrets stay in env vars**: `saveConfig` strips all API keys/tokens before writing `gateway.json` to disk
+- **Service disabled on install**: LaunchAgent/systemd/Task Scheduler entries are created but not enabled, so the gateway won't start until you've configured credentials
+
+---
+
 ## 1.9.3 (2026-01-31)
 
 ### Fixed
