@@ -22,6 +22,14 @@ BIN_DIR="$CLAUDIA_DIR/bin"
 # Upgrade mode: skip config generation if config exists
 IS_UPGRADE="${CLAUDIA_GATEWAY_UPGRADE:-0}"
 
+# Detect shell rc file (used for PATH and token persistence)
+SHELL_RC=""
+if [ -n "$ZSH_VERSION" ] || [ "$(basename "$SHELL")" = "zsh" ]; then
+    SHELL_RC="$HOME/.zshrc"
+elif [ -n "$BASH_VERSION" ] || [ "$(basename "$SHELL")" = "bash" ]; then
+    SHELL_RC="$HOME/.bashrc"
+fi
+
 # Clear screen and show banner
 clear
 
@@ -243,14 +251,6 @@ echo -e "  ${GREEN}✓${NC} CLI installed at ~/.claudia/bin/claudia-gateway"
 PATH_ADDED=0
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     PATH_LINE='export PATH="$HOME/.claudia/bin:$PATH"'
-
-    # Detect shell rc file
-    SHELL_RC=""
-    if [ -n "$ZSH_VERSION" ] || [ "$(basename "$SHELL")" = "zsh" ]; then
-        SHELL_RC="$HOME/.zshrc"
-    elif [ -n "$BASH_VERSION" ] || [ "$(basename "$SHELL")" = "bash" ]; then
-        SHELL_RC="$HOME/.bashrc"
-    fi
 
     if [ -n "$SHELL_RC" ]; then
         # Check if already in rc file (even if not in current PATH)
