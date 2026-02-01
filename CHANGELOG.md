@@ -2,6 +2,29 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.10.0 (2026-02-01)
+
+### Gateway: Local Model Support (Zero API Key)
+
+The gateway now works without an Anthropic API key by using local Ollama models. Users who picked a model during memory daemon setup (qwen3, smollm3, llama3.2) can use the same model for chat. Provider auto-detects at startup: Anthropic if `ANTHROPIC_API_KEY` is set, Ollama otherwise.
+
+### Added
+
+- **Ollama provider in bridge** - New `_callOllama()` method using `/api/chat` with multi-turn conversation support, 0.7 temperature for chat, 60s timeout, and 2-retry logic matching the memory daemon pattern.
+- **Provider auto-detection** - `start()` tries Anthropic first (dynamic import), falls back to Ollama (pings `/api/tags`), throws a helpful error if neither is available.
+- **Shared config reading** - Gateway reads `~/.claudia/config.json` `language_model` field (written by memory daemon installer) to auto-detect which Ollama model to use.
+- **Installer model menu** - Both `install.sh` and `install.ps1` now offer to pull a local model if Ollama is installed and no model is configured. Same menu as memory daemon: qwen3:4b, smollm3:3b, llama3.2:3b, or skip.
+- **`ollama.host` and `ollama.model`** config fields with `OLLAMA_HOST` env override.
+- **Local-only data flow diagram** in README showing the fully offline path (phone to gateway to Ollama, no cloud).
+
+### Changed
+
+- **Anthropic SDK is now dynamically imported** - The gateway no longer crashes at startup if `@anthropic-ai/sdk` isn't installed but user only uses Ollama.
+- **Installer security checklist** adapts based on whether a local model was detected (skips the "Set ANTHROPIC_API_KEY" step).
+- **`getStatus()`** returns `provider` and `providerReady` instead of `anthropicReady`.
+
+---
+
 ## 1.9.4 (2026-02-01)
 
 ### Messaging Gateway: Talk to Claudia from Your Phone
