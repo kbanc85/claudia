@@ -32,6 +32,7 @@
     "bin",
     "template-v2",
     "memory-daemon",
+    "gateway",
     "assets"
   ],
   "engines": {

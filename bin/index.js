@@ -129,22 +129,84 @@ async function main() {
     }
   }
 
-  // Ask about enhanced memory system
+  // Interactive setup prompts
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout
   });
 
-  const askMemory = () => {
+  const askYesNo = (question) => {
     return new Promise((resolve) => {
-      rl.question(`\n${colors.yellow}?${colors.reset} Set up enhanced memory system? (recommended) [y/n]: `, (answer) => {
+      rl.question(question, (answer) => {
         resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
       });
     });
   };
 
-  const setupMemory = await askMemory();
+  const setupMemory = await askYesNo(`\n${colors.yellow}?${colors.reset} Set up enhanced memory system? (recommended) [y/n]: `);
+  const setupGateway = await askYesNo(`${colors.yellow}?${colors.reset} Set up messaging gateway (Telegram/Slack)? [y/n]: `);
   rl.close();
+
+  // Helper: run gateway install script and call back when done
+  function runGatewaySetup(callback) {
+    console.log(`\n${colors.cyan}Setting up messaging gateway...${colors.reset}`);
+
+    const gatewayScriptPath = isWindows
+      ? join(__dirname, '..', 'gateway', 'scripts', 'install.ps1')
+      : join(__dirname, '..', 'gateway', 'scripts', 'install.sh');
+
+    if (!existsSync(gatewayScriptPath)) {
+      console.log(`${colors.yellow}!${colors.reset} Gateway files not found. Skipping.`);
+      callback(false);
+      return;
+    }
+
+    try {
+      const spawnCmd = isWindows ? powershellPath : 'bash';
+      const spawnArgs = isWindows
+        ? ['-ExecutionPolicy', 'Bypass', '-File', gatewayScriptPath]
+        : [gatewayScriptPath];
+      const gwResult = spawn(spawnCmd, spawnArgs, {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          CLAUDIA_GATEWAY_UPGRADE: isUpgrade ? '1' : '0'
+        }
+      });
+
+      gwResult.on('close', (code) => {
+        if (code === 0) {
+          console.log(`${colors.green}✓${colors.reset} Gateway installed`);
+          callback(true);
+        } else {
+          console.log(`${colors.yellow}!${colors.reset} Gateway setup had issues. You can run it later with:`);
+          if (isWindows) {
+            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${gatewayScriptPath}"${colors.reset}`);
+          } else {
+            console.log(`  ${colors.cyan}bash ${gatewayScriptPath}${colors.reset}`);
+          }
+          callback(false);
+        }
+      });
+    } catch (error) {
+      console.log(`${colors.yellow}!${colors.reset} Could not set up gateway: ${error.message}`);
+      callback(false);
+    }
+  }
+
+  // Helper: finish install after optional components
+  function finishInstall(memoryInstalled, gatewayInstalled) {
+    showNextSteps(memoryInstalled, gatewayInstalled);
+  }
+
+  // Helper: run gateway if requested, then finish
+  function maybeRunGateway(memoryInstalled) {
+    if (setupGateway) {
+      runGatewaySetup((gatewayOk) => finishInstall(memoryInstalled, gatewayOk));
+    } else {
+      finishInstall(memoryInstalled, false);
+    }
+  }
 
   if (setupMemory) {
     console.log(`\n${colors.cyan}Setting up enhanced memory system...${colors.reset}`);
@@ -169,8 +231,10 @@ async function main() {
         });
 
         result.on('close', (code) => {
+          let memoryOk = false;
           if (code === 0) {
             console.log(`${colors.green}✓${colors.reset} Memory system installed`);
+            memoryOk = true;
 
             // Update .mcp.json if it exists
             const mcpPath = join(targetPath, '.mcp.json');
@@ -194,7 +258,6 @@ async function main() {
               writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
               console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
             }
-            showNextSteps(true); // Memory installed - emphasize restart
           } else {
             console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
             if (isWindows) {
@@ -202,8 +265,10 @@ async function main() {
             } else {
               console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
             }
-            showNextSteps(false);
           }
+
+          // Chain gateway setup (or finish)
+          maybeRunGateway(memoryOk);
         });
 
         return; // Wait for spawn to complete
@@ -216,14 +281,14 @@ async function main() {
     }
   }
 
-  showNextSteps(false);
+  // Memory skipped or failed to spawn -- continue with gateway
+  maybeRunGateway(false);
 
-  function showNextSteps(memoryInstalled) {
-    // Show next steps - different message if memory was installed
+  function showNextSteps(memoryInstalled, gatewayInstalled) {
+    // Show next steps - different message based on what was installed
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
     if (memoryInstalled) {
-      // Memory was installed
       console.log(`
 ${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
@@ -233,13 +298,20 @@ ${colors.dim}If Claude was already running elsewhere, restart it to activate mem
 ${colors.dim}Troubleshooting: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}
 `);
     } else {
-      // No memory - standard message
       console.log(`
 ${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
   ${colors.dim}Say hi!${colors.reset}
 
 ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
+`);
+    }
+
+    if (gatewayInstalled) {
+      console.log(`${colors.bold}Gateway:${colors.reset}
+  ${colors.dim}Configure API keys and allowlist, then:${colors.reset}
+  ${colors.cyan}claudia-gateway start${colors.reset}
+  ${colors.dim}See ~/.claudia/gateway.json for settings.${colors.reset}
 `);
     }
   }
