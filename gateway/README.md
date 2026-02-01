@@ -236,6 +236,82 @@ To enable:
 
 3. Requires the memory daemon to be running and healthy.
 
+## Architecture: Gateway vs Claude Code
+
+The gateway and Claude Code are independent systems that share the same memory:
+
+```
+┌─────────────────────────┐    ┌──────────────────────────┐
+│  Claude Code (terminal)  │    │  Gateway (Telegram/Slack) │
+│                          │    │                           │
+│  Claude (Anthropic API)  │    │  Ollama OR Anthropic API  │
+│  Full MCP toolset        │    │  Memory tools only        │
+│  File access, skills     │    │  Chat-optimized responses │
+└────────────┬─────────────┘    └─────────────┬────────────┘
+             │                                 │
+             └──────────┐  ┌───────────────────┘
+                        ▼  ▼
+               ┌──────────────────┐
+               │  Memory Daemon   │
+               │  (shared SQLite) │
+               └──────────────────┘
+```
+
+Key points:
+- **Separate LLMs.** Claude Code always uses the Anthropic API (Claude). The gateway uses whichever provider is available: Anthropic if you have an API key, or a local Ollama model if you don't.
+- **Shared memory.** Both read and write to the same memory daemon. A fact remembered in Claude Code is available in Telegram, and vice versa.
+- **Different tool access.** Claude Code has the full toolset (files, skills, commands, MCP servers). The gateway only has memory tools, keeping responses fast and focused for chat.
+
+## MCP Server Troubleshooting
+
+If MCP servers (Brave Search, Gmail, etc.) fail to connect or time out, try these fixes:
+
+### Option A: Install globally (most reliable)
+
+`npx` can be flaky with MCP servers because it downloads on every launch. Installing globally avoids this:
+
+```bash
+npm install -g @anthropics/mcp-server-brave-search
+npm install -g @modelcontextprotocol/server-google-calendar
+```
+
+Then update `.mcp.json` to use the global binary directly:
+
+```json
+{
+  "brave-search": {
+    "command": "mcp-server-brave-search",
+    "env": { "BRAVE_API_KEY": "your-key" }
+  }
+}
+```
+
+### Option B: Use full paths instead of npx
+
+Find where npm installs global packages and use the absolute path:
+
+```bash
+# Find global bin directory
+npm config get prefix
+# e.g. /usr/local or /Users/you/.nvm/versions/node/v22.x.x
+
+# Use full path in .mcp.json
+{
+  "brave-search": {
+    "command": "/usr/local/bin/mcp-server-brave-search",
+    "env": { "BRAVE_API_KEY": "your-key" }
+  }
+}
+```
+
+### Option C: Reconnect workaround
+
+If a server shows as disconnected in Claude Code:
+1. Open the `/mcp` menu
+2. Select the server and try reconnecting
+3. If it fails, try a second time (race condition in npx startup)
+4. Avoid `/mcp reconnect` (reconnects all servers simultaneously, which can cause timeouts)
+
 ## Troubleshooting
 
 **Gateway won't start**

@@ -57,6 +57,7 @@
 
   "_notes": {
     "about": "Claudia prefers CLI tools when available (faster, simpler), then MCP servers. Find more at mcp.so or github.com/modelcontextprotocol/servers",
+    "reliability": "npx can be flaky for MCP servers. For best results, install globally (npm install -g <package>) and use the binary name directly instead of npx. See gateway/README.md for details.",
     "setup": [
       "1. Rename this file to .mcp.json",
       "2. Remove _disabled from servers you want to use",

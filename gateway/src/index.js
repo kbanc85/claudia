@@ -155,7 +155,13 @@ async function cmdStart(args) {
     await gateway.start();
     writePidFile(process.pid);
 
+    const status = gateway.bridge?.getStatus();
+    const providerLabel = status
+      ? `${status.provider}${status.model ? ` (${status.model})` : ''}`
+      : 'unknown';
+
     console.log('Claudia Gateway is running.');
+    console.log(`  Provider: ${providerLabel}`);
     console.log(`  Channels: ${[...gateway.adapters.keys()].join(', ') || 'none'}`);
     console.log(`  Memory: ${gateway.bridge?.memoryAvailable ? 'connected' : 'unavailable'}`);
     console.log(`  PID: ${process.pid}`);
@@ -214,7 +220,7 @@ async function cmdStatus() {
   console.log(`  Config: ${CONFIG_PATH}`);
   console.log(`  Logs:   ${logPath}`);
 
-  // Show configured channels
+  // Show configured channels and provider
   if (existsSync(CONFIG_PATH)) {
     try {
       const config = loadConfig();
@@ -222,6 +228,16 @@ async function cmdStatus() {
         .filter(([, v]) => v.enabled)
         .map(([k]) => k);
       console.log(`  Channels: ${channels.length > 0 ? channels.join(', ') : 'none enabled'}`);
+
+      // Detect provider the same way the bridge does
+      const hasApiKey = !!(config.anthropicApiKey || process.env.ANTHROPIC_API_KEY);
+      if (hasApiKey) {
+        console.log(`  Provider: anthropic (${config.model || 'claude-sonnet-4-20250514'})`);
+      } else if (config.ollama?.model) {
+        console.log(`  Provider: ollama (${config.ollama.model})`);
+      } else {
+        console.log('  Provider: none configured');
+      }
     } catch {
       // ignore
     }

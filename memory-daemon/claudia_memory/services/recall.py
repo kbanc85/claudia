@@ -55,6 +55,8 @@ class EntityResult:
 class RecallService:
     """Search and retrieve memories"""
 
+    _vec0_warned = False
+
     def __init__(self):
         self.db = get_db()
         self.embedding_service = get_embedding_service()
@@ -126,7 +128,9 @@ class RecallService:
                     vector_scores[mid] = row["vector_score"] if "vector_score" in row.keys() else 0.0
                     vector_rows[mid] = row
             except Exception as e:
-                logger.warning(f"Vector search failed: {e}")
+                if not RecallService._vec0_warned:
+                    logger.warning(f"Vector search failed (will fall back silently from now on): {e}")
+                    RecallService._vec0_warned = True
 
         # --- FTS5 search ---
         fts_scores = self._fts_search(query, limit * 2, memory_types, min_importance)
@@ -650,7 +654,9 @@ class RecallService:
                     fetch=True,
                 ) or []
             except Exception as e:
-                logger.warning(f"Episode vector search failed, falling back to keyword: {e}")
+                if not RecallService._vec0_warned:
+                    logger.warning(f"Episode vector search failed, falling back to keyword: {e}")
+                    RecallService._vec0_warned = True
                 rows = self.db.execute(
                     """
                     SELECT e.*, 0.5 as relevance
