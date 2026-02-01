@@ -41,6 +41,7 @@ export class Bridge {
     this.mcpClient = null;
     this.mcpTransport = null;
     this.memoryAvailable = false;
+    this.extractor = null; // Set by gateway after construction
     this._consecutiveFailures = 0;
   }
 
@@ -118,7 +119,7 @@ export class Bridge {
    * @param {Object[]} conversationHistory - Recent turns for this session
    * @returns {Object} { text: string, memories?: Object[] }
    */
-  async processMessage(message, conversationHistory = []) {
+  async processMessage(message, conversationHistory = [], episodeId = null) {
     const { text, userId, userName, channel } = message;
 
     // 1. Recall relevant memories (skip if memory is failing repeatedly)
@@ -171,21 +172,45 @@ export class Bridge {
     const { text: responseText, usage } = result;
 
     // 5. Store the exchange in memory (always attempt -- resets failure counter on success)
+    let returnedEpisodeId = episodeId;
     if (this.memoryAvailable) {
-      this._bufferTurn(text, responseText)
-        .then(() => {
+      // Await on first call (no episodeId) so we capture it for session continuity.
+      // Subsequent calls fire-and-forget since we already have the episode.
+      const bufferPromise = this._bufferTurn(text, responseText, channel, episodeId);
+
+      if (!episodeId) {
+        try {
+          const bufferResult = await bufferPromise;
           this._consecutiveFailures = 0;
-        })
-        .catch((err) => {
+          if (bufferResult?.episode_id) {
+            returnedEpisodeId = bufferResult.episode_id;
+          }
+        } catch (err) {
           this._consecutiveFailures++;
           log.warn('Failed to buffer turn', {
             error: err.message,
             consecutiveFailures: this._consecutiveFailures,
           });
-        });
+        }
+      } else {
+        bufferPromise
+          .then(() => { this._consecutiveFailures = 0; })
+          .catch((err) => {
+            this._consecutiveFailures++;
+            log.warn('Failed to buffer turn', {
+              error: err.message,
+              consecutiveFailures: this._consecutiveFailures,
+            });
+          });
+      }
+
+      // 6. Fire-and-forget extraction
+      if (this.extractor) {
+        this._extractAsync(text, responseText, channel);
+      }
     }
 
-    return { text: responseText, usage };
+    return { text: responseText, usage, episodeId: returnedEpisodeId };
   }
 
   /**
@@ -241,20 +266,31 @@ export class Bridge {
 
   /**
    * Store a conversation turn in memory buffer.
+   * @param {string} userContent
+   * @param {string} assistantContent
+   * @param {string} [channel] - Source channel for tagging
+   * @param {number|null} [episodeId] - Existing episode to append to
+   * @returns {Object|null} Parsed MCP result with episode_id
    */
-  async _bufferTurn(userContent, assistantContent) {
-    if (!this.mcpClient) return;
+  async _bufferTurn(userContent, assistantContent, channel = null, episodeId = null) {
+    if (!this.mcpClient) return null;
 
     try {
-      await this.mcpClient.callTool({
+      const args = {
+        user_content: userContent,
+        assistant_content: assistantContent,
+      };
+      if (channel) args.source = channel;
+      if (episodeId) args.episode_id = episodeId;
+
+      const result = await this.mcpClient.callTool({
         name: 'memory.buffer_turn',
-        arguments: {
-          user_content: userContent,
-          assistant_content: assistantContent,
-        },
+        arguments: args,
       });
+      return this._parseMcpResult(result);
     } catch (err) {
       log.debug('Buffer turn failed', { error: err.message });
+      return null;
     }
   }
 
@@ -274,6 +310,50 @@ export class Bridge {
       log.warn('Remember failed', { error: err.message });
       return null;
     }
+  }
+
+  /**
+   * End a session by building a narrative from history and calling memory.end_session.
+   * Called by the router when a session expires (TTL cleanup).
+   *
+   * @param {Object} session - Session object with history and episodeId
+   */
+  async endSession(session) {
+    if (!this.mcpClient || !session.episodeId || !session.history.length) return;
+
+    try {
+      // Build a minimal narrative from the conversation turns
+      const lines = session.history.map((turn) => {
+        const userSnippet = (turn.user || '').slice(0, 150);
+        const assistantSnippet = (turn.assistant || '').slice(0, 150);
+        return `User: ${userSnippet}\nCloudia: ${assistantSnippet}`;
+      });
+      const narrative =
+        `Gateway session (${session.history.length} turns, ended by TTL expiry).\n\n` +
+        lines.join('\n\n');
+
+      await this.mcpClient.callTool({
+        name: 'memory.end_session',
+        arguments: {
+          episode_id: session.episodeId,
+          narrative,
+        },
+      });
+      log.debug('Session ended via TTL', { episodeId: session.episodeId });
+    } catch (err) {
+      log.debug('Failed to end session', { error: err.message });
+    }
+  }
+
+  /**
+   * Fire-and-forget extraction from a conversation turn.
+   * Calls the extractor module (if wired) to detect notes and extract facts.
+   */
+  _extractAsync(userMsg, assistantMsg, channel) {
+    if (!this.extractor) return;
+    this.extractor.extract(userMsg, assistantMsg, channel, this).catch((err) => {
+      log.debug('Extraction failed (non-blocking)', { error: err.message });
+    });
   }
 
   /**

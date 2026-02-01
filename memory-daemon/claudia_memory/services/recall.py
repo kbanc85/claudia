@@ -575,8 +575,16 @@ class RecallService:
         limit: int = 10,
         memory_types: Optional[List[str]] = None,
         hours: int = 24,
+        source_filter: Optional[str] = None,
     ) -> List[RecallResult]:
-        """Get recent memories within a time window"""
+        """Get recent memories within a time window.
+
+        Args:
+            limit: Maximum results to return
+            memory_types: Filter by memory types
+            hours: Time window in hours
+            source_filter: Filter by source channel (e.g. 'telegram', 'slack')
+        """
         cutoff = datetime.utcnow() - timedelta(hours=hours)
 
         sql = """
@@ -592,6 +600,10 @@ class RecallService:
             placeholders = ", ".join(["?" for _ in memory_types])
             sql += f" AND m.type IN ({placeholders})"
             params.extend(memory_types)
+
+        if source_filter:
+            sql += " AND m.source = ?"
+            params.append(source_filter)
 
         sql += " GROUP BY m.id ORDER BY m.created_at DESC LIMIT ?"
         params.append(limit)

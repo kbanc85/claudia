@@ -197,6 +197,22 @@ This handles the case where the user closed the terminal, lost connection, or si
 
 Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
 
+### 1b. Check Telegram Inbox
+
+After loading session context, check for new Telegram messages:
+
+```
+Session context already includes the inbox (via memory.session_context).
+If unread Telegram/Slack messages are returned:
+├── Summarize them to the user:
+│   "You have N new messages from Telegram since we last talked: [summary]"
+├── Messages are marked as read automatically, so they won't appear again
+└── Mid-session: user can say "check telegram" or "any new messages?"
+    to trigger another inbox check via memory.telegram_inbox
+```
+
+The `memory.session_context` call automatically includes a Telegram Inbox section when unread gateway messages exist. If the user asks "any new messages?" or "check telegram" mid-session, call `memory.telegram_inbox` directly to fetch and display any messages that arrived since session start.
+
 ### 2. Greeting
 
 Use me.md + predictions to build the greeting. See Greeting Calibration below.

@@ -405,6 +405,7 @@ class RememberService:
         user_content: Optional[str] = None,
         assistant_content: Optional[str] = None,
         episode_id: Optional[int] = None,
+        source: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Buffer a conversation turn for later summarization.
@@ -416,12 +417,13 @@ class RememberService:
             user_content: What the user said
             assistant_content: What the assistant said
             episode_id: Episode to append to (creates one if None)
+            source: Origin channel ('claude_code', 'telegram', 'slack', etc.)
 
         Returns:
             Dict with episode_id and turn_number
         """
         if episode_id is None:
-            episode_id = self._get_or_create_episode()
+            episode_id = self._get_or_create_episode(source=source)
 
         # Get next turn number
         row = self.db.execute(
@@ -431,16 +433,17 @@ class RememberService:
         )
         next_turn = (row[0]["max_turn"] + 1) if row else 1
 
-        self.db.insert(
-            "turn_buffer",
-            {
-                "episode_id": episode_id,
-                "turn_number": next_turn,
-                "user_content": user_content,
-                "assistant_content": assistant_content,
-                "created_at": datetime.utcnow().isoformat(),
-            },
-        )
+        insert_data = {
+            "episode_id": episode_id,
+            "turn_number": next_turn,
+            "user_content": user_content,
+            "assistant_content": assistant_content,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        if source:
+            insert_data["source"] = source
+
+        self.db.insert("turn_buffer", insert_data)
 
         # Update episode turn count
         self.db.execute(
@@ -753,19 +756,19 @@ class RememberService:
         # Create new
         return self.remember_entity(name=name, entity_type=entity_type)
 
-    def _get_or_create_episode(self) -> int:
+    def _get_or_create_episode(self, source: Optional[str] = None) -> int:
         """Get current episode or create a new one"""
         # For now, create a new episode each time
         # In a more sophisticated implementation, we'd track session context
         session_id = str(uuid.uuid4())
-        return self.db.insert(
-            "episodes",
-            {
-                "session_id": session_id,
-                "started_at": datetime.utcnow().isoformat(),
-                "message_count": 0,
-            },
-        )
+        insert_data = {
+            "session_id": session_id,
+            "started_at": datetime.utcnow().isoformat(),
+            "message_count": 0,
+        }
+        if source:
+            insert_data["source"] = source
+        return self.db.insert("episodes", insert_data)
 
 
 # Global service instance

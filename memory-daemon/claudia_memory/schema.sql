@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS episodes (
     message_count INTEGER DEFAULT 0,
     turn_count INTEGER DEFAULT 0,  -- Buffered turns count
     is_summarized INTEGER DEFAULT 0,  -- Whether session has been summarized by Claude
+    source TEXT,  -- Origin channel: 'claude_code', 'telegram', 'slack', etc.
+    ingested_at TEXT,  -- When Claude Code read this (NULL = unread)
     key_topics TEXT,  -- JSON array of main topics
     metadata TEXT
 );
@@ -226,6 +228,7 @@ CREATE TABLE IF NOT EXISTS turn_buffer (
     user_content TEXT,
     assistant_content TEXT,
     is_archived INTEGER DEFAULT 0,
+    source TEXT,  -- Origin channel: 'claude_code', 'telegram', 'slack', etc.
     created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -263,3 +266,6 @@ VALUES (3, 'Add source_context to memories, is_archived to turn_buffer for episo
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (5, 'Add verification columns to memories, prediction_pattern_name to predictions');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (6, 'Add source and ingested_at to episodes, source to turn_buffer for gateway integration');

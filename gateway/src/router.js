@@ -109,10 +109,16 @@ export class Router {
     try {
       const result = await this.bridge.processMessage(
         { text, userId, userName, channel },
-        [...session.history]
+        [...session.history],
+        session.episodeId
       );
 
-      // 5. Update session history
+      // 5. Store episode ID for session continuity
+      if (result.episodeId) {
+        session.episodeId = result.episodeId;
+      }
+
+      // 6. Update session history
       session.history.push({
         user: text,
         assistant: result.text,
@@ -210,6 +216,7 @@ export class Router {
       this.sessions.set(key, {
         history: [],
         lastActive: Date.now(),
+        episodeId: null,
       });
     }
     return this.sessions.get(key);
@@ -223,6 +230,12 @@ export class Router {
     let cleaned = 0;
     for (const [key, session] of this.sessions) {
       if (now - session.lastActive > SESSION_TTL_MS) {
+        // Finalize episode in memory before discarding the session
+        if (session.history.length > 0) {
+          this.bridge.endSession(session).catch((err) => {
+            log.debug('Failed to end session on cleanup', { key, error: err.message });
+          });
+        }
         this.sessions.delete(key);
         cleaned++;
       }

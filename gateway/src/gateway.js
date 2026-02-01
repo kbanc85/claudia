@@ -8,6 +8,7 @@
 import { loadConfig, deepMerge } from './config.js';
 import { AuthManager } from './utils/auth.js';
 import { Bridge } from './bridge.js';
+import { Extractor } from './extractor.js';
 import { Router } from './router.js';
 import { ProactiveEmitter } from './emitter.js';
 import { TelegramAdapter } from './adapters/telegram.js';
@@ -53,6 +54,9 @@ export class Gateway {
     // 4. Initialize bridge (Anthropic API + memory daemon)
     this.bridge = new Bridge(this.config);
     await this.bridge.start();
+
+    // 4b. Wire extractor for fact/commitment extraction from conversations
+    this.bridge.extractor = new Extractor(this.config);
 
     // 5. Initialize router
     this.router = new Router({

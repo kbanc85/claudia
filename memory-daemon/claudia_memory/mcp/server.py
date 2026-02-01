@@ -283,6 +283,10 @@ async def list_tools() -> ListToolsResult:
                         "type": "integer",
                         "description": "Episode ID from a previous buffer_turn call (omit on first call to create new episode)",
                     },
+                    "source": {
+                        "type": "string",
+                        "description": "Origin channel: 'claude_code', 'telegram', 'slack'. Tags the episode for inbox filtering.",
+                    },
                 },
                 "required": [],
             },
@@ -589,6 +593,25 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.telegram_inbox",
+            description=(
+                "Fetch unread Telegram/Slack conversations and extracted notes. Marks them as read. "
+                "Call at session start to catch up on gateway messages, or mid-session when the user "
+                "asks 'check telegram' or 'any new messages?'. Returns conversation summaries and "
+                "extracted facts/commitments from gateway channels."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of episodes to return",
+                        "default": 10,
+                    },
+                },
+            },
+        ),
+        Tool(
             name="cognitive.ingest",
             description=(
                 "Extract structured data from raw text using a local language model. "
@@ -884,6 +907,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 user_content=arguments.get("user_content"),
                 assistant_content=arguments.get("assistant_content"),
                 episode_id=arguments.get("episode_id"),
+                source=arguments.get("source"),
             )
             return CallToolResult(
                 content=[
@@ -1065,6 +1089,20 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 ]
             )
 
+        elif name == "memory.telegram_inbox":
+            inbox_text = _build_telegram_inbox(
+                limit=arguments.get("limit", 10),
+                mark_read=True,
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=inbox_text,
+                    )
+                ]
+            )
+
         else:
             return CallToolResult(
                 content=[
@@ -1087,6 +1125,111 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             ],
             isError=True,
         )
+
+
+def _build_telegram_inbox(limit: int = 10, mark_read: bool = True) -> str:
+    """
+    Fetch unread gateway episodes and recent gateway-sourced memories.
+    Marks returned episodes as ingested (read) if mark_read is True.
+
+    Returns formatted text block with conversation summaries and notes.
+    """
+    db = get_db()
+    sections = []
+    episode_ids = []
+
+    # 1. Get unread episodes from gateway channels
+    try:
+        unread_episodes = db.execute(
+            """
+            SELECT id, session_id, narrative, started_at, turn_count, source
+            FROM episodes
+            WHERE source IN ('telegram', 'slack')
+              AND ingested_at IS NULL
+            ORDER BY started_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+            fetch=True,
+        ) or []
+
+        if unread_episodes:
+            sections.append(f"## Telegram Inbox ({len(unread_episodes)} unread)\n")
+            for ep in unread_episodes:
+                episode_ids.append(ep["id"])
+                source = ep["source"] or "gateway"
+                started = ep["started_at"] or "unknown"
+                turn_count = ep["turn_count"] or 0
+
+                sections.append(f"### {source.title()} conversation ({started[:16]}, {turn_count} turns)")
+
+                # Fetch turns for this episode
+                turns = db.execute(
+                    """
+                    SELECT user_content, assistant_content, turn_number
+                    FROM turn_buffer
+                    WHERE episode_id = ?
+                    ORDER BY turn_number ASC
+                    """,
+                    (ep["id"],),
+                    fetch=True,
+                ) or []
+
+                if turns:
+                    for t in turns:
+                        if t["user_content"]:
+                            sections.append(f"  **User:** {t['user_content'][:200]}")
+                        if t["assistant_content"]:
+                            sections.append(f"  **Claudia:** {t['assistant_content'][:200]}")
+                else:
+                    # Fall back to narrative if turns were already archived
+                    narrative = ep["narrative"]
+                    if narrative:
+                        preview = narrative[:300] + "..." if len(narrative) > 300 else narrative
+                        sections.append(f"  {preview}")
+                    else:
+                        sections.append(f"  (no content available)")
+
+                sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch unread episodes: {e}")
+
+    # 2. Get recent gateway-sourced memories (48h)
+    try:
+        recall_svc = get_recall_service()
+        telegram_memories = recall_svc.get_recent_memories(
+            limit=limit,
+            hours=48,
+            source_filter="telegram",
+        )
+        if telegram_memories:
+            sections.append(f"## Recent Telegram Memories ({len(telegram_memories)})\n")
+            for m in telegram_memories:
+                entities_str = ", ".join(m.entities[:3]) if m.entities else ""
+                prefix = f"[{m.type}]"
+                if entities_str:
+                    prefix += f" [{entities_str}]"
+                sections.append(f"- {prefix} {m.content}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch telegram memories: {e}")
+
+    # 3. Mark episodes as ingested
+    if mark_read and episode_ids:
+        try:
+            placeholders = ", ".join(["?" for _ in episode_ids])
+            db.execute(
+                f"UPDATE episodes SET ingested_at = datetime('now') WHERE id IN ({placeholders})",
+                tuple(episode_ids),
+            )
+            logger.debug(f"Marked {len(episode_ids)} episodes as ingested")
+        except Exception as e:
+            logger.warning(f"Could not mark episodes as ingested: {e}")
+
+    if not sections:
+        return "No new messages from Telegram or Slack."
+
+    return "\n".join(sections)
 
 
 def _build_session_context(token_budget: str = "normal") -> str:
@@ -1123,7 +1266,15 @@ def _build_session_context(token_budget: str = "normal") -> str:
     except Exception as e:
         logger.debug(f"Could not fetch unsummarized sessions: {e}")
 
-    # 2. Recent memories (48h)
+    # 2. Telegram/Slack Inbox (unread gateway messages)
+    try:
+        inbox_text = _build_telegram_inbox(limit=limits.get("memories", 10), mark_read=True)
+        if inbox_text and "No new messages" not in inbox_text:
+            sections.append(inbox_text)
+    except Exception as e:
+        logger.debug(f"Could not fetch telegram inbox: {e}")
+
+    # 3. Recent memories (48h)
     try:
         recall_svc = get_recall_service()
         recent = recall_svc.get_recent_memories(

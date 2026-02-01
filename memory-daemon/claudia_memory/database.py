@@ -345,6 +345,34 @@ class Database:
             conn.commit()
             logger.info("Applied migration 5: memory verification and prediction feedback")
 
+        if current_version < 6:
+            # Migration 6: Add source tracking and ingested_at for gateway integration
+            migration_stmts = [
+                "ALTER TABLE episodes ADD COLUMN source TEXT",
+                "ALTER TABLE episodes ADD COLUMN ingested_at TEXT",
+                "ALTER TABLE turn_buffer ADD COLUMN source TEXT",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"Migration 6 statement failed: {e}")
+
+            # Index for inbox queries (unread gateway episodes)
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_episodes_source_ingested ON episodes(source, ingested_at)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 6 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (6, 'Add source and ingested_at to episodes, source to turn_buffer for gateway integration')"
+            )
+            conn.commit()
+            logger.info("Applied migration 6: gateway source tracking and inbox")
+
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
     ) -> Optional[List[sqlite3.Row]]:
