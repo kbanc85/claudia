@@ -4,7 +4,7 @@
  * Writes JSON-structured logs to ~/.claudia/gateway.log and stderr.
  */
 
-import { createWriteStream, mkdirSync } from 'fs';
+import { createWriteStream, mkdirSync, statSync, renameSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -13,11 +13,23 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 let currentLevel = LOG_LEVELS.info;
 let fileStream = null;
 
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB
+
 function ensureLogFile() {
   if (fileStream) return;
   const logDir = join(homedir(), '.claudia');
   mkdirSync(logDir, { recursive: true });
   const logPath = join(logDir, 'gateway.log');
+
+  // Rotate if log exceeds 5 MB (one backup, checked once on startup)
+  try {
+    if (existsSync(logPath) && statSync(logPath).size > MAX_LOG_SIZE) {
+      renameSync(logPath, logPath + '.1');
+    }
+  } catch {
+    // Best-effort rotation; continue even if it fails
+  }
+
   fileStream = createWriteStream(logPath, { flags: 'a' });
 }
 

@@ -38,6 +38,7 @@ export class Bridge {
     this.mcpClient = null;
     this.mcpTransport = null;
     this.memoryAvailable = false;
+    this._consecutiveFailures = 0;
   }
 
   async start() {
@@ -84,13 +85,18 @@ export class Bridge {
   async processMessage(message, conversationHistory = []) {
     const { text, userId, userName, channel } = message;
 
-    // 1. Recall relevant memories
+    // 1. Recall relevant memories (skip if memory is failing repeatedly)
     let memoryContext = '';
-    if (this.memoryAvailable) {
+    if (this.memoryAvailable && this._consecutiveFailures < 3) {
       try {
         memoryContext = await this._recallContext(text, userName);
+        this._consecutiveFailures = 0;
       } catch (err) {
-        log.warn('Memory recall failed, continuing without context', { error: err.message });
+        this._consecutiveFailures++;
+        log.warn('Memory recall failed, continuing without context', {
+          error: err.message,
+          consecutiveFailures: this._consecutiveFailures,
+        });
       }
     }
 
@@ -99,7 +105,7 @@ export class Bridge {
 
     // 3. Build message history
     const messages = [];
-    for (const turn of conversationHistory.slice(-10)) {
+    for (const turn of conversationHistory) {
       messages.push({ role: 'user', content: turn.user });
       if (turn.assistant) {
         messages.push({ role: 'assistant', content: turn.assistant });
@@ -123,11 +129,19 @@ export class Bridge {
         .map((block) => block.text)
         .join('\n');
 
-      // 5. Store the exchange in memory (async, don't block response)
+      // 5. Store the exchange in memory (always attempt — resets failure counter on success)
       if (this.memoryAvailable) {
-        this._bufferTurn(text, responseText).catch((err) => {
-          log.warn('Failed to buffer turn', { error: err.message });
-        });
+        this._bufferTurn(text, responseText)
+          .then(() => {
+            this._consecutiveFailures = 0;
+          })
+          .catch((err) => {
+            this._consecutiveFailures++;
+            log.warn('Failed to buffer turn', {
+              error: err.message,
+              consecutiveFailures: this._consecutiveFailures,
+            });
+          });
       }
 
       return {

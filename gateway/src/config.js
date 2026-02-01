@@ -134,7 +134,18 @@ export function loadConfig() {
  */
 export function saveConfig(config) {
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+
+  // Strip secrets before writing to disk (they come from env vars at load time)
+  const safe = JSON.parse(JSON.stringify(config));
+  delete safe.anthropicApiKey;
+  if (safe.channels?.telegram) delete safe.channels.telegram.token;
+  if (safe.channels?.slack) {
+    delete safe.channels.slack.botToken;
+    delete safe.channels.slack.appToken;
+    delete safe.channels.slack.signingSecret;
+  }
+
+  writeFileSync(CONFIG_PATH, JSON.stringify(safe, null, 2));
   log.info('Saved gateway config', { path: CONFIG_PATH });
 }
 
@@ -143,9 +154,9 @@ export function saveConfig(config) {
  */
 export function generateExampleConfig() {
   const example = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-  example.anthropicApiKey = 'sk-ant-...';
+  example.anthropicApiKey = '(set ANTHROPIC_API_KEY env var)';
   example.channels.telegram.enabled = true;
-  example.channels.telegram.token = 'BOT_TOKEN_FROM_BOTFATHER';
+  example.channels.telegram.token = '(set TELEGRAM_BOT_TOKEN env var)';
   example.channels.telegram.allowedUsers = ['YOUR_TELEGRAM_USER_ID'];
   example.globalAllowedUsers = [];
   return example;
@@ -183,4 +194,4 @@ export function removePidFile() {
   }
 }
 
-export { CONFIG_PATH, PID_PATH, CONFIG_DIR };
+export { CONFIG_PATH, PID_PATH, CONFIG_DIR, deepMerge };

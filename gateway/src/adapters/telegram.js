@@ -58,11 +58,12 @@ export class TelegramAdapter extends BaseAdapter {
       this.emit('error', err);
     });
 
-    // Start polling
+    // Start polling — set running before start() to close the timing gap
+    // where messages arrive before the onStart callback fires
+    this.running = true;
     log.info('Starting Telegram bot (long polling)');
     this.bot.start({
       onStart: () => {
-        this.running = true;
         log.info('Telegram bot started');
       },
     });
@@ -136,11 +137,11 @@ function splitText(text, maxLen) {
   while (remaining.length > maxLen) {
     // Try to split at paragraph boundary
     let splitAt = remaining.lastIndexOf('\n\n', maxLen);
-    if (splitAt < maxLen * 0.3) {
+    if (splitAt === -1 || splitAt < maxLen * 0.3) {
       // Try sentence boundary
       splitAt = remaining.lastIndexOf('. ', maxLen);
     }
-    if (splitAt < maxLen * 0.3) {
+    if (splitAt === -1 || splitAt < maxLen * 0.3) {
       // Force split at maxLen
       splitAt = maxLen;
     }

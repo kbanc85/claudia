@@ -5,7 +5,7 @@
  * Provides lifecycle management (start/stop) and health reporting.
  */
 
-import { loadConfig } from './config.js';
+import { loadConfig, deepMerge } from './config.js';
 import { AuthManager } from './utils/auth.js';
 import { Bridge } from './bridge.js';
 import { Router } from './router.js';
@@ -36,7 +36,7 @@ export class Gateway {
 
     // 1. Load config
     this.config = loadConfig();
-    Object.assign(this.config, this._configOverrides);
+    this.config = deepMerge(this.config, this._configOverrides);
 
     // 2. Initialize auth
     this.auth = new AuthManager(this.config);

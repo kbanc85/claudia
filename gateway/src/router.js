@@ -14,7 +14,7 @@ const log = createLogger('router');
 // Session TTL: 30 minutes of inactivity
 const SESSION_TTL_MS = 30 * 60 * 1000;
 // Max conversation history per session (turns, not messages)
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 10;
 
 export class Router {
   /**
@@ -135,8 +135,8 @@ export class Router {
       try {
         await metadata.ctx.reply(text);
         return;
-      } catch {
-        // Fall through to generic send
+      } catch (err) {
+        log.debug('Telegram ctx.reply failed, falling through', { error: err.message });
       }
     }
 
@@ -148,8 +148,8 @@ export class Router {
           thread_ts: metadata.threadTs || metadata.ts,
         });
         return;
-      } catch {
-        // Fall through to generic send
+      } catch (err) {
+        log.debug('Slack say() failed, falling through', { error: err.message });
       }
     }
 
