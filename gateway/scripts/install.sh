@@ -239,10 +239,36 @@ WRAPPER
 chmod +x "$BIN_DIR/claudia-gateway"
 echo -e "  ${GREEN}✓${NC} CLI installed at ~/.claudia/bin/claudia-gateway"
 
-# Add to PATH hint if not already there
+# Auto-add to PATH via shell rc file if not already there
+PATH_ADDED=0
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-    echo -e "  ${YELLOW}!${NC} Add to your PATH if not already present:"
-    echo -e "    ${DIM}export PATH=\"\$HOME/.claudia/bin:\$PATH\"${NC}"
+    PATH_LINE='export PATH="$HOME/.claudia/bin:$PATH"'
+
+    # Detect shell rc file
+    SHELL_RC=""
+    if [ -n "$ZSH_VERSION" ] || [ "$(basename "$SHELL")" = "zsh" ]; then
+        SHELL_RC="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ] || [ "$(basename "$SHELL")" = "bash" ]; then
+        SHELL_RC="$HOME/.bashrc"
+    fi
+
+    if [ -n "$SHELL_RC" ]; then
+        # Check if already in rc file (even if not in current PATH)
+        if [ -f "$SHELL_RC" ] && grep -q '\.claudia/bin' "$SHELL_RC" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} PATH already configured in $(basename "$SHELL_RC")"
+        else
+            echo "" >> "$SHELL_RC"
+            echo "# Claudia CLI" >> "$SHELL_RC"
+            echo "$PATH_LINE" >> "$SHELL_RC"
+            echo -e "  ${GREEN}✓${NC} PATH added to ~/${SHELL_RC##*/}"
+            PATH_ADDED=1
+        fi
+        # Also add to current session
+        export PATH="$HOME/.claudia/bin:$PATH"
+    else
+        echo -e "  ${YELLOW}!${NC} Add to your PATH manually:"
+        echo -e "    ${DIM}${PATH_LINE}${NC}"
+    fi
 fi
 
 # Create LaunchAgent / systemd unit (disabled by default)
@@ -338,30 +364,176 @@ cat << 'EOF'
 EOF
 echo -e "${NC}"
 
-echo -e "${BOLD}Security checklist (do these before starting):${NC}"
+# Offer interactive setup guide
+echo -e "  The gateway needs a chat platform (Telegram or Slack) to"
+echo -e "  receive your messages. ${BOLD}Want a step-by-step setup guide?${NC}"
+echo
+read -p "  Show setup guide? [y/n, default=y]: " SHOW_GUIDE
+SHOW_GUIDE="${SHOW_GUIDE:-y}"
+
+if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
+    echo
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo
+    echo -e "  ${BOLD}Which platform?${NC}"
+    echo -e "    ${CYAN}1)${NC} Telegram   ${DIM}(easiest, 2 minutes)${NC}"
+    echo -e "    ${CYAN}2)${NC} Slack      ${DIM}(requires workspace admin)${NC}"
+    echo -e "    ${CYAN}3)${NC} Skip       ${DIM}(I'll set it up later)${NC}"
+    echo
+    read -p "  Choice [1-3, default=1]: " PLATFORM_CHOICE
+    PLATFORM_CHOICE="${PLATFORM_CHOICE:-1}"
+
+    if [ "$PLATFORM_CHOICE" = "1" ]; then
+        echo
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo
+        echo -e "  ${BOLD}Telegram Setup${NC}"
+        echo
+        echo -e "  ${CYAN}Step 1:${NC} Open Telegram and search for ${BOLD}@BotFather${NC}"
+        echo -e "          (or tap: ${DIM}https://t.me/BotFather${NC})"
+        echo
+        echo -e "  ${CYAN}Step 2:${NC} Send ${BOLD}/newbot${NC} to BotFather"
+        echo -e "          He'll ask for a display name (anything, e.g. \"My Claudia\")"
+        echo -e "          Then a username (must end in 'bot', e.g. \"my_claudia_bot\")"
+        echo
+        echo -e "  ${CYAN}Step 3:${NC} BotFather will reply with a token like:"
+        echo -e "          ${DIM}123456789:ABCdefGHIjklMNOpqrsTUVwxyz${NC}"
+        echo -e "          Copy that token."
+        echo
+        read -p "  Paste your bot token here (or press Enter to skip): " BOT_TOKEN
+
+        if [ -n "$BOT_TOKEN" ]; then
+            echo
+            echo -e "  ${CYAN}Step 4:${NC} Now get your Telegram user ID."
+            echo -e "          Search for ${BOLD}@userinfobot${NC} in Telegram"
+            echo -e "          (or tap: ${DIM}https://t.me/userinfobot${NC})"
+            echo -e "          Send it any message. It replies with your ID (a number)."
+            echo
+            read -p "  Paste your user ID here (or press Enter to skip): " USER_ID
+
+            if [ -n "$USER_ID" ]; then
+                # Write the config
+                node -e "
+                  const fs = require('fs');
+                  const path = '$CONFIG_FILE';
+                  let c = {};
+                  try { c = JSON.parse(fs.readFileSync(path, 'utf8')); } catch {}
+                  if (!c.channels) c.channels = {};
+                  if (!c.channels.telegram) c.channels.telegram = {};
+                  c.channels.telegram.enabled = true;
+                  c.channels.telegram.allowedUsers = ['$USER_ID'];
+                  fs.writeFileSync(path, JSON.stringify(c, null, 2));
+                " 2>/dev/null
+
+                echo
+                echo -e "  ${GREEN}✓${NC} Telegram configured in gateway.json"
+                echo -e "  ${GREEN}✓${NC} User ${USER_ID} added to allowlist"
+                echo
+
+                # Export the token for this session
+                export TELEGRAM_BOT_TOKEN="$BOT_TOKEN"
+
+                echo -e "  ${BOLD}To start the gateway now:${NC}"
+                echo
+                echo -e "    ${CYAN}export TELEGRAM_BOT_TOKEN=\"$BOT_TOKEN\"${NC}"
+                echo -e "    ${CYAN}claudia-gateway start${NC}"
+                echo
+                echo -e "  ${DIM}To make the token persistent, add the export line to"
+                echo -e "  your ~/.zshrc or ~/.bashrc${NC}"
+                echo
+                echo -e "  ${CYAN}Step 5:${NC} Open your bot in Telegram and send a message!"
+                echo -e "          ${DIM}(start the gateway first)${NC}"
+            else
+                echo
+                echo -e "  ${YELLOW}!${NC} Skipped user ID. You'll need to add it manually:"
+                echo -e "    ${DIM}Edit ~/.claudia/gateway.json and set:"
+                echo -e "    channels.telegram.allowedUsers = [\"YOUR_USER_ID\"]${NC}"
+            fi
+        else
+            echo
+            echo -e "  ${DIM}No worries. When you have your token, run:${NC}"
+            echo -e "    ${CYAN}export TELEGRAM_BOT_TOKEN=\"your-token-here\"${NC}"
+            echo -e "    ${CYAN}claudia-gateway start${NC}"
+        fi
+
+    elif [ "$PLATFORM_CHOICE" = "2" ]; then
+        echo
+        echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo
+        echo -e "  ${BOLD}Slack Setup${NC}"
+        echo
+        echo -e "  ${CYAN}Step 1:${NC} Go to ${BOLD}https://api.slack.com/apps${NC}"
+        echo -e "          Click ${BOLD}Create New App${NC} > ${BOLD}From scratch${NC}"
+        echo -e "          Pick a name and workspace."
+        echo
+        echo -e "  ${CYAN}Step 2:${NC} Enable ${BOLD}Socket Mode${NC} (in Settings sidebar)"
+        echo -e "          This generates an app-level token (starts with ${DIM}xapp-${NC})"
+        echo -e "          Name it anything (e.g. \"claudia-socket\"). Copy it."
+        echo
+        echo -e "  ${CYAN}Step 3:${NC} Go to ${BOLD}OAuth & Permissions${NC}. Add these bot token scopes:"
+        echo -e "          ${DIM}app_mentions:read, chat:write, im:history, im:read, im:write${NC}"
+        echo
+        echo -e "  ${CYAN}Step 4:${NC} Go to ${BOLD}Event Subscriptions${NC}. Enable events."
+        echo -e "          Subscribe to: ${DIM}message.im${NC} and ${DIM}app_mention${NC}"
+        echo
+        echo -e "  ${CYAN}Step 5:${NC} Click ${BOLD}Install to Workspace${NC} (in sidebar or OAuth page)"
+        echo -e "          This generates a bot token (starts with ${DIM}xoxb-${NC}). Copy it."
+        echo
+        echo -e "  ${CYAN}Step 6:${NC} Get your Slack user ID:"
+        echo -e "          Click your profile picture > ${BOLD}Profile${NC} > ${BOLD}...${NC} (more) > ${BOLD}Copy member ID${NC}"
+        echo
+        read -p "  Paste your bot token (xoxb-...): " SLACK_BOT
+        read -p "  Paste your app token (xapp-...): " SLACK_APP
+        read -p "  Paste your user ID (U...): " SLACK_USER
+
+        if [ -n "$SLACK_BOT" ] && [ -n "$SLACK_APP" ] && [ -n "$SLACK_USER" ]; then
+            node -e "
+              const fs = require('fs');
+              const path = '$CONFIG_FILE';
+              let c = {};
+              try { c = JSON.parse(fs.readFileSync(path, 'utf8')); } catch {}
+              if (!c.channels) c.channels = {};
+              if (!c.channels.slack) c.channels.slack = {};
+              c.channels.slack.enabled = true;
+              c.channels.slack.allowedUsers = ['$SLACK_USER'];
+              fs.writeFileSync(path, JSON.stringify(c, null, 2));
+            " 2>/dev/null
+
+            echo
+            echo -e "  ${GREEN}✓${NC} Slack configured in gateway.json"
+            echo -e "  ${GREEN}✓${NC} User ${SLACK_USER} added to allowlist"
+            echo
+            echo -e "  ${BOLD}To start the gateway:${NC}"
+            echo
+            echo -e "    ${CYAN}export SLACK_BOT_TOKEN=\"$SLACK_BOT\"${NC}"
+            echo -e "    ${CYAN}export SLACK_APP_TOKEN=\"$SLACK_APP\"${NC}"
+            echo -e "    ${CYAN}claudia-gateway start${NC}"
+            echo
+            echo -e "  ${DIM}Add those export lines to your ~/.zshrc or ~/.bashrc to persist them.${NC}"
+            echo
+            echo -e "  ${CYAN}Step 7:${NC} DM the bot or @mention it in a channel!"
+        else
+            echo
+            echo -e "  ${DIM}Missing some values. When you have all tokens, run:${NC}"
+            echo -e "    ${CYAN}export SLACK_BOT_TOKEN=\"xoxb-...\"${NC}"
+            echo -e "    ${CYAN}export SLACK_APP_TOKEN=\"xapp-...\"${NC}"
+            echo -e "    ${CYAN}claudia-gateway start${NC}"
+        fi
+    fi
+
+    echo
+    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo
+fi
+
+echo -e "${BOLD}Security reminders:${NC}"
 echo
 if [ -z "$LOCAL_MODEL" ]; then
     echo -e "  ${YELLOW}□${NC} Set ANTHROPIC_API_KEY as an environment variable"
 else
-    echo -e "  ${GREEN}✓${NC} Local model ${LOCAL_MODEL} configured (no API key needed)"
-    echo -e "  ${DIM}    Set ANTHROPIC_API_KEY to use Claude instead${NC}"
+    echo -e "  ${GREEN}✓${NC} Local model ${LOCAL_MODEL} (no API key needed)"
 fi
-echo -e "  ${YELLOW}□${NC} Set TELEGRAM_BOT_TOKEN (or SLACK_BOT_TOKEN + SLACK_APP_TOKEN)"
-echo -e "  ${YELLOW}□${NC} Add your user ID(s) to allowedUsers in gateway.json"
-echo -e "  ${YELLOW}□${NC} Never commit API keys to git or store them in gateway.json"
-echo
-echo -e "${BOLD}Quick start:${NC}"
-echo
-if [ -z "$LOCAL_MODEL" ]; then
-    echo -e "  ${CYAN}1.${NC} export ANTHROPIC_API_KEY=sk-ant-..."
-    echo -e "  ${CYAN}2.${NC} export TELEGRAM_BOT_TOKEN=123456:ABC..."
-    echo -e "  ${CYAN}3.${NC} Edit ~/.claudia/gateway.json (enable channel, set allowedUsers)"
-    echo -e "  ${CYAN}4.${NC} claudia-gateway start"
-else
-    echo -e "  ${CYAN}1.${NC} export TELEGRAM_BOT_TOKEN=123456:ABC..."
-    echo -e "  ${CYAN}2.${NC} Edit ~/.claudia/gateway.json (enable channel, set allowedUsers)"
-    echo -e "  ${CYAN}3.${NC} claudia-gateway start"
-fi
+echo -e "  ${YELLOW}□${NC} Never commit API keys to git or store them in config files"
 echo
 echo -e "${BOLD}Installed:${NC}"
 echo
@@ -369,6 +541,10 @@ echo -e "  ${CYAN}◆${NC} Gateway source     ${DIM}$GATEWAY_DIR${NC}"
 echo -e "  ${CYAN}◆${NC} Config             ${DIM}~/.claudia/gateway.json${NC}"
 echo -e "  ${CYAN}◆${NC} CLI                ${DIM}~/.claudia/bin/claudia-gateway${NC}"
 echo -e "  ${CYAN}◆${NC} Logs               ${DIM}~/.claudia/gateway.log${NC}"
+if [ "$PATH_ADDED" = "1" ]; then
+    echo
+    echo -e "  ${YELLOW}!${NC} PATH was updated. Run ${BOLD}source ~/${SHELL_RC##*/}${NC} or open a new terminal."
+fi
 echo
 echo -e "${BOLD}CLI commands:${NC}"
 echo

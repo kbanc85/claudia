@@ -309,8 +309,8 @@ ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 
     if (gatewayInstalled) {
       console.log(`${colors.bold}Gateway:${colors.reset}
-  ${colors.dim}Configure API keys and allowlist, then:${colors.reset}
-  ${colors.cyan}claudia-gateway start${colors.reset}
+  ${colors.dim}If claudia-gateway isn't found, open a new terminal or run:${colors.reset}
+  ${colors.cyan}~/.claudia/bin/claudia-gateway start${colors.reset}
   ${colors.dim}See ~/.claudia/gateway.json for settings.${colors.reset}
 `);
     }

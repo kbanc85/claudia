@@ -230,11 +230,20 @@ node "%USERPROFILE%\.claudia\gateway\src\index.js" %*
 Set-Content -Path $wrapperPath -Value $wrapperContent
 Write-Host "  ${GREEN}✓${NC} CLI installed at $wrapperPath"
 
-# PATH hint
+# Auto-add to user PATH if not already there
+$PATH_ADDED = $false
 $currentPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
 if ($currentPath -notlike "*$BIN_DIR*") {
-    Write-Host "  ${YELLOW}!${NC} Add to your PATH if not already present:"
-    Write-Host "    ${DIM}[Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$BIN_DIR', 'User')${NC}"
+    try {
+        $newPath = if ($currentPath) { "$currentPath;$BIN_DIR" } else { $BIN_DIR }
+        [System.Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+        $env:PATH = "$BIN_DIR;$env:PATH"
+        Write-Host "  ${GREEN}✓${NC} PATH updated (user environment)"
+        $PATH_ADDED = $true
+    } catch {
+        Write-Host "  ${YELLOW}!${NC} Add to your PATH manually:"
+        Write-Host "    ${DIM}[Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$BIN_DIR', 'User')${NC}"
+    }
 }
 
 # Create scheduled task (disabled by default)
@@ -298,30 +307,172 @@ Write-Host "  ║                                                           ║"
 Write-Host "  ╚═══════════════════════════════════════════════════════════╝"
 Write-Host "${NC}"
 
-Write-Host "${BOLD}Security checklist (do these before starting):${NC}"
+# Offer interactive setup guide
+Write-Host "  The gateway needs a chat platform (Telegram or Slack) to"
+Write-Host "  receive your messages. ${BOLD}Want a step-by-step setup guide?${NC}"
+Write-Host ""
+$showGuide = Read-Host "  Show setup guide? [y/n, default=y]"
+if (-not $showGuide) { $showGuide = "y" }
+
+if ($showGuide -match "^[Yy]") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+    Write-Host "  ${BOLD}Which platform?${NC}"
+    Write-Host "    ${CYAN}1)${NC} Telegram   ${DIM}(easiest, 2 minutes)${NC}"
+    Write-Host "    ${CYAN}2)${NC} Slack      ${DIM}(requires workspace admin)${NC}"
+    Write-Host "    ${CYAN}3)${NC} Skip       ${DIM}(I'll set it up later)${NC}"
+    Write-Host ""
+    $platformChoice = Read-Host "  Choice [1-3, default=1]"
+    if (-not $platformChoice) { $platformChoice = "1" }
+
+    if ($platformChoice -eq "1") {
+        Write-Host ""
+        Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        Write-Host ""
+        Write-Host "  ${BOLD}Telegram Setup${NC}"
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 1:${NC} Open Telegram and search for ${BOLD}@BotFather${NC}"
+        Write-Host "          (or open: ${DIM}https://t.me/BotFather${NC})"
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 2:${NC} Send ${BOLD}/newbot${NC} to BotFather"
+        Write-Host "          He'll ask for a display name (anything, e.g. $([char]34)My Claudia$([char]34))"
+        Write-Host "          Then a username (must end in 'bot', e.g. $([char]34)my_claudia_bot$([char]34))"
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 3:${NC} BotFather will reply with a token like:"
+        Write-Host "          ${DIM}123456789:ABCdefGHIjklMNOpqrsTUVwxyz${NC}"
+        Write-Host "          Copy that token."
+        Write-Host ""
+        $botToken = Read-Host "  Paste your bot token here (or press Enter to skip)"
+
+        if ($botToken) {
+            Write-Host ""
+            Write-Host "  ${CYAN}Step 4:${NC} Now get your Telegram user ID."
+            Write-Host "          Search for ${BOLD}@userinfobot${NC} in Telegram"
+            Write-Host "          (or open: ${DIM}https://t.me/userinfobot${NC})"
+            Write-Host "          Send it any message. It replies with your ID (a number)."
+            Write-Host ""
+            $userId = Read-Host "  Paste your user ID here (or press Enter to skip)"
+
+            if ($userId) {
+                # Write the config
+                $cfgData = @{}
+                if (Test-Path $CONFIG_FILE) {
+                    try { $cfgData = Get-Content $CONFIG_FILE -Raw | ConvertFrom-Json } catch {}
+                }
+                if (-not $cfgData.channels) { $cfgData | Add-Member -NotePropertyName "channels" -NotePropertyValue @{} -Force }
+                $cfgData.channels | Add-Member -NotePropertyName "telegram" -NotePropertyValue @{
+                    enabled = $true
+                    allowedUsers = @($userId)
+                } -Force
+                $cfgData | ConvertTo-Json -Depth 10 | Set-Content $CONFIG_FILE
+
+                Write-Host ""
+                Write-Host "  ${GREEN}✓${NC} Telegram configured in gateway.json"
+                Write-Host "  ${GREEN}✓${NC} User $userId added to allowlist"
+                Write-Host ""
+
+                $env:TELEGRAM_BOT_TOKEN = $botToken
+
+                Write-Host "  ${BOLD}To start the gateway now:${NC}"
+                Write-Host ""
+                Write-Host "    ${CYAN}`$env:TELEGRAM_BOT_TOKEN = '$botToken'${NC}"
+                Write-Host "    ${CYAN}claudia-gateway start${NC}"
+                Write-Host ""
+                Write-Host "  ${DIM}To make the token persistent, add to your PowerShell profile.${NC}"
+                Write-Host ""
+                Write-Host "  ${CYAN}Step 5:${NC} Open your bot in Telegram and send a message!"
+                Write-Host "          ${DIM}(start the gateway first)${NC}"
+            } else {
+                Write-Host ""
+                Write-Host "  ${YELLOW}!${NC} Skipped user ID. You'll need to add it manually:"
+                Write-Host "    ${DIM}Edit $CONFIG_FILE and set:"
+                Write-Host "    channels.telegram.allowedUsers = [$([char]34)YOUR_USER_ID$([char]34)]${NC}"
+            }
+        } else {
+            Write-Host ""
+            Write-Host "  ${DIM}No worries. When you have your token, run:${NC}"
+            Write-Host "    ${CYAN}`$env:TELEGRAM_BOT_TOKEN = 'your-token-here'${NC}"
+            Write-Host "    ${CYAN}claudia-gateway start${NC}"
+        }
+
+    } elseif ($platformChoice -eq "2") {
+        Write-Host ""
+        Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        Write-Host ""
+        Write-Host "  ${BOLD}Slack Setup${NC}"
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 1:${NC} Go to ${BOLD}https://api.slack.com/apps${NC}"
+        Write-Host "          Click ${BOLD}Create New App${NC} > ${BOLD}From scratch${NC}"
+        Write-Host "          Pick a name and workspace."
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 2:${NC} Enable ${BOLD}Socket Mode${NC} (in Settings sidebar)"
+        Write-Host "          This generates an app-level token (starts with ${DIM}xapp-${NC})"
+        Write-Host "          Name it anything (e.g. $([char]34)claudia-socket$([char]34)). Copy it."
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 3:${NC} Go to ${BOLD}OAuth & Permissions${NC}. Add these bot token scopes:"
+        Write-Host "          ${DIM}app_mentions:read, chat:write, im:history, im:read, im:write${NC}"
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 4:${NC} Go to ${BOLD}Event Subscriptions${NC}. Enable events."
+        Write-Host "          Subscribe to: ${DIM}message.im${NC} and ${DIM}app_mention${NC}"
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 5:${NC} Click ${BOLD}Install to Workspace${NC} (in sidebar or OAuth page)"
+        Write-Host "          This generates a bot token (starts with ${DIM}xoxb-${NC}). Copy it."
+        Write-Host ""
+        Write-Host "  ${CYAN}Step 6:${NC} Get your Slack user ID:"
+        Write-Host "          Click your profile picture > ${BOLD}Profile${NC} > ${BOLD}...${NC} (more) > ${BOLD}Copy member ID${NC}"
+        Write-Host ""
+        $slackBot = Read-Host "  Paste your bot token (xoxb-...)"
+        $slackApp = Read-Host "  Paste your app token (xapp-...)"
+        $slackUser = Read-Host "  Paste your user ID (U...)"
+
+        if ($slackBot -and $slackApp -and $slackUser) {
+            $cfgData = @{}
+            if (Test-Path $CONFIG_FILE) {
+                try { $cfgData = Get-Content $CONFIG_FILE -Raw | ConvertFrom-Json } catch {}
+            }
+            if (-not $cfgData.channels) { $cfgData | Add-Member -NotePropertyName "channels" -NotePropertyValue @{} -Force }
+            $cfgData.channels | Add-Member -NotePropertyName "slack" -NotePropertyValue @{
+                enabled = $true
+                allowedUsers = @($slackUser)
+            } -Force
+            $cfgData | ConvertTo-Json -Depth 10 | Set-Content $CONFIG_FILE
+
+            Write-Host ""
+            Write-Host "  ${GREEN}✓${NC} Slack configured in gateway.json"
+            Write-Host "  ${GREEN}✓${NC} User $slackUser added to allowlist"
+            Write-Host ""
+            Write-Host "  ${BOLD}To start the gateway:${NC}"
+            Write-Host ""
+            Write-Host "    ${CYAN}`$env:SLACK_BOT_TOKEN = '$slackBot'${NC}"
+            Write-Host "    ${CYAN}`$env:SLACK_APP_TOKEN = '$slackApp'${NC}"
+            Write-Host "    ${CYAN}claudia-gateway start${NC}"
+            Write-Host ""
+            Write-Host "  ${DIM}Add those to your PowerShell profile to persist them.${NC}"
+            Write-Host ""
+            Write-Host "  ${CYAN}Step 7:${NC} DM the bot or @mention it in a channel!"
+        } else {
+            Write-Host ""
+            Write-Host "  ${DIM}Missing some values. When you have all tokens, run:${NC}"
+            Write-Host "    ${CYAN}`$env:SLACK_BOT_TOKEN = 'xoxb-...'${NC}"
+            Write-Host "    ${CYAN}`$env:SLACK_APP_TOKEN = 'xapp-...'${NC}"
+            Write-Host "    ${CYAN}claudia-gateway start${NC}"
+        }
+    }
+
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
+
+Write-Host "${BOLD}Security reminders:${NC}"
 Write-Host ""
 if (-not $LOCAL_MODEL) {
     Write-Host "  ${YELLOW}□${NC} Set ANTHROPIC_API_KEY as an environment variable"
 } else {
-    Write-Host "  ${GREEN}✓${NC} Local model $LOCAL_MODEL configured (no API key needed)"
-    Write-Host "  ${DIM}    Set ANTHROPIC_API_KEY to use Claude instead${NC}"
+    Write-Host "  ${GREEN}✓${NC} Local model $LOCAL_MODEL (no API key needed)"
 }
-Write-Host "  ${YELLOW}□${NC} Set TELEGRAM_BOT_TOKEN (or SLACK_BOT_TOKEN + SLACK_APP_TOKEN)"
-Write-Host "  ${YELLOW}□${NC} Add your user ID(s) to allowedUsers in gateway.json"
-Write-Host "  ${YELLOW}□${NC} Never commit API keys to git or store them in gateway.json"
-Write-Host ""
-Write-Host "${BOLD}Quick start:${NC}"
-Write-Host ""
-if (-not $LOCAL_MODEL) {
-    Write-Host "  ${CYAN}1.${NC} `$env:ANTHROPIC_API_KEY = 'sk-ant-...'"
-    Write-Host "  ${CYAN}2.${NC} `$env:TELEGRAM_BOT_TOKEN = '123456:ABC...'"
-    Write-Host "  ${CYAN}3.${NC} Edit $CONFIG_FILE (enable channel, set allowedUsers)"
-    Write-Host "  ${CYAN}4.${NC} claudia-gateway start"
-} else {
-    Write-Host "  ${CYAN}1.${NC} `$env:TELEGRAM_BOT_TOKEN = '123456:ABC...'"
-    Write-Host "  ${CYAN}2.${NC} Edit $CONFIG_FILE (enable channel, set allowedUsers)"
-    Write-Host "  ${CYAN}3.${NC} claudia-gateway start"
-}
+Write-Host "  ${YELLOW}□${NC} Never commit API keys to git or store them in config files"
 Write-Host ""
 Write-Host "${BOLD}Installed:${NC}"
 Write-Host ""
@@ -329,6 +480,10 @@ Write-Host "  ${CYAN}◆${NC} Gateway source     ${DIM}$GATEWAY_DIR${NC}"
 Write-Host "  ${CYAN}◆${NC} Config             ${DIM}$CONFIG_FILE${NC}"
 Write-Host "  ${CYAN}◆${NC} CLI                ${DIM}$wrapperPath${NC}"
 Write-Host "  ${CYAN}◆${NC} Logs               ${DIM}$CLAUDIA_DIR\gateway.log${NC}"
+if ($PATH_ADDED) {
+    Write-Host ""
+    Write-Host "  ${YELLOW}!${NC} PATH was updated. Restart your terminal for it to take effect."
+}
 Write-Host ""
 Write-Host "${BOLD}CLI commands:${NC}"
 Write-Host ""
