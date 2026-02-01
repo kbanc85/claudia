@@ -42,14 +42,42 @@ export class AuthManager {
 
     // Fall back to global allowlist
     if (this.globalAllowed.size > 0) {
-      return this.globalAllowed.has(userIdStr);
+      if (this.globalAllowed.has(userIdStr)) return true;
     }
 
-    // If no allowlists configured at all, deny by default (secure default)
-    log.warn('No allowlists configured - denying all access. Add user IDs to gateway config.', {
-      channel,
-      userId: userIdStr,
-    });
+    // Denied -- figure out why and log an actionable message
+    const channelEntries = this.channelAllowed[channel]
+      ? [...this.channelAllowed[channel]]
+      : [];
+    const globalEntries = [...this.globalAllowed];
+    const allEntries = [...channelEntries, ...globalEntries];
+
+    if (allEntries.length === 0) {
+      // No allowlists configured at all
+      log.warn('No allowlists configured - denying all access. Add user IDs to gateway config.', {
+        channel,
+        userId: userIdStr,
+      });
+    } else if (allEntries.some(e => !/^\d+$/.test(e))) {
+      // Allowlist contains non-numeric entries (likely usernames instead of IDs)
+      const nonNumeric = allEntries.filter(e => !/^\d+$/.test(e));
+      log.warn(
+        'Auth denied: allowlist may contain usernames instead of numeric IDs. ' +
+        'Telegram requires numeric user IDs (get yours from @userinfobot).', {
+          channel,
+          userId: userIdStr,
+          hint: 'Replace usernames with numeric IDs in gateway.json',
+          suspectEntries: nonNumeric,
+        }
+      );
+    } else {
+      // Allowlist exists with numeric IDs, user just isn't in it
+      log.warn('Auth denied: user not in allowlist.', {
+        channel,
+        userId: userIdStr,
+      });
+    }
+
     return false;
   }
 }

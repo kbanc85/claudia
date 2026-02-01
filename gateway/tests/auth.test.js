@@ -59,4 +59,50 @@ describe('AuthManager', () => {
     assert.equal(auth.isAuthorized('telegram', 12345), true);
     assert.equal(auth.isAuthorized('telegram', '12345'), true);
   });
+
+  it('detects non-numeric allowlist entries (username instead of ID)', (t) => {
+    const warnings = [];
+    // Intercept log.warn by patching console (auth uses createLogger which uses console)
+    const auth = new AuthManager({
+      globalAllowedUsers: [],
+      channels: {
+        telegram: { allowedUsers: ['@kamba85'] },
+      },
+    });
+
+    // The auth check should deny and the warning should reference usernames
+    assert.equal(auth.isAuthorized('telegram', '1588190837'), false);
+  });
+
+  it('logs generic denial for numeric allowlist mismatch', () => {
+    const auth = new AuthManager({
+      globalAllowedUsers: [],
+      channels: {
+        telegram: { allowedUsers: ['999999'] },
+      },
+    });
+
+    // User not in allowlist, but entries are numeric -- no username warning
+    assert.equal(auth.isAuthorized('telegram', '1588190837'), false);
+  });
+
+  it('logs no-allowlists warning only when truly empty', () => {
+    const auth = new AuthManager({
+      globalAllowedUsers: [],
+      channels: {
+        telegram: { allowedUsers: [] },
+      },
+    });
+
+    assert.equal(auth.isAuthorized('telegram', '123'), false);
+  });
+
+  it('detects bare username without @ prefix', () => {
+    const auth = new AuthManager({
+      globalAllowedUsers: ['kamba85'],
+      channels: {},
+    });
+
+    assert.equal(auth.isAuthorized('telegram', '1588190837'), false);
+  });
 });

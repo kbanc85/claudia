@@ -28,6 +28,7 @@ export class Router {
     this.auth = auth;
     this.adapters = adapters;
     this.sessions = new Map(); // sessionKey -> { history: [], lastActive: Date }
+    this._rejectedUsers = new Set(); // Track users we've already sent a rejection reply to
     this._cleanupInterval = null;
   }
 
@@ -67,6 +68,29 @@ export class Router {
     // 1. Auth check
     if (!this.auth.isAuthorized(channel, userId)) {
       log.warn('Unauthorized message rejected', { channel, userId });
+
+      // Send a one-time rejection reply so the user knows what's wrong
+      const rejectKey = `${channel}:${userId}`;
+      if (!this._rejectedUsers.has(rejectKey)) {
+        this._rejectedUsers.add(rejectKey);
+        const rejectMsg =
+          `I don't recognize your user ID. Your ${channel} user ID is: ${userId}\n` +
+          `Ask the person who set me up to add it to the allowlist in ~/.claudia/gateway.json`;
+        try {
+          const adapter = this.adapters.get(channel);
+          if (adapter && metadata?.ctx && channel === 'telegram') {
+            await metadata.ctx.reply(rejectMsg);
+          } else if (adapter && metadata?.say && channel === 'slack') {
+            await metadata.say({ text: rejectMsg });
+          } else if (adapter) {
+            const targetId = metadata?.chatId || metadata?.channelId || userId;
+            await adapter.sendMessage(targetId, rejectMsg);
+          }
+        } catch (err) {
+          log.debug('Failed to send rejection reply', { channel, userId, error: err.message });
+        }
+      }
+
       return;
     }
 

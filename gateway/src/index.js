@@ -112,6 +112,28 @@ async function cmdStart(args) {
     }
   }
 
+  // Pre-flight: check for missing tokens before starting
+  const preflight = loadConfig();
+  const telegramEnabled = preflight.channels?.telegram?.enabled || overrides.channels?.telegram?.enabled;
+  const slackEnabled = preflight.channels?.slack?.enabled || overrides.channels?.slack?.enabled;
+  if (telegramEnabled && !process.env.TELEGRAM_BOT_TOKEN && !preflight.channels?.telegram?.token) {
+    console.error('Telegram is enabled but TELEGRAM_BOT_TOKEN is not set in this terminal.');
+    console.error('');
+    console.error('Your token was likely saved to your shell profile during install.');
+    console.error('Fix: Open a NEW terminal window and run claudia-gateway start');
+    console.error('  Or: source ~/.zshrc   (or ~/.bashrc)');
+    console.error('  Or: export TELEGRAM_BOT_TOKEN="your-token-here"');
+    process.exit(1);
+  }
+  if (slackEnabled && !process.env.SLACK_BOT_TOKEN && !preflight.channels?.slack?.token) {
+    console.error('Slack is enabled but SLACK_BOT_TOKEN is not set in this terminal.');
+    console.error('');
+    console.error('Fix: Open a NEW terminal window and run claudia-gateway start');
+    console.error('  Or: export SLACK_BOT_TOKEN="your-token-here"');
+    console.error('  Or: export SLACK_APP_TOKEN="your-token-here"');
+    process.exit(1);
+  }
+
   const gateway = new Gateway(overrides);
 
   // Graceful shutdown
@@ -137,7 +159,9 @@ async function cmdStart(args) {
     console.log(`  Channels: ${[...gateway.adapters.keys()].join(', ') || 'none'}`);
     console.log(`  Memory: ${gateway.bridge?.memoryAvailable ? 'connected' : 'unavailable'}`);
     console.log(`  PID: ${process.pid}`);
-    console.log('\nPress Ctrl+C to stop.\n');
+    console.log('');
+    console.log('This terminal is now dedicated to the gateway. Use Claude in a separate terminal.');
+    console.log('Press Ctrl+C to stop.\n');
 
     // Keep process alive
     await new Promise(() => {});

@@ -352,7 +352,24 @@ if ($showGuide -match "^[Yy]") {
             Write-Host "          (or open: ${DIM}https://t.me/userinfobot${NC})"
             Write-Host "          Send it any message. It replies with your ID (a number)."
             Write-Host ""
-            $userId = Read-Host "  Paste your user ID here (or press Enter to skip)"
+            while ($true) {
+                $userId = Read-Host "  Paste your user ID here (or press Enter to skip)"
+
+                # Empty = skip
+                if (-not $userId) { break }
+
+                # Strip leading @
+                $userId = $userId -replace '^@', ''
+
+                # Validate: must be all digits
+                if ($userId -match '^\d+$') { break }
+
+                Write-Host ""
+                Write-Host "  ${RED}✗${NC} That looks like a username, not a numeric ID."
+                Write-Host "    Telegram user IDs are numbers only (e.g. ${BOLD}1588190837${NC})."
+                Write-Host "    Get yours from ${BOLD}@userinfobot${NC} in Telegram."
+                Write-Host ""
+            }
 
             if ($userId) {
                 # Write the config
@@ -392,6 +409,15 @@ if ($showGuide -match "^[Yy]") {
                     Add-Content -Path $profilePath -Value "`n# Claudia Gateway - Telegram`n$tokenLine"
                     Write-Host "  ${GREEN}✓${NC} Bot token saved to PowerShell profile"
                 }
+
+                Write-Host ""
+                Write-Host "  ${YELLOW}┌─────────────────────────────────────────────────┐${NC}"
+                Write-Host "  ${YELLOW}│${NC}  ${BOLD}Open a NEW terminal${NC} to run the gateway.         ${YELLOW}│${NC}"
+                Write-Host "  ${YELLOW}│${NC}  This terminal doesn't have your token yet.      ${YELLOW}│${NC}"
+                Write-Host "  ${YELLOW}│${NC}                                                   ${YELLOW}│${NC}"
+                Write-Host "  ${YELLOW}│${NC}  Or reload your profile in this terminal:         ${YELLOW}│${NC}"
+                Write-Host "  ${YELLOW}│${NC}    ${CYAN}. `$PROFILE${NC}                                      ${YELLOW}│${NC}"
+                Write-Host "  ${YELLOW}└─────────────────────────────────────────────────┘${NC}"
             } else {
                 Write-Host ""
                 Write-Host "  ${YELLOW}!${NC} Skipped user ID. You'll need to add it manually:"

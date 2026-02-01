@@ -409,7 +409,28 @@ if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
             echo -e "          (or tap: ${DIM}https://t.me/userinfobot${NC})"
             echo -e "          Send it any message. It replies with your ID (a number)."
             echo
-            read -p "  Paste your user ID here (or press Enter to skip): " USER_ID
+            while true; do
+                read -p "  Paste your user ID here (or press Enter to skip): " USER_ID
+
+                # Empty = skip
+                if [ -z "$USER_ID" ]; then
+                    break
+                fi
+
+                # Strip leading @
+                USER_ID="${USER_ID#@}"
+
+                # Validate: must be all digits
+                if [[ "$USER_ID" =~ ^[0-9]+$ ]]; then
+                    break
+                else
+                    echo
+                    echo -e "  ${RED}✗${NC} That looks like a username, not a numeric ID."
+                    echo -e "    Telegram user IDs are numbers only (e.g. ${BOLD}1588190837${NC})."
+                    echo -e "    Get yours from ${BOLD}@userinfobot${NC} in Telegram."
+                    echo
+                fi
+            done
 
             if [ -n "$USER_ID" ]; then
                 # Write the config
@@ -446,6 +467,15 @@ if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
                         echo "$TOKEN_LINE" >> "$SHELL_RC"
                         echo -e "  ${GREEN}✓${NC} Bot token saved to ~/${SHELL_RC##*/}"
                     fi
+
+                    echo
+                    echo -e "  ${YELLOW}┌─────────────────────────────────────────────────┐${NC}"
+                    echo -e "  ${YELLOW}│${NC}  ${BOLD}Open a NEW terminal${NC} to run the gateway.         ${YELLOW}│${NC}"
+                    echo -e "  ${YELLOW}│${NC}  This terminal doesn't have your token yet.      ${YELLOW}│${NC}"
+                    echo -e "  ${YELLOW}│${NC}                                                   ${YELLOW}│${NC}"
+                    echo -e "  ${YELLOW}│${NC}  Or run in this terminal first:                   ${YELLOW}│${NC}"
+                    echo -e "  ${YELLOW}│${NC}    ${CYAN}source ~/${SHELL_RC##*/}${NC}                          ${YELLOW}│${NC}"
+                    echo -e "  ${YELLOW}└─────────────────────────────────────────────────┘${NC}"
                 else
                     echo -e "  ${YELLOW}!${NC} Add this to your shell profile to persist the token:"
                     echo -e "    ${DIM}${TOKEN_LINE}${NC}"
