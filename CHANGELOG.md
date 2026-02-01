@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.10.1 (2026-02-01)
+
+### Fixed
+
+- **PATH auto-configuration** -- The installer now auto-appends `~/.claudia/bin` to your shell rc file (zshrc/bashrc) and updates the current session, so `claudia-gateway` works immediately. Windows installer auto-adds to user PATH via registry.
+- **Interactive setup guide** -- After install, the gateway offers a step-by-step walkthrough for setting up Telegram or Slack. Walks you through @BotFather, token collection, user ID lookup, and writes everything to `gateway.json` automatically. No more guessing.
+- **`bin/index.js` next steps** -- Now shows the full `~/.claudia/bin/claudia-gateway` path as fallback if the short command isn't found.
+
+---
+
 ## 1.10.0 (2026-02-01)
 
 ### Gateway: Local Model Support (Zero API Key)
