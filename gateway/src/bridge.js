@@ -2,14 +2,16 @@
  * Claudia Core Bridge
  *
  * Connects the gateway to:
- * 1. Anthropic API (Claude) for response generation
+ * 1. LLM provider (Anthropic API or local Ollama) for response generation
  * 2. Memory daemon (via MCP subprocess) for recall/remember
  *
  * This is the brain of the gateway - it enriches messages with memory context,
- * builds prompts, calls Claude, and stores new memories.
+ * builds prompts, calls the LLM, and stores new memories.
+ *
+ * Provider auto-detection: if ANTHROPIC_API_KEY is set, uses Anthropic.
+ * Otherwise, uses the local Ollama model from ~/.claudia/config.json.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { existsSync } from 'fs';
@@ -35,6 +37,7 @@ export class Bridge {
   constructor(config) {
     this.config = config;
     this.anthropic = null;
+    this.provider = null; // 'anthropic' | 'ollama'
     this.mcpClient = null;
     this.mcpTransport = null;
     this.memoryAvailable = false;
@@ -42,16 +45,49 @@ export class Bridge {
   }
 
   async start() {
-    // Initialize Anthropic client
+    // Provider auto-detection: try Anthropic first, then Ollama
     const apiKey = this.config.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        'Anthropic API key not configured. Set anthropicApiKey in gateway.json or ANTHROPIC_API_KEY env var'
-      );
+
+    if (apiKey) {
+      // Anthropic path: dynamic import so gateway doesn't crash if SDK isn't installed
+      try {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk');
+        this.anthropic = new Anthropic({ apiKey });
+        this.provider = 'anthropic';
+        log.info('Using Anthropic provider', { model: this.config.model });
+      } catch (err) {
+        log.warn('Anthropic SDK not available', { error: err.message });
+      }
     }
 
-    this.anthropic = new Anthropic({ apiKey });
-    log.info('Anthropic client initialized', { model: this.config.model });
+    if (!this.provider) {
+      // Ollama path: check if Ollama is running and a model is configured
+      const ollamaModel = this.config.ollama?.model;
+      const ollamaHost = this.config.ollama?.host || 'http://localhost:11434';
+
+      if (!ollamaModel) {
+        throw new Error(
+          'No LLM provider available. Either:\n' +
+            '  1. Set ANTHROPIC_API_KEY for cloud inference, or\n' +
+            '  2. Install a local model: ollama pull qwen3:4b\n' +
+            '     (model is auto-detected from ~/.claudia/config.json)'
+        );
+      }
+
+      try {
+        const res = await fetch(`${ollamaHost}/api/tags`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        this.provider = 'ollama';
+        log.info('Using Ollama provider', { model: ollamaModel, host: ollamaHost });
+      } catch (err) {
+        throw new Error(
+          `Ollama not reachable at ${ollamaHost} (${err.message}).\n` +
+            '  Start Ollama or set ANTHROPIC_API_KEY for cloud inference.'
+        );
+      }
+    }
 
     // Try to connect to memory daemon via MCP
     await this._connectMemory();
@@ -113,45 +149,43 @@ export class Bridge {
     }
     messages.push({ role: 'user', content: text });
 
-    // 4. Call Claude
-    log.info('Calling Claude API', { model: this.config.model, messageCount: messages.length });
+    // 4. Call LLM (Anthropic or Ollama)
+    log.info('Calling LLM', {
+      provider: this.provider,
+      model: this.provider === 'anthropic' ? this.config.model : this.config.ollama.model,
+      messageCount: messages.length,
+    });
 
+    let result;
     try {
-      const response = await this.anthropic.messages.create({
-        model: this.config.model,
-        max_tokens: this.config.maxTokens || 2048,
-        system: systemPrompt,
-        messages,
-      });
-
-      const responseText = response.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
-        .join('\n');
-
-      // 5. Store the exchange in memory (always attempt — resets failure counter on success)
-      if (this.memoryAvailable) {
-        this._bufferTurn(text, responseText)
-          .then(() => {
-            this._consecutiveFailures = 0;
-          })
-          .catch((err) => {
-            this._consecutiveFailures++;
-            log.warn('Failed to buffer turn', {
-              error: err.message,
-              consecutiveFailures: this._consecutiveFailures,
-            });
-          });
+      if (this.provider === 'anthropic') {
+        result = await this._callAnthropic(systemPrompt, messages);
+      } else {
+        result = await this._callOllama(systemPrompt, messages);
       }
-
-      return {
-        text: responseText,
-        usage: response.usage,
-      };
     } catch (err) {
-      log.error('Claude API call failed', { error: err.message });
+      log.error('LLM call failed', { provider: this.provider, error: err.message });
       throw err;
     }
+
+    const { text: responseText, usage } = result;
+
+    // 5. Store the exchange in memory (always attempt -- resets failure counter on success)
+    if (this.memoryAvailable) {
+      this._bufferTurn(text, responseText)
+        .then(() => {
+          this._consecutiveFailures = 0;
+        })
+        .catch((err) => {
+          this._consecutiveFailures++;
+          log.warn('Failed to buffer turn', {
+            error: err.message,
+            consecutiveFailures: this._consecutiveFailures,
+          });
+        });
+    }
+
+    return { text: responseText, usage };
   }
 
   /**
@@ -289,6 +323,78 @@ export class Bridge {
   }
 
   /**
+   * Call Anthropic API.
+   * @returns {{ text: string, usage: Object }}
+   */
+  async _callAnthropic(systemPrompt, messages) {
+    const response = await this.anthropic.messages.create({
+      model: this.config.model,
+      max_tokens: this.config.maxTokens || 2048,
+      system: systemPrompt,
+      messages,
+    });
+
+    const text = response.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
+
+    return { text, usage: response.usage };
+  }
+
+  /**
+   * Call Ollama /api/chat endpoint.
+   * Retries up to 2 times with 2s delay (matching memory daemon pattern).
+   * @returns {{ text: string, usage: null }}
+   */
+  async _callOllama(systemPrompt, messages) {
+    const host = this.config.ollama?.host || 'http://localhost:11434';
+    const model = this.config.ollama?.model;
+
+    // Build Ollama message array: system prompt + conversation turns
+    const ollamaMessages = [{ role: 'system', content: systemPrompt }];
+    for (const msg of messages) {
+      ollamaMessages.push({ role: msg.role, content: msg.content });
+    }
+
+    const maxRetries = 2;
+    let lastError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        log.debug('Retrying Ollama call', { attempt });
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+
+      try {
+        const res = await fetch(`${host}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: ollamaMessages,
+            stream: false,
+            options: { temperature: 0.7 },
+          }),
+          signal: AbortSignal.timeout(60000),
+        });
+
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`Ollama HTTP ${res.status}: ${body}`);
+        }
+
+        const data = await res.json();
+        return { text: data.message?.content || '', usage: null };
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
    * Connect to the memory daemon via MCP stdio.
    */
   async _connectMemory() {
@@ -342,9 +448,11 @@ export class Bridge {
 
   getStatus() {
     return {
-      anthropicReady: !!this.anthropic,
+      provider: this.provider,
+      providerReady: this.provider === 'anthropic' ? !!this.anthropic : this.provider === 'ollama',
       memoryAvailable: this.memoryAvailable,
-      model: this.config.model,
+      model:
+        this.provider === 'ollama' ? this.config.ollama?.model : this.config.model,
     };
   }
 }

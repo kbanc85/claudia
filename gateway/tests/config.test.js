@@ -7,7 +7,7 @@ describe('Config', () => {
     const config = generateExampleConfig();
 
     assert.ok(config);
-    assert.equal(config.anthropicApiKey, '(set ANTHROPIC_API_KEY env var)');
+    assert.equal(config.anthropicApiKey, '(set ANTHROPIC_API_KEY env var, or leave empty for Ollama)');
     assert.equal(config.channels.telegram.enabled, true);
     assert.equal(config.channels.telegram.token, '(set TELEGRAM_BOT_TOKEN env var)');
     assert.ok(config.channels.slack);

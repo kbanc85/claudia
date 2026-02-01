@@ -37,7 +37,7 @@ class MockBridge {
     return { text: `Echo: ${message.text}`, usage: { input_tokens: 10, output_tokens: 5 } };
   }
   getStatus() {
-    return { anthropicReady: true, memoryAvailable: true };
+    return { provider: 'anthropic', providerReady: true, memoryAvailable: true };
   }
 }
 

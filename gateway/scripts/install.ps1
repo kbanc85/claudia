@@ -110,6 +110,91 @@ Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━�
 Write-Host ""
 
 # ============================================================
+# Step 3.5: Local model check (Ollama)
+# ============================================================
+Write-Host "${BOLD}Step 3.5/6: Local Model${NC}"
+Write-Host ""
+
+$LOCAL_MODEL = ""
+$CLAUDIA_CONFIG = Join-Path $CLAUDIA_DIR "config.json"
+
+# Check if a language model is already configured
+if (Test-Path $CLAUDIA_CONFIG) {
+    try {
+        $configData = Get-Content $CLAUDIA_CONFIG -Raw | ConvertFrom-Json
+        $LOCAL_MODEL = $configData.language_model
+        if ($null -eq $LOCAL_MODEL) { $LOCAL_MODEL = "" }
+    } catch {
+        $LOCAL_MODEL = ""
+    }
+}
+
+$OLLAMA_AVAILABLE = $false
+try {
+    $ollamaList = & ollama list 2>&1
+    if ($LASTEXITCODE -eq 0) { $OLLAMA_AVAILABLE = $true }
+} catch {}
+
+if ($LOCAL_MODEL -and $OLLAMA_AVAILABLE) {
+    # Check if model is pulled
+    $modelFound = $ollamaList | Select-String -Pattern "^$LOCAL_MODEL" -Quiet
+    if ($modelFound) {
+        Write-Host "  ${GREEN}✓${NC} Using ${BOLD}${LOCAL_MODEL}${NC} for chat (no API key needed)"
+    } else {
+        Write-Host "  ${YELLOW}!${NC} Model $LOCAL_MODEL configured but not pulled"
+        Write-Host "    ${DIM}Run: ollama pull $LOCAL_MODEL${NC}"
+    }
+} elseif ($OLLAMA_AVAILABLE) {
+    Write-Host "  ${CYAN}?${NC} No local language model configured."
+    Write-Host "    A local model lets you use the gateway without an Anthropic API key."
+    Write-Host ""
+    Write-Host "  ${BOLD}Pick a model:${NC}"
+    Write-Host "    ${CYAN}1)${NC} qwen3:4b     ${DIM}(recommended, 2.5GB)${NC}"
+    Write-Host "    ${CYAN}2)${NC} smollm3:3b   ${DIM}(smaller, 1.7GB)${NC}"
+    Write-Host "    ${CYAN}3)${NC} llama3.2:3b  ${DIM}(Meta, 2.0GB)${NC}"
+    Write-Host "    ${CYAN}4)${NC} skip         ${DIM}(use Anthropic API key instead)${NC}"
+    Write-Host ""
+    $modelChoice = Read-Host "  Choice [1-4, default=4]"
+
+    switch ($modelChoice) {
+        "1" { $LOCAL_MODEL = "qwen3:4b" }
+        "2" { $LOCAL_MODEL = "smollm3:3b" }
+        "3" { $LOCAL_MODEL = "llama3.2:3b" }
+        default { $LOCAL_MODEL = "" }
+    }
+
+    if ($LOCAL_MODEL) {
+        Write-Host ""
+        Write-Host "  ${CYAN}◐${NC} Pulling $LOCAL_MODEL (this may take a few minutes)..."
+        try {
+            & ollama pull $LOCAL_MODEL 2>&1 | Select-Object -Last 1
+            Write-Host "  ${GREEN}✓${NC} Model $LOCAL_MODEL ready"
+
+            # Write to shared config
+            if (Test-Path $CLAUDIA_CONFIG) {
+                $configData = Get-Content $CLAUDIA_CONFIG -Raw | ConvertFrom-Json
+                $configData | Add-Member -NotePropertyName "language_model" -NotePropertyValue $LOCAL_MODEL -Force
+                $configData | ConvertTo-Json -Depth 10 | Set-Content $CLAUDIA_CONFIG
+            } else {
+                @{ language_model = $LOCAL_MODEL } | ConvertTo-Json | Set-Content $CLAUDIA_CONFIG
+            }
+        } catch {
+            Write-Host "  ${RED}✗${NC} Failed to pull $LOCAL_MODEL"
+            $LOCAL_MODEL = ""
+        }
+    } else {
+        Write-Host "  ${DIM}  Skipped. You'll need ANTHROPIC_API_KEY to use the gateway.${NC}"
+    }
+} else {
+    Write-Host "  ${DIM}  Ollama not found. You'll need ANTHROPIC_API_KEY to use the gateway.${NC}"
+    Write-Host "  ${DIM}  Install Ollama: https://ollama.com${NC}"
+}
+
+Write-Host ""
+Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+Write-Host ""
+
+# ============================================================
 # Step 4: Generate config
 # ============================================================
 Write-Host "${BOLD}Step 4/6: Configuration${NC}"
@@ -215,17 +300,28 @@ Write-Host "${NC}"
 
 Write-Host "${BOLD}Security checklist (do these before starting):${NC}"
 Write-Host ""
-Write-Host "  ${YELLOW}□${NC} Set ANTHROPIC_API_KEY as an environment variable"
+if (-not $LOCAL_MODEL) {
+    Write-Host "  ${YELLOW}□${NC} Set ANTHROPIC_API_KEY as an environment variable"
+} else {
+    Write-Host "  ${GREEN}✓${NC} Local model $LOCAL_MODEL configured (no API key needed)"
+    Write-Host "  ${DIM}    Set ANTHROPIC_API_KEY to use Claude instead${NC}"
+}
 Write-Host "  ${YELLOW}□${NC} Set TELEGRAM_BOT_TOKEN (or SLACK_BOT_TOKEN + SLACK_APP_TOKEN)"
 Write-Host "  ${YELLOW}□${NC} Add your user ID(s) to allowedUsers in gateway.json"
 Write-Host "  ${YELLOW}□${NC} Never commit API keys to git or store them in gateway.json"
 Write-Host ""
 Write-Host "${BOLD}Quick start:${NC}"
 Write-Host ""
-Write-Host "  ${CYAN}1.${NC} `$env:ANTHROPIC_API_KEY = 'sk-ant-...'"
-Write-Host "  ${CYAN}2.${NC} `$env:TELEGRAM_BOT_TOKEN = '123456:ABC...'"
-Write-Host "  ${CYAN}3.${NC} Edit $CONFIG_FILE (enable channel, set allowedUsers)"
-Write-Host "  ${CYAN}4.${NC} claudia-gateway start"
+if (-not $LOCAL_MODEL) {
+    Write-Host "  ${CYAN}1.${NC} `$env:ANTHROPIC_API_KEY = 'sk-ant-...'"
+    Write-Host "  ${CYAN}2.${NC} `$env:TELEGRAM_BOT_TOKEN = '123456:ABC...'"
+    Write-Host "  ${CYAN}3.${NC} Edit $CONFIG_FILE (enable channel, set allowedUsers)"
+    Write-Host "  ${CYAN}4.${NC} claudia-gateway start"
+} else {
+    Write-Host "  ${CYAN}1.${NC} `$env:TELEGRAM_BOT_TOKEN = '123456:ABC...'"
+    Write-Host "  ${CYAN}2.${NC} Edit $CONFIG_FILE (enable channel, set allowedUsers)"
+    Write-Host "  ${CYAN}3.${NC} claudia-gateway start"
+}
 Write-Host ""
 Write-Host "${BOLD}Installed:${NC}"
 Write-Host ""

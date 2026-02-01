@@ -123,6 +123,87 @@ echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 # ============================================================
+# Step 3.5: Local model check (Ollama)
+# ============================================================
+echo -e "${BOLD}Step 3.5/6: Local Model${NC}"
+echo
+
+LOCAL_MODEL=""
+CLAUDIA_CONFIG="$CLAUDIA_DIR/config.json"
+
+# Check if a language model is already configured
+if [ -f "$CLAUDIA_CONFIG" ]; then
+    LOCAL_MODEL=$(node -e "try{const c=JSON.parse(require('fs').readFileSync('$CLAUDIA_CONFIG','utf8'));console.log(c.language_model||'')}catch{}" 2>/dev/null)
+fi
+
+OLLAMA_AVAILABLE=0
+if command -v ollama &> /dev/null; then
+    if ollama list &> /dev/null; then
+        OLLAMA_AVAILABLE=1
+    fi
+fi
+
+if [ -n "$LOCAL_MODEL" ] && [ "$OLLAMA_AVAILABLE" = "1" ]; then
+    # Check if the model is actually pulled
+    if ollama list 2>/dev/null | grep -q "^${LOCAL_MODEL}"; then
+        echo -e "  ${GREEN}✓${NC} Using ${BOLD}${LOCAL_MODEL}${NC} for chat (no API key needed)"
+    else
+        echo -e "  ${YELLOW}!${NC} Model ${LOCAL_MODEL} configured but not pulled"
+        echo -e "    ${DIM}Run: ollama pull ${LOCAL_MODEL}${NC}"
+    fi
+elif [ "$OLLAMA_AVAILABLE" = "1" ]; then
+    echo -e "  ${CYAN}?${NC} No local language model configured."
+    echo -e "    A local model lets you use the gateway without an Anthropic API key."
+    echo
+    echo -e "  ${BOLD}Pick a model:${NC}"
+    echo -e "    ${CYAN}1)${NC} qwen3:4b     ${DIM}(recommended, 2.5GB)${NC}"
+    echo -e "    ${CYAN}2)${NC} smollm3:3b   ${DIM}(smaller, 1.7GB)${NC}"
+    echo -e "    ${CYAN}3)${NC} llama3.2:3b  ${DIM}(Meta, 2.0GB)${NC}"
+    echo -e "    ${CYAN}4)${NC} skip         ${DIM}(use Anthropic API key instead)${NC}"
+    echo
+    read -p "  Choice [1-4, default=4]: " MODEL_CHOICE
+
+    case "$MODEL_CHOICE" in
+        1) LOCAL_MODEL="qwen3:4b" ;;
+        2) LOCAL_MODEL="smollm3:3b" ;;
+        3) LOCAL_MODEL="llama3.2:3b" ;;
+        *) LOCAL_MODEL="" ;;
+    esac
+
+    if [ -n "$LOCAL_MODEL" ]; then
+        echo
+        echo -e "  ${CYAN}◐${NC} Pulling ${LOCAL_MODEL} (this may take a few minutes)..."
+        if ollama pull "$LOCAL_MODEL" 2>&1 | tail -1; then
+            echo -e "  ${GREEN}✓${NC} Model ${LOCAL_MODEL} ready"
+
+            # Write to shared config
+            if [ -f "$CLAUDIA_CONFIG" ]; then
+                node -e "
+                  const fs = require('fs');
+                  const c = JSON.parse(fs.readFileSync('$CLAUDIA_CONFIG','utf8'));
+                  c.language_model = '$LOCAL_MODEL';
+                  fs.writeFileSync('$CLAUDIA_CONFIG', JSON.stringify(c, null, 2));
+                " 2>/dev/null
+            else
+                echo "{\"language_model\":\"$LOCAL_MODEL\"}" > "$CLAUDIA_CONFIG"
+            fi
+        else
+            echo -e "  ${RED}✗${NC} Failed to pull ${LOCAL_MODEL}"
+            LOCAL_MODEL=""
+        fi
+    else
+        echo -e "  ${DIM}  Skipped. You'll need ANTHROPIC_API_KEY to use the gateway.${NC}"
+    fi
+else
+    echo -e "  ${DIM}  Ollama not found. You'll need ANTHROPIC_API_KEY to use the gateway.${NC}"
+    echo -e "  ${DIM}  Install Ollama: https://ollama.com${NC}"
+fi
+
+echo
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo
+
+# ============================================================
 # Step 4: Generate config
 # ============================================================
 echo -e "${BOLD}Step 4/6: Configuration${NC}"
@@ -259,17 +340,28 @@ echo -e "${NC}"
 
 echo -e "${BOLD}Security checklist (do these before starting):${NC}"
 echo
-echo -e "  ${YELLOW}□${NC} Set ANTHROPIC_API_KEY as an environment variable"
+if [ -z "$LOCAL_MODEL" ]; then
+    echo -e "  ${YELLOW}□${NC} Set ANTHROPIC_API_KEY as an environment variable"
+else
+    echo -e "  ${GREEN}✓${NC} Local model ${LOCAL_MODEL} configured (no API key needed)"
+    echo -e "  ${DIM}    Set ANTHROPIC_API_KEY to use Claude instead${NC}"
+fi
 echo -e "  ${YELLOW}□${NC} Set TELEGRAM_BOT_TOKEN (or SLACK_BOT_TOKEN + SLACK_APP_TOKEN)"
 echo -e "  ${YELLOW}□${NC} Add your user ID(s) to allowedUsers in gateway.json"
 echo -e "  ${YELLOW}□${NC} Never commit API keys to git or store them in gateway.json"
 echo
 echo -e "${BOLD}Quick start:${NC}"
 echo
-echo -e "  ${CYAN}1.${NC} export ANTHROPIC_API_KEY=sk-ant-..."
-echo -e "  ${CYAN}2.${NC} export TELEGRAM_BOT_TOKEN=123456:ABC..."
-echo -e "  ${CYAN}3.${NC} Edit ~/.claudia/gateway.json (enable channel, set allowedUsers)"
-echo -e "  ${CYAN}4.${NC} claudia-gateway start"
+if [ -z "$LOCAL_MODEL" ]; then
+    echo -e "  ${CYAN}1.${NC} export ANTHROPIC_API_KEY=sk-ant-..."
+    echo -e "  ${CYAN}2.${NC} export TELEGRAM_BOT_TOKEN=123456:ABC..."
+    echo -e "  ${CYAN}3.${NC} Edit ~/.claudia/gateway.json (enable channel, set allowedUsers)"
+    echo -e "  ${CYAN}4.${NC} claudia-gateway start"
+else
+    echo -e "  ${CYAN}1.${NC} export TELEGRAM_BOT_TOKEN=123456:ABC..."
+    echo -e "  ${CYAN}2.${NC} Edit ~/.claudia/gateway.json (enable channel, set allowedUsers)"
+    echo -e "  ${CYAN}3.${NC} claudia-gateway start"
+fi
 echo
 echo -e "${BOLD}Installed:${NC}"
 echo

@@ -1,17 +1,28 @@
 # Claudia Gateway
 
-The messaging gateway lets you talk to Claudia from Telegram and Slack on your phone or desktop. Messages flow from your chat app to the gateway running on your machine, where they're processed by Claude with full access to Claudia's memory system. Everything runs locally except the Anthropic API call itself.
+The messaging gateway lets you talk to Claudia from Telegram and Slack on your phone or desktop. Messages flow from your chat app to the gateway running on your machine, where they're processed with full access to Claudia's memory system. You can use a local Ollama model (completely offline) or the Anthropic API (Claude).
+
+## Provider
+
+The gateway auto-detects which LLM provider to use at startup:
+
+1. **Anthropic (cloud)** -- If `ANTHROPIC_API_KEY` is set, uses the Anthropic API with the configured Claude model.
+2. **Ollama (local)** -- If no API key is set, uses the local Ollama model from `~/.claudia/config.json`. This is the same model you picked during memory daemon setup (qwen3:4b, smollm3:3b, or llama3.2:3b).
+
+No manual `provider` field needed. The gateway figures it out.
 
 ## Quick Start
+
+### Local-only (no API key needed)
 
 1. Run the installer (done automatically via `npx get-claudia`):
    ```bash
    bash gateway/scripts/install.sh
    ```
+   The installer will offer to pull a local model if Ollama is installed.
 
-2. Set your API keys as environment variables:
+2. Set your chat platform token:
    ```bash
-   export ANTHROPIC_API_KEY="sk-ant-..."
    export TELEGRAM_BOT_TOKEN="123456:ABC-DEF..."
    ```
 
@@ -31,6 +42,14 @@ The messaging gateway lets you talk to Claudia from Telegram and Slack on your p
    ```bash
    claudia-gateway start
    ```
+
+### With Anthropic API
+
+Same as above, but also set:
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+When an API key is present, the gateway uses Claude instead of the local model.
 
 ## Telegram Setup
 
@@ -95,9 +114,11 @@ Config lives at `~/.claudia/gateway.json`. All API keys/tokens should be set as 
 
 | Key | Env Override | Description |
 |-----|-------------|-------------|
-| `anthropicApiKey` | `ANTHROPIC_API_KEY` | Your Anthropic API key |
+| `anthropicApiKey` | `ANTHROPIC_API_KEY` | Your Anthropic API key (optional if using Ollama) |
 | `model` | | Claude model to use (default: `claude-sonnet-4-20250514`) |
 | `maxTokens` | | Max response tokens (default: `2048`) |
+| `ollama.host` | `OLLAMA_HOST` | Ollama server URL (default: `http://localhost:11434`) |
+| `ollama.model` | | Ollama model name; auto-detected from `~/.claudia/config.json` |
 | `channels.telegram.enabled` | | Enable Telegram adapter |
 | `channels.telegram.token` | `TELEGRAM_BOT_TOKEN` | Bot token from BotFather |
 | `channels.telegram.allowedUsers` | | Array of allowed Telegram user IDs |
@@ -131,6 +152,7 @@ Per-channel `allowedUsers` and `globalAllowedUsers` are both checked. A user mus
 
 ### Data flow
 
+**With Anthropic API:**
 ```
 Phone/Desktop                Your Machine                  Cloud
 ┌──────────┐    encrypted    ┌──────────────────┐         ┌───────────┐
@@ -144,17 +166,32 @@ Phone/Desktop                Your Machine                  Cloud
                              └──────────────────────┘
 ```
 
+**With Ollama (fully local):**
+```
+Phone/Desktop                Your Machine
+┌──────────┐    encrypted    ┌──────────────────┐
+│ Telegram  │───(TLS)──────▶│  Claudia Gateway  │
+│ or Slack  │◀──(TLS)───────│  (localhost)       │
+└──────────┘                 │                    │
+                             │  ┌──────────────┐ │
+                             │  │ Ollama LLM    │ │
+                             │  │ Memory Daemon │ │
+                             │  │ (localhost)   │ │
+                             │  └──────────────┘ │
+                             └──────────────────────┘
+```
+
 - **Your message** travels from your chat app through the platform's servers (Telegram/Slack) to the gateway running on your machine.
-- **The gateway** processes your message locally, reads/writes to Claudia's memory (local SQLite), and sends only the conversation to the Anthropic API.
-- **Anthropic** returns a response; the gateway relays it back through the chat platform to your device.
-- **Memory stays local.** The memory daemon runs on your machine, stores data in `~/.claudia/memory/`, and never sends data to any external service except when explicitly included in a Claude API call.
+- **The gateway** processes your message locally, reads/writes to Claudia's memory (local SQLite), and calls either the Anthropic API or local Ollama model.
+- **With Ollama**, no data leaves your machine except through the chat platform routing. The LLM runs entirely on your hardware.
+- **Memory stays local.** The memory daemon stores data in `~/.claudia/memory/` and never sends data to any external service.
 
 ### What goes where
 
 | Data | Where it goes |
 |------|--------------|
-| Your messages | Telegram/Slack servers (platform routing), Anthropic API |
-| Claude's responses | Anthropic API, Telegram/Slack servers (delivery) |
+| Your messages | Telegram/Slack servers (platform routing), Anthropic API or local Ollama |
+| LLM responses | Anthropic API or local Ollama, Telegram/Slack servers (delivery) |
 | Memory (facts, entities, relationships) | Local SQLite only (`~/.claudia/memory/`) |
 | API keys | Environment variables on your machine only |
 | Gateway config | `~/.claudia/gateway.json` on your machine (secrets stripped) |
@@ -203,8 +240,9 @@ To enable:
 
 **Gateway won't start**
 - Check Node.js version: `node --version` (must be 18+)
-- Verify API key is set: `echo $ANTHROPIC_API_KEY`
+- Verify a provider is available: `echo $ANTHROPIC_API_KEY` or `ollama list`
 - Check config: `cat ~/.claudia/gateway.json`
+- Check shared config: `cat ~/.claudia/config.json` (should have `language_model`)
 - Look at logs: `claudia-gateway logs --lines 100`
 
 **Bot doesn't respond**

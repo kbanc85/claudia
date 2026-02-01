@@ -21,6 +21,12 @@ const DEFAULT_CONFIG = {
   model: 'claude-sonnet-4-20250514',
   maxTokens: 2048,
 
+  // Ollama (local model, auto-detected from ~/.claudia/config.json)
+  ollama: {
+    host: 'http://localhost:11434',
+    model: '', // Auto-detected from ~/.claudia/config.json language_model field
+  },
+
   // System prompt context
   systemPromptPath: '', // Optional path to custom system prompt
 
@@ -96,7 +102,17 @@ export function loadConfig() {
 
   if (!existsSync(CONFIG_PATH)) {
     log.info('No gateway config found, using defaults');
-    return { ...DEFAULT_CONFIG };
+    const defaults = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+    if (!defaults.ollama.model) {
+      defaults.ollama.model = readClaudiaConfig();
+    }
+    if (process.env.ANTHROPIC_API_KEY) {
+      defaults.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    }
+    if (process.env.OLLAMA_HOST) {
+      defaults.ollama.host = process.env.OLLAMA_HOST;
+    }
+    return defaults;
   }
 
   try {
@@ -119,6 +135,14 @@ export function loadConfig() {
     }
     if (process.env.SLACK_SIGNING_SECRET) {
       merged.channels.slack.signingSecret = process.env.SLACK_SIGNING_SECRET;
+    }
+    if (process.env.OLLAMA_HOST) {
+      merged.ollama.host = process.env.OLLAMA_HOST;
+    }
+
+    // Auto-detect Ollama model from Claudia's shared config if not explicitly set
+    if (!merged.ollama.model) {
+      merged.ollama.model = readClaudiaConfig();
     }
 
     log.info('Loaded gateway config', { path: CONFIG_PATH });
@@ -150,11 +174,29 @@ export function saveConfig(config) {
 }
 
 /**
+ * Read the shared Claudia config (~/.claudia/config.json) to get the
+ * language_model value set during memory daemon installation.
+ *
+ * @returns {string} Model name (e.g. 'qwen3:4b') or empty string if not found
+ */
+export function readClaudiaConfig() {
+  const configPath = join(homedir(), '.claudia', 'config.json');
+  try {
+    if (!existsSync(configPath)) return '';
+    const data = JSON.parse(readFileSync(configPath, 'utf8'));
+    return data.language_model || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Generate an example config file.
  */
 export function generateExampleConfig() {
   const example = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-  example.anthropicApiKey = '(set ANTHROPIC_API_KEY env var)';
+  example.anthropicApiKey = '(set ANTHROPIC_API_KEY env var, or leave empty for Ollama)';
+  example.ollama.model = '(auto-detected from ~/.claudia/config.json)';
   example.channels.telegram.enabled = true;
   example.channels.telegram.token = '(set TELEGRAM_BOT_TOKEN env var)';
   example.channels.telegram.allowedUsers = ['YOUR_TELEGRAM_USER_ID'];
