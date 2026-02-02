@@ -2,6 +2,34 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.11.0 (2026-02-02)
+
+### The Provenance Release
+
+Every claim traces to a source. Every document links to people and projects. Auditable, verifiable, robust.
+
+### Added
+
+- **Document storage** -- Store transcripts, emails, and files on disk with automatic registration in SQLite. Deduplication by file hash. Lifecycle management (active, dormant, archived, purged). Three new MCP tools: `memory.file`, `memory.documents`, `memory.purge`.
+- **Provenance tracking** -- New `memory_sources` table links memories to their source documents. `memory.trace` now includes document references. `save_source_material()` auto-registers in the documents table.
+- **Graph traversal** -- `memory.about` responses now include a `connected` field showing related entities via recursive CTE traversal of the relationship graph. Cycle prevention, weak-edge pruning, configurable depth.
+- **Compact session briefing** -- New `memory.briefing` MCP tool returns ~500 token aggregate summary (commitment counts, cooling relationships, unread messages, top prediction, recent activity). Replaces full file loading at session startup.
+- **`/memory-audit` command** -- Full system audit or entity-specific deep dive. Shows memory counts, top people/projects, provenance chains, linked documents.
+- **Installer "What's New" section** -- Fresh installs and upgrades now show a brief feature summary in yellow/cyan matching the Claudia banner.
+
+### Fixed
+
+- **FTS5 on fresh installs** -- FTS5 virtual table was only created in migration v4, but fresh databases skipped it. Added post-migration setup block that creates FTS5 regardless of migration path. All 7 pre-existing FTS5 test failures now pass.
+- **FTS5 test skip markers** -- Tests gracefully skip when FTS5 module is unavailable in the SQLite build.
+
+### Changed
+
+- **`capture-meeting.md`** -- New step stores raw transcript via `memory.file` and links to extracted memories.
+- **`meeting-prep.md`** -- Queries `memory.documents` for recent files involving the meeting person.
+- **`memory-manager.md`** -- Session startup uses `memory.briefing` instead of `memory.predictions`, with fallback.
+
+---
+
 ## 1.10.1 (2026-02-01)
 
 ### Fixed
