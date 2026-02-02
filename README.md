@@ -113,9 +113,10 @@ This upgrades framework files while preserving your data (context/, people/, pro
 Claudia isn't a list of features. She's a set of outcomes:
 
 - **Catches your commitments.** Say "I'll send that proposal by Friday" in conversation, and she'll track it. On Friday morning, she'll remind you.
-- **Remembers your relationships.** Mention Sarah from Acme, and Claudia surfaces what she knows: last conversation, open commitments, communication frequency, sentiment.
+- **Remembers your relationships.** Mention Sarah from Acme, and Claudia surfaces what she knows: last conversation, open commitments, communication frequency, sentiment. Ask about one person, and she'll show you their connected network of people and projects.
 - **Warns you before things slip.** Haven't talked to your best client in three weeks? Overdue on a deliverable? She surfaces it without being asked.
-- **Processes your meetings.** Paste a transcript. She pulls out decisions, action items, and follow-ups, then stores them where they belong.
+- **Processes your meetings.** Paste a transcript. She pulls out decisions, action items, and follow-ups, then stores the transcript as a document linked to participants and memories.
+- **Shows her work.** Every fact traces back to its source. Ask "how do you know that?" and Claudia shows the email, transcript, or conversation it came from.
 - **Adapts to how you work.** She notices patterns ("You draft LinkedIn posts almost daily. Want me to add a quick command for that?") and suggests improvements to her own workflow.
 
 ---
@@ -152,7 +153,7 @@ She challenges constructively, surfaces what you might be missing, and adapts he
 
 - **Fully local.** Memory, embeddings, and cognitive tools run on your machine. No external APIs for data storage.
 - **No external actions without approval.** Every email, calendar event, and external action requires your explicit "yes." Non-negotiable, enforced at the framework level.
-- **Your data is yours.** Memories live in `~/.claudia/memory/` as SQLite databases. Context lives in readable markdown files. Delete anything, anytime.
+- **Your data is yours.** Memories live in `~/.claudia/memory/` as SQLite databases. Documents live in `~/.claudia/files/`. Context lives in readable markdown files. Delete anything, anytime.
 
 ---
 
@@ -178,7 +179,7 @@ Claude reads Claudia's template files (skills, commands, rules)
 Claude becomes Claudia: personality, proactive behaviors, safety principles
     |
     v
-Claudia calls memory tools via MCP (remember, recall, about, ingest)
+Claudia calls memory tools via MCP (remember, recall, about, file, documents, briefing)
     |
     v
 Memory daemon processes locally: SQLite + vector search + Ollama
@@ -198,6 +199,7 @@ For full technical diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 | `/morning-brief` | What needs attention today: commitments, meetings, warnings |
 | `/meeting-prep [person]` | One-page briefing before a call |
 | `/capture-meeting` | Process notes into decisions, commitments, action items |
+| `/memory-audit` | See everything Claudia knows, with source chains |
 | `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
 | `/weekly-review` | Guided reflection across relationships and projects |
 | `/accountability-check` | Outstanding commitments and waiting-on items |
@@ -220,13 +222,19 @@ For full technical diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Claudia's memory goes beyond chat history. She stores facts, preferences, commitments, and observations in a local SQLite database with 384-dimensional vector embeddings (via [Ollama](https://ollama.com) and the all-minilm:l6-v2 model).
 
-**Semantic search** uses a 60/30/10 scoring formula: 60% vector similarity, 30% importance weighting, 10% recency. Accessing a memory boosts it (rehearsal effect), so frequently referenced facts stay prominent.
+**Semantic search** uses hybrid ranking: 50% vector similarity, 25% importance, 10% recency, and 15% full-text search. Accessing a memory boosts it (rehearsal effect), so frequently referenced facts stay prominent.
+
+**Document storage** keeps files, transcripts, and emails on disk and linked to people and memories. Each document has a lifecycle (active, dormant, archived) managed automatically. Files are deduplicated by content hash.
+
+**Provenance chains** trace any fact back to the email, transcript, or conversation it came from. Run `/memory-audit [person]` to see every memory with its source chain.
+
+**Graph traversal** connects the dots across your network. Ask about one person, and Claudia shows related entities with their top memories, using graph walks across the relationship table.
+
+**Compact briefing** keeps session startup lightweight (~500 tokens) with counts and highlights instead of dumping full context. Full data is pulled on demand during conversation.
 
 **Per-project isolation** keeps work memories separate from personal projects. Each workspace gets its own database, keyed by folder path hash.
 
 **Session narratives** capture tone, emotional context, and unresolved threads, so Claudia understands not just what happened but how the conversation felt.
-
-**Source provenance** traces any fact back to the email, transcript, or conversation it came from.
 
 **Eight built-in skills** activate automatically based on context:
 
