@@ -2,6 +2,28 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.12.0 (2026-02-02)
+
+### The Intelligence Upgrade
+
+Smarter folder structure. Relationship history. Better recall scoring. Overnight LLM processing.
+
+### Added
+
+- **Entity-aware document folders** -- Documents linked to known entities now route to `people/`, `clients/`, or `projects/` folders by entity type and canonical name. Unlinked files fall back to `general/`. Deterministic path construction from entity metadata.
+- **Bi-temporal relationships** -- Relationships gain `valid_at` and `invalid_at` columns (schema v8). `supersedes=True` on `memory.relate` invalidates the old relationship instead of deleting it. `memory.about` filters to current relationships by default; `include_historical=True` shows the full timeline.
+- **Reciprocal Rank Fusion (RRF)** -- Replaces fixed weighted-sum scoring with rank-based fusion across 5 independent signals: vector similarity, FTS5, importance, recency, and graph proximity. Eliminates scale sensitivity between signals. Configurable via `rrf_k` and `enable_rrf`.
+- **Graph proximity scoring** -- Memories linked to entities mentioned in the query get a recall boost: 1.0 for direct entity matches, 0.7 for one-hop graph neighbors, 0.4 for two-hop. Uses existing `_expand_graph()` recursive CTE.
+- **Sleep-time LLM consolidation** -- Optional daily 3:30 AM job rewrites high-importance memories for clarity (preserving originals in metadata) and generates richer predictions using the local Ollama model. Gracefully skips when no LLM is available.
+
+### Changed
+
+- **`_build_relative_path()`** now prefixes unlinked files with `general/` to avoid collisions with entity folders. Existing files are unaffected (paths stored in DB are absolute).
+- **`_expand_graph()`** now includes entity `id` in returned dicts for downstream use by graph proximity scoring.
+- **5 new config fields**: `rrf_k`, `enable_rrf`, `graph_proximity_enabled`, `llm_consolidation_batch_size`, `enable_llm_consolidation`.
+
+---
+
 ## 1.11.0 (2026-02-02)
 
 ### The Provenance Release
