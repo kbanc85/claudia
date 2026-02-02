@@ -49,13 +49,33 @@ User provides one of:
 - Main themes discussed
 - Important context shared
 
-### 3. Organize
+### 3. Store Transcript & Link Provenance
+
+If the user provided a full transcript or substantial meeting notes:
+
+```
+Call memory.file with:
+├── content: The raw transcript/notes text
+├── filename: YYYY-MM-DD-[person]-[topic].md
+├── source_type: "transcript"
+├── summary: Brief 1-line summary of the meeting
+├── about: [list of participant entity names]
+```
+
+After extracting memories (facts, commitments) via memory.batch or memory.remember:
+```
+Call memory.file again with memory_ids=[...] to link the stored transcript
+to the memories extracted from it. This creates the provenance chain:
+memory -> document -> file on disk.
+```
+
+### 4. Organize
 
 - Save notes to appropriate location
 - Update person files with new context
 - Link commitments and waiting items
 
-### 4. Synthesize
+### 5. Synthesize
 
 Create a summary that captures:
 - What happened (brief)

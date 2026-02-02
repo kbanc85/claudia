@@ -35,6 +35,7 @@ from ..services.recall import (
     trace_memory,
 )
 from ..services.ingest import get_ingest_service
+from ..services.documents import get_document_service
 from ..services.remember import (
     buffer_turn,
     end_session,
@@ -612,6 +613,113 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.briefing",
+            description=(
+                "Compact session briefing (~500 tokens). Returns aggregate counts and highlights: "
+                "active commitments, cooling relationships, unread messages, top prediction, "
+                "recent activity. Call at session start instead of loading full context. "
+                "Use memory.recall or memory.about to drill into specifics during conversation."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="memory.file",
+            description=(
+                "Store a document (transcript, email, file) with entity and memory links. "
+                "The file is saved to managed storage on disk and registered in the database "
+                "with provenance links. Deduplicates by file hash. Use this when the user "
+                "shares a document, transcript, or email that should be preserved."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Raw text content of the document",
+                    },
+                    "filename": {
+                        "type": "string",
+                        "description": "Display filename (e.g., '2026-02-01-meeting-sarah.md')",
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["gmail", "transcript", "upload", "capture", "session"],
+                        "description": "Type of source document",
+                        "default": "capture",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief summary of the document",
+                    },
+                    "about": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Entity names this document relates to",
+                    },
+                    "memory_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Memory IDs to link as sourced from this document",
+                    },
+                    "source_ref": {
+                        "type": "string",
+                        "description": "External reference (email ID, URL, etc.)",
+                    },
+                },
+                "required": ["content", "filename"],
+            },
+        ),
+        Tool(
+            name="memory.documents",
+            description=(
+                "Search and list documents by entity, source type, or text query. "
+                "Use to find transcripts, emails, or files linked to a person or topic."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Text to search in filenames and summaries",
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Filter documents linked to this entity",
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["gmail", "transcript", "upload", "capture", "session"],
+                        "description": "Filter by document source type",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "default": 20,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.purge",
+            description=(
+                "Delete a document's file from disk while keeping its metadata as a tombstone. "
+                "Use when a user requests file deletion but you want to preserve the provenance record."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "document_id": {
+                        "type": "integer",
+                        "description": "The document ID to purge",
+                    },
+                },
+                "required": ["document_id"],
+            },
+        ),
+        Tool(
             name="cognitive.ingest",
             description=(
                 "Extract structured data from raw text using a local language model. "
@@ -1078,6 +1186,66 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 ]
             )
 
+        elif name == "memory.briefing":
+            briefing_text = _build_briefing()
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=briefing_text,
+                    )
+                ]
+            )
+
+        elif name == "memory.file":
+            doc_svc = get_document_service()
+            result = doc_svc.file_document_from_text(
+                content=arguments["content"],
+                filename=arguments["filename"],
+                source_type=arguments.get("source_type", "capture"),
+                summary=arguments.get("summary"),
+                about_entities=arguments.get("about"),
+                memory_ids=arguments.get("memory_ids"),
+                source_ref=arguments.get("source_ref"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.documents":
+            doc_svc = get_document_service()
+            results = doc_svc.search_documents(
+                query=arguments.get("query"),
+                source_type=arguments.get("source_type"),
+                entity_name=arguments.get("entity"),
+                limit=arguments.get("limit", 20),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"documents": results, "count": len(results)}),
+                    )
+                ]
+            )
+
+        elif name == "memory.purge":
+            doc_svc = get_document_service()
+            result = doc_svc.purge_document(document_id=arguments["document_id"])
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
         elif name == "memory.trace":
             result = trace_memory(memory_id=arguments["memory_id"])
             return CallToolResult(
@@ -1125,6 +1293,108 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             ],
             isError=True,
         )
+
+
+def _build_briefing() -> str:
+    """
+    Build a compact session briefing (~500 tokens).
+
+    Returns aggregate counts and one-line highlights instead of full data.
+    Designed to replace "load all markdown files at session start" with a
+    single lightweight call.
+    """
+    from datetime import datetime, timedelta
+
+    db = get_db()
+    lines = []
+    lines.append("# Session Briefing\n")
+
+    # 1. Active commitments count + stale count
+    try:
+        total_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1",
+            fetch=True,
+        )
+        total_commitments = total_row[0]["cnt"] if total_row else 0
+
+        stale_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        stale_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1 AND created_at < ?",
+            (stale_cutoff,),
+            fetch=True,
+        )
+        stale_commitments = stale_row[0]["cnt"] if stale_row else 0
+
+        if total_commitments > 0:
+            stale_note = f" ({stale_commitments} older than 7d)" if stale_commitments else ""
+            lines.append(f"**Commitments:** {total_commitments} active{stale_note}")
+    except Exception as e:
+        logger.debug(f"Briefing commitments failed: {e}")
+
+    # 2. Cooling relationships (30d+ no mention)
+    try:
+        cooling_cutoff = (datetime.utcnow() - timedelta(days=30)).isoformat()
+        cooling_row = db.execute(
+            """
+            SELECT COUNT(*) as cnt FROM entities
+            WHERE type = 'person' AND importance > 0.3
+              AND updated_at < ?
+            """,
+            (cooling_cutoff,),
+            fetch=True,
+        )
+        cooling_count = cooling_row[0]["cnt"] if cooling_row else 0
+        if cooling_count > 0:
+            lines.append(f"**Cooling relationships:** {cooling_count} people not mentioned in 30+ days")
+    except Exception as e:
+        logger.debug(f"Briefing cooling failed: {e}")
+
+    # 3. Unread gateway messages
+    try:
+        unread_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM episodes WHERE source IN ('telegram', 'slack') AND ingested_at IS NULL",
+            fetch=True,
+        )
+        unread_count = unread_row[0]["cnt"] if unread_row else 0
+        if unread_count > 0:
+            lines.append(f"**Unread messages:** {unread_count} from gateway")
+    except Exception as e:
+        logger.debug(f"Briefing unread failed: {e}")
+
+    # 4. Top prediction (1 line)
+    try:
+        pred_row = db.execute(
+            """
+            SELECT content, prediction_type FROM predictions
+            WHERE expires_at > datetime('now') AND is_shown = 0
+            ORDER BY priority DESC
+            LIMIT 1
+            """,
+            fetch=True,
+        )
+        if pred_row:
+            p = pred_row[0]
+            lines.append(f"**Top prediction:** [{p['prediction_type']}] {p['content'][:100]}")
+    except Exception as e:
+        logger.debug(f"Briefing prediction failed: {e}")
+
+    # 5. Recent activity count (24h)
+    try:
+        recent_cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        recent_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM memories WHERE created_at > ?",
+            (recent_cutoff,),
+            fetch=True,
+        )
+        recent_count = recent_row[0]["cnt"] if recent_row else 0
+        lines.append(f"**Recent activity:** {recent_count} memories in last 24h")
+    except Exception as e:
+        logger.debug(f"Briefing recent failed: {e}")
+
+    if len(lines) <= 1:
+        lines.append("No context available yet. This appears to be a fresh workspace.")
+
+    return "\n".join(lines)
 
 
 def _build_telegram_inbox(limit: int = 10, mark_read: bool = True) -> str:

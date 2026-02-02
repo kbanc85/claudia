@@ -500,6 +500,9 @@ class RecallService:
             for row in episode_rows
         ]
 
+        # Expand graph: get connected entities via relationship traversal
+        connected = self._expand_graph(entity["id"])
+
         return {
             "entity": {
                 "id": entity["id"],
@@ -510,6 +513,7 @@ class RecallService:
             },
             "memories": memories,
             "relationships": relationships,
+            "connected": connected,
             "recent_sessions": recent_sessions,
         }
 
@@ -810,7 +814,7 @@ class RecallService:
             except (ValueError, TypeError):
                 pass  # source_id wasn't a numeric episode ID
 
-        # 4. Check for source material file on disk
+        # 4. Check for source material file on disk (legacy path)
         sources_dir = self.db.db_path.parent / "sources"
         source_file = sources_dir / f"{memory_id}.md"
         if source_file.exists():
@@ -830,7 +834,135 @@ class RecallService:
             except Exception:
                 result["source_file_preview"] = "(could not read file)"
 
+        # 5. Check for linked documents via memory_sources (provenance)
+        try:
+            doc_rows = self.db.execute(
+                """
+                SELECT d.id, d.filename, d.source_type, d.summary,
+                       d.storage_path, d.created_at, ms.excerpt
+                FROM documents d
+                JOIN memory_sources ms ON d.id = ms.document_id
+                WHERE ms.memory_id = ?
+                ORDER BY d.created_at DESC
+                """,
+                (memory_id,),
+                fetch=True,
+            ) or []
+            if doc_rows:
+                result["documents"] = [
+                    {
+                        "id": row["id"],
+                        "filename": row["filename"],
+                        "source_type": row["source_type"],
+                        "summary": row["summary"],
+                        "excerpt": row["excerpt"],
+                        "storage_path": row["storage_path"],
+                        "created_at": row["created_at"],
+                    }
+                    for row in doc_rows
+                ]
+        except Exception as e:
+            # Graceful degradation if documents table doesn't exist yet
+            logger.debug(f"Could not fetch document provenance: {e}")
+
         return result
+
+    def _expand_graph(
+        self,
+        entity_id: int,
+        depth: int = 1,
+        limit_per_hop: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """
+        Traverse the relationship graph from an entity using recursive CTEs.
+
+        Returns connected entities (1 hop by default) with their top memories.
+        Prevents cycles and prunes weak relationships (importance < 0.1).
+
+        Args:
+            entity_id: Starting entity ID
+            depth: Maximum hops (default 1)
+            limit_per_hop: Max connected entities per hop
+
+        Returns:
+            List of dicts with entity info and top memories
+        """
+        try:
+            # Use recursive CTE to find connected entities
+            rows = self.db.execute(
+                """
+                WITH RECURSIVE graph(entity_id, hop) AS (
+                    -- Seed: direct neighbors
+                    SELECT CASE
+                        WHEN r.source_entity_id = ? THEN r.target_entity_id
+                        ELSE r.source_entity_id
+                    END, 1
+                    FROM relationships r
+                    WHERE (r.source_entity_id = ? OR r.target_entity_id = ?)
+                      AND r.strength > 0.1
+
+                    UNION
+
+                    -- Recurse: neighbors of neighbors (up to depth)
+                    SELECT CASE
+                        WHEN r.source_entity_id = g.entity_id THEN r.target_entity_id
+                        ELSE r.source_entity_id
+                    END, g.hop + 1
+                    FROM relationships r
+                    JOIN graph g ON (r.source_entity_id = g.entity_id OR r.target_entity_id = g.entity_id)
+                    WHERE g.hop < ?
+                      AND r.strength > 0.1
+                      AND CASE
+                          WHEN r.source_entity_id = g.entity_id THEN r.target_entity_id
+                          ELSE r.source_entity_id
+                      END != ?
+                )
+                SELECT DISTINCT e.id, e.name, e.type, e.description, e.importance,
+                       MIN(g.hop) as distance
+                FROM graph g
+                JOIN entities e ON g.entity_id = e.id
+                WHERE e.id != ? AND e.importance > 0.1
+                GROUP BY e.id
+                ORDER BY distance ASC, e.importance DESC
+                LIMIT ?
+                """,
+                (entity_id, entity_id, entity_id, depth, entity_id, entity_id, limit_per_hop * depth),
+                fetch=True,
+            ) or []
+
+            connected = []
+            for row in rows:
+                # Fetch top 2 memories for each connected entity
+                mem_rows = self.db.execute(
+                    """
+                    SELECT m.content, m.type, m.importance
+                    FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ?
+                    ORDER BY m.importance DESC
+                    LIMIT 2
+                    """,
+                    (row["id"],),
+                    fetch=True,
+                ) or []
+
+                connected.append({
+                    "name": row["name"],
+                    "type": row["type"],
+                    "description": row["description"],
+                    "importance": row["importance"],
+                    "distance": row["distance"],
+                    "top_memories": [
+                        {"content": m["content"], "type": m["type"]}
+                        for m in mem_rows
+                    ],
+                })
+
+            return connected
+
+        except Exception as e:
+            logger.debug(f"Graph traversal failed: {e}")
+            return []
 
     def _keyword_search(
         self,

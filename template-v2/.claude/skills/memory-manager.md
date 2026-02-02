@@ -192,10 +192,14 @@ This handles the case where the user closed the terminal, lost connection, or si
 
 ```
 1. Read context/me.md (for greeting personalization, name, archetype)
-2. Call memory.predictions (surfaces overdue items, cooling relationships, patterns)
+2. Call memory.briefing (compact counts + highlights: commitments, cooling, unread, predictions, activity)
 ```
 
+The briefing returns ~500 tokens of aggregate context. Use it to inform the greeting and surface urgent items. Pull full context on-demand via `memory.recall` / `memory.about` during conversation.
+
 Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
+
+**Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.predictions`.
 
 ### 1b. Check Telegram Inbox
 

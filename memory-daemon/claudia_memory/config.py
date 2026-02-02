@@ -48,6 +48,11 @@ class MemoryConfig:
     verify_interval_minutes: int = 60  # How often to run background verification
     verify_batch_size: int = 20  # Max memories to verify per run
 
+    # Document storage
+    files_base_dir: Path = field(default_factory=lambda: Path.home() / ".claudia" / "files")
+    document_dormant_days: int = 90
+    document_archive_days: int = 180
+
     # Health check
     health_port: int = 3848
 

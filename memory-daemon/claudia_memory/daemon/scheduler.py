@@ -19,6 +19,7 @@ from ..services.consolidate import (
     run_decay,
     run_full_consolidation,
 )
+from ..services.documents import get_document_service
 from ..services.verify import run_verification
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,15 @@ class MemoryScheduler:
             IntervalTrigger(minutes=self.config.verify_interval_minutes),
             id="memory_verification",
             name="Background memory verification",
+            replace_existing=True,
+        )
+
+        # Weekly Sunday at 4am: Document lifecycle maintenance
+        self.scheduler.add_job(
+            self._run_document_lifecycle,
+            CronTrigger(day_of_week="sun", hour=4, minute=0),
+            id="document_lifecycle",
+            name="Weekly document lifecycle maintenance",
             replace_existing=True,
         )
 
@@ -145,6 +155,16 @@ class MemoryScheduler:
             logger.info(f"Prediction generation complete: {len(predictions)} predictions")
         except Exception as e:
             logger.exception("Error in prediction generation")
+
+    def _run_document_lifecycle(self) -> None:
+        """Run weekly document lifecycle maintenance (active->dormant->archived)"""
+        try:
+            logger.debug("Running document lifecycle maintenance")
+            doc_svc = get_document_service()
+            result = doc_svc.run_lifecycle_maintenance()
+            logger.info(f"Document lifecycle maintenance complete: {result}")
+        except Exception as e:
+            logger.exception("Error in document lifecycle maintenance")
 
     def _run_memory_verification(self) -> None:
         """Run background memory verification"""

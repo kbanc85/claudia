@@ -241,6 +241,56 @@ CREATE VIRTUAL TABLE IF NOT EXISTS episode_embeddings USING vec0(
 );
 
 -- ============================================================================
+-- DOCUMENTS: File registry for provenance tracking
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_hash TEXT,  -- SHA-256 of file contents for deduplication
+    filename TEXT NOT NULL,
+    mime_type TEXT,
+    file_size INTEGER,
+    storage_provider TEXT DEFAULT 'local' CHECK (storage_provider IN ('local', 'google_drive')),
+    storage_path TEXT,  -- Resolved file path on disk or cloud URI
+    source_type TEXT CHECK (source_type IN ('gmail', 'transcript', 'upload', 'capture', 'session')),
+    source_ref TEXT,  -- External reference (email ID, URL, etc.)
+    summary TEXT,
+    lifecycle TEXT DEFAULT 'active' CHECK (lifecycle IN ('active', 'dormant', 'archived', 'purged')),
+    last_accessed_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    workspace_id TEXT,  -- Project hash for isolation
+    metadata TEXT  -- JSON blob
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(file_hash);
+CREATE INDEX IF NOT EXISTS idx_documents_lifecycle ON documents(lifecycle);
+CREATE INDEX IF NOT EXISTS idx_documents_source_type ON documents(source_type);
+CREATE INDEX IF NOT EXISTS idx_documents_workspace ON documents(workspace_id);
+
+-- Links documents to entities (people, projects, etc.)
+CREATE TABLE IF NOT EXISTS entity_documents (
+    entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    relationship TEXT DEFAULT 'about' CHECK (relationship IN ('sent_by', 'about', 'mentioned_in', 'authored', 'received_by')),
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (entity_id, document_id, relationship)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_documents_doc ON entity_documents(document_id);
+
+-- Links memories to source documents (provenance)
+CREATE TABLE IF NOT EXISTS memory_sources (
+    memory_id INTEGER NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    excerpt TEXT,  -- Relevant excerpt from the document
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (memory_id, document_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_sources_doc ON memory_sources(document_id);
+
+-- ============================================================================
 -- MIGRATION TRACKING
 -- ============================================================================
 
@@ -269,3 +319,6 @@ VALUES (5, 'Add verification columns to memories, prediction_pattern_name to pre
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (6, 'Add source and ingested_at to episodes, source to turn_buffer for gateway integration');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (7, 'Add documents, entity_documents, memory_sources tables for provenance tracking');

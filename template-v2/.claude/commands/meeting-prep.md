@@ -21,6 +21,14 @@ From `people/[person].md`:
 - Waiting items
 
 ### 3. Recent Context
+
+Query for documents linked to this person:
+```
+Call memory.documents with entity=[person name]
+```
+This returns recent transcripts, emails, and files involving the person. Include the most relevant (up to 3) in the briefing with their summaries.
+
+Also check:
 - Last meeting notes (if any)
 - Recent email threads (if available)
 - Any project/client context

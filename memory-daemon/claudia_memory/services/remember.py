@@ -669,6 +669,10 @@ class RememberService:
         ~/.claudia/memory/sources/{memory_id}.md. The directory is created
         lazily on first write.
 
+        Also registers the file in the documents table and creates a
+        memory_sources link for provenance tracking (if the documents table
+        exists in this database version).
+
         Args:
             memory_id: The memory this source material belongs to
             content: Full raw text of the source material
@@ -699,11 +703,64 @@ class RememberService:
 
             file_path.write_text(file_content, encoding="utf-8")
             logger.debug(f"Saved source material for memory {memory_id} to {file_path}")
+
+            # Register in documents table for provenance (graceful if table doesn't exist)
+            self._register_document_provenance(memory_id, content, file_path, metadata)
+
             return file_path
 
         except Exception as e:
             logger.warning(f"Could not save source material for memory {memory_id}: {e}")
             return None
+
+    def _register_document_provenance(
+        self,
+        memory_id: int,
+        content: str,
+        file_path: Path,
+        metadata: Optional[Dict] = None,
+    ) -> None:
+        """Register a source material file in the documents table and link to memory."""
+        try:
+            import hashlib
+
+            file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            source_type = (metadata or {}).get("source", "session")
+            source_context = (metadata or {}).get("source_context")
+
+            doc_id = self.db.insert(
+                "documents",
+                {
+                    "file_hash": file_hash,
+                    "filename": file_path.name,
+                    "mime_type": "text/markdown",
+                    "file_size": len(content.encode("utf-8")),
+                    "storage_provider": "local",
+                    "storage_path": str(file_path),
+                    "source_type": source_type if source_type in (
+                        "gmail", "transcript", "upload", "capture", "session"
+                    ) else "session",
+                    "source_ref": source_context,
+                    "lifecycle": "active",
+                    "last_accessed_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+            )
+
+            # Create provenance link
+            self.db.insert(
+                "memory_sources",
+                {
+                    "memory_id": memory_id,
+                    "document_id": doc_id,
+                    "created_at": datetime.utcnow().isoformat(),
+                },
+            )
+            logger.debug(f"Registered document {doc_id} for memory {memory_id}")
+        except Exception as e:
+            # Graceful degradation: documents table may not exist on older schemas
+            logger.debug(f"Could not register document provenance: {e}")
 
     def _ensure_entity(self, extracted: ExtractedEntity) -> Optional[int]:
         """Ensure an extracted entity exists in the database"""

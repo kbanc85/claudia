@@ -27,6 +27,8 @@ const colors = {
   white: '\x1b[97m',
   dim: '\x1b[2m',
   bold: '\x1b[1m',
+  boldYellow: '\x1b[1;33m',
+  boldCyan: '\x1b[1;36m',
 };
 
 // Pixel art banner - "CLAUDIA" text + portrait (double-width for square pixels)
@@ -128,6 +130,9 @@ async function main() {
       process.exit(1);
     }
   }
+
+  // Show what's new in this release
+  showWhatsNew(isUpgrade);
 
   // Interactive setup prompts
   const rl = createInterface({
@@ -315,6 +320,41 @@ ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
 `);
     }
   }
+}
+
+function showWhatsNew(isUpgrade) {
+  const c = colors.cyan;
+  const y = colors.yellow;
+  const d = colors.dim;
+  const by = colors.boldYellow;
+  const bc = colors.boldCyan;
+  const r = colors.reset;
+
+  const header = isUpgrade ? `${by}What's New${r}` : `${by}What You're Getting${r}`;
+  const line = `${y}${'─'.repeat(48)}${r}`;
+
+  console.log(`
+${line}
+  ${header}
+${line}
+
+  ${bc}Document Storage${r}   ${d}Files, transcripts, and emails are stored${r}
+                      ${d}and linked to people and memories.${r}
+
+  ${bc}Provenance${r}         ${d}Every fact traces back to its source.${r}
+                      ${d}Ask "how do you know that?" and Claudia shows her work.${r}
+
+  ${bc}Graph Traversal${r}    ${d}Ask about a person, see their connected${r}
+                      ${d}network of people and projects.${r}
+
+  ${bc}Smart Briefing${r}     ${d}Session startup is now ~500 tokens, not${r}
+                      ${d}thousands. Full context pulled on demand.${r}
+
+  ${bc}/memory-audit${r}      ${d}New command. See everything Claudia knows${r}
+                      ${d}about a person, with source chains.${r}
+
+${line}
+`);
 }
 
 main();

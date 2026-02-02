@@ -373,6 +373,108 @@ class Database:
             conn.commit()
             logger.info("Applied migration 6: gateway source tracking and inbox")
 
+        if current_version < 7:
+            # Migration 7: Document storage and provenance tracking
+            migration_stmts = [
+                """CREATE TABLE IF NOT EXISTS documents (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    file_hash TEXT,
+                    filename TEXT NOT NULL,
+                    mime_type TEXT,
+                    file_size INTEGER,
+                    storage_provider TEXT DEFAULT 'local',
+                    storage_path TEXT,
+                    source_type TEXT,
+                    source_ref TEXT,
+                    summary TEXT,
+                    lifecycle TEXT DEFAULT 'active',
+                    last_accessed_at TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now')),
+                    workspace_id TEXT,
+                    metadata TEXT
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(file_hash)",
+                "CREATE INDEX IF NOT EXISTS idx_documents_lifecycle ON documents(lifecycle)",
+                "CREATE INDEX IF NOT EXISTS idx_documents_source_type ON documents(source_type)",
+                "CREATE INDEX IF NOT EXISTS idx_documents_workspace ON documents(workspace_id)",
+                """CREATE TABLE IF NOT EXISTS entity_documents (
+                    entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+                    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                    relationship TEXT DEFAULT 'about',
+                    created_at TEXT DEFAULT (datetime('now')),
+                    PRIMARY KEY (entity_id, document_id, relationship)
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_entity_documents_doc ON entity_documents(document_id)",
+                """CREATE TABLE IF NOT EXISTS memory_sources (
+                    memory_id INTEGER NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+                    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                    excerpt TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    PRIMARY KEY (memory_id, document_id)
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_memory_sources_doc ON memory_sources(document_id)",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "already exists" not in str(e).lower():
+                        logger.warning(f"Migration 7 statement failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (7, 'Add documents, entity_documents, memory_sources tables for provenance tracking')"
+            )
+            conn.commit()
+            logger.info("Applied migration 7: document storage and provenance")
+
+        # FTS5 setup: ensure memories_fts exists regardless of migration path.
+        # The FTS5 virtual table + triggers contain internal semicolons that the
+        # schema.sql line-based parser can't handle, so we always check here.
+        try:
+            check = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='memories_fts'"
+            ).fetchone()
+            if not check:
+                conn.execute("""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+                        content,
+                        content='memories',
+                        content_rowid='id',
+                        tokenize='porter unicode61'
+                    )
+                """)
+                conn.execute("""
+                    CREATE TRIGGER IF NOT EXISTS memories_fts_insert AFTER INSERT ON memories BEGIN
+                        INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
+                    END
+                """)
+                conn.execute("""
+                    CREATE TRIGGER IF NOT EXISTS memories_fts_delete AFTER DELETE ON memories BEGIN
+                        INSERT INTO memories_fts(memories_fts, rowid, content) VALUES ('delete', old.id, old.content);
+                    END
+                """)
+                conn.execute("""
+                    CREATE TRIGGER IF NOT EXISTS memories_fts_update AFTER UPDATE OF content ON memories BEGIN
+                        INSERT INTO memories_fts(memories_fts, rowid, content) VALUES ('delete', old.id, old.content);
+                        INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
+                    END
+                """)
+                # Backfill existing memories
+                conn.execute(
+                    "INSERT INTO memories_fts(rowid, content) SELECT id, content FROM memories"
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (4, 'FTS5 full-text search with auto-sync triggers')"
+                )
+                conn.commit()
+                logger.info("Created FTS5 table and triggers for full-text search")
+        except sqlite3.OperationalError as e:
+            if "fts5" in str(e).lower():
+                logger.warning(f"FTS5 not available in this SQLite build: {e}")
+            else:
+                logger.warning(f"FTS5 setup failed: {e}")
+
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
     ) -> Optional[List[sqlite3.Row]]:

@@ -1,5 +1,6 @@
 """Tests for FTS5 hybrid search functionality"""
 
+import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -7,6 +8,24 @@ from unittest.mock import patch
 import pytest
 
 from claudia_memory.database import Database, content_hash
+
+
+def _fts5_available() -> bool:
+    """Check if FTS5 module is available in this SQLite build."""
+    try:
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE VIRTUAL TABLE _fts5_test USING fts5(content)")
+        conn.execute("DROP TABLE _fts5_test")
+        conn.close()
+        return True
+    except sqlite3.OperationalError:
+        return False
+
+
+requires_fts5 = pytest.mark.skipif(
+    not _fts5_available(),
+    reason="FTS5 module not available in this SQLite build",
+)
 
 
 def _make_db():
@@ -31,6 +50,7 @@ def _insert_memory(db, content, memory_type="fact", importance=1.0):
     )
 
 
+@requires_fts5
 def test_fts5_table_created_on_migration():
     """Fresh DB should have the memories_fts table after initialization."""
     db, _ = _make_db()
@@ -52,6 +72,7 @@ def test_fts5_table_created_on_migration():
         db.close()
 
 
+@requires_fts5
 def test_fts5_auto_sync_insert():
     """Inserting a memory should make it findable via FTS5 MATCH."""
     db, _ = _make_db()
@@ -67,6 +88,7 @@ def test_fts5_auto_sync_insert():
         db.close()
 
 
+@requires_fts5
 def test_fts5_auto_sync_delete():
     """Deleting a memory should remove it from the FTS5 index."""
     db, _ = _make_db()
@@ -93,6 +115,7 @@ def test_fts5_auto_sync_delete():
         db.close()
 
 
+@requires_fts5
 def test_fts5_stemming():
     """Porter stemmer should match 'run' to 'running'."""
     db, _ = _make_db()
@@ -108,6 +131,7 @@ def test_fts5_stemming():
         db.close()
 
 
+@requires_fts5
 def test_fts5_multiple_results_ranking():
     """Multiple FTS results should be ranked by BM25 relevance."""
     db, _ = _make_db()
@@ -132,6 +156,7 @@ def test_fts5_multiple_results_ranking():
         db.close()
 
 
+@requires_fts5
 def test_fts5_backfill_on_migration():
     """Memories inserted before FTS5 migration should be backfilled."""
     db, _ = _make_db()
@@ -149,6 +174,7 @@ def test_fts5_backfill_on_migration():
         db.close()
 
 
+@requires_fts5
 def test_fts5_update_sync():
     """Updating a memory's content should update the FTS5 index."""
     db, _ = _make_db()
