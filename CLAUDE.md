@@ -15,6 +15,7 @@ This repository contains:
 - `bin/index.js` - NPM installer CLI that bootstraps new Claudia instances
 - `template-v2/` - Current template with minimal seed files (recommended)
 - `memory-daemon/` - Python memory system with SQLite database, vector search, and background services
+- `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package)
 - `template/` - Legacy template with pre-built examples
 - `assets/` - Banner art and demo assets
 
@@ -280,6 +281,8 @@ claudia/
 │   ├── tests/               ← Pytest suite (asyncio_mode = auto)
 │   ├── test.sh              ← One-click test runner (unit + integration + daemon)
 │   └── pyproject.toml       ← Python config (requires Python 3.10+)
+├── openclaw-skills/           ← Standalone skills for OpenClaw (not in npm package)
+│   └── claudia-agent-rms/    ← Relationship management for Moltbook agents
 └── template/                 ← Legacy template (deprecated)
 ```
 
