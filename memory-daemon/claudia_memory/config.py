@@ -48,6 +48,15 @@ class MemoryConfig:
     verify_interval_minutes: int = 60  # How often to run background verification
     verify_batch_size: int = 20  # Max memories to verify per run
 
+    # RRF (Reciprocal Rank Fusion) scoring
+    rrf_k: int = 60  # Smoothing parameter for RRF formula (1/(k+rank))
+    enable_rrf: bool = True  # When False, use legacy weighted-sum scoring
+    graph_proximity_enabled: bool = True  # Include graph proximity as a ranking signal
+
+    # LLM consolidation (sleep-time processing)
+    llm_consolidation_batch_size: int = 10  # Memories to LLM-improve per run
+    enable_llm_consolidation: bool = True  # Enable LLM-powered overnight consolidation
+
     # Document storage
     files_base_dir: Path = field(default_factory=lambda: Path.home() / ".claudia" / "files")
     document_dormant_days: int = 90

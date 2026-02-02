@@ -155,6 +155,11 @@ async def list_tools() -> ListToolsResult:
                         "description": "Maximum number of memories to return",
                         "default": 20,
                     },
+                    "include_historical": {
+                        "type": "boolean",
+                        "description": "Include superseded/historical relationships (shows valid_at/invalid_at timestamps)",
+                        "default": False,
+                    },
                 },
                 "required": ["entity"],
             },
@@ -181,6 +186,15 @@ async def list_tools() -> ListToolsResult:
                         "type": "number",
                         "description": "Relationship strength from 0.0 to 1.0",
                         "default": 1.0,
+                    },
+                    "valid_at": {
+                        "type": "string",
+                        "description": "When this relationship became true (ISO date string). Defaults to now.",
+                    },
+                    "supersedes": {
+                        "type": "boolean",
+                        "description": "If true, invalidate existing relationship of same type between same entities and create new one",
+                        "default": False,
                     },
                 },
                 "required": ["source", "target", "relationship"],
@@ -896,6 +910,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             result = recall_about(
                 entity_name=arguments["entity"],
                 limit=arguments.get("limit", 20),
+                include_historical=arguments.get("include_historical", False),
             )
 
             # Convert RecallResult objects to dicts
@@ -929,6 +944,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 target=arguments["target"],
                 relationship=arguments["relationship"],
                 strength=arguments.get("strength", 1.0),
+                valid_at=arguments.get("valid_at"),
+                supersedes=arguments.get("supersedes", False),
             )
             return CallToolResult(
                 content=[

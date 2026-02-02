@@ -106,12 +106,15 @@ class LocalFileStore(FileStore):
 def _build_relative_path(source_type: str, filename: str) -> str:
     """Build a date-partitioned relative path for a file.
 
+    Unlinked documents go under general/ so they don't collide with
+    entity-aware folders (people/, clients/, projects/).
+
     Examples:
-        transcript -> transcripts/2026-02-02-filename.md
-        gmail      -> emails/2026/02/filename.eml
-        upload     -> documents/2026/02/filename.pdf
-        capture    -> documents/2026/02/filename
-        session    -> documents/2026/02/filename
+        transcript -> general/transcripts/2026-02-02-filename.md
+        gmail      -> general/emails/2026/02/filename.eml
+        upload     -> general/documents/2026/02/filename.pdf
+        capture    -> general/documents/2026/02/filename
+        session    -> general/documents/2026/02/filename
     """
     now = datetime.utcnow()
     year = now.strftime("%Y")
@@ -119,11 +122,51 @@ def _build_relative_path(source_type: str, filename: str) -> str:
     date_prefix = now.strftime("%Y-%m-%d")
 
     if source_type == "transcript":
-        return f"transcripts/{date_prefix}-{filename}"
+        return f"general/transcripts/{date_prefix}-{filename}"
     elif source_type == "gmail":
-        return f"emails/{year}/{month}/{filename}"
+        return f"general/emails/{year}/{month}/{filename}"
     else:
-        return f"documents/{year}/{month}/{filename}"
+        return f"general/documents/{year}/{month}/{filename}"
+
+
+# Mapping from entity type to top-level folder name
+_ENTITY_TYPE_FOLDERS = {
+    "person": "people",
+    "organization": "clients",
+    "project": "projects",
+}
+
+
+def _build_entity_path(
+    entity_type: str,
+    entity_canonical_name: str,
+    source_type: str,
+    filename: str,
+) -> str:
+    """Build an entity-aware relative path for a file.
+
+    Routes documents into entity-specific folders based on entity type
+    and canonical name.
+
+    Examples:
+        person/sarah-chen + transcript -> people/sarah-chen/transcripts/2026-02-02-filename.md
+        organization/acme-corp + gmail -> clients/acme-corp/emails/2026-02-filename.eml
+        project/website-redesign + upload -> projects/website-redesign/documents/2026-02-filename.pdf
+    """
+    top = _ENTITY_TYPE_FOLDERS.get(entity_type, "general")
+    now = datetime.utcnow()
+    date_prefix = now.strftime("%Y-%m-%d")
+    month_prefix = now.strftime("%Y-%m")
+
+    # Sanitize canonical name for filesystem use (replace spaces with hyphens)
+    safe_name = entity_canonical_name.replace(" ", "-").lower()
+
+    if source_type == "transcript":
+        return f"{top}/{safe_name}/transcripts/{date_prefix}-{filename}"
+    elif source_type == "gmail":
+        return f"{top}/{safe_name}/emails/{month_prefix}-{filename}"
+    else:
+        return f"{top}/{safe_name}/documents/{month_prefix}-{filename}"
 
 
 # Global instance

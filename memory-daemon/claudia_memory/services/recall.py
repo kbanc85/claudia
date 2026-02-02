@@ -172,14 +172,77 @@ class RecallService:
 
         # --- Score and build results ---
         now = datetime.utcnow()
-        results = []
-        for mid in all_ids:
-            row = vector_rows.get(mid)
-            if not row:
-                continue
-            vs = vector_scores.get(mid, 0.0)
-            fs = fts_scores.get(mid, 0.0)
-            results.append(self._row_to_result(row, vs, fs, now))
+
+        if self.config.enable_rrf and len(all_ids) > 0:
+            # Build independent rankings for RRF
+            signal_rankings: Dict[str, List[int]] = {}
+
+            # Vector ranking (sorted by vector score, best first)
+            if vector_scores:
+                signal_rankings["vector"] = sorted(
+                    vector_scores.keys(), key=lambda mid: vector_scores[mid], reverse=True
+                )
+
+            # FTS ranking (sorted by FTS score, best first)
+            if fts_scores:
+                signal_rankings["fts"] = sorted(
+                    fts_scores.keys(), key=lambda mid: fts_scores[mid], reverse=True
+                )
+
+            # Importance ranking (sorted by importance, best first)
+            importance_data = {}
+            for mid in all_ids:
+                row = vector_rows.get(mid)
+                if row:
+                    importance_data[mid] = row["importance"]
+            if importance_data:
+                signal_rankings["importance"] = sorted(
+                    importance_data.keys(), key=lambda mid: importance_data[mid], reverse=True
+                )
+
+            # Recency ranking (sorted by created_at, newest first)
+            recency_data = {}
+            for mid in all_ids:
+                row = vector_rows.get(mid)
+                if row:
+                    try:
+                        created = datetime.fromisoformat(row["created_at"])
+                        recency_data[mid] = (now - created).total_seconds()
+                    except (ValueError, TypeError):
+                        recency_data[mid] = float("inf")
+            if recency_data:
+                signal_rankings["recency"] = sorted(
+                    recency_data.keys(), key=lambda mid: recency_data[mid]  # smallest age = most recent = best
+                )
+
+            # Graph proximity ranking
+            graph_scores = self._compute_graph_scores(query, all_ids)
+            if graph_scores:
+                signal_rankings["graph"] = sorted(
+                    graph_scores.keys(), key=lambda mid: graph_scores[mid], reverse=True
+                )
+
+            # Fuse via RRF
+            rrf_scores = self._rrf_score(all_ids, signal_rankings, k=self.config.rrf_k)
+
+            results = []
+            for mid in all_ids:
+                row = vector_rows.get(mid)
+                if not row:
+                    continue
+                result = self._row_to_result(row, vector_scores.get(mid, 0.0), fts_scores.get(mid, 0.0), now)
+                result.score = rrf_scores.get(mid, 0.0)
+                results.append(result)
+        else:
+            # Legacy weighted-sum scoring
+            results = []
+            for mid in all_ids:
+                row = vector_rows.get(mid)
+                if not row:
+                    continue
+                vs = vector_scores.get(mid, 0.0)
+                fs = fts_scores.get(mid, 0.0)
+                results.append(self._row_to_result(row, vs, fs, now))
 
         # Sort by combined score and limit
         results.sort(key=lambda r: r.score, reverse=True)
@@ -262,6 +325,147 @@ class RecallService:
             source_id=source_id_val,
             source_context=source_context_val,
         )
+
+    def _rrf_score(
+        self,
+        memory_ids: set,
+        signal_rankings: Dict[str, List[int]],
+        k: int = 60,
+    ) -> Dict[int, float]:
+        """
+        Reciprocal Rank Fusion across multiple ranking signals.
+
+        RRF_score(d) = sum(1 / (k + rank_i(d))) for each signal i
+
+        Args:
+            memory_ids: All candidate memory IDs
+            signal_rankings: Dict of signal_name -> list of memory IDs sorted best-first
+            k: Smoothing constant (default 60)
+
+        Returns:
+            Dict mapping memory_id -> RRF score
+        """
+        scores = {mid: 0.0 for mid in memory_ids}
+        for signal_name, ranked_ids in signal_rankings.items():
+            for rank, mid in enumerate(ranked_ids, start=1):
+                if mid in scores:
+                    scores[mid] += 1.0 / (k + rank)
+        return scores
+
+    def _resolve_entities_from_text(self, text: str) -> List[int]:
+        """
+        Match entity names in query text against known entities.
+
+        Uses n-gram matching against canonical entity names and aliases.
+
+        Returns:
+            List of entity IDs found in the text
+        """
+        if not text or len(text.strip()) < 2:
+            return []
+
+        text_lower = text.lower()
+        entity_ids = []
+
+        # Try canonical name matching
+        try:
+            entities = self.db.execute(
+                "SELECT id, canonical_name FROM entities WHERE importance > 0.05",
+                fetch=True,
+            ) or []
+
+            for entity in entities:
+                canonical = entity["canonical_name"]
+                if canonical and canonical in text_lower:
+                    entity_ids.append(entity["id"])
+
+            # Also check aliases
+            if not entity_ids:
+                aliases = self.db.execute(
+                    "SELECT entity_id, canonical_alias FROM entity_aliases",
+                    fetch=True,
+                ) or []
+                for alias in aliases:
+                    if alias["canonical_alias"] and alias["canonical_alias"] in text_lower:
+                        entity_ids.append(alias["entity_id"])
+
+        except Exception as e:
+            logger.debug(f"Entity resolution from text failed: {e}")
+
+        return list(set(entity_ids))
+
+    def _compute_graph_scores(
+        self,
+        query: str,
+        candidate_ids: set,
+    ) -> Dict[int, float]:
+        """
+        Compute graph proximity scores for candidate memories.
+
+        Memories linked to entities mentioned in the query get a boost.
+        Direct entity links get 1.0, 1-hop neighbors 0.7, 2-hop 0.4.
+
+        Args:
+            query: Search query text
+            candidate_ids: Set of candidate memory IDs
+
+        Returns:
+            Dict mapping memory_id -> proximity score (0-1)
+        """
+        if not self.config.graph_proximity_enabled or not candidate_ids:
+            return {}
+
+        # Find entities mentioned in the query
+        query_entity_ids = self._resolve_entities_from_text(query)
+        if not query_entity_ids:
+            return {}
+
+        scores: Dict[int, float] = {}
+
+        try:
+            # Build entity -> hop_distance mapping via graph expansion
+            entity_distances: Dict[int, int] = {}
+            for eid in query_entity_ids:
+                entity_distances[eid] = 0  # Direct mention
+
+                # Expand graph to depth 2
+                neighbors = self._expand_graph(eid, depth=2, limit_per_hop=10)
+                for neighbor in neighbors:
+                    nid = neighbor["id"]
+                    dist = neighbor.get("distance", 1)
+                    if nid not in entity_distances or dist < entity_distances[nid]:
+                        entity_distances[nid] = dist
+
+            # Score each candidate memory by its entity links
+            placeholders = ", ".join(["?" for _ in candidate_ids])
+            mem_entities = self.db.execute(
+                f"""
+                SELECT memory_id, entity_id
+                FROM memory_entities
+                WHERE memory_id IN ({placeholders})
+                """,
+                tuple(candidate_ids),
+                fetch=True,
+            ) or []
+
+            for row in mem_entities:
+                mid = row["memory_id"]
+                eid = row["entity_id"]
+                if eid in entity_distances:
+                    dist = entity_distances[eid]
+                    # Score: 1.0 direct, 0.7 one-hop, 0.4 two-hop
+                    if dist == 0:
+                        score = 1.0
+                    elif dist == 1:
+                        score = 0.7
+                    else:
+                        score = 0.4
+                    scores[mid] = max(scores.get(mid, 0.0), score)
+
+        except Exception as e:
+            logger.debug(f"Graph proximity scoring failed: {e}")
+
+        return scores
 
     def _update_access_counts(self, results: List[RecallResult], now: datetime) -> None:
         """Update access counts for rehearsal effect."""
@@ -368,6 +572,7 @@ class RecallService:
         entity_name: str,
         limit: int = None,
         memory_types: Optional[List[str]] = None,
+        include_historical: bool = False,
     ) -> Dict[str, Any]:
         """
         Get everything known about an entity.
@@ -444,7 +649,7 @@ class RecallService:
                 )
             )
 
-        # Get relationships
+        # Get relationships (default: current only; include_historical shows all)
         rel_sql = """
             SELECT r.*,
                    s.name as source_name, s.type as source_type,
@@ -452,13 +657,16 @@ class RecallService:
             FROM relationships r
             JOIN entities s ON r.source_entity_id = s.id
             JOIN entities t ON r.target_entity_id = t.id
-            WHERE r.source_entity_id = ? OR r.target_entity_id = ?
-            ORDER BY r.strength DESC
+            WHERE (r.source_entity_id = ? OR r.target_entity_id = ?)
         """
+        if not include_historical:
+            rel_sql += " AND r.invalid_at IS NULL"
+        rel_sql += " ORDER BY r.strength DESC"
         rel_rows = self.db.execute(rel_sql, (entity["id"], entity["id"]), fetch=True) or []
 
-        relationships = [
-            {
+        relationships = []
+        for row in rel_rows:
+            rel_dict = {
                 "type": row["relationship_type"],
                 "direction": row["direction"],
                 "strength": row["strength"],
@@ -473,8 +681,12 @@ class RecallService:
                     else row["source_type"]
                 ),
             }
-            for row in rel_rows
-        ]
+            # Include temporal fields when showing historical data
+            if include_historical:
+                row_keys = row.keys()
+                rel_dict["valid_at"] = row["valid_at"] if "valid_at" in row_keys else None
+                rel_dict["invalid_at"] = row["invalid_at"] if "invalid_at" in row_keys else None
+            relationships.append(rel_dict)
 
         # Get relevant episode narratives mentioning this entity
         episode_rows = self.db.execute(
@@ -947,6 +1159,7 @@ class RecallService:
                 ) or []
 
                 connected.append({
+                    "id": row["id"],
                     "name": row["name"],
                     "type": row["type"],
                     "description": row["description"],

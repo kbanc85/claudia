@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from ..config import get_config
 from ..database import get_db
 from ..extraction.entity_extractor import get_extractor
-from .filestore import LocalFileStore, _build_relative_path, get_file_store
+from .filestore import LocalFileStore, _build_entity_path, _build_relative_path, get_file_store
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +106,26 @@ class DocumentService:
         # Detect mime type
         mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
 
+        # Resolve primary entity for path routing (if any)
+        entity_path_info = None
+        if about_entities:
+            canonical = self.extractor.canonical_name(about_entities[0])
+            entity_row = self.db.get_one(
+                "entities",
+                where="canonical_name = ?",
+                where_params=(canonical,),
+            )
+            if entity_row:
+                entity_path_info = (entity_row["type"], entity_row["canonical_name"])
+
         # Store file on disk
         store = self._get_store()
-        relative_path = _build_relative_path(source_type, filename)
+        if entity_path_info:
+            relative_path = _build_entity_path(
+                entity_path_info[0], entity_path_info[1], source_type, filename
+            )
+        else:
+            relative_path = _build_relative_path(source_type, filename)
         storage_path = store.store(raw, relative_path)
 
         # Insert DB row

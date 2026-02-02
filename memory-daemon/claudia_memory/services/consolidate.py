@@ -761,6 +761,190 @@ class ConsolidateService:
 
         logger.debug(f"Merged memory {duplicate_id} into {primary_id}")
 
+    def run_llm_consolidation(self) -> Dict[str, Any]:
+        """
+        Run LLM-powered memory consolidation (sleep-time processing).
+
+        Uses the local language model to:
+        1. Improve memory summaries for clarity
+        2. Generate richer predictions from recent memories
+
+        Gracefully degrades when no LLM is available.
+
+        Returns:
+            Dict with counts of improvements made, or {"skipped": True}
+        """
+        from ..language_model import get_language_model_service
+
+        lm = get_language_model_service()
+        if not lm.is_available_sync():
+            logger.info("LLM consolidation skipped: no language model available")
+            return {"skipped": True}
+
+        if not self.config.enable_llm_consolidation:
+            logger.info("LLM consolidation skipped: disabled in config")
+            return {"skipped": True}
+
+        results = {}
+
+        try:
+            improved = self._improve_memory_summaries(lm)
+            results["memories_improved"] = improved
+        except Exception as e:
+            logger.warning(f"Memory summary improvement failed: {e}")
+            results["memories_improved"] = 0
+
+        try:
+            predicted = self._generate_llm_predictions(lm)
+            results["predictions_generated"] = predicted
+        except Exception as e:
+            logger.warning(f"LLM prediction generation failed: {e}")
+            results["predictions_generated"] = 0
+
+        logger.info(f"LLM consolidation complete: {results}")
+        return results
+
+    def _improve_memory_summaries(self, lm) -> int:
+        """
+        Rewrite high-importance memories for clarity using the local LLM.
+
+        Processes batch_size memories per run. Skips already-improved memories
+        (checked via metadata.llm_improved flag).
+
+        Returns:
+            Count of memories improved
+        """
+        batch_size = self.config.llm_consolidation_batch_size
+        improved = 0
+
+        # Find high-importance memories not yet improved
+        rows = self.db.execute(
+            """
+            SELECT id, content, metadata FROM memories
+            WHERE importance > 0.3
+            ORDER BY importance DESC, created_at DESC
+            LIMIT ?
+            """,
+            (batch_size * 3,),  # Fetch extra to account for already-improved
+            fetch=True,
+        ) or []
+
+        for row in rows:
+            if improved >= batch_size:
+                break
+
+            # Check if already improved
+            meta = json.loads(row["metadata"] or "{}")
+            if meta.get("llm_improved"):
+                continue
+
+            # Improve the memory
+            prompt = (
+                f"Rewrite this memory to be more concise and clear. "
+                f"Keep all facts. Return only the rewritten text, nothing else.\n\n"
+                f"Original: {row['content']}"
+            )
+            result = lm.generate_sync(prompt, temperature=0.1)
+
+            if result and len(result.strip()) > 10:
+                # Preserve original and mark as improved
+                meta["original_content"] = row["content"]
+                meta["llm_improved"] = True
+
+                self.db.update(
+                    "memories",
+                    {
+                        "content": result.strip(),
+                        "metadata": json.dumps(meta),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    },
+                    "id = ?",
+                    (row["id"],),
+                )
+                improved += 1
+
+        return improved
+
+    def _generate_llm_predictions(self, lm) -> int:
+        """
+        Use the local LLM to reason about recent memories and generate predictions.
+
+        Gathers recent high-importance memories with entity context, asks the LLM
+        to generate actionable suggestions, and stores them as predictions.
+
+        Returns:
+            Count of predictions generated
+        """
+        # Gather recent high-importance memories
+        rows = self.db.execute(
+            """
+            SELECT m.content, m.type, m.importance,
+                   GROUP_CONCAT(e.name) as entity_names
+            FROM memories m
+            LEFT JOIN memory_entities me ON m.id = me.memory_id
+            LEFT JOIN entities e ON me.entity_id = e.id
+            WHERE m.importance > 0.3
+            GROUP BY m.id
+            ORDER BY m.created_at DESC
+            LIMIT 20
+            """,
+            fetch=True,
+        ) or []
+
+        if not rows:
+            return 0
+
+        # Build context for the LLM
+        memory_lines = []
+        for row in rows:
+            entities = row["entity_names"] or "none"
+            memory_lines.append(
+                f"- [{row['type']}] {row['content']} (entities: {entities})"
+            )
+
+        memories_text = "\n".join(memory_lines)
+        prompt = (
+            f"Based on these recent memories, generate 1-3 actionable suggestions "
+            f"for the user. Each suggestion should be something they should do, "
+            f"follow up on, or be aware of.\n\n"
+            f"Memories:\n{memories_text}\n\n"
+            f"Return a JSON array of objects with 'content' (string) and "
+            f"'priority' (float 0-1) fields. Example:\n"
+            f'[{{"content": "Follow up with Sarah about the proposal", "priority": 0.8}}]\n\n'
+            f"JSON:"
+        )
+
+        result = lm.generate_sync(prompt, temperature=0.3, format_json=True)
+        if not result:
+            return 0
+
+        # Parse JSON response
+        try:
+            predictions = json.loads(result.strip())
+            if not isinstance(predictions, list):
+                return 0
+        except (json.JSONDecodeError, ValueError):
+            logger.debug("LLM returned invalid JSON for predictions")
+            return 0
+
+        # Store predictions
+        count = 0
+        for pred in predictions:
+            if not isinstance(pred, dict) or "content" not in pred:
+                continue
+
+            self._store_prediction(Prediction(
+                content=pred["content"],
+                prediction_type="suggestion",
+                priority=min(1.0, max(0.0, float(pred.get("priority", 0.5)))),
+                expires_at=datetime.utcnow() + timedelta(days=7),
+                metadata={"source": "llm_consolidation"},
+                pattern_name=None,
+            ))
+            count += 1
+
+        return count
+
     def run_full_consolidation(self) -> Dict[str, Any]:
         """
         Run complete consolidation: decay, patterns, predictions.

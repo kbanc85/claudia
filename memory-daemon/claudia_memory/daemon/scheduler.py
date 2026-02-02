@@ -84,6 +84,15 @@ class MemoryScheduler:
             replace_existing=True,
         )
 
+        # Daily at 3:30am: LLM-powered consolidation (after regular consolidation)
+        self.scheduler.add_job(
+            self._run_llm_consolidation,
+            CronTrigger(hour=3, minute=30),
+            id="llm_consolidation",
+            name="Sleep-time LLM consolidation",
+            replace_existing=True,
+        )
+
         # Weekly Sunday at 4am: Document lifecycle maintenance
         self.scheduler.add_job(
             self._run_document_lifecycle,
@@ -165,6 +174,16 @@ class MemoryScheduler:
             logger.info(f"Document lifecycle maintenance complete: {result}")
         except Exception as e:
             logger.exception("Error in document lifecycle maintenance")
+
+    def _run_llm_consolidation(self) -> None:
+        """Run LLM-powered sleep-time consolidation"""
+        try:
+            logger.info("Running LLM consolidation")
+            from ..services.consolidate import get_consolidate_service
+            result = get_consolidate_service().run_llm_consolidation()
+            logger.info(f"LLM consolidation complete: {result}")
+        except Exception as e:
+            logger.exception("Error in LLM consolidation")
 
     def _run_memory_verification(self) -> None:
         """Run background memory verification"""

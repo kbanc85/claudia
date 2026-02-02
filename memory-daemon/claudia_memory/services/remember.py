@@ -335,6 +335,8 @@ class RememberService:
         strength: float = 1.0,
         direction: str = "bidirectional",
         metadata: Optional[Dict] = None,
+        valid_at: Optional[str] = None,
+        supersedes: bool = False,
     ) -> Optional[int]:
         """
         Create or strengthen a relationship between entities.
@@ -346,6 +348,9 @@ class RememberService:
             strength: Relationship strength
             direction: 'forward', 'backward', or 'bidirectional'
             metadata: Additional metadata
+            valid_at: When this relationship became true (ISO string, defaults to now)
+            supersedes: If True, invalidate existing relationship of same type
+                        between same entities before creating a new one
 
         Returns:
             Relationship ID or None
@@ -364,22 +369,77 @@ class RememberService:
         if not source_id or not target_id:
             return None
 
-        # Check for existing relationship
+        now = datetime.utcnow().isoformat()
+        effective_valid_at = valid_at or now
+
+        if supersedes:
+            # Invalidate any existing relationship of same type FROM this source entity
+            existing_to_supersede = self.db.get_one(
+                "relationships",
+                where="source_entity_id = ? AND relationship_type = ? AND invalid_at IS NULL",
+                where_params=(source_id, relationship_type),
+            )
+            if existing_to_supersede:
+                # Invalidate the old relationship (mark when it ended)
+                self.db.update(
+                    "relationships",
+                    {
+                        "invalid_at": now,
+                        "updated_at": now,
+                    },
+                    "id = ?",
+                    (existing_to_supersede["id"],),
+                )
+                # Rename the type to free the UNIQUE constraint slot
+                old_meta = json.loads(existing_to_supersede["metadata"] or "{}")
+                old_meta["superseded_by_at"] = now
+                self.db.update(
+                    "relationships",
+                    {
+                        "relationship_type": f"{relationship_type}__superseded_{existing_to_supersede['id']}",
+                        "metadata": json.dumps(old_meta),
+                    },
+                    "id = ?",
+                    (existing_to_supersede["id"],),
+                )
+
+            # Create new relationship
+            return self.db.insert(
+                "relationships",
+                {
+                    "source_entity_id": source_id,
+                    "target_entity_id": target_id,
+                    "relationship_type": relationship_type,
+                    "strength": strength,
+                    "direction": direction,
+                    "valid_at": effective_valid_at,
+                    "created_at": now,
+                    "updated_at": now,
+                    "metadata": json.dumps(metadata) if metadata else None,
+                },
+            )
+
+        # Check for existing current relationship (non-supersede path)
         existing = self.db.get_one(
             "relationships",
-            where="source_entity_id = ? AND target_entity_id = ? AND relationship_type = ?",
+            where="source_entity_id = ? AND target_entity_id = ? AND relationship_type = ? AND invalid_at IS NULL",
             where_params=(source_id, target_id, relationship_type),
         )
 
         if existing:
-            # Strengthen existing relationship
+            # Default behavior: strengthen existing relationship
             new_strength = min(1.0, existing["strength"] + 0.1)
+            update_data = {
+                "strength": new_strength,
+                "updated_at": now,
+            }
+            # Ensure valid_at is set on existing relationships
+            row_keys = existing.keys()
+            if "valid_at" in row_keys and not existing["valid_at"]:
+                update_data["valid_at"] = existing["created_at"]
             self.db.update(
                 "relationships",
-                {
-                    "strength": new_strength,
-                    "updated_at": datetime.utcnow().isoformat(),
-                },
+                update_data,
                 "id = ?",
                 (existing["id"],),
             )
@@ -394,8 +454,9 @@ class RememberService:
                     "relationship_type": relationship_type,
                     "strength": strength,
                     "direction": direction,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "valid_at": effective_valid_at,
+                    "created_at": now,
+                    "updated_at": now,
                     "metadata": json.dumps(metadata) if metadata else None,
                 },
             )

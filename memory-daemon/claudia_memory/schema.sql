@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS relationships (
     relationship_type TEXT NOT NULL,  -- works_with, manages, client_of, etc.
     strength REAL DEFAULT 1.0,  -- Relationship strength (decays/grows)
     direction TEXT DEFAULT 'bidirectional' CHECK (direction IN ('forward', 'backward', 'bidirectional')),
+    valid_at TEXT,  -- When this relationship became true in the real world
+    invalid_at TEXT,  -- When this relationship was superseded (NULL = current)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     metadata TEXT,
@@ -99,6 +101,7 @@ CREATE TABLE IF NOT EXISTS relationships (
 CREATE INDEX IF NOT EXISTS idx_relationships_source ON relationships(source_entity_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_target ON relationships(target_entity_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_type ON relationships(relationship_type);
+CREATE INDEX IF NOT EXISTS idx_relationships_temporal ON relationships(invalid_at, valid_at);
 
 -- ============================================================================
 -- EPISODES: Conversation session summaries
@@ -322,3 +325,6 @@ VALUES (6, 'Add source and ingested_at to episodes, source to turn_buffer for ga
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (7, 'Add documents, entity_documents, memory_sources tables for provenance tracking');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (8, 'Add valid_at, invalid_at to relationships for bi-temporal tracking');

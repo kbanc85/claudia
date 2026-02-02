@@ -428,6 +428,41 @@ class Database:
             conn.commit()
             logger.info("Applied migration 7: document storage and provenance")
 
+        if current_version < 8:
+            # Migration 8: Bi-temporal relationship tracking
+            migration_stmts = [
+                "ALTER TABLE relationships ADD COLUMN valid_at TEXT",
+                "ALTER TABLE relationships ADD COLUMN invalid_at TEXT",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"Migration 8 statement failed: {e}")
+
+            # Index for temporal queries
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_relationships_temporal ON relationships(invalid_at, valid_at)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 8 index failed: {e}")
+
+            # Grandfather: existing relationships are current (valid since creation)
+            try:
+                conn.execute(
+                    "UPDATE relationships SET valid_at = created_at WHERE valid_at IS NULL"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 8 grandfather failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (8, 'Add valid_at, invalid_at to relationships for bi-temporal tracking')"
+            )
+            conn.commit()
+            logger.info("Applied migration 8: bi-temporal relationships")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
