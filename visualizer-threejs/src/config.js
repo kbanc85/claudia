@@ -8,6 +8,9 @@
  */
 
 export const config = {
+  // ── Theme ──────────────────────────────────────────────────
+  theme: 'midnight',
+
   // ── Colors ─────────────────────────────────────────────────
   background: '#050510',
 
@@ -35,7 +38,16 @@ export const config = {
     highlighted: '#7dd3fc',
     particle: '#b4b4ff',
     particleHighlight: '#7dd3fc',
-    historical: '#ffffff'
+    historical: '#ffffff',
+    // Per-memory-type link colors (memory-entity links)
+    memoryEntityByType: {
+      fact: '#94a3b8',        // Slate (subtle)
+      commitment: '#f87171',  // Red (urgent)
+      learning: '#4ade80',    // Green (growth)
+      observation: '#93c5fd', // Blue (neutral)
+      preference: '#fbbf24',  // Amber (personal)
+      pattern: '#a78bfa'      // Violet (insight)
+    }
   },
 
   // ── Lighting ───────────────────────────────────────────────
@@ -203,6 +215,7 @@ export const config = {
   },
 
   nebula: {
+    enabled: true,
     size: 1500,
     positionZ: -400,
     rotationSpeed: 0.01,

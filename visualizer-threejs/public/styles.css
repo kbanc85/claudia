@@ -103,9 +103,10 @@ body {
 }
 
 .hud-logo {
-  font-size: 18px;
-  color: var(--accent);
-  filter: drop-shadow(0 0 4px var(--accent-glow));
+  height: 28px;
+  width: auto;
+  margin-right: 8px;
+  filter: drop-shadow(0 0 4px var(--accent));
 }
 
 #hud-stats {
@@ -145,6 +146,19 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.hud-github {
+  color: var(--text-dim);
+  opacity: 0.6;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.hud-github:hover {
+  opacity: 1;
+  color: var(--accent);
 }
 
 /* ── Database selector ────────────────────────────────────── */

@@ -5,6 +5,7 @@
  */
 
 import { setQuality, getQuality } from './effects.js';
+import { config, onConfigUpdate } from './config.js';
 
 let graphData = null;
 let activeFilters = { entities: new Set(), memories: new Set() };
@@ -19,12 +20,15 @@ let onFilterNodes = null;
 let onResetFilter = null;
 let onDatabaseSwitch = null;
 
-const TYPE_COLORS = {
-  person: '#fbbf24', organization: '#60a5fa', project: '#34d399',
-  concept: '#c084fc', location: '#fb923c',
-  fact: '#e2e8f0', commitment: '#f87171', learning: '#4ade80',
-  observation: '#93c5fd', preference: '#fbbf24', pattern: '#a78bfa'
-};
+/**
+ * Get current legend colors from config (dynamic, theme-aware)
+ */
+function getLegendColors() {
+  return {
+    ...config.entityColors,
+    ...config.memoryColors
+  };
+}
 
 export function initUI(data, callbacks) {
   graphData = data;
@@ -39,6 +43,13 @@ export function initUI(data, callbacks) {
   initTimeline();
   initSettings();
   initDatabaseSelector();
+
+  // Subscribe to theme changes to update legend colors
+  onConfigUpdate((path) => {
+    if (path === '*' || path.startsWith('entityColors') || path.startsWith('memoryColors')) {
+      rebuildFiltersAndLegend();
+    }
+  });
 }
 
 export function setGraphData(data) {
@@ -141,14 +152,29 @@ function performSearch(query) {
 // ── Filters ─────────────────────────────────────────────────
 
 function initFilters() {
+  buildFiltersUI();
+  buildLegend();
+}
+
+function buildFiltersUI() {
   const entityFilters = document.getElementById('type-filters');
   const memoryFilters = document.getElementById('memory-filters');
+  const colors = getLegendColors();
 
-  for (const type of allEntityTypes) activeFilters.entities.add(type);
-  for (const type of allMemoryTypes) activeFilters.memories.add(type);
+  // Clear existing
+  entityFilters.replaceChildren();
+  memoryFilters.replaceChildren();
+
+  // Initialize active filters if empty
+  if (activeFilters.entities.size === 0) {
+    for (const type of allEntityTypes) activeFilters.entities.add(type);
+  }
+  if (activeFilters.memories.size === 0) {
+    for (const type of allMemoryTypes) activeFilters.memories.add(type);
+  }
 
   for (const type of allEntityTypes) {
-    entityFilters.appendChild(createFilterItem(type, TYPE_COLORS[type], true, (checked) => {
+    entityFilters.appendChild(createFilterItem(type, colors[type], activeFilters.entities.has(type), (checked) => {
       if (checked) activeFilters.entities.add(type);
       else activeFilters.entities.delete(type);
       applyFilters();
@@ -156,13 +182,16 @@ function initFilters() {
   }
 
   for (const type of allMemoryTypes) {
-    memoryFilters.appendChild(createFilterItem(type, TYPE_COLORS[type], true, (checked) => {
+    memoryFilters.appendChild(createFilterItem(type, colors[type], activeFilters.memories.has(type), (checked) => {
       if (checked) activeFilters.memories.add(type);
       else activeFilters.memories.delete(type);
       applyFilters();
     }));
   }
+}
 
+function rebuildFiltersAndLegend() {
+  buildFiltersUI();
   buildLegend();
 }
 
@@ -201,12 +230,17 @@ function applyFilters() {
 
 function buildLegend() {
   const legend = document.getElementById('legend');
+  const colors = getLegendColors();
+
+  // Clear existing legend items
+  legend.replaceChildren();
+
   const shapes = [
-    { label: 'Person', shape: 'circle', color: TYPE_COLORS.person },
-    { label: 'Organization', shape: 'square', color: TYPE_COLORS.organization },
-    { label: 'Project', shape: 'diamond', color: TYPE_COLORS.project },
-    { label: 'Concept', shape: 'circle', color: TYPE_COLORS.concept },
-    { label: 'Pattern', shape: 'circle', color: TYPE_COLORS.pattern }
+    { label: 'Person', shape: 'circle', color: colors.person },
+    { label: 'Organization', shape: 'square', color: colors.organization },
+    { label: 'Project', shape: 'diamond', color: colors.project },
+    { label: 'Concept', shape: 'circle', color: colors.concept },
+    { label: 'Pattern', shape: 'circle', color: colors.pattern }
   ];
 
   for (const item of shapes) {

@@ -55,9 +55,16 @@ export function updateLinks(links, nodePositions, highlightSet, scene) {
 
     if (link.linkType === 'memory_entity') {
       // Memory links: simple straight lines (many, subtle)
+      // Color based on memory type if source is a memory node
+      const sourceNode = typeof link.source === 'object' ? link.source : null;
+      const memoryType = sourceNode?.memoryType || 'fact';
+      const typeColorHex = config.linkColors.memoryEntityByType?.[memoryType]
+        || config.linkColors.memoryEntity;
+      const typeColor = parseColor(typeColorHex);
+
       memoryLines.push(s.x, s.y, s.z, t.x, t.y, t.z);
       const alpha = config.links.memoryLineAlpha;
-      memoryColors.push(0.47, 0.55, 1.0, alpha, 0.47, 0.55, 1.0, alpha);
+      memoryColors.push(typeColor.r, typeColor.g, typeColor.b, alpha, typeColor.r, typeColor.g, typeColor.b, alpha);
     } else {
       // Relationship links: curved tubes
       const isHighlighted = highlightSet.has(link);
@@ -319,4 +326,38 @@ export function disposeLinks(scene) {
 
   linkCurves.clear();
   particleData = [];
+}
+
+/**
+ * Refresh link colors based on current config
+ * Call this when themes change to update existing links
+ */
+export function refreshLinkColors() {
+  const { linkColors } = config;
+
+  // Update relationship meshes
+  for (const mesh of relationshipMeshes) {
+    const link = mesh.userData?.link;
+    if (!link || !mesh.material) continue;
+
+    // Only update non-custom colored links
+    if (!link.color) {
+      if (link.dashed) {
+        mesh.material.color.set(linkColors.historical);
+      } else {
+        mesh.material.color.set(linkColors.relationship);
+      }
+    }
+  }
+
+  // Update particle system colors
+  if (particleSystem && particleSystem.material) {
+    particleSystem.material.color.set(linkColors.particle);
+  }
+
+  // Update memory line colors
+  if (memoryLineMesh && memoryLineMesh.material) {
+    memoryLineMesh.material.color.set(linkColors.memoryEntity);
+    memoryLineMesh.material.opacity = linkColors.memoryEntityAlpha;
+  }
 }

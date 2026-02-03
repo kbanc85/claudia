@@ -16,6 +16,13 @@ import {
   saveToLocalStorage,
   loadFromLocalStorage
 } from './config.js';
+import {
+  themes,
+  applyTheme,
+  getThemeNames,
+  saveThemePreference,
+  getCurrentTheme
+} from './themes.js';
 
 let gui = null;
 let visible = false;
@@ -41,6 +48,33 @@ export function initDesignPanel(onUpdate) {
     notifyConfigUpdate(path);
     if (onUpdate) onUpdate(path);
   };
+
+  // ── Theme ──────────────────────────────────────────────────
+  const themeFolder = gui.addFolder('Theme');
+
+  // Build theme options object { displayName: key }
+  const themeOptions = {};
+  for (const [key, theme] of Object.entries(themes)) {
+    themeOptions[theme.name] = key;
+  }
+
+  // State holder for dropdown
+  const themeState = { current: themes[getCurrentTheme()]?.name || 'Midnight' };
+
+  themeFolder.add(themeState, 'current', Object.keys(themeOptions))
+    .name('Style')
+    .onChange((displayName) => {
+      const themeKey = themeOptions[displayName];
+      if (themeKey) {
+        applyTheme(themeKey);
+        saveThemePreference(themeKey);
+        // Refresh all GUI controllers to show new values
+        gui.controllersRecursive().forEach(c => c.updateDisplay());
+        if (onUpdate) onUpdate('*');
+      }
+    });
+
+  themeFolder.open();
 
   // ── Colors ─────────────────────────────────────────────────
   const colorsFolder = gui.addFolder('Colors');
@@ -116,10 +150,21 @@ export function initDesignPanel(onUpdate) {
   const animFolder = gui.addFolder('Animations');
 
   const breathingFolder = animFolder.addFolder('Breathing');
+  // Entity breathing
   breathingFolder.add(config.animations.breathing, 'entityRate', 0.2, 2, 0.1).name('Entity Rate').onChange(() => update('animations.breathing.entityRate'));
   breathingFolder.add(config.animations.breathing, 'entityDepth', 0, 0.15, 0.01).name('Entity Depth').onChange(() => update('animations.breathing.entityDepth'));
+  breathingFolder.add(config.animations.breathing, 'entityImportanceRateBonus', 0, 1, 0.05).name('Entity Imp Rate+').onChange(() => update('animations.breathing.entityImportanceRateBonus'));
+  breathingFolder.add(config.animations.breathing, 'entityImportanceDepthBonus', 0, 0.1, 0.005).name('Entity Imp Depth+').onChange(() => update('animations.breathing.entityImportanceDepthBonus'));
+  // Memory breathing
   breathingFolder.add(config.animations.breathing, 'memoryRate', 0.5, 3, 0.1).name('Memory Rate').onChange(() => update('animations.breathing.memoryRate'));
   breathingFolder.add(config.animations.breathing, 'memoryDepth', 0, 0.1, 0.005).name('Memory Depth').onChange(() => update('animations.breathing.memoryDepth'));
+  breathingFolder.add(config.animations.breathing, 'memoryRateVariance', 0, 1, 0.05).name('Memory Rate Var').onChange(() => update('animations.breathing.memoryRateVariance'));
+  // Pattern breathing
+  breathingFolder.add(config.animations.breathing, 'patternRate', 0.5, 3, 0.1).name('Pattern Rate').onChange(() => update('animations.breathing.patternRate'));
+  breathingFolder.add(config.animations.breathing, 'patternDepth', 0, 0.15, 0.01).name('Pattern Depth').onChange(() => update('animations.breathing.patternDepth'));
+  // Commitment breathing
+  breathingFolder.add(config.animations.breathing, 'commitmentRate', 0.5, 4, 0.1).name('Commitment Rate').onChange(() => update('animations.breathing.commitmentRate'));
+  breathingFolder.add(config.animations.breathing, 'commitmentDepth', 0, 0.15, 0.01).name('Commitment Depth').onChange(() => update('animations.breathing.commitmentDepth'));
   breathingFolder.close();
 
   const rotationFolder = animFolder.addFolder('Rotation');
