@@ -2,78 +2,95 @@
 <img src="assets/claudia-banner.gif" alt="Claudia" width="500">
 </p>
 
+<h3 align="center">A thinking partner who tracks relationships, not just tasks.</h3>
+
+<p align="center">
+Catches commitments. Remembers context. Connects the dots across your network.
+</p>
+
 <p align="center">
   <a href="https://github.com/kbanc85/claudia/stargazers"><img src="https://img.shields.io/github/stars/kbanc85/claudia?style=flat-square" alt="GitHub stars"></a>
   <a href="https://www.npmjs.com/package/get-claudia"><img src="https://img.shields.io/npm/v/get-claudia?style=flat-square" alt="npm version"></a>
   <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue?style=flat-square" alt="License"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D14-brightgreen?style=flat-square" alt="Node.js"></a>
-  <a href="https://python.org"><img src="https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square" alt="Python"></a>
-</p>
-
-<h3 align="center">An AI thinking partner who learns how you work.</h3>
-
-<p align="center">
-<em>"Busy work is my job. Judgment is yours."</em>
 </p>
 
 <p align="center">
-Created by <a href="https://github.com/kbanc85">Kamil Banc</a> · <a href="https://x.com/kamilbanc">@kamilbanc</a> · <a href="https://aiadopters.club">AI Adopters Club</a>
+<a href="#try-it-in-30-seconds"><strong>Try the Demo</strong></a> ·
+<a href="#what-makes-claudia-different">Why Claudia</a> ·
+<a href="#quick-start">Install</a> ·
+<a href="#how-it-works">How It Works</a>
 </p>
 
 ---
 
-## The Problem
+<!-- TODO: Add GIF of /brain 3D visualization here -->
+<!-- <p align="center">
+<img src="assets/brain-visualization.gif" alt="Claudia's 3D Memory Graph" width="700">
+</p> -->
 
-You finish a call and forget to follow up. You promise a deliverable on Friday and lose track of it by Wednesday. You meet someone important, and three weeks later you can't remember what you talked about. You juggle four clients, two projects, and a growing pipeline, and the context lives scattered across notes, emails, and your memory.
+## The Problem With AI Assistants
 
-AI tools can draft emails and summarize documents. But none of them actually *know* you. None of them remember last Tuesday's conversation, track the commitment you made to Sarah, or warn you that you haven't talked to your best client in three weeks.
+You tell ChatGPT about Sarah on Monday. By Wednesday, it's forgotten.
 
-That's the gap Claudia fills.
+You make a promise in a meeting. Nobody tracks it. You promise a deliverable on Friday and lose track of it by Wednesday. You meet someone important, and three weeks later you can't remember what you talked about.
 
----
-
-## What Is Claudia?
-
-Claudia is an open-source AI thinking partner that runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). She remembers your conversations, tracks your relationships, catches commitments you make, and adapts to match how you actually work.
-
-Not a chatbot. Not a task manager. Not another inbox. She's a thinking partner with memory that compounds over time.
-
-Everything runs locally. Your data stays on your machine.
+**AI tools don't have memory. Claudia does.**
 
 ---
 
-## See It in Action
+## What Makes Claudia Different
 
+<table>
+<tr>
+<td width="33%" align="center">
+<h3>🎯 Catches Commitments</h3>
+<p>Say "I'll send that by Friday" and she tracks it. On Friday morning, she reminds you.</p>
+</td>
+<td width="33%" align="center">
+<h3>🔗 Remembers Relationships</h3>
+<p>Mention Sarah from Acme and Claudia surfaces: last conversation, open promises, sentiment.</p>
+</td>
+<td width="33%" align="center">
+<h3>⚠️ Warns Before Things Slip</h3>
+<p>Haven't talked to your best client in 3 weeks? She tells you before it's a problem.</p>
+</td>
+</tr>
+<tr>
+<td width="33%" align="center">
+<h3>📄 Shows Her Work</h3>
+<p>Every fact traces to its source. Ask "how do you know that?" and she shows the receipt.</p>
+</td>
+<td width="33%" align="center">
+<h3>🧠 Visualize Your Memory</h3>
+<p>Run <code>/brain</code> to see a 3D graph of everything she knows: people, projects, connections.</p>
+</td>
+<td width="33%" align="center">
+<h3>🔒 Fully Local</h3>
+<p>Everything runs on your machine. Your data never leaves. Delete anything, anytime.</p>
+</td>
+</tr>
+</table>
+
+---
+
+## Try It in 30 Seconds
+
+Demo mode creates a pre-populated installation with realistic fake data. No setup, no configuration.
+
+```bash
+npx get-claudia my-demo --demo
+cd my-demo
+claude
 ```
-Claudia: Hey there. I'm Claudia. What's your name?
 
-You:     Sarah
+**What's in the demo:**
+- 60 people across investor, founder, and client networks
+- 15 organizations and 15 projects
+- 115 memories (facts, commitments, observations)
+- Overdue items and relationship warnings to explore
+- Full 3D brain visualization
 
-Claudia: Nice to meet you, Sarah. What do you do?
-
-You:     I'm a fractional CMO. I work with 4 clients right now.
-
-Claudia: Got it. What are your top priorities?
-
-You:     Client deliverables, growing my pipeline, and not dropping balls
-
-Claudia: Based on what you've shared, here's how I'd organize things:
-
-         clients/         [one folder per client]
-         people/          [key relationships]
-         context/         [commitments, waiting-on items]
-
-         And I'll set up commands for your work:
-         /morning-brief, /client-status, /meeting-prep
-
-         Want me to create this?
-
-You:     Yes, do it
-
-Claudia: Done. Try '/morning-brief' tomorrow, or tell me about a client.
-```
-
-From here, every conversation builds on the last. She remembers.
+The demo database is isolated in `~/.claudia/demo/`. Your real data is never touched.
 
 ---
 
@@ -81,24 +98,21 @@ From here, every conversation builds on the last. She remembers.
 
 ```bash
 npx get-claudia
+cd claudia
+claude
 ```
 
 <p align="center">
 <img src="assets/claudia-install.gif" alt="Installing Claudia" width="600">
 </p>
 
-The installer walks you through everything: creates your workspace, installs the memory system, and optionally sets up a local language model. Then:
-
-```bash
-cd claudia
-claude
-```
-
-Say hi. She'll introduce herself and learn about you in a natural conversation. Within a few sessions, she'll have a personalized workspace, commands, and workflows tailored to your role.
+Say hi. She'll introduce herself, learn about you in a natural conversation, and generate a personalized workspace within a few sessions.
 
 **Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+ (for memory)
 
-**Already have Claudia?** Upgrade from any version:
+<details>
+<summary><strong>Upgrading from a previous version?</strong></summary>
+
 ```bash
 cd your-claudia-directory
 npx get-claudia .
@@ -106,7 +120,11 @@ npx get-claudia .
 
 This upgrades framework files while preserving your data (context/, people/, projects/).
 
-**Add the Brain Visualizer to an existing install:**
+</details>
+
+<details>
+<summary><strong>Add Brain Visualizer to existing install</strong></summary>
+
 ```bash
 # macOS/Linux
 bash "$(npm root -g)/get-claudia/visualizer/scripts/install.sh"
@@ -115,75 +133,77 @@ bash "$(npm root -g)/get-claudia/visualizer/scripts/install.sh"
 & "$(npm root -g)\get-claudia\visualizer\scripts\install.ps1"
 ```
 
+</details>
+
 ---
 
-## Demo Mode
+## See It in Action
 
-Want to try Claudia without setting up your own data? Demo mode creates a pre-populated installation with realistic fake data.
+<!-- TODO: Replace with GIF showing memory recall -->
 
-```bash
-npx get-claudia my-demo --demo
-cd my-demo
-claude
+```
+You:     What do I know about Sarah Chen?
+
+Claudia: Sarah Chen is CEO at Meridian Ventures. You met at SaaStr 2025.
+
+         📊 Relationship Health: Strong (last contact 3 days ago)
+
+         🎯 Open Commitments:
+         • Send updated pitch deck to Sarah [OVERDUE - was due Friday]
+
+         💡 Recent Context:
+         • She's interested in AI infrastructure angle
+         • Wants to see technical architecture doc
+         • Bringing in technical partner for next meeting
+
+         🔗 Connected to: Series A (project), Priya Sharma (introduced by)
+
+         Source: Call notes from Jan 28, Email thread Jan 30
 ```
 
-Demo mode includes:
-- 12 people with varying relationship health
-- 3 organizations and 3 projects
-- Commitments (some overdue) and predictions
-- Past session episodes
-
-The demo database is completely isolated in `~/.claudia/demo/`, so it never touches your real data.
-
----
-
-## What She Actually Does
-
-Claudia isn't a list of features. She's a set of outcomes:
-
-- **Catches your commitments.** Say "I'll send that proposal by Friday" in conversation, and she'll track it. On Friday morning, she'll remind you.
-- **Remembers your relationships.** Mention Sarah from Acme, and Claudia surfaces what she knows: last conversation, open commitments, communication frequency, sentiment. Ask about one person, and she'll show you their connected network of people and projects.
-- **Warns you before things slip.** Haven't talked to your best client in three weeks? Overdue on a deliverable? She surfaces it without being asked.
-- **Processes your meetings.** Paste a transcript. She pulls out decisions, action items, and follow-ups, then stores the transcript as a document linked to participants and memories.
-- **Shows her work.** Every fact traces back to its source. Ask "how do you know that?" and Claudia shows the email, transcript, or conversation it came from.
-- **Adapts to how you work.** She notices patterns ("You draft LinkedIn posts almost daily. Want me to add a quick command for that?") and suggests improvements to her own workflow.
-- **Visualize your memory.** Run `/brain` to see a 3D force-directed graph of everything Claudia knows: entities, relationships, memories, and patterns rendered in real-time.
+From here, every conversation builds on the last. She remembers.
 
 ---
 
 ## Who It's For
 
-Claudia detects your work style during setup and generates structure that fits:
+Claudia detects your work style and generates structure that fits:
 
-- **Consultant** -- Multiple clients, deliverables, proposals, pipeline tracking
-- **Executive** -- Direct reports, initiatives, leadership, board prep
-- **Founder** -- Investors, team, product, fundraising cycles
-- **Solo Professional** -- Mix of clients and projects, wearing many hats
-- **Creator** -- Audience growth, content calendar, collaborations
-
-Each gets custom folder structures, commands, and templates.
-
----
-
-## How She Gets Smarter
-
-Claudia suggests improvements as she learns your patterns:
-
-> "I notice you draft LinkedIn posts almost daily. Want me to add a `/linkedin-quick` command?"
-
-> "You often ask about project status on Mondays. Should I add that to your morning brief?"
-
-> "You've mentioned being stretched thin in three conversations this week."
-
-She challenges constructively, surfaces what you might be missing, and adapts her structure to fit how your work actually evolves.
+| Role | What You Get |
+|------|--------------|
+| **Consultant** | Client folders, deliverable tracking, pipeline commands |
+| **Executive** | Direct reports, initiatives, board prep, leadership tools |
+| **Founder** | Investor CRM, fundraising cycles, team and product tracking |
+| **Solo Professional** | Flexible structure for wearing many hats |
+| **Creator** | Audience growth, content calendar, collaboration tracking |
 
 ---
 
-## Privacy and Safety
+## Key Commands
 
-- **Fully local.** Memory, embeddings, and cognitive tools run on your machine. No external APIs for data storage.
-- **No external actions without approval.** Every email, calendar event, and external action requires your explicit "yes." Non-negotiable, enforced at the framework level.
-- **Your data is yours.** Memories live in `~/.claudia/memory/` as SQLite databases. Documents live in `~/.claudia/files/`. Context lives in readable markdown files. Delete anything, anytime.
+| Command | What It Does |
+|---------|--------------|
+| `/morning-brief` | What needs attention today: commitments, meetings, warnings |
+| `/brain` | Launch 3D memory visualization |
+| `/meeting-prep [person]` | One-page briefing before a call |
+| `/capture-meeting` | Process notes into decisions, commitments, action items |
+| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
+| `/memory-audit` | See everything Claudia knows, with source chains |
+
+<details>
+<summary><strong>All commands</strong></summary>
+
+| Command | What It Does |
+|---------|--------------|
+| `/weekly-review` | Guided reflection across relationships and projects |
+| `/accountability-check` | Outstanding commitments and waiting-on items |
+| `/draft-reply` | Email response drafts in your voice |
+| `/follow-up-draft [person]` | Post-meeting thank-you and summary |
+| `/new-person [name]` | Create a relationship file |
+| `/pipeline-review` | Active deals, capacity, pipeline health |
+| `/client-health` | Status across all client relationships |
+
+</details>
 
 ---
 
@@ -191,106 +211,65 @@ She challenges constructively, surfaces what you might be missing, and adapts he
 
 Claudia has two layers:
 
-**Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup. This is what makes her Claudia rather than generic Claude.
+**Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup.
 
-**Memory system** (Python) defines what she remembers. A daemon running locally with SQLite, vector embeddings, and three service layers:
+**Memory system** (Python) defines what she remembers. SQLite + vector embeddings + three services:
 
-- **Remember** -- stores facts, entities, and relationships with embeddings for semantic search
-- **Recall** -- retrieves memories using hybrid ranking (vector similarity + importance + recency)
-- **Consolidate** -- runs in the background: decaying old memories, detecting patterns, generating predictions
+| Service | What It Does |
+|---------|--------------|
+| **Remember** | Stores facts, entities, relationships with embeddings |
+| **Recall** | Retrieves via hybrid ranking (vector + importance + recency) |
+| **Consolidate** | Background: decay old memories, detect patterns, generate predictions |
 
 ```
-You talk to Claude Code
-    |
-    v
-Claude reads Claudia's template files (skills, commands, rules)
-    |
-    v
-Claude becomes Claudia: personality, proactive behaviors, safety principles
-    |
-    v
-Claudia calls memory tools via MCP (remember, recall, about, file, documents, briefing)
-    |
-    v
-Memory daemon processes locally: SQLite + vector search + Ollama
-    |
-    v
-Everything stays on your machine
+You ──► Claude Code ──► Reads Claudia's templates ──► Becomes Claudia
+                                                           │
+                                                           ▼
+                              Memory daemon (local) ◄── MCP tools
+                                      │
+                                      ▼
+                        SQLite + vectors + Ollama (all local)
 ```
-
-For full technical diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
-
----
-
-## Key Commands
-
-| Command | What It Does |
-|---------|-------------|
-| `/morning-brief` | What needs attention today: commitments, meetings, warnings |
-| `/meeting-prep [person]` | One-page briefing before a call |
-| `/capture-meeting` | Process notes into decisions, commitments, action items |
-| `/memory-audit` | See everything Claudia knows, with source chains |
-| `/brain` | Launch 3D memory visualizer |
-| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
-| `/weekly-review` | Guided reflection across relationships and projects |
-| `/accountability-check` | Outstanding commitments and waiting-on items |
 
 <details>
-<summary>All commands</summary>
+<summary><strong>Technical deep dive</strong></summary>
 
-| Command | What It Does |
-|---------|-------------|
-| `/draft-reply` | Email response drafts in your voice |
-| `/follow-up-draft [person]` | Post-meeting thank-you and summary |
-| `/new-person [name]` | Create a relationship file |
-| `/pipeline-review` | Active deals, capacity, pipeline health |
+**Semantic search** uses hybrid ranking: 50% vector similarity, 25% importance, 10% recency, 15% full-text. Accessing a memory boosts it (rehearsal effect).
+
+**Document storage** keeps files, transcripts, emails on disk, linked to people and memories. Content-hash deduplication. Automatic lifecycle management.
+
+**Provenance chains** trace any fact to its source email, transcript, or conversation.
+
+**Graph traversal** connects dots across your network. Ask about one person, see related entities with top memories.
+
+**Per-project isolation** keeps work memories separate from personal. Each workspace gets its own database.
+
+**Session narratives** capture tone and emotional context, not just facts.
+
+For full architecture diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+</details>
+
+<details>
+<summary><strong>Cognitive tools (local LLM extraction)</strong></summary>
+
+Paste a meeting transcript. A local language model extracts structured data (entities, facts, commitments) in seconds. Claude reviews and applies judgment.
+
+- Runs locally via [Ollama](https://ollama.com), no API keys
+- Models: Qwen3-4B (recommended), SmolLM3-3B, Llama 3.2-3B
+- Falls back gracefully when no model installed
+
+Four extraction modes: **meeting**, **email**, **document**, **general**.
 
 </details>
 
 ---
 
-## Advanced: Memory System
+## Privacy and Safety
 
-Claudia's memory goes beyond chat history. She stores facts, preferences, commitments, and observations in a local SQLite database with 384-dimensional vector embeddings (via [Ollama](https://ollama.com) and the all-minilm:l6-v2 model).
-
-**Semantic search** uses hybrid ranking: 50% vector similarity, 25% importance, 10% recency, and 15% full-text search. Accessing a memory boosts it (rehearsal effect), so frequently referenced facts stay prominent.
-
-**Document storage** keeps files, transcripts, and emails on disk and linked to people and memories. Each document has a lifecycle (active, dormant, archived) managed automatically. Files are deduplicated by content hash.
-
-**Provenance chains** trace any fact back to the email, transcript, or conversation it came from. Run `/memory-audit [person]` to see every memory with its source chain.
-
-**Graph traversal** connects the dots across your network. Ask about one person, and Claudia shows related entities with their top memories, using graph walks across the relationship table.
-
-**Compact briefing** keeps session startup lightweight (~500 tokens) with counts and highlights instead of dumping full context. Full data is pulled on demand during conversation.
-
-**Per-project isolation** keeps work memories separate from personal projects. Each workspace gets its own database, keyed by folder path hash.
-
-**Session narratives** capture tone, emotional context, and unresolved threads, so Claudia understands not just what happened but how the conversation felt.
-
-**Eight built-in skills** activate automatically based on context:
-
-| Skill | What It Does |
-|-------|-------------|
-| **Commitment Detector** | Catches promises in conversation. "I'll send that by Friday" triggers tracking |
-| **Relationship Tracker** | Surfaces context when people are mentioned. Tracks contact frequency, sentiment |
-| **Pattern Recognizer** | Notices recurring themes after 3+ observations |
-| **Risk Surfacer** | Warns about overdue items, cooling relationships, capacity issues |
-| **Memory Manager** | Handles session startup, shutdown, and cross-session persistence |
-| **Capability Suggester** | Notices repeated tasks and offers to create commands for them |
-| **Onboarding** | First-run discovery that generates your personalized workspace |
-| **Structure Generator** | Creates folder structures and commands matched to your archetype |
-
----
-
-## Advanced: Cognitive Tools
-
-Paste a meeting transcript or email. Instead of Claude parsing it token by token, a local language model extracts structured data (entities, facts, commitments, action items) in seconds. Claude then reviews the output and applies judgment.
-
-- Runs locally via [Ollama](https://ollama.com), no API keys needed
-- Choose your model during install: Qwen3-4B (recommended), SmolLM3-3B, or Llama 3.2-3B
-- Falls back gracefully when no model is installed (Claude handles extraction directly)
-
-Four specialized extraction modes: **meeting** (participants, decisions, action items), **email** (sender, recipients, tone, action items), **document** (key points, entities, relationships), and **general** (facts, commitments, entities).
+- **Fully local.** Memory, embeddings, cognitive tools run on your machine. No external APIs for storage.
+- **No external actions without approval.** Every email, calendar event, external action requires your explicit "yes."
+- **Your data is yours.** `~/.claudia/memory/` (SQLite), `~/.claudia/files/` (documents), readable markdown. Delete anything.
 
 ---
 
@@ -298,58 +277,55 @@ Four specialized extraction modes: **meeting** (participants, decisions, action 
 
 | Component | Required | Purpose |
 |-----------|----------|---------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Yes | Runtime for Claudia |
-| Node.js 14+ | Yes | NPM installer |
-| Python 3.10+ | Recommended | Memory system daemon |
-| [Ollama](https://ollama.com) | Recommended | Local embeddings + cognitive tools |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Yes | Runtime |
+| Node.js 14+ | Yes | Installer |
+| Python 3.10+ | Recommended | Memory system |
+| [Ollama](https://ollama.com) | Recommended | Embeddings + cognitive tools |
 
-The memory system and Ollama are optional. Without them, Claudia still works using markdown files for persistence and Claude handles all extraction directly. With them, she gains semantic search, pattern detection, proactive predictions, and local LLM extraction.
+Without the memory system, Claudia still works using markdown files. With it, she gains semantic search, pattern detection, and predictions.
 
-**Supported platforms:** macOS, Linux, Windows
+**Platforms:** macOS, Linux, Windows
 
 ---
 
-## Troubleshooting
+<details>
+<summary><strong>Troubleshooting</strong></summary>
 
 **Memory tools not appearing?**
 ```bash
-# Run the diagnostic script
 ~/.claudia/diagnose.sh
+# Then restart Claude Code in a NEW terminal
+```
 
-# Common fixes:
-# 1. Restart Claude Code in a NEW terminal (reads .mcp.json at startup)
-# 2. Check daemon health: curl http://localhost:3848/health
-# 3. View logs: tail -f ~/.claudia/daemon-stderr.log
+**Check daemon health:**
+```bash
+curl http://localhost:3848/health
+tail -f ~/.claudia/daemon-stderr.log
 ```
 
 **Ollama not running after reboot?**
 ```bash
 launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist
-# Or start manually: ollama serve
 ```
 
-**Pull models manually**
+**Pull models manually:**
 ```bash
-ollama pull all-minilm:l6-v2    # Embeddings (required for vector search)
+ollama pull all-minilm:l6-v2    # Embeddings
 ollama pull qwen3:4b             # Cognitive tools (optional)
 ```
 
-**Vector search not working?**
-```bash
-~/.claudia/daemon/venv/bin/python -c "import sqlite_vec; print('ok')"
-# If not: ~/.claudia/daemon/venv/bin/pip install sqlite-vec
-```
+</details>
 
 ---
 
 ## Contributing
 
-Claudia is source-available under the PolyForm Noncommercial License. Contributions welcome for noncommercial use.
+Claudia is source-available under the PolyForm Noncommercial License.
 
-- **Template changes:** Edit files in `template-v2/`. Changes apply to new installations.
-- **Memory system:** Python code in `memory-daemon/`. Run tests with `pytest tests/`.
-- **Architecture overview:** See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
-- **Development guide:** See [CLAUDE.md](CLAUDE.md) for the developer workflow.
+- **Template changes:** `template-v2/`
+- **Memory system:** `memory-daemon/` (tests: `pytest tests/`)
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Dev guide:** [CLAUDE.md](CLAUDE.md)
 
 ---
 
@@ -357,24 +333,19 @@ Claudia is source-available under the PolyForm Noncommercial License. Contributi
 
 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
 
-**Free for:** Personal use, research, education, hobby projects, nonprofits, government.
-
-**Requires permission:** Commercial use.
-
-For commercial licensing inquiries: [mail@kbanc.com](mailto:mail@kbanc.com) or [open an issue](https://github.com/kbanc85/claudia/issues).
-
----
-
-## Credits
-
-Created by [Kamil Banc](https://github.com/kbanc85) · [@kamilbanc](https://x.com/kamilbanc)
-
-Part of the [AI Adopters Club](https://aiadopters.club) -- helping teams build AI-first reflexes.
-
-If Claudia helps you, a star on GitHub means a lot.
+**Free for:** Personal use, research, education, nonprofits.
+**Requires permission:** Commercial use. Contact [mail@kbanc.com](mailto:mail@kbanc.com)
 
 ---
 
 <p align="center">
+Created by <a href="https://github.com/kbanc85">Kamil Banc</a> · <a href="https://x.com/kamilbanc">@kamilbanc</a> · <a href="https://aiadopters.club">AI Adopters Club</a>
+</p>
+
+<p align="center">
 <em>"I learn how you work. Let's get started."</em>
+</p>
+
+<p align="center">
+If Claudia helps you, a ⭐ on GitHub means a lot.
 </p>
