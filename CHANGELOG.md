@@ -2,6 +2,29 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.15.0 (2026-02-03)
+
+### Database Switcher
+
+View all Claudia databases, see what's in each, and switch between them.
+
+### Added
+
+- **`/databases` command** -- List all Claudia databases with stats (size, people, memories, last activity). Shows which workspace each database belongs to.
+- **`/databases use <hash>`** -- Switch to a different database by modifying `.mcp.json`. Requires Claude restart to take effect.
+- **`/databases info <hash>`** -- Deep dive into a specific database: entity breakdown, memory types, relationship count, top entities.
+- **`/databases delete <hash>`** -- Delete a database with explicit confirmation. Cannot delete the currently active database.
+- **`_meta` table** -- Databases now store their workspace path internally, making hash-based filenames reversible. Legacy databases show "Unknown (legacy)".
+- **`CLAUDIA_DB_OVERRIDE` env var** -- Force a specific database path, bypassing project hash detection. Used by `/databases use`.
+
+### Technical
+
+- Schema migration v9 adds `_meta` table
+- `CLAUDIA_WORKSPACE_PATH` env var set by daemon on startup
+- Config priority: `CLAUDIA_DB_OVERRIDE` > `CLAUDIA_DEMO_MODE` > project hash > default
+
+---
+
 ## 1.14.1 (2026-02-03)
 
 ### Database Selector
