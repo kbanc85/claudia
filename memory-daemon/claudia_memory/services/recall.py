@@ -1177,6 +1177,371 @@ class RecallService:
             logger.debug(f"Graph traversal failed: {e}")
             return []
 
+    def get_project_network(self, project_name: str) -> Dict[str, Any]:
+        """
+        Get all people and organizations connected to a project.
+
+        Finds the project entity, retrieves all direct relationships (collaborates_on,
+        owns, manages), and gets 1-hop connections from those people.
+
+        Args:
+            project_name: Name of the project entity
+
+        Returns:
+            Dict with project info, direct participants, organizations, and extended network
+        """
+        canonical = self.extractor.canonical_name(project_name)
+
+        # Find project entity
+        project = self.db.get_one(
+            "entities",
+            where="canonical_name = ? AND type = 'project'",
+            where_params=(canonical,),
+        )
+
+        if not project:
+            # Try partial match
+            project = self.db.get_one(
+                "entities",
+                where="canonical_name LIKE ? AND type = 'project'",
+                where_params=(f"%{canonical}%",),
+            )
+
+        if not project:
+            return {"error": f"Project '{project_name}' not found", "project": None}
+
+        result = {
+            "project": {
+                "id": project["id"],
+                "name": project["name"],
+                "description": project["description"],
+                "importance": project["importance"],
+            },
+            "direct_participants": [],
+            "organizations": [],
+            "extended_network": [],
+            "total_people": 0,
+            "total_orgs": 0,
+        }
+
+        try:
+            # Get direct relationships to project
+            direct_rels = self.db.execute(
+                """
+                SELECT r.*, e.id as entity_id, e.name, e.type, e.description, e.importance
+                FROM relationships r
+                JOIN entities e ON (
+                    (r.source_entity_id = ? AND r.target_entity_id = e.id) OR
+                    (r.target_entity_id = ? AND r.source_entity_id = e.id)
+                )
+                WHERE r.strength > 0.1 AND r.invalid_at IS NULL
+                ORDER BY r.strength DESC
+                """,
+                (project["id"], project["id"]),
+                fetch=True,
+            ) or []
+
+            people_ids = []
+            for rel in direct_rels:
+                entity_data = {
+                    "id": rel["entity_id"],
+                    "name": rel["name"],
+                    "type": rel["type"],
+                    "description": rel["description"],
+                    "importance": rel["importance"],
+                    "relationship": rel["relationship_type"],
+                    "strength": rel["strength"],
+                }
+
+                if rel["type"] == "person":
+                    result["direct_participants"].append(entity_data)
+                    people_ids.append(rel["entity_id"])
+                elif rel["type"] == "organization":
+                    result["organizations"].append(entity_data)
+
+            # Get 1-hop connections from direct participants
+            extended_ids = set()
+            for person_id in people_ids[:10]:  # Limit to avoid explosion
+                neighbors = self._expand_graph(person_id, depth=1, limit_per_hop=5)
+                for neighbor in neighbors:
+                    if neighbor["id"] not in people_ids and neighbor["id"] != project["id"]:
+                        if neighbor["id"] not in extended_ids:
+                            extended_ids.add(neighbor["id"])
+                            result["extended_network"].append({
+                                "id": neighbor["id"],
+                                "name": neighbor["name"],
+                                "type": neighbor["type"],
+                                "description": neighbor["description"],
+                                "connected_via": next(
+                                    (p["name"] for p in result["direct_participants"]
+                                     if any(m.get("content", "").find(neighbor["name"]) >= 0
+                                            for m in neighbor.get("top_memories", []))),
+                                    result["direct_participants"][0]["name"] if result["direct_participants"] else "unknown"
+                                ),
+                            })
+
+            result["total_people"] = len(result["direct_participants"]) + len(
+                [e for e in result["extended_network"] if e.get("type") == "person"]
+            )
+            result["total_orgs"] = len(result["organizations"])
+
+        except Exception as e:
+            logger.debug(f"Project network query failed: {e}")
+            result["error"] = str(e)
+
+        return result
+
+    def find_path(
+        self,
+        entity_a: str,
+        entity_b: str,
+        max_depth: int = 4,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Find shortest path between two entities via relationships.
+
+        Uses BFS through the relationships table to find a connection path.
+
+        Args:
+            entity_a: Name of first entity
+            entity_b: Name of second entity
+            max_depth: Maximum hops to search (default 4)
+
+        Returns:
+            List of dicts describing the path, or None if no path found
+        """
+        canonical_a = self.extractor.canonical_name(entity_a)
+        canonical_b = self.extractor.canonical_name(entity_b)
+
+        # Resolve entity IDs
+        ent_a = self.db.get_one(
+            "entities",
+            where="canonical_name = ?",
+            where_params=(canonical_a,),
+        )
+        ent_b = self.db.get_one(
+            "entities",
+            where="canonical_name = ?",
+            where_params=(canonical_b,),
+        )
+
+        if not ent_a or not ent_b:
+            return None
+
+        if ent_a["id"] == ent_b["id"]:
+            return [{"entity": ent_a["name"], "relationship": None, "direction": None}]
+
+        try:
+            # BFS using recursive CTE
+            rows = self.db.execute(
+                """
+                WITH RECURSIVE path_search(entity_id, path, depth) AS (
+                    -- Start from entity A
+                    SELECT ?, json_array(json_object('entity_id', ?, 'name', ?)), 0
+
+                    UNION ALL
+
+                    -- Expand to neighbors
+                    SELECT
+                        CASE
+                            WHEN r.source_entity_id = ps.entity_id THEN r.target_entity_id
+                            ELSE r.source_entity_id
+                        END,
+                        json_insert(
+                            ps.path,
+                            '$[#]',
+                            json_object(
+                                'entity_id', CASE WHEN r.source_entity_id = ps.entity_id THEN r.target_entity_id ELSE r.source_entity_id END,
+                                'name', e.name,
+                                'relationship', r.relationship_type,
+                                'direction', CASE WHEN r.source_entity_id = ps.entity_id THEN 'forward' ELSE 'backward' END
+                            )
+                        ),
+                        ps.depth + 1
+                    FROM path_search ps
+                    JOIN relationships r ON (r.source_entity_id = ps.entity_id OR r.target_entity_id = ps.entity_id)
+                    JOIN entities e ON e.id = CASE WHEN r.source_entity_id = ps.entity_id THEN r.target_entity_id ELSE r.source_entity_id END
+                    WHERE ps.depth < ?
+                      AND r.strength > 0.1
+                      AND r.invalid_at IS NULL
+                      AND json_extract(ps.path, '$[#-1].entity_id') != CASE WHEN r.source_entity_id = ps.entity_id THEN r.target_entity_id ELSE r.source_entity_id END
+                )
+                SELECT path, depth FROM path_search
+                WHERE entity_id = ?
+                ORDER BY depth ASC
+                LIMIT 1
+                """,
+                (ent_a["id"], ent_a["id"], ent_a["name"], max_depth, ent_b["id"]),
+                fetch=True,
+            )
+
+            if rows:
+                path_json = json.loads(rows[0]["path"])
+                return path_json
+
+        except Exception as e:
+            logger.debug(f"Path finding failed: {e}")
+
+        return None
+
+    def get_hub_entities(
+        self,
+        min_connections: int = 5,
+        entity_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """
+        Find most connected entities in the graph.
+
+        Identifies "hub" entities that have many relationships, useful for
+        finding key connectors in the network.
+
+        Args:
+            min_connections: Minimum relationships to be considered a hub
+            entity_type: Filter by entity type (person, organization, etc.)
+            limit: Maximum results to return
+
+        Returns:
+            List of dicts with entity info and connection counts
+        """
+        try:
+            sql = """
+                SELECT
+                    e.id, e.name, e.type, e.description, e.importance,
+                    COUNT(DISTINCT r.id) as connection_count,
+                    GROUP_CONCAT(DISTINCT
+                        CASE
+                            WHEN r.source_entity_id = e.id THEN t.name
+                            ELSE s.name
+                        END
+                    ) as connected_names
+                FROM entities e
+                LEFT JOIN relationships r ON (e.id = r.source_entity_id OR e.id = r.target_entity_id)
+                    AND r.strength > 0.1 AND r.invalid_at IS NULL
+                LEFT JOIN entities s ON r.source_entity_id = s.id
+                LEFT JOIN entities t ON r.target_entity_id = t.id
+                WHERE e.importance > 0.1
+            """
+            params = []
+
+            if entity_type:
+                sql += " AND e.type = ?"
+                params.append(entity_type)
+
+            sql += """
+                GROUP BY e.id
+                HAVING connection_count >= ?
+                ORDER BY connection_count DESC, e.importance DESC
+                LIMIT ?
+            """
+            params.extend([min_connections, limit])
+
+            rows = self.db.execute(sql, tuple(params), fetch=True) or []
+
+            results = []
+            for row in rows:
+                connected_names = row["connected_names"].split(",") if row["connected_names"] else []
+                results.append({
+                    "id": row["id"],
+                    "name": row["name"],
+                    "type": row["type"],
+                    "description": row["description"],
+                    "importance": row["importance"],
+                    "connection_count": row["connection_count"],
+                    "top_connections": connected_names[:5],  # Top 5 connections
+                })
+
+            return results
+
+        except Exception as e:
+            logger.debug(f"Hub detection failed: {e}")
+            return []
+
+    def get_dormant_relationships(
+        self,
+        days: int = 60,
+        min_strength: float = 0.3,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """
+        Find relationships with no recent activity.
+
+        Identifies relationships that may need attention because there
+        hasn't been any recent memory or interaction involving both entities.
+
+        Args:
+            days: Number of days without activity to consider dormant
+            min_strength: Minimum relationship strength to include
+            limit: Maximum results to return
+
+        Returns:
+            List of dicts with relationship info and days since last activity
+        """
+        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+
+        try:
+            # Find relationships where neither entity has recent memories
+            rows = self.db.execute(
+                """
+                SELECT
+                    r.id as relationship_id,
+                    r.relationship_type,
+                    r.strength,
+                    r.created_at as relationship_created,
+                    s.id as source_id, s.name as source_name, s.type as source_type,
+                    t.id as target_id, t.name as target_name, t.type as target_type,
+                    MAX(COALESCE(sm.created_at, '2000-01-01')) as source_last_memory,
+                    MAX(COALESCE(tm.created_at, '2000-01-01')) as target_last_memory
+                FROM relationships r
+                JOIN entities s ON r.source_entity_id = s.id
+                JOIN entities t ON r.target_entity_id = t.id
+                LEFT JOIN memory_entities sme ON sme.entity_id = s.id
+                LEFT JOIN memories sm ON sme.memory_id = sm.id
+                LEFT JOIN memory_entities tme ON tme.entity_id = t.id
+                LEFT JOIN memories tm ON tme.memory_id = tm.id
+                WHERE r.strength >= ?
+                  AND r.invalid_at IS NULL
+                GROUP BY r.id
+                HAVING MAX(source_last_memory) < ? AND MAX(target_last_memory) < ?
+                ORDER BY r.strength DESC, source_last_memory ASC
+                LIMIT ?
+                """,
+                (min_strength, cutoff, cutoff, limit),
+                fetch=True,
+            ) or []
+
+            results = []
+            now = datetime.utcnow()
+            for row in rows:
+                source_last = datetime.fromisoformat(row["source_last_memory"])
+                target_last = datetime.fromisoformat(row["target_last_memory"])
+                most_recent = max(source_last, target_last)
+                days_dormant = (now - most_recent).days
+
+                results.append({
+                    "relationship_id": row["relationship_id"],
+                    "relationship_type": row["relationship_type"],
+                    "strength": row["strength"],
+                    "source": {
+                        "id": row["source_id"],
+                        "name": row["source_name"],
+                        "type": row["source_type"],
+                    },
+                    "target": {
+                        "id": row["target_id"],
+                        "name": row["target_name"],
+                        "type": row["target_type"],
+                    },
+                    "days_dormant": days_dormant,
+                    "last_activity": most_recent.isoformat(),
+                })
+
+            return results
+
+        except Exception as e:
+            logger.debug(f"Dormant relationship detection failed: {e}")
+            return []
+
     def _keyword_search(
         self,
         query: str,
@@ -1281,3 +1646,23 @@ def fetch_by_ids(memory_ids: List[int]) -> List[RecallResult]:
 def trace_memory(memory_id: int) -> Dict[str, Any]:
     """Reconstruct full provenance for a memory"""
     return get_recall_service().trace_memory(memory_id)
+
+
+def get_project_network(project_name: str) -> Dict[str, Any]:
+    """Get all people and organizations connected to a project"""
+    return get_recall_service().get_project_network(project_name)
+
+
+def find_path(entity_a: str, entity_b: str, max_depth: int = 4) -> Optional[List[Dict[str, Any]]]:
+    """Find shortest path between two entities"""
+    return get_recall_service().find_path(entity_a, entity_b, max_depth)
+
+
+def get_hub_entities(min_connections: int = 5, entity_type: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+    """Find most connected entities in the graph"""
+    return get_recall_service().get_hub_entities(min_connections, entity_type, limit)
+
+
+def get_dormant_relationships(days: int = 60, min_strength: float = 0.3, limit: int = 20) -> List[Dict[str, Any]]:
+    """Find relationships with no recent activity"""
+    return get_recall_service().get_dormant_relationships(days, min_strength, limit)

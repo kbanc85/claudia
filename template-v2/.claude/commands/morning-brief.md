@@ -45,7 +45,22 @@ From `memory.recall` or `context/commitments.md`:
 - What's due this week that needs attention today
 - Any blocked items that need unblocking
 
-### 4. Relationship Cooling Alerts
+### 4. Relationship Health Dashboard
+
+From `memory.morning_context` relationship health section:
+
+**Dormant relationships by severity:**
+- **30+ days**: Consider reaching out (still warm)
+- **60+ days**: Relationship cooling (needs attention)
+- **90+ days**: At risk (reconnect soon)
+
+**Introduction opportunities:**
+- People who share attributes but aren't connected
+- Same company, community, or city+industry matches
+
+**Forming clusters:**
+- Groups of 3+ people mentioned together frequently
+- May benefit from formalizing as a project or team
 
 From predictions or checking `people/` files:
 - Anyone not contacted in 60+ days who should be
@@ -100,8 +115,15 @@ Keep it scannable. Lead with predictions and warnings.
   - Last talked: [date]
   - Open items: [any commitments/waiting]
 
-### 👀 Relationships to Reconnect
-- [Person] - last contact [X] days ago
+### 👀 Relationship Health
+**Needs attention:**
+- [Person] ↔ [Person] - [X] days dormant
+
+**Introductions to consider:**
+- [Person A] and [Person B] might benefit from meeting (same [attribute])
+
+**Forming groups:**
+- You're frequently mentioning [names] together
 
 ### ⏳ Waiting On
 - [Item] from [Person] - expected [date], now [status]

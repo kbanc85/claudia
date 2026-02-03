@@ -10,7 +10,7 @@ import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import get_config
 from ..database import get_db
@@ -161,6 +161,22 @@ class ConsolidateService:
         cross_patterns = self._detect_cross_entity_patterns()
         patterns.extend(cross_patterns)
 
+        # Detect inferred connections (attribute-based: same city, industry, community)
+        inferred_patterns = self.detect_inferred_connections()
+        patterns.extend(inferred_patterns)
+
+        # Detect introduction opportunities (people who should know each other)
+        intro_patterns = self._detect_introduction_opportunities()
+        patterns.extend(intro_patterns)
+
+        # Detect forming clusters (3+ people mentioned together frequently)
+        cluster_patterns = self._detect_cluster_forming()
+        patterns.extend(cluster_patterns)
+
+        # Detect opportunities (skill-project matches, network bridges)
+        opportunity_patterns = self.detect_opportunities()
+        patterns.extend(opportunity_patterns)
+
         # Store detected patterns
         for pattern in patterns:
             self._store_pattern(pattern)
@@ -243,6 +259,126 @@ class ConsolidateService:
 
         return patterns
 
+    def infer_connections(self, entity_a_id: int, entity_b_id: int) -> Optional[Tuple[str, float]]:
+        """
+        Infer a likely connection between two entities based on shared attributes.
+
+        Uses entity metadata (geography, industry, company, communities) to suggest
+        likely connections that aren't explicitly stated.
+
+        Args:
+            entity_a_id: First entity ID
+            entity_b_id: Second entity ID
+
+        Returns:
+            Tuple of (relationship_type, confidence) or None if no inference possible
+        """
+        try:
+            entity_a = self.db.get_one("entities", where="id = ?", where_params=(entity_a_id,))
+            entity_b = self.db.get_one("entities", where="id = ?", where_params=(entity_b_id,))
+
+            if not entity_a or not entity_b:
+                return None
+
+            # Safely extract metadata from database row
+            a_meta_raw = entity_a["metadata"] if "metadata" in entity_a.keys() else None
+            b_meta_raw = entity_b["metadata"] if "metadata" in entity_b.keys() else None
+            a_meta = json.loads(a_meta_raw) if a_meta_raw else {}
+            b_meta = json.loads(b_meta_raw) if b_meta_raw else {}
+
+            # Same company = definitely connected (colleagues)
+            a_company = a_meta.get("company")
+            b_company = b_meta.get("company")
+            if a_company and b_company and a_company.lower() == b_company.lower():
+                return ("colleagues", 0.9)
+
+            # Same community = probably know each other
+            a_communities = set(c.lower() for c in a_meta.get("communities", []))
+            b_communities = set(c.lower() for c in b_meta.get("communities", []))
+            if a_communities & b_communities:
+                shared = a_communities & b_communities
+                return ("community_connection", 0.6)
+
+            # Same city + same industry = might know each other
+            a_geo = a_meta.get("geography", {})
+            b_geo = b_meta.get("geography", {})
+            a_city = a_geo.get("city", "").lower() if a_geo else ""
+            b_city = b_geo.get("city", "").lower() if b_geo else ""
+
+            a_industries = set(i.lower() for i in a_meta.get("industries", []))
+            b_industries = set(i.lower() for i in b_meta.get("industries", []))
+
+            if a_city and a_city == b_city and a_industries & b_industries:
+                return ("likely_connected", 0.3)
+
+            # Same industry alone = weak inference
+            if a_industries & b_industries and len(a_industries & b_industries) >= 1:
+                return ("industry_peers", 0.2)
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"Connection inference failed: {e}")
+            return None
+
+    def detect_inferred_connections(self) -> List[DetectedPattern]:
+        """
+        Detect potential connections between entities based on shared attributes.
+
+        Scans person entities for shared geography, industry, or communities
+        and suggests relationships that don't yet exist.
+
+        Returns:
+            List of DetectedPattern for potential connections
+        """
+        patterns = []
+
+        try:
+            # Get person entities with metadata
+            entities = self.db.execute(
+                """
+                SELECT id, name, metadata FROM entities
+                WHERE type = 'person' AND importance > 0.2 AND metadata IS NOT NULL
+                ORDER BY importance DESC
+                LIMIT 100
+                """,
+                fetch=True,
+            ) or []
+
+            # Compare pairs
+            for i in range(len(entities)):
+                for j in range(i + 1, len(entities)):
+                    entity_a = entities[i]
+                    entity_b = entities[j]
+
+                    # Check if relationship already exists
+                    existing = self.db.get_one(
+                        "relationships",
+                        where="(source_entity_id = ? AND target_entity_id = ?) OR (source_entity_id = ? AND target_entity_id = ?)",
+                        where_params=(entity_a["id"], entity_b["id"], entity_b["id"], entity_a["id"]),
+                    )
+                    if existing:
+                        continue
+
+                    # Try to infer connection
+                    inference = self.infer_connections(entity_a["id"], entity_b["id"])
+                    if inference:
+                        rel_type, confidence = inference
+                        patterns.append(
+                            DetectedPattern(
+                                name=f"inferred_connection_{entity_a['id']}_{entity_b['id']}",
+                                description=f"{entity_a['name']} and {entity_b['name']} may be connected ({rel_type})",
+                                pattern_type="relationship",
+                                confidence=confidence,
+                                evidence=[f"Inferred relationship type: {rel_type}"],
+                            )
+                        )
+
+        except Exception as e:
+            logger.debug(f"Inferred connection detection failed: {e}")
+
+        return patterns
+
     def _detect_cross_entity_patterns(self) -> List[DetectedPattern]:
         """Detect person entities that co-occur in memories but have no explicit relationship."""
         patterns = []
@@ -292,6 +428,142 @@ class ConsolidateService:
 
         except Exception as e:
             logger.debug(f"Cross-entity detection failed: {e}")
+
+        return patterns
+
+    def _detect_introduction_opportunities(self) -> List[DetectedPattern]:
+        """
+        Detect pairs of people who share attributes but aren't directly connected.
+
+        Uses the infer_connections logic to find people who likely should know
+        each other based on shared geography, industry, or communities.
+
+        Returns:
+            List of DetectedPattern for introduction opportunities
+        """
+        patterns = []
+
+        try:
+            # Get person entities with metadata
+            entities = self.db.execute(
+                """
+                SELECT id, name, metadata FROM entities
+                WHERE type = 'person' AND importance > 0.3 AND metadata IS NOT NULL
+                ORDER BY importance DESC
+                LIMIT 50
+                """,
+                fetch=True,
+            ) or []
+
+            for i in range(len(entities)):
+                for j in range(i + 1, len(entities)):
+                    entity_a = entities[i]
+                    entity_b = entities[j]
+
+                    # Check if relationship already exists
+                    existing = self.db.get_one(
+                        "relationships",
+                        where="(source_entity_id = ? AND target_entity_id = ?) OR (source_entity_id = ? AND target_entity_id = ?)",
+                        where_params=(entity_a["id"], entity_b["id"], entity_b["id"], entity_a["id"]),
+                    )
+                    if existing:
+                        continue
+
+                    # Try to infer connection
+                    inference = self.infer_connections(entity_a["id"], entity_b["id"])
+                    if inference and inference[1] >= 0.5:  # Only strong inferences
+                        rel_type, confidence = inference
+                        a_meta_raw = entity_a["metadata"] if "metadata" in entity_a.keys() else None
+                        b_meta_raw = entity_b["metadata"] if "metadata" in entity_b.keys() else None
+                        a_meta = json.loads(a_meta_raw) if a_meta_raw else {}
+                        b_meta = json.loads(b_meta_raw) if b_meta_raw else {}
+
+                        # Build reason
+                        reason_parts = []
+                        if rel_type == "colleagues":
+                            reason_parts.append(f"both at {a_meta.get('company', 'same company')}")
+                        elif rel_type == "community_connection":
+                            shared_communities = set(a_meta.get("communities", [])) & set(b_meta.get("communities", []))
+                            if shared_communities:
+                                reason_parts.append(f"both in {list(shared_communities)[0]}")
+
+                        reason = " and ".join(reason_parts) if reason_parts else rel_type
+
+                        patterns.append(
+                            DetectedPattern(
+                                name=f"intro_opportunity_{entity_a['id']}_{entity_b['id']}",
+                                description=f"{entity_a['name']} and {entity_b['name']} might benefit from meeting ({reason})",
+                                pattern_type="relationship",
+                                confidence=confidence,
+                                evidence=[f"Shared attributes suggest connection: {rel_type}"],
+                            )
+                        )
+
+        except Exception as e:
+            logger.debug(f"Introduction opportunity detection failed: {e}")
+
+        return patterns[:10]  # Limit to top 10
+
+    def _detect_cluster_forming(self) -> List[DetectedPattern]:
+        """
+        Detect when 3+ people are mentioned together frequently.
+
+        Identifies emerging collaboration groups that might benefit from
+        being formalized as a project or team.
+
+        Returns:
+            List of DetectedPattern for forming clusters
+        """
+        patterns = []
+
+        try:
+            # Find memories with 3+ person entities in the last 30 days
+            cutoff = (datetime.utcnow() - timedelta(days=30)).isoformat()
+
+            cluster_rows = self.db.execute(
+                """
+                SELECT
+                    m.id as memory_id,
+                    GROUP_CONCAT(e.name) as people,
+                    COUNT(DISTINCT e.id) as person_count
+                FROM memories m
+                JOIN memory_entities me ON m.id = me.memory_id
+                JOIN entities e ON me.entity_id = e.id AND e.type = 'person'
+                WHERE m.created_at >= ?
+                GROUP BY m.id
+                HAVING person_count >= 3
+                ORDER BY m.created_at DESC
+                LIMIT 50
+                """,
+                (cutoff,),
+                fetch=True,
+            ) or []
+
+            # Count co-occurrence frequency
+            cluster_counts = Counter()
+            for row in cluster_rows:
+                people = tuple(sorted(row["people"].split(",")))
+                cluster_counts[people] += 1
+
+            # Report clusters appearing 2+ times
+            for people, count in cluster_counts.most_common(5):
+                if count >= 2:
+                    people_str = ", ".join(people[:3])
+                    if len(people) > 3:
+                        people_str += f" and {len(people) - 3} others"
+
+                    patterns.append(
+                        DetectedPattern(
+                            name=f"cluster_forming_{'_'.join(p.split()[0].lower() for p in people[:3])}",
+                            description=f"You're frequently mentioning {people_str} together ({count} times recently)",
+                            pattern_type="behavioral",
+                            confidence=min(0.9, 0.5 + count * 0.1),
+                            evidence=[f"Co-mentioned in {count} memories in the last 30 days"],
+                        )
+                    )
+
+        except Exception as e:
+            logger.debug(f"Cluster detection failed: {e}")
 
         return patterns
 
@@ -407,6 +679,202 @@ class ConsolidateService:
 
         logger.info(f"Generated {len(predictions)} predictions")
         return predictions
+
+    def detect_opportunities(self) -> List[DetectedPattern]:
+        """
+        Detect cross-network patterns that surface business/relationship opportunities.
+
+        Includes:
+        - Skill-project matches: Person has skills matching a project they're not on
+        - Network bridges: User bridges distinct clusters
+        - Timing alignment: Related entities have upcoming events
+
+        Returns:
+            List of DetectedPattern for opportunities
+        """
+        patterns = []
+
+        # 1. Skill-project matches
+        skill_matches = self._detect_skill_project_matches()
+        patterns.extend(skill_matches)
+
+        # 2. Network bridges
+        bridges = self._detect_network_bridges()
+        patterns.extend(bridges)
+
+        return patterns
+
+    def _detect_skill_project_matches(self) -> List[DetectedPattern]:
+        """
+        Find people with skills/interests that match projects they're not connected to.
+
+        Uses entity metadata (industries, role) and project descriptions to find matches.
+        """
+        patterns = []
+
+        try:
+            # Get projects with descriptions
+            projects = self.db.execute(
+                """
+                SELECT id, name, description, metadata FROM entities
+                WHERE type = 'project' AND importance > 0.2
+                ORDER BY importance DESC
+                LIMIT 20
+                """,
+                fetch=True,
+            ) or []
+
+            # Get people with attributes
+            people = self.db.execute(
+                """
+                SELECT id, name, metadata FROM entities
+                WHERE type = 'person' AND importance > 0.3 AND metadata IS NOT NULL
+                ORDER BY importance DESC
+                LIMIT 50
+                """,
+                fetch=True,
+            ) or []
+
+            for project in projects:
+                proj_desc = (project["description"] or "").lower()
+                proj_meta = json.loads(project["metadata"] or "{}") if project.get("metadata") else {}
+                proj_industries = set(proj_meta.get("industries", []))
+
+                # Keywords from project description
+                proj_keywords = set()
+                for keyword_list in self.config.__dict__.get("industry_keywords", {}).values():
+                    for kw in keyword_list if isinstance(keyword_list, list) else []:
+                        if kw in proj_desc:
+                            proj_keywords.add(kw)
+
+                for person in people:
+                    # Check if person is already connected to project
+                    existing = self.db.get_one(
+                        "relationships",
+                        where="(source_entity_id = ? AND target_entity_id = ?) OR (source_entity_id = ? AND target_entity_id = ?)",
+                        where_params=(person["id"], project["id"], project["id"], person["id"]),
+                    )
+                    if existing:
+                        continue
+
+                    person_meta = json.loads(person["metadata"] or "{}") if person.get("metadata") else {}
+                    person_industries = set(person_meta.get("industries", []))
+                    person_role = person_meta.get("role", "").lower()
+
+                    # Check for industry match
+                    shared_industries = proj_industries & person_industries
+                    if shared_industries:
+                        patterns.append(
+                            DetectedPattern(
+                                name=f"skill_project_match_{person['id']}_{project['id']}",
+                                description=f"{person['name']} might be valuable for {project['name']} (shares {', '.join(shared_industries)} expertise)",
+                                pattern_type="opportunity",
+                                confidence=0.6,
+                                evidence=[f"Shared industries: {', '.join(shared_industries)}"],
+                            )
+                        )
+                        continue
+
+                    # Check for role match in description
+                    if person_role and person_role in proj_desc:
+                        patterns.append(
+                            DetectedPattern(
+                                name=f"skill_project_match_{person['id']}_{project['id']}",
+                                description=f"{person['name']} ({person_role}) might be valuable for {project['name']}",
+                                pattern_type="opportunity",
+                                confidence=0.5,
+                                evidence=[f"Role '{person_role}' mentioned in project description"],
+                            )
+                        )
+
+        except Exception as e:
+            logger.debug(f"Skill-project matching failed: {e}")
+
+        return patterns[:10]  # Limit to top 10
+
+    def _detect_network_bridges(self) -> List[DetectedPattern]:
+        """
+        Detect when the user bridges distinct clusters in their network.
+
+        Uses community detection heuristics to find groups of densely connected
+        entities that are only connected through a single hub.
+        """
+        patterns = []
+
+        try:
+            # Find people with high connection counts
+            hubs = self.db.execute(
+                """
+                SELECT e.id, e.name,
+                       COUNT(DISTINCT r.id) as connection_count
+                FROM entities e
+                LEFT JOIN relationships r ON (e.id = r.source_entity_id OR e.id = r.target_entity_id)
+                    AND r.strength > 0.2 AND r.invalid_at IS NULL
+                WHERE e.type = 'person' AND e.importance > 0.4
+                GROUP BY e.id
+                HAVING connection_count >= 5
+                ORDER BY connection_count DESC
+                LIMIT 10
+                """,
+                fetch=True,
+            ) or []
+
+            for hub in hubs:
+                # Get all neighbors of this hub
+                neighbors = self.db.execute(
+                    """
+                    SELECT DISTINCT
+                        CASE WHEN r.source_entity_id = ? THEN r.target_entity_id ELSE r.source_entity_id END as neighbor_id,
+                        e.name as neighbor_name
+                    FROM relationships r
+                    JOIN entities e ON e.id = CASE WHEN r.source_entity_id = ? THEN r.target_entity_id ELSE r.source_entity_id END
+                    WHERE (r.source_entity_id = ? OR r.target_entity_id = ?)
+                      AND r.strength > 0.2 AND r.invalid_at IS NULL
+                      AND e.type = 'person'
+                    """,
+                    (hub["id"], hub["id"], hub["id"], hub["id"]),
+                    fetch=True,
+                ) or []
+
+                if len(neighbors) < 4:
+                    continue
+
+                # Check how many neighbors are connected to each other (not through hub)
+                neighbor_ids = [n["neighbor_id"] for n in neighbors]
+                interconnections = self.db.execute(
+                    f"""
+                    SELECT COUNT(*) as cnt FROM relationships
+                    WHERE source_entity_id IN ({','.join('?' for _ in neighbor_ids)})
+                      AND target_entity_id IN ({','.join('?' for _ in neighbor_ids)})
+                      AND strength > 0.2 AND invalid_at IS NULL
+                    """,
+                    tuple(neighbor_ids) + tuple(neighbor_ids),
+                    fetch=True,
+                )
+
+                inter_count = interconnections[0]["cnt"] if interconnections else 0
+                max_possible = len(neighbor_ids) * (len(neighbor_ids) - 1) / 2
+
+                # If few interconnections relative to possible, this is a bridge
+                if max_possible > 0 and inter_count / max_possible < 0.2:
+                    # Find distinct groups
+                    group_a = neighbors[:len(neighbors)//2]
+                    group_b = neighbors[len(neighbors)//2:]
+
+                    patterns.append(
+                        DetectedPattern(
+                            name=f"network_bridge_{hub['id']}",
+                            description=f"{hub['name']} bridges distinct groups ({len(group_a)} and {len(group_b)} people who don't know each other)",
+                            pattern_type="opportunity",
+                            confidence=0.7,
+                            evidence=[f"Only {inter_count} connections among {len(neighbor_ids)} neighbors"],
+                        )
+                    )
+
+        except Exception as e:
+            logger.debug(f"Network bridge detection failed: {e}")
+
+        return patterns
 
     def _generate_reconnect_predictions(self) -> List[Prediction]:
         """Suggest people to reconnect with"""

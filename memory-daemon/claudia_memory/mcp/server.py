@@ -27,6 +27,10 @@ from ..services.consolidate import (
 )
 from ..services.recall import (
     fetch_by_ids,
+    find_path,
+    get_dormant_relationships,
+    get_hub_entities,
+    get_project_network,
     get_recall_service,
     recall,
     recall_about,
@@ -734,6 +738,107 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.project_network",
+            description=(
+                "Get all people and organizations connected to a project. "
+                "Returns direct participants, organizations involved, and 1-hop extended network. "
+                "Use when asked 'who's involved in [project]?' or to understand project stakeholders."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Name of the project to analyze",
+                    },
+                },
+                "required": ["project"],
+            },
+        ),
+        Tool(
+            name="memory.find_path",
+            description=(
+                "Find connection path between two entities. "
+                "Returns the shortest chain of relationships connecting them, or null if unconnected. "
+                "Use when asked 'how is [A] connected to [B]?' or 'do [A] and [B] know each other?'"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity_a": {
+                        "type": "string",
+                        "description": "Name of the first entity",
+                    },
+                    "entity_b": {
+                        "type": "string",
+                        "description": "Name of the second entity",
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum hops to search (default 4)",
+                        "default": 4,
+                    },
+                },
+                "required": ["entity_a", "entity_b"],
+            },
+        ),
+        Tool(
+            name="memory.network_hubs",
+            description=(
+                "Find most connected entities in the network. "
+                "Identifies 'hub' people or organizations with many relationships. "
+                "Use when asked 'who knows the most people?' or 'who are the key connectors?'"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "min_connections": {
+                        "type": "integer",
+                        "description": "Minimum relationships to be considered a hub (default 5)",
+                        "default": 5,
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "enum": ["person", "organization", "project"],
+                        "description": "Filter by entity type (optional)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum results to return (default 20)",
+                        "default": 20,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.dormant_relationships",
+            description=(
+                "Find relationships with no recent activity. "
+                "Identifies connections that may need attention because there hasn't been "
+                "any recent memory or interaction. Use for relationship health monitoring."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Days without activity to consider dormant (default 60)",
+                        "default": 60,
+                    },
+                    "min_strength": {
+                        "type": "number",
+                        "description": "Minimum relationship strength to include (default 0.3)",
+                        "default": 0.3,
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum results to return (default 20)",
+                        "default": 20,
+                    },
+                },
+            },
+        ),
+        Tool(
             name="cognitive.ingest",
             description=(
                 "Extract structured data from raw text using a local language model. "
@@ -1263,6 +1368,62 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 ]
             )
 
+        elif name == "memory.project_network":
+            result = get_project_network(project_name=arguments["project"])
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, default=str),
+                    )
+                ]
+            )
+
+        elif name == "memory.find_path":
+            result = find_path(
+                entity_a=arguments["entity_a"],
+                entity_b=arguments["entity_b"],
+                max_depth=arguments.get("max_depth", 4),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"path": result, "connected": result is not None}),
+                    )
+                ]
+            )
+
+        elif name == "memory.network_hubs":
+            result = get_hub_entities(
+                min_connections=arguments.get("min_connections", 5),
+                entity_type=arguments.get("entity_type"),
+                limit=arguments.get("limit", 20),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"hubs": result, "count": len(result)}),
+                    )
+                ]
+            )
+
+        elif name == "memory.dormant_relationships":
+            result = get_dormant_relationships(
+                days=arguments.get("days", 60),
+                min_strength=arguments.get("min_strength", 0.3),
+                limit=arguments.get("limit", 20),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"dormant": result, "count": len(result)}),
+                    )
+                ]
+            )
+
         elif name == "memory.trace":
             result = trace_memory(memory_id=arguments["memory_id"])
             return CallToolResult(
@@ -1709,6 +1870,63 @@ def _build_morning_context() -> str:
             sections.append("")
     except Exception as e:
         logger.debug(f"Could not detect cross-entity patterns: {e}")
+
+    # 3.5 Relationship Health Dashboard
+    try:
+        # Dormant relationships (30/60/90 day buckets)
+        dormant_30 = get_dormant_relationships(days=30, min_strength=0.4, limit=5)
+        dormant_60 = get_dormant_relationships(days=60, min_strength=0.3, limit=5)
+        dormant_90 = get_dormant_relationships(days=90, min_strength=0.2, limit=5)
+
+        # Deduplicate (90 includes 60 includes 30)
+        seen_ids = set()
+        buckets = {"30d": [], "60d": [], "90d": []}
+        for rel in dormant_30:
+            buckets["30d"].append(rel)
+            seen_ids.add(rel["relationship_id"])
+        for rel in dormant_60:
+            if rel["relationship_id"] not in seen_ids:
+                buckets["60d"].append(rel)
+                seen_ids.add(rel["relationship_id"])
+        for rel in dormant_90:
+            if rel["relationship_id"] not in seen_ids:
+                buckets["90d"].append(rel)
+
+        total_dormant = len(buckets["30d"]) + len(buckets["60d"]) + len(buckets["90d"])
+        if total_dormant > 0:
+            sections.append(f"## Relationship Health ({total_dormant} need attention)\n")
+            if buckets["30d"]:
+                sections.append("**30+ days dormant (consider reaching out):**")
+                for rel in buckets["30d"][:3]:
+                    sections.append(f"- {rel['source']['name']} ↔ {rel['target']['name']} ({rel['days_dormant']}d)")
+            if buckets["60d"]:
+                sections.append("\n**60+ days dormant (relationship cooling):**")
+                for rel in buckets["60d"][:3]:
+                    sections.append(f"- {rel['source']['name']} ↔ {rel['target']['name']} ({rel['days_dormant']}d)")
+            if buckets["90d"]:
+                sections.append("\n**90+ days dormant (at risk):**")
+                for rel in buckets["90d"][:3]:
+                    sections.append(f"- {rel['source']['name']} ↔ {rel['target']['name']} ({rel['days_dormant']}d)")
+            sections.append("")
+
+        # Introduction opportunities
+        intro_patterns = consolidate_svc._detect_introduction_opportunities()
+        if intro_patterns:
+            sections.append(f"## Introduction Opportunities ({len(intro_patterns)})\n")
+            for p in intro_patterns[:5]:
+                sections.append(f"- {p.description}")
+            sections.append("")
+
+        # Forming clusters
+        cluster_patterns = consolidate_svc._detect_cluster_forming()
+        if cluster_patterns:
+            sections.append(f"## Forming Groups ({len(cluster_patterns)})\n")
+            for p in cluster_patterns[:3]:
+                sections.append(f"- {p.description}")
+            sections.append("")
+
+    except Exception as e:
+        logger.debug(f"Could not build relationship health: {e}")
 
     # 4. Active predictions
     try:

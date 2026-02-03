@@ -143,11 +143,14 @@ class TestMorningContext:
             with patch("claudia_memory.mcp.server.get_db", return_value=db), \
                  patch("claudia_memory.mcp.server.get_consolidate_service") as mock_cons, \
                  patch("claudia_memory.mcp.server.get_recall_service") as mock_recall, \
-                 patch("claudia_memory.mcp.server.get_predictions", return_value=[]):
+                 patch("claudia_memory.mcp.server.get_predictions", return_value=[]), \
+                 patch("claudia_memory.mcp.server.get_dormant_relationships", return_value=[]):
 
                 mock_cons_svc = MagicMock()
                 mock_cons_svc._detect_cooling_relationships.return_value = []
                 mock_cons_svc._detect_cross_entity_patterns.return_value = []
+                mock_cons_svc._detect_introduction_opportunities.return_value = []
+                mock_cons_svc._detect_cluster_forming.return_value = []
                 mock_cons.return_value = mock_cons_svc
 
                 mock_recall_svc = MagicMock()
@@ -181,11 +184,14 @@ class TestMorningContext:
             with patch("claudia_memory.mcp.server.get_db", return_value=db), \
                  patch("claudia_memory.mcp.server.get_consolidate_service") as mock_cons, \
                  patch("claudia_memory.mcp.server.get_recall_service") as mock_recall, \
-                 patch("claudia_memory.mcp.server.get_predictions", return_value=[]):
+                 patch("claudia_memory.mcp.server.get_predictions", return_value=[]), \
+                 patch("claudia_memory.mcp.server.get_dormant_relationships", return_value=[]):
 
                 mock_cons_svc = MagicMock()
                 mock_cons_svc._detect_cooling_relationships.return_value = []
                 mock_cons_svc._detect_cross_entity_patterns.return_value = []
+                mock_cons_svc._detect_introduction_opportunities.return_value = []
+                mock_cons_svc._detect_cluster_forming.return_value = []
                 mock_cons.return_value = mock_cons_svc
 
                 mock_recall_svc = MagicMock()
