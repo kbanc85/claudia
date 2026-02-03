@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.17.1 (2026-02-03)
+
+### Docs
+
+- Added upgrade instructions for existing users to install the brain visualizer
+
+---
+
 ## 1.17.0 (2026-02-03)
 
 ### Brain Visualizer Auto-Install
