@@ -62,15 +62,23 @@ ${colors.dim}by Kamil Banc${colors.reset}
 async function main() {
   console.log(banner);
 
-  // Determine target directory
+  // Determine target directory and flags
   const args = process.argv.slice(2);
-  const arg = args[0];
+
+  // Check for --demo flag
+  const isDemoMode = args.includes('--demo');
+  const filteredArgs = args.filter(a => a !== '--demo');
+  const arg = filteredArgs[0];
 
   // Support "." or "upgrade" for current directory
   const isCurrentDir = arg === '.' || arg === 'upgrade';
   const targetDir = isCurrentDir ? '.' : (arg || 'claudia');
   const targetPath = isCurrentDir ? process.cwd() : join(process.cwd(), targetDir);
   const displayDir = isCurrentDir ? 'current directory' : targetDir;
+
+  if (isDemoMode) {
+    console.log(`${colors.yellow}🎭 Demo mode${colors.reset} - Will seed with example data after install`);
+  }
 
   // Check if directory already exists with Claudia files
   let isUpgrade = false;
@@ -151,6 +159,50 @@ async function main() {
   const setupMemory = await askYesNo(`\n${colors.yellow}?${colors.reset} Set up enhanced memory system? (recommended) [y/n]: `);
   const setupGateway = await askYesNo(`${colors.yellow}?${colors.reset} Set up messaging gateway (Telegram/Slack)? [y/n]: `);
   rl.close();
+
+  // Helper: seed demo database using spawn (safe, no shell injection)
+  function seedDemoDatabase(targetPath, mcpPath, callback) {
+    console.log(`\n${colors.cyan}Seeding demo database...${colors.reset}`);
+    const seedScript = join(__dirname, '..', 'memory-daemon', 'scripts', 'seed_demo.py');
+    const pythonPath = isWindows
+      ? join(homedir(), '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
+      : join(homedir(), '.claudia', 'daemon', 'venv', 'bin', 'python');
+
+    const seedProc = spawn(pythonPath, [seedScript, '--workspace', targetPath, '--force'], {
+      stdio: 'inherit'
+    });
+
+    seedProc.on('close', (seedCode) => {
+      if (seedCode === 0) {
+        console.log(`${colors.green}✓${colors.reset} Demo data seeded (isolated in ~/.claudia/demo/)`);
+        console.log(`${colors.dim}  Your real data directory (~/.claudia/memory/) is untouched.${colors.reset}`);
+
+        // Add CLAUDIA_DEMO_MODE to .mcp.json env
+        if (existsSync(mcpPath)) {
+          try {
+            let mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
+            if (mcpConfig.mcpServers && mcpConfig.mcpServers['claudia-memory']) {
+              mcpConfig.mcpServers['claudia-memory'].env = mcpConfig.mcpServers['claudia-memory'].env || {};
+              mcpConfig.mcpServers['claudia-memory'].env.CLAUDIA_DEMO_MODE = '1';
+              writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
+              console.log(`${colors.green}✓${colors.reset} Configured to use demo database`);
+            }
+          } catch (e) {
+            console.log(`${colors.yellow}!${colors.reset} Could not update .mcp.json for demo mode`);
+          }
+        }
+      } else {
+        console.log(`${colors.yellow}!${colors.reset} Could not seed demo data`);
+        console.log(`  You can seed manually: python ~/.claudia/daemon/venv/bin/python ~/.claudia/daemon/memory-daemon/scripts/seed_demo.py`);
+      }
+      callback();
+    });
+
+    seedProc.on('error', (err) => {
+      console.log(`${colors.yellow}!${colors.reset} Could not seed demo data: ${err.message}`);
+      callback();
+    });
+  }
 
   // Helper: run gateway install script and call back when done
   function runGatewaySetup(callback) {
@@ -262,6 +314,13 @@ async function main() {
               };
               writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
               console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
+            }
+
+            // Seed demo database if --demo flag was passed
+            if (isDemoMode) {
+              const mcpPathForDemo = join(targetPath, '.mcp.json');
+              seedDemoDatabase(targetPath, mcpPathForDemo, () => maybeRunGateway(memoryOk));
+              return; // Wait for demo seed to complete
             }
           } else {
             console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);

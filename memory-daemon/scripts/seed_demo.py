@@ -648,36 +648,56 @@ def seed_database(db: Database):
     print(f"   - {len(episodes)} episodes")
 
 
+def get_demo_db_path() -> Path:
+    """Return the safe, isolated demo database path."""
+    # Demo database ALWAYS goes in a dedicated demo directory
+    # This prevents any possibility of overwriting real user data
+    return Path(os.path.expanduser("~/.claudia/demo/claudia-demo.db"))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Seed Claudia demo database")
     parser.add_argument(
-        "--db-path",
-        default=os.path.expanduser("~/.claudia/memory/demo.db"),
-        help="Path to database file (default: ~/.claudia/memory/demo.db)"
+        "--workspace",
+        help="Target workspace directory (creates workspace-specific demo db)"
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite existing database"
+        help="Overwrite existing demo database"
     )
     args = parser.parse_args()
 
-    db_path = Path(args.db_path)
+    # SAFETY: Demo database ALWAYS goes in isolated demo directory
+    # Never in the main memory directory where real data lives
+    if args.workspace:
+        # For workspace-specific demo, still use demo subdirectory
+        workspace_hash = hash(args.workspace) & 0xFFFFFFFF
+        db_path = Path(os.path.expanduser(f"~/.claudia/demo/{workspace_hash:08x}.db"))
+    else:
+        db_path = get_demo_db_path()
 
-    # Create directory if needed
+    # Create demo directory if needed
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # SAFETY CHECK: Refuse to write to main memory directory
+    if "memory" in str(db_path) and "demo" not in str(db_path):
+        print("❌ SAFETY: Cannot write demo data to main memory directory")
+        print("   Demo data is isolated in ~/.claudia/demo/")
+        sys.exit(1)
 
     # Check for existing database
     if db_path.exists():
         if args.force:
-            print(f"🗑️  Removing existing database: {db_path}")
+            print(f"🗑️  Removing existing demo database: {db_path}")
             db_path.unlink()
         else:
-            print(f"❌ Database already exists: {db_path}")
+            print(f"❌ Demo database already exists: {db_path}")
             print("   Use --force to overwrite")
             sys.exit(1)
 
-    print(f"📁 Creating database: {db_path}")
+    print(f"📁 Creating demo database: {db_path}")
+    print("   (isolated in ~/.claudia/demo/ - your real data is safe)")
 
     # Create and seed database
     db = Database(db_path)
@@ -689,9 +709,11 @@ def main():
     finally:
         db.close()
 
-    print(f"\n🎉 Done! Database ready at: {db_path}")
-    print(f"\nTo use this database, set CLAUDIA_DB_PATH={db_path}")
-    print("Or copy it to replace your workspace database.")
+    print(f"\n🎉 Done! Demo database ready at: {db_path}")
+    print(f"\n📋 To use the demo database:")
+    print(f"   export CLAUDIA_DEMO_MODE=1")
+    print(f"\n   Or copy to a test installation:")
+    print(f"   cp {db_path} <your-test-install>/.claudia/memory/claudia.db")
 
 
 if __name__ == "__main__":

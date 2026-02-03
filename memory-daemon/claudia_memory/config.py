@@ -123,9 +123,18 @@ class MemoryConfig:
                 # Use defaults on error
                 pass
 
+        # DEMO MODE: Use isolated demo database (never touches real data)
+        # Set CLAUDIA_DEMO_MODE=1 in environment to use demo database
+        if os.environ.get("CLAUDIA_DEMO_MODE") == "1":
+            if project_id:
+                # Workspace-specific demo database
+                config.db_path = Path.home() / ".claudia" / "demo" / f"{project_id}.db"
+            else:
+                # Global demo database
+                config.db_path = Path.home() / ".claudia" / "demo" / "claudia-demo.db"
         # Override database path for project isolation
         # This ensures each project gets its own isolated database
-        if project_id:
+        elif project_id:
             config.db_path = Path.home() / ".claudia" / "memory" / f"{project_id}.db"
 
         # Ensure directories exist
