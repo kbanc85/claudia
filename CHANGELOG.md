@@ -2,6 +2,37 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.14.0 (2026-02-03)
+
+### Brain Visualizer
+
+Full 3D memory visualization with design controls and per-project database isolation.
+
+### Added
+
+- **Three.js Brain Visualizer** -- Real-time 3D force-directed graph of your memory system. Entities, relationships, memories, and patterns rendered with bloom, particles, and ambient effects.
+- **Design control panel** -- Press `H` to open live GUI. Adjust colors, bloom, fog, animations, particles, and more in real-time. Export/import configs as JSON.
+- **`/brain` command** -- Launch the visualizer from any Claudia session. Auto-detects and starts API backend + frontend.
+- **Per-project database isolation** -- Visualizer uses `--project-dir` to select the correct database via SHA256 path hashing. Each Claudia installation sees only its own memories.
+- **API backend** (`visualizer/`) -- Express server on port 3849. Endpoints: `/api/graph`, `/api/stats`, `/api/entity/:id`, `/api/timeline`, `/api/events` (SSE).
+- **~300 config parameters** -- Full control over entity colors, memory colors, link colors, lighting, nodes, links, particles, animations, bloom, fog, ambient particles, starfield, nebula, camera, and simulation forces.
+
+### Architecture
+
+```
+Port 3848: Memory daemon (MCP, embeddings)
+Port 3849: API server (graph data from SQLite)
+Port 5173: Vite frontend (Three.js visualization)
+```
+
+### Stats
+
+- 2 new directories: `visualizer/`, `visualizer-threejs/`
+- 25 new files
+- ~10,000 lines added
+
+---
+
 ## 1.13.1 (2026-02-03)
 
 ### Demo Mode
