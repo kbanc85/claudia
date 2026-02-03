@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import hashlib
 import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -170,6 +171,8 @@ def main():
         project_id = get_project_hash(args.project_dir)
         # Set project context early for commands that don't call run_daemon
         set_project_id(project_id)
+        # Set workspace path environment variable for database metadata
+        os.environ["CLAUDIA_WORKSPACE_PATH"] = args.project_dir
 
     if args.consolidate:
         # One-shot consolidation

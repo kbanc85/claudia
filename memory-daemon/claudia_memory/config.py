@@ -123,22 +123,33 @@ class MemoryConfig:
                 # Use defaults on error
                 pass
 
+        # DATABASE PATH OVERRIDE: Explicit database path takes highest priority
+        # Set CLAUDIA_DB_OVERRIDE to a full .db path to force that database
+        # Used by /databases use command to switch between databases
+        db_override = os.environ.get("CLAUDIA_DB_OVERRIDE")
+        if db_override:
+            config.db_path = Path(db_override)
+            # Don't create directories for override paths - they should already exist
         # DEMO MODE: Use isolated demo database (never touches real data)
         # Set CLAUDIA_DEMO_MODE=1 in environment to use demo database
-        if os.environ.get("CLAUDIA_DEMO_MODE") == "1":
+        elif os.environ.get("CLAUDIA_DEMO_MODE") == "1":
             if project_id:
                 # Workspace-specific demo database
                 config.db_path = Path.home() / ".claudia" / "demo" / f"{project_id}.db"
             else:
                 # Global demo database
                 config.db_path = Path.home() / ".claudia" / "demo" / "claudia-demo.db"
+            config.db_path.parent.mkdir(parents=True, exist_ok=True)
         # Override database path for project isolation
         # This ensures each project gets its own isolated database
         elif project_id:
             config.db_path = Path.home() / ".claudia" / "memory" / f"{project_id}.db"
+            config.db_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # Default path
+            config.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Ensure directories exist
-        config.db_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure log directory exists
         config.log_path.parent.mkdir(parents=True, exist_ok=True)
 
         return config

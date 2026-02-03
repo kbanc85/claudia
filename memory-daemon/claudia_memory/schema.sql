@@ -294,6 +294,17 @@ CREATE TABLE IF NOT EXISTS memory_sources (
 CREATE INDEX IF NOT EXISTS idx_memory_sources_doc ON memory_sources(document_id);
 
 -- ============================================================================
+-- DATABASE METADATA
+-- ============================================================================
+
+-- Stores database-level metadata like workspace path for identification
+CREATE TABLE IF NOT EXISTS _meta (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ============================================================================
 -- MIGRATION TRACKING
 -- ============================================================================
 
@@ -328,3 +339,6 @@ VALUES (7, 'Add documents, entity_documents, memory_sources tables for provenanc
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (8, 'Add valid_at, invalid_at to relationships for bi-temporal tracking');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (9, 'Add _meta table for database identification and workspace path tracking');

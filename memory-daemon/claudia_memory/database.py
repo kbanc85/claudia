@@ -11,9 +11,11 @@ Handles SQLite connection with:
 import hashlib
 import json
 import logging
+import os
 import sqlite3
 import threading
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
@@ -178,6 +180,9 @@ class Database:
 
             # Run migrations for existing databases
             self._run_migrations(conn)
+
+            # Store workspace path in _meta for database identification
+            self._store_workspace_path(conn)
 
             self._initialized = True
 
@@ -463,6 +468,26 @@ class Database:
             conn.commit()
             logger.info("Applied migration 8: bi-temporal relationships")
 
+        if current_version < 9:
+            # Migration 9: Add _meta table for database identification
+            try:
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS _meta (
+                        key TEXT PRIMARY KEY,
+                        value TEXT,
+                        updated_at TEXT DEFAULT (datetime('now'))
+                    )"""
+                )
+            except sqlite3.OperationalError as e:
+                if "already exists" not in str(e).lower():
+                    logger.warning(f"Migration 9 statement failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (9, 'Add _meta table for database identification and workspace path tracking')"
+            )
+            conn.commit()
+            logger.info("Applied migration 9: database metadata table")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -509,6 +534,47 @@ class Database:
                 logger.warning(f"FTS5 not available in this SQLite build: {e}")
             else:
                 logger.warning(f"FTS5 setup failed: {e}")
+
+    def _store_workspace_path(self, conn: sqlite3.Connection) -> None:
+        """Store workspace path in _meta table for database identification.
+
+        The workspace path is sourced from:
+        1. CLAUDIA_WORKSPACE_PATH environment variable (set by MCP server)
+        2. Derived from database filename if it looks like a workspace hash
+
+        This allows the /databases command to show which workspace each database belongs to.
+        """
+        # Check if _meta table exists (may not on very first run before schema executes)
+        try:
+            check = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='_meta'"
+            ).fetchone()
+            if not check:
+                return
+        except sqlite3.OperationalError:
+            return
+
+        # Get workspace path from environment (set by MCP server from cwd)
+        workspace_path = os.environ.get("CLAUDIA_WORKSPACE_PATH")
+
+        if workspace_path:
+            # Store or update workspace_path
+            conn.execute(
+                """INSERT INTO _meta (key, value, updated_at)
+                   VALUES ('workspace_path', ?, datetime('now'))
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')""",
+                (workspace_path,)
+            )
+
+            # Store created_at if not already set
+            conn.execute(
+                """INSERT OR IGNORE INTO _meta (key, value, updated_at)
+                   VALUES ('created_at', ?, datetime('now'))""",
+                (datetime.now().isoformat(),)
+            )
+
+            conn.commit()
+            logger.debug(f"Stored workspace path in _meta: {workspace_path}")
 
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
