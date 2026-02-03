@@ -1,0 +1,21 @@
+{
+  "name": "claudia-brain-threejs",
+  "version": "1.0.0",
+  "description": "Claudia Brain visualizer - Three.js version with smooth rendering and rich visuals",
+  "type": "module",
+  "scripts": {
+    "start": "./start.sh",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "d3-force-3d": "^3.0.5",
+    "lil-gui": "^0.20.0",
+    "three": "^0.172.0",
+    "three-spritetext": "^1.9.2"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
