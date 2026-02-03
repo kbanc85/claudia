@@ -2,6 +2,34 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.18.0 (2026-02-03)
+
+### Brain Visualizer: Real-Time Settings & Smart Navigation
+
+Design panel settings now update the visualization instantly. No more refreshing the window to see changes take effect.
+
+### Added
+
+- **Live force simulation updates** - Adjusting charge, distance, or decay in the design panel immediately reheats the simulation and applies new forces. Watch nodes reorganize in real-time.
+- **Live glow sprite updates** - Glow size and intensity sliders update existing node halos without recreating meshes.
+- **Live link curvature updates** - Changing link curvature, opacity, or radius triggers immediate geometry rebuild.
+- **Live emissive intensity** - Node emissive settings apply instantly to all visible nodes.
+- **Reload hint toasts** - Settings that truly require reload (particle count, star count) now show a brief toast notification explaining why.
+- **Smart H-key navigation** - When the design panel is open and a node is selected, pressing `H` jumps to the relevant settings section:
+  - Entity nodes → Opens "Nodes" folder + "Entity Colors"
+  - Memory nodes → Opens "Nodes" folder + "Memory Colors"
+  - Pattern nodes → Opens "Nodes" folder
+  - Scrolls and briefly highlights the target folder
+
+### Technical Details
+
+New exports in visualizer modules:
+- `graph.js`: `updateSimulationForces()` - Updates running d3-force simulation
+- `nodes.js`: `refreshNodeGlows()`, `refreshNodeEmissive()` - Update sprite scales and material properties
+- `design-panel.js`: `setSelectedNodeCallback()`, `focusSectionForNode()` - Smart navigation system
+
+---
+
 ## 1.17.2 (2026-02-03)
 
 ### Fixed
