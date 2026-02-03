@@ -313,7 +313,7 @@ ollama pull qwen3:4b             # Cognitive tools (optional)
 
 ## Contributing
 
-Claudia is open source under Apache 2.0. Contributions welcome.
+Claudia is source-available under the PolyForm Noncommercial License. Contributions welcome for noncommercial use.
 
 - **Template changes:** Edit files in `template-v2/`. Changes apply to new installations.
 - **Memory system:** Python code in `memory-daemon/`. Run tests with `pytest tests/`.
@@ -324,7 +324,13 @@ Claudia is open source under Apache 2.0. Contributions welcome.
 
 ## License
 
-Apache 2.0
+[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
+
+**Free for:** Personal use, research, education, hobby projects, nonprofits, government.
+
+**Requires permission:** Commercial use.
+
+For commercial licensing inquiries: [mail@kbanc.com](mailto:mail@kbanc.com) or [open an issue](https://github.com/kbanc85/claudia/issues).
 
 ---
 

@@ -2,6 +2,37 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.16.0 (2026-02-03)
+
+### License Change: PolyForm Noncommercial
+
+Claudia is now licensed under [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
+
+### What This Means
+
+**Free for:**
+- Personal use
+- Research and experimentation
+- Education and learning
+- Hobby projects
+- Nonprofits, charities, and government
+
+**Requires permission:**
+- Commercial use (contact mail@kbanc.com or open a GitHub issue)
+
+### Why
+
+This license protects the project while keeping it freely available for the community. You can view, use, modify, and share Claudia for any noncommercial purpose. Commercial use requires a separate license.
+
+### Changed
+
+- LICENSE file updated to PolyForm Noncommercial 1.0.0
+- package.json license field updated
+- README updated with license details
+- template-v2/LICENSE and NOTICE updated
+
+---
+
 ## 1.15.1 (2026-02-03)
 
 ### MCP Template Cleanup
