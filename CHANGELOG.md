@@ -2,6 +2,36 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.13.0 (2026-02-02)
+
+### Relationship Intelligence
+
+Claudia now maps your network. Graph analytics, attribute inference, proactive relationship surfacing.
+
+### Added
+
+- **`/map-connections` command** -- Scans `people/`, `projects/`, `context/` directories. Extracts entities and relationships with confidence levels (0.9 explicit, 0.6 co-mentioned, 0.3 inferred). Reports new entities, new relationships, and inferred connections.
+- **Attribute-based inference** -- Extracts structured attributes from text: geography (city/state/country), industry keywords, role/title, community memberships (YPO, EO, clubs, associations). `infer_connections()` suggests relationships between people with shared attributes.
+- **`memory.project_network`** -- New MCP tool returns all people and organizations connected to a project, plus their 1-hop extended network.
+- **`memory.find_path`** -- BFS pathfinding between any two entities. Returns the shortest relationship chain.
+- **`memory.network_hubs`** -- Identifies most-connected entities in your network. Configurable minimum connection threshold.
+- **`memory.dormant_relationships`** -- Surfaces relationships that need attention based on days since last memory. Configurable dormancy threshold and minimum strength.
+- **Relationship health dashboard** -- Morning brief now includes 30/60/90-day dormancy buckets, introduction opportunities (people with shared attributes who aren't connected), and forming clusters (groups frequently mentioned together).
+- **Introduction opportunity detection** -- Pattern detector identifies pairs of people who share geography+industry, community membership, or company but have no explicit relationship.
+- **Cluster forming alerts** -- Detects when 3+ people are frequently mentioned together, suggesting a project or team may be forming.
+
+### Changed
+
+- **`morning-brief.md`** -- Now documents the relationship health dashboard section showing dormant relationships, introduction opportunities, and forming clusters.
+
+### Stats
+
+- 23 new tests for graph analytics
+- 138 total tests passing
+- 2,177 lines added
+
+---
+
 ## 1.12.0 (2026-02-02)
 
 ### The Intelligence Upgrade
