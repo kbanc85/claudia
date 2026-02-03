@@ -1,49 +1,35 @@
 {
   "mcpServers": {
 
-    "_comment": "Add your MCP servers below. See docs/integrations.md for setup instructions.",
-    "_comment2": "Find servers at mcp.so or github.com/modelcontextprotocol/servers",
-
-    "example-npx-server": {
-      "_comment": "Example: NPM package server (most common)",
+    "gmail": {
       "_disabled": true,
       "command": "npx",
-      "args": ["-y", "@package/server-name"]
+      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
+      "_setup": "Remove _disabled, restart Claude Code, authenticate when browser opens"
     },
 
-    "example-local-server": {
-      "_comment": "Example: Local server (if you built or cloned one)",
-      "_disabled": true,
-      "command": "node",
-      "args": ["/path/to/server/dist/index.js"]
-    },
-
-    "example-with-env": {
-      "_comment": "Example: Server with environment variables (API keys)",
+    "google-calendar": {
       "_disabled": true,
       "command": "npx",
-      "args": ["-y", "@package/server-name"],
-      "env": {
-        "API_KEY": "your-api-key-here"
-      }
+      "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
+      "_setup": "Remove _disabled, restart Claude Code, authenticate when browser opens"
     }
 
   },
 
   "_notes": {
-    "setup": [
-      "1. Copy this file to .mcp.json",
-      "2. Remove the example entries",
-      "3. Add your servers following the patterns above",
-      "4. Fill in credentials/API keys as needed",
-      "5. Restart Claude Code for changes to take effect"
+    "quick_start": [
+      "1. Rename this file to .mcp.json",
+      "2. Remove _disabled from servers you want",
+      "3. Restart Claude Code",
+      "4. Gmail/Calendar will open a browser for you to authenticate with YOUR Google account"
     ],
-    "common_servers": [
-      "Gmail: @gongrzhe/server-gmail-autoauth-mcp",
-      "Calendar: @modelcontextprotocol/server-google-calendar",
-      "Brave Search: @anthropics/mcp-server-brave-search",
-      "Filesystem: @anthropics/mcp-server-filesystem"
-    ],
-    "safety": "Claudia uses integrations for reading context. Any actions (sending, creating, deleting) require your explicit approval."
+    "security": "Each user authenticates with their own accounts. OAuth tokens are stored locally on your machine, never shared.",
+    "not_included": {
+      "filesystem": "Claude Code has native Read/Write/Edit tools",
+      "web-search": "Claude Code has native WebSearch",
+      "fetch": "Claude Code has native WebFetch"
+    },
+    "more_servers": "Find more at mcp.so or github.com/modelcontextprotocol/servers"
   }
 }

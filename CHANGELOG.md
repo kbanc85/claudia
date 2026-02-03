@@ -2,6 +2,25 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.15.1 (2026-02-03)
+
+### MCP Template Cleanup
+
+Cleaner MCP server config for new users. Removed redundant servers, clearer setup instructions.
+
+### Changed
+
+- **Removed redundant MCP servers from template** -- `filesystem`, `brave-search`, `fetch`, `web-search` removed (Claude Code has native tools for all of these)
+- **Kept useful servers** -- `claudia-memory`, `gmail`, `google-calendar` remain as templates
+- **Clearer setup instructions** -- Each server has `_setup` field with one-line instructions
+- **Security note** -- Explicitly states OAuth tokens are stored locally, never shared
+
+### Why
+
+Claude Code now has built-in `WebSearch`, `WebFetch`, and file tools (`Read`, `Write`, `Edit`). The old MCP servers for these functions were redundant and the `filesystem` server with placeholder path caused startup failures.
+
+---
+
 ## 1.15.0 (2026-02-03)
 
 ### Database Switcher

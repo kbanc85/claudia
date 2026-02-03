@@ -5,74 +5,38 @@
       "_disabled": true,
       "command": "~/.claudia/daemon/venv/bin/python",
       "args": ["-m", "claudia_memory", "--project-dir", "${workspaceFolder}"],
-      "_description": "Enhanced memory with vector search (per-project isolation). Install with: ~/.claudia/daemon/scripts/install.sh"
+      "_setup": "Run: ~/.claudia/daemon/scripts/install.sh"
     },
 
     "gmail": {
       "_disabled": true,
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "_description": "Read, draft, and search emails (~5 min setup)"
+      "_setup": "Remove _disabled, restart Claude Code, authenticate when browser opens"
     },
 
     "google-calendar": {
       "_disabled": true,
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
-      "_description": "See your schedule in morning briefs (~5 min setup)"
-    },
-
-    "filesystem": {
-      "_disabled": true,
-      "command": "npx",
-      "args": ["-y", "@anthropics/mcp-server-filesystem", "/path/to/allowed/folder"],
-      "_description": "Read files in specific folders you choose (~2 min setup)"
-    },
-
-    "brave-search": {
-      "_disabled": true,
-      "command": "npx",
-      "args": ["-y", "@anthropics/mcp-server-brave-search"],
-      "env": {
-        "BRAVE_API_KEY": "your-api-key-here"
-      },
-      "_description": "Search the web for research (~3 min setup, free tier available)"
-    },
-
-    "fetch": {
-      "_disabled": true,
-      "command": "npx",
-      "args": ["-y", "@anthropics/mcp-server-fetch"],
-      "_description": "Fetch and clean web pages into LLM-ready content (~1 min setup, free, no API key)"
-    },
-
-    "web-search": {
-      "_disabled": true,
-      "command": "npx",
-      "args": ["-y", "@mcp-server/web-search"],
-      "_description": "DuckDuckGo web search - free, no API key, fully local (~1 min setup)"
+      "_setup": "Remove _disabled, restart Claude Code, authenticate when browser opens"
     }
 
   },
 
   "_notes": {
-    "about": "Claudia prefers CLI tools when available (faster, simpler), then MCP servers. Find more at mcp.so or github.com/modelcontextprotocol/servers",
-    "reliability": "npx can be flaky for MCP servers. For best results, install globally (npm install -g <package>) and use the binary name directly instead of npx. See gateway/README.md for details.",
-    "setup": [
+    "quick_start": [
       "1. Rename this file to .mcp.json",
-      "2. Remove _disabled from servers you want to use",
-      "3. Update paths and API keys as needed",
-      "4. Restart Claude Code for changes to take effect"
+      "2. Remove _disabled from servers you want",
+      "3. Restart Claude Code",
+      "4. Gmail/Calendar will open a browser for you to authenticate with YOUR Google account"
     ],
-    "priority_order": [
-      "1. CLI tools (gh, rclone) - Already installed, most reliable",
-      "2. MCP servers - Feature-rich, requires setup",
-      "3. Browser assist - Last resort for web-only tools"
-    ],
-    "cli_alternatives": {
-      "github": "Use `gh` CLI instead (brew install gh)",
-      "cloud_storage": "Use `rclone` CLI instead (brew install rclone)"
+    "security": "Each user authenticates with their own accounts. OAuth tokens are stored locally on your machine, never shared.",
+    "not_included": {
+      "filesystem": "Claude Code has native Read/Write/Edit tools",
+      "web-search": "Claude Code has native WebSearch",
+      "fetch": "Claude Code has native WebFetch"
     },
-    "safety": "Claudia uses integrations for reading context. Any actions (sending, creating, deleting) require your explicit approval."
+    "more_servers": "Find more at mcp.so or github.com/modelcontextprotocol/servers"
   }
 }
