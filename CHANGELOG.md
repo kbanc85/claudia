@@ -2,6 +2,21 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.14.1 (2026-02-03)
+
+### Database Selector
+
+Switch between different Claudia databases directly from the visualizer UI.
+
+### Added
+
+- **Database dropdown** in the HUD bar to select which database to visualize
+- **`GET /api/databases`** endpoint lists all available databases
+- **`POST /api/database/switch`** endpoint switches to a different database
+- Graph automatically reloads when switching databases
+
+---
+
 ## 1.14.0 (2026-02-03)
 
 ### Brain Visualizer
