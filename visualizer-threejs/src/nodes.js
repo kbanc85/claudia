@@ -69,11 +69,15 @@ export function createEntityMesh(node, scene) {
   // Glow aura (larger, softer) - from legacy
   const glowSize = (node.size || 5) * nodeCfg.glowSize;
   const glow = createGlowSprite(node.color || config.entityColors[node.entityType], glowSize, nodeCfg.glowIntensity);
+  glow.userData.isGlow = true;
+  glow.userData.baseNodeSize = node.size || 5;
   group.add(glow);
 
   // Second, tighter inner glow
   const innerGlowSize = (node.size || 5) * nodeCfg.innerGlowSize;
   const innerGlow = createGlowSprite(node.color || config.entityColors[node.entityType], innerGlowSize, nodeCfg.innerGlowIntensity);
+  innerGlow.userData.isInnerGlow = true;
+  innerGlow.userData.baseNodeSize = node.size || 5;
   group.add(innerGlow);
 
   // Floating label (SpriteText from legacy)
@@ -250,4 +254,95 @@ export function disposeAllNodes(scene) {
   }
   nodeMeshes.clear();
   labelMeshes.clear();
+}
+
+/**
+ * Refresh node material colors based on current config
+ * Call this when themes change to update existing nodes
+ */
+export function refreshNodeColors() {
+  for (const [nodeId, group] of nodeMeshes) {
+    const node = group.userData?.node;
+    const mesh = group.userData?.mesh;
+
+    if (!node || !mesh || !mesh.material) continue;
+
+    let newColor = null;
+
+    if (node.nodeType === 'entity' && node.entityType) {
+      newColor = config.entityColors[node.entityType];
+    } else if (node.nodeType === 'memory' && node.memoryType) {
+      newColor = config.memoryColors[node.memoryType];
+    } else if (node.nodeType === 'pattern') {
+      newColor = config.nodes.patternColor;
+      // Also update emissive for patterns
+      if (mesh.material.emissive) {
+        mesh.material.emissive.set(config.nodes.patternEmissive);
+      }
+    }
+
+    if (newColor && mesh.material.color) {
+      mesh.material.color.set(newColor);
+      if (mesh.material.emissive && node.nodeType !== 'pattern') {
+        mesh.material.emissive.set(newColor);
+      }
+    }
+  }
+}
+
+/**
+ * Refresh glow sprite sizes and intensities based on current config
+ * Call this when glow size or intensity settings change to update existing nodes
+ */
+export function refreshNodeGlows() {
+  const { nodes: nodeCfg } = config;
+
+  for (const [nodeId, group] of nodeMeshes) {
+    const node = group.userData?.node;
+    if (!node || node.nodeType !== 'entity') continue;
+
+    // Traverse the group to find glow sprites
+    group.traverse(child => {
+      if (child.isSprite) {
+        const baseSize = child.userData?.baseNodeSize || node.size || 5;
+
+        if (child.userData?.isGlow) {
+          child.scale.setScalar(baseSize * nodeCfg.glowSize);
+          // Adjust opacity as a proxy for intensity
+          if (child.material) {
+            child.material.opacity = nodeCfg.glowIntensity;
+          }
+        } else if (child.userData?.isInnerGlow) {
+          child.scale.setScalar(baseSize * nodeCfg.innerGlowSize);
+          // Adjust opacity as a proxy for intensity
+          if (child.material) {
+            child.material.opacity = nodeCfg.innerGlowIntensity;
+          }
+        }
+      }
+    });
+  }
+}
+
+/**
+ * Refresh node emissive intensity based on current config
+ * Call this when emissive settings change
+ */
+export function refreshNodeEmissive() {
+  const { nodes: nodeCfg } = config;
+
+  for (const [nodeId, group] of nodeMeshes) {
+    const node = group.userData?.node;
+    const mesh = group.userData?.mesh;
+
+    if (!node || !mesh || !mesh.material) continue;
+
+    if (node.nodeType === 'entity' && mesh.material.emissiveIntensity !== undefined) {
+      mesh.material.emissiveIntensity = nodeCfg.emissiveIntensity;
+    } else if (node.nodeType === 'memory' && mesh.material.emissiveIntensity !== undefined) {
+      mesh.material.emissiveIntensity = nodeCfg.memoryEmissive;
+    } else if (node.nodeType === 'pattern' && mesh.material.emissiveIntensity !== undefined) {
+      mesh.material.emissiveIntensity = nodeCfg.patternEmissiveIntensity;
+    }
+  }
 }

@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/kbanc85/claudia/stargazers"><img src="https://img.shields.io/github/stars/kbanc85/claudia?style=flat-square" alt="GitHub stars"></a>
   <a href="https://www.npmjs.com/package/get-claudia"><img src="https://img.shields.io/npm/v/get-claudia?style=flat-square" alt="npm version"></a>
-  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue?style=flat-square" alt="License"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D14-brightgreen?style=flat-square" alt="Node.js"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square" alt="Python"></a>
 </p>
@@ -108,6 +108,26 @@ This upgrades framework files while preserving your data (context/, people/, pro
 
 ---
 
+## Demo Mode
+
+Want to try Claudia without setting up your own data? Demo mode creates a pre-populated installation with realistic fake data.
+
+```bash
+npx get-claudia my-demo --demo
+cd my-demo
+claude
+```
+
+Demo mode includes:
+- 12 people with varying relationship health
+- 3 organizations and 3 projects
+- Commitments (some overdue) and predictions
+- Past session episodes
+
+The demo database is completely isolated in `~/.claudia/demo/`, so it never touches your real data.
+
+---
+
 ## What She Actually Does
 
 Claudia isn't a list of features. She's a set of outcomes:
@@ -118,6 +138,7 @@ Claudia isn't a list of features. She's a set of outcomes:
 - **Processes your meetings.** Paste a transcript. She pulls out decisions, action items, and follow-ups, then stores the transcript as a document linked to participants and memories.
 - **Shows her work.** Every fact traces back to its source. Ask "how do you know that?" and Claudia shows the email, transcript, or conversation it came from.
 - **Adapts to how you work.** She notices patterns ("You draft LinkedIn posts almost daily. Want me to add a quick command for that?") and suggests improvements to her own workflow.
+- **Visualize your memory.** Run `/brain` to see a 3D force-directed graph of everything Claudia knows: entities, relationships, memories, and patterns rendered in real-time.
 
 ---
 
@@ -200,6 +221,7 @@ For full technical diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 | `/meeting-prep [person]` | One-page briefing before a call |
 | `/capture-meeting` | Process notes into decisions, commitments, action items |
 | `/memory-audit` | See everything Claudia knows, with source chains |
+| `/brain` | Launch 3D memory visualizer |
 | `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
 | `/weekly-review` | Guided reflection across relationships and projects |
 | `/accountability-check` | Outstanding commitments and waiting-on items |

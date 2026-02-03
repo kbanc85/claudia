@@ -16,6 +16,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { config } from './config.js';
 import { initDesignPanel } from './design-panel.js';
+import { applyTheme, loadThemePreference } from './themes.js';
 
 import {
   initGraph,
@@ -31,10 +32,12 @@ import {
   filterNodes,
   resetFilter,
   getNodePositions,
-  disposeGraph
+  disposeGraph,
+  refreshLinkColors,
+  updateSimulationForces
 } from './graph.js';
 
-import { getAllNodeMeshes, ENTITY_COLORS, MEMORY_COLORS } from './nodes.js';
+import { getAllNodeMeshes, ENTITY_COLORS, MEMORY_COLORS, refreshNodeColors, refreshNodeGlows, refreshNodeEmissive } from './nodes.js';
 
 import {
   initEffects,
@@ -46,6 +49,7 @@ import {
   updateBloom,
   updateFog,
   updateAmbientParticlesConfig,
+  updateNebulaConfig,
   getBloomPass,
   refreshAnimationCache,
   refreshAmbientCache
@@ -77,6 +81,12 @@ let idleTimer = null;
 
 async function init() {
   container = document.getElementById('graph-container');
+
+  // Load saved theme preference (before creating scene)
+  const savedTheme = loadThemePreference();
+  if (savedTheme) {
+    applyTheme(savedTheme);
+  }
 
   try {
     // Create renderer
@@ -181,18 +191,24 @@ async function init() {
 
 // ── Lighting ────────────────────────────────────────────────
 
+// Light references for dynamic updates
+let ambientLight = null;
+let keyLight = null;
+let fillLight = null;
+let accentLight = null;
+
 function setupLighting(scene) {
   const { lighting } = config;
 
   // Ambient
-  const ambient = new THREE.AmbientLight(
+  ambientLight = new THREE.AmbientLight(
     new THREE.Color(lighting.ambient.color),
     lighting.ambient.intensity
   );
-  scene.add(ambient);
+  scene.add(ambientLight);
 
   // Key light (indigo, upper right)
-  const keyLight = new THREE.PointLight(
+  keyLight = new THREE.PointLight(
     new THREE.Color(lighting.key.color),
     lighting.key.intensity,
     800
@@ -201,7 +217,7 @@ function setupLighting(scene) {
   scene.add(keyLight);
 
   // Fill light (cyan, lower left)
-  const fillLight = new THREE.PointLight(
+  fillLight = new THREE.PointLight(
     new THREE.Color(lighting.fill.color),
     lighting.fill.intensity,
     600
@@ -210,13 +226,37 @@ function setupLighting(scene) {
   scene.add(fillLight);
 
   // Accent light (amber, behind)
-  const accentLight = new THREE.PointLight(
+  accentLight = new THREE.PointLight(
     new THREE.Color(lighting.accent.color),
     lighting.accent.intensity,
     500
   );
   accentLight.position.set(...lighting.accent.position);
   scene.add(accentLight);
+}
+
+function updateLighting() {
+  const { lighting } = config;
+
+  if (ambientLight) {
+    ambientLight.color.set(lighting.ambient.color);
+    ambientLight.intensity = lighting.ambient.intensity;
+  }
+
+  if (keyLight) {
+    keyLight.color.set(lighting.key.color);
+    keyLight.intensity = lighting.key.intensity;
+  }
+
+  if (fillLight) {
+    fillLight.color.set(lighting.fill.color);
+    fillLight.intensity = lighting.fill.intensity;
+  }
+
+  if (accentLight) {
+    accentLight.color.set(lighting.accent.color);
+    accentLight.intensity = lighting.accent.intensity;
+  }
 }
 
 // ── Render loop (the key to smooth performance) ─────────────
@@ -466,6 +506,59 @@ function handleConfigUpdate(changedPath) {
   // Animation config
   if (changedPath.startsWith('animations') || changedPath === '*') {
     refreshAnimationCache();
+  }
+
+  // Nebula
+  if (changedPath.startsWith('nebula') || changedPath === '*') {
+    updateNebulaConfig();
+  }
+
+  // Lighting (when themes change)
+  if (changedPath.startsWith('lighting') || changedPath === '*') {
+    updateLighting();
+  }
+
+  // Node colors (when themes change)
+  if (changedPath.startsWith('entityColors') || changedPath.startsWith('memoryColors') ||
+      changedPath.startsWith('nodes.pattern') || changedPath === '*') {
+    refreshNodeColors();
+  }
+
+  // Link colors (when themes change)
+  if (changedPath.startsWith('linkColors') || changedPath === '*') {
+    refreshLinkColors();
+  }
+
+  // Node glow sizes
+  if (changedPath.startsWith('nodes.glowSize') || changedPath.startsWith('nodes.innerGlowSize') ||
+      changedPath.startsWith('nodes.glowIntensity') || changedPath.startsWith('nodes.innerGlowIntensity') ||
+      changedPath === '*') {
+    refreshNodeGlows();
+  }
+
+  // Node emissive intensity
+  if (changedPath.startsWith('nodes.emissiveIntensity') || changedPath.startsWith('nodes.memoryEmissive') ||
+      changedPath.startsWith('nodes.patternEmissiveIntensity') || changedPath === '*') {
+    refreshNodeEmissive();
+  }
+
+  // Force simulation parameters
+  if (changedPath.startsWith('simulation') || changedPath === '*') {
+    updateSimulationForces();
+  }
+
+  // Link visual properties (curvature, opacity, radius)
+  if (changedPath.startsWith('links.curvature') || changedPath.startsWith('links.tubeRadius') ||
+      changedPath.startsWith('links.opacity') || changedPath.startsWith('links.highlightOpacity') ||
+      changedPath.startsWith('links.highlightRadius')) {
+    // Force immediate link rebuild by triggering syncPositions
+    syncPositions();
+  }
+
+  // Link particles
+  if (changedPath.startsWith('particles') || changedPath === '*') {
+    // Particle changes need link rebuild to re-create particle system
+    syncPositions();
   }
 }
 

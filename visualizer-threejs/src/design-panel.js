@@ -26,6 +26,29 @@ import {
 
 let gui = null;
 let visible = false;
+let toastTimeout = null;
+
+/**
+ * Show a temporary toast notification for reload-required settings
+ * @param {string} message - The message to display
+ */
+function showReloadHint(message) {
+  // Remove existing toast if any
+  const existing = document.querySelector('.config-toast');
+  if (existing) {
+    existing.remove();
+    clearTimeout(toastTimeout);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'config-toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  toastTimeout = setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
 
 /**
  * Initialize the design panel
@@ -185,14 +208,20 @@ export function initDesignPanel(onUpdate) {
   const ambientFolder = gui.addFolder('Ambient Effects');
 
   const dustFolder = ambientFolder.addFolder('Neural Dust');
-  dustFolder.add(config.ambientParticles, 'count', 0, 2000, 100).name('Count (reload)').onChange(() => update('ambientParticles.count'));
+  dustFolder.add(config.ambientParticles, 'count', 0, 2000, 100).name('Count ⟳').onChange(() => {
+    update('ambientParticles.count');
+    showReloadHint('Particle count change requires reload');
+  });
   dustFolder.add(config.ambientParticles, 'size', 0.2, 3, 0.1).name('Size').onChange(() => update('ambientParticles.size'));
   dustFolder.add(config.ambientParticles, 'baseOpacity', 0, 0.4, 0.01).name('Opacity').onChange(() => update('ambientParticles.baseOpacity'));
   dustFolder.addColor(config.ambientParticles, 'color').name('Color').onChange(() => update('ambientParticles.color'));
   dustFolder.close();
 
   const starfieldFolder = ambientFolder.addFolder('Starfield');
-  starfieldFolder.add(config.starfield, 'count', 0, 3000, 100).name('Count (reload)').onChange(() => update('starfield.count'));
+  starfieldFolder.add(config.starfield, 'count', 0, 3000, 100).name('Count ⟳').onChange(() => {
+    update('starfield.count');
+    showReloadHint('Star count change requires reload');
+  });
   starfieldFolder.add(config.starfield, 'size', 0.2, 2, 0.1).name('Size').onChange(() => update('starfield.size'));
   starfieldFolder.add(config.starfield, 'opacity', 0, 1, 0.05).name('Opacity').onChange(() => update('starfield.opacity'));
   starfieldFolder.close();

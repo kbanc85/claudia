@@ -30,8 +30,12 @@ import {
 
 import {
   updateLinks,
-  disposeLinks
+  disposeLinks,
+  refreshLinkColors
 } from './links.js';
+
+// Re-export for theme updates
+export { refreshLinkColors };
 
 let simulation = null;
 let graphData = { nodes: [], links: [] };
@@ -306,4 +310,54 @@ export function disposeGraph() {
   highlightNodes.clear();
   highlightLinks.clear();
   selectedNode = null;
+}
+
+// ── Live force updates ───────────────────────────────────────
+
+import { config } from './config.js';
+
+/**
+ * Update running simulation forces based on current config
+ * Call this when simulation config changes to apply them live
+ */
+export function updateSimulationForces() {
+  if (!simulation) return;
+
+  // Update charge force
+  const chargeForce = simulation.force('charge');
+  if (chargeForce) {
+    chargeForce
+      .strength(node => {
+        if (node.nodeType === 'entity') return config.simulation.chargeEntity;
+        if (node.nodeType === 'pattern') return config.simulation.chargePattern;
+        return config.simulation.chargeMemory;
+      })
+      .distanceMax(config.simulation.chargeDistanceMax);
+  }
+
+  // Update link force
+  const linkForce = simulation.force('link');
+  if (linkForce) {
+    linkForce
+      .distance(link => {
+        if (link.linkType === 'relationship') {
+          return config.simulation.linkDistanceRelationship +
+            (1 - (link.strength || 0.5)) * config.simulation.linkDistanceRelationshipVariance;
+        }
+        return config.simulation.linkDistanceMemory;
+      })
+      .strength(link => {
+        if (link.linkType === 'relationship') {
+          return (link.strength || 0.5) * config.simulation.linkStrengthRelationship;
+        }
+        return config.simulation.linkStrengthMemory;
+      });
+  }
+
+  // Update decay rates
+  simulation.alphaDecay(config.simulation.alphaDecay);
+  simulation.velocityDecay(config.simulation.velocityDecay);
+
+  // Reheat simulation to apply changes
+  simulation.alpha(0.3).restart();
 }

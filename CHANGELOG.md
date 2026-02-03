@@ -2,6 +2,33 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.17.0 (2026-02-03)
+
+### Brain Visualizer Auto-Install
+
+The 3D memory visualizer now installs automatically when you set up the memory system. No more manual file copying.
+
+### Added
+
+- **Visualizer auto-install** - When you say "yes" to memory system setup, the brain visualizer is automatically installed to `~/.claudia/visualizer/` and `~/.claudia/visualizer-threejs/`. Just run `/brain` and it works.
+- **Cross-platform installers** - `visualizer/scripts/install.sh` (macOS/Linux) and `visualizer/scripts/install.ps1` (Windows) handle Node.js version checks, file copying, npm install, and launcher script creation.
+- **Launcher script** - `~/.claudia/bin/brain` starts both the API backend (port 3849) and Three.js frontend (port 5173/5174), then opens your browser.
+
+### Changed
+
+- **README updates** - Fixed license badge (was Apache 2.0, now PolyForm Noncommercial). Added Demo Mode section with clear instructions. Added `/brain` command to the command table.
+- **Installer flow** - The visualizer now chains after memory daemon setup: memory -> visualizer (auto) -> gateway (if requested) -> finish.
+
+### How It Works
+
+After running `npx get-claudia` and saying "yes" to memory setup:
+1. Memory daemon installs (Python venv, Ollama models, SQLite database)
+2. Visualizer auto-installs (copies files, runs npm install)
+3. Gateway setup runs (if you said yes)
+4. You can immediately use `/brain` to see your memory graph
+
+---
+
 ## 1.16.0 (2026-02-03)
 
 ### License Change: PolyForm Noncommercial

@@ -258,6 +258,12 @@ function addStarfield(scene) {
 
 function addNebula(scene) {
   const { nebula: cfg } = config;
+
+  // Skip if nebula is disabled by theme
+  if (cfg.enabled === false) {
+    return;
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -474,6 +480,7 @@ export function updateStarfieldConfig() {
 
 export function updateNebulaConfig() {
   if (nebulaMesh) {
+    nebulaMesh.visible = config.nebula.enabled !== false;
     nebulaMesh.scale.setScalar(config.nebula.size);
     nebulaMesh.position.z = config.nebula.positionZ;
   }

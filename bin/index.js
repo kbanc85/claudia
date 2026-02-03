@@ -204,6 +204,49 @@ async function main() {
     });
   }
 
+  // Helper: run visualizer install script and call back when done (auto-install, no prompt)
+  function runVisualizerSetup(callback) {
+    console.log(`\n${colors.cyan}Setting up brain visualizer...${colors.reset}`);
+
+    const visualizerScriptPath = isWindows
+      ? join(__dirname, '..', 'visualizer', 'scripts', 'install.ps1')
+      : join(__dirname, '..', 'visualizer', 'scripts', 'install.sh');
+
+    if (!existsSync(visualizerScriptPath)) {
+      console.log(`${colors.yellow}!${colors.reset} Visualizer files not found. Skipping.`);
+      callback(false);
+      return;
+    }
+
+    try {
+      const spawnCmd = isWindows ? powershellPath : 'bash';
+      const spawnArgs = isWindows
+        ? ['-ExecutionPolicy', 'Bypass', '-File', visualizerScriptPath]
+        : [visualizerScriptPath];
+      const vizResult = spawn(spawnCmd, spawnArgs, {
+        stdio: 'inherit'
+      });
+
+      vizResult.on('close', (code) => {
+        if (code === 0) {
+          console.log(`${colors.green}✓${colors.reset} Brain visualizer installed`);
+          callback(true);
+        } else {
+          console.log(`${colors.yellow}!${colors.reset} Visualizer setup had issues. You can run it later with:`);
+          if (isWindows) {
+            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${visualizerScriptPath}"${colors.reset}`);
+          } else {
+            console.log(`  ${colors.cyan}bash ${visualizerScriptPath}${colors.reset}`);
+          }
+          callback(false);
+        }
+      });
+    } catch (error) {
+      console.log(`${colors.yellow}!${colors.reset} Could not set up visualizer: ${error.message}`);
+      callback(false);
+    }
+  }
+
   // Helper: run gateway install script and call back when done
   function runGatewaySetup(callback) {
     console.log(`\n${colors.cyan}Setting up messaging gateway...${colors.reset}`);
@@ -252,16 +295,27 @@ async function main() {
   }
 
   // Helper: finish install after optional components
-  function finishInstall(memoryInstalled, gatewayInstalled) {
-    showNextSteps(memoryInstalled, gatewayInstalled);
+  function finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled) {
+    showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled);
   }
 
   // Helper: run gateway if requested, then finish
-  function maybeRunGateway(memoryInstalled) {
+  function maybeRunGateway(memoryInstalled, visualizerInstalled) {
     if (setupGateway) {
-      runGatewaySetup((gatewayOk) => finishInstall(memoryInstalled, gatewayOk));
+      runGatewaySetup((gatewayOk) => finishInstall(memoryInstalled, visualizerInstalled, gatewayOk));
     } else {
-      finishInstall(memoryInstalled, false);
+      finishInstall(memoryInstalled, visualizerInstalled, false);
+    }
+  }
+
+  // Helper: auto-install visualizer after memory (if memory was installed), then chain to gateway
+  function maybeRunVisualizer(memoryInstalled) {
+    if (memoryInstalled) {
+      // Visualizer auto-installs when memory is installed (needs the database)
+      runVisualizerSetup((vizOk) => maybeRunGateway(memoryInstalled, vizOk));
+    } else {
+      // Skip visualizer if no memory system
+      maybeRunGateway(memoryInstalled, false);
     }
   }
 
@@ -319,7 +373,7 @@ async function main() {
             // Seed demo database if --demo flag was passed
             if (isDemoMode) {
               const mcpPathForDemo = join(targetPath, '.mcp.json');
-              seedDemoDatabase(targetPath, mcpPathForDemo, () => maybeRunGateway(memoryOk));
+              seedDemoDatabase(targetPath, mcpPathForDemo, () => maybeRunVisualizer(memoryOk));
               return; // Wait for demo seed to complete
             }
           } else {
@@ -331,8 +385,8 @@ async function main() {
             }
           }
 
-          // Chain gateway setup (or finish)
-          maybeRunGateway(memoryOk);
+          // Chain visualizer setup (auto), then gateway (if requested)
+          maybeRunVisualizer(memoryOk);
         });
 
         return; // Wait for spawn to complete
@@ -345,10 +399,10 @@ async function main() {
     }
   }
 
-  // Memory skipped or failed to spawn -- continue with gateway
-  maybeRunGateway(false);
+  // Memory skipped or failed to spawn -- continue with visualizer/gateway
+  maybeRunVisualizer(false);
 
-  function showNextSteps(memoryInstalled, gatewayInstalled) {
+  function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled) {
     // Show next steps - different message based on what was installed
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
@@ -368,6 +422,12 @@ ${cdStep}  ${colors.cyan}claude${colors.reset}
   ${colors.dim}Say hi!${colors.reset}
 
 ${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
+`);
+    }
+
+    if (visualizerInstalled) {
+      console.log(`${colors.bold}Brain Visualizer:${colors.reset}
+  ${colors.dim}See your memory in 3D:${colors.reset}  ${colors.cyan}/brain${colors.reset}
 `);
     }
 
