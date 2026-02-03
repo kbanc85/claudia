@@ -28,6 +28,12 @@ let gui = null;
 let visible = false;
 let toastTimeout = null;
 
+// Folder references for smart navigation
+let folders = {};
+
+// Callback to get selected node from main.js
+let getSelectedNodeCallback = null;
+
 /**
  * Show a temporary toast notification for reload-required settings
  * @param {string} message - The message to display
@@ -48,6 +54,69 @@ function showReloadHint(message) {
   toastTimeout = setTimeout(() => {
     toast.remove();
   }, 3000);
+}
+
+/**
+ * Set callback to get the currently selected node
+ * @param {Function} callback - Returns the selected node or null
+ */
+export function setSelectedNodeCallback(callback) {
+  getSelectedNodeCallback = callback;
+}
+
+/**
+ * Focus on the relevant settings section for a node type
+ * Opens the folder, scrolls it into view, and briefly highlights it
+ * @param {Object} node - The selected node
+ * @returns {boolean} - True if a section was focused
+ */
+function focusSectionForNode(node) {
+  if (!node || !gui) return false;
+
+  let targetFolder = null;
+  let subFolder = null;
+
+  // Determine which folder to open based on node type
+  if (node.nodeType === 'entity') {
+    targetFolder = folders.nodes;
+    // Also open entity colors if available
+    subFolder = folders.entityColors;
+  } else if (node.nodeType === 'memory') {
+    targetFolder = folders.nodes;
+    subFolder = folders.memoryColors;
+  } else if (node.nodeType === 'pattern') {
+    targetFolder = folders.nodes;
+  }
+
+  if (!targetFolder) return false;
+
+  // Close all top-level folders first for cleaner view
+  gui.folders.forEach(f => f.close());
+
+  // Open target folder
+  targetFolder.open();
+
+  // Open sub-folder if specified
+  if (subFolder) {
+    // Need to open parent first (Colors folder)
+    if (folders.colors) folders.colors.open();
+    subFolder.open();
+  }
+
+  // Scroll the folder into view and highlight it
+  const folderEl = targetFolder.domElement;
+  if (folderEl) {
+    // Scroll into view with smooth behavior
+    folderEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Add highlight animation
+    folderEl.classList.add('folder-highlight');
+    setTimeout(() => {
+      folderEl.classList.remove('folder-highlight');
+    }, 1500);
+  }
+
+  return true;
 }
 
 /**
@@ -101,9 +170,11 @@ export function initDesignPanel(onUpdate) {
 
   // ── Colors ─────────────────────────────────────────────────
   const colorsFolder = gui.addFolder('Colors');
+  folders.colors = colorsFolder;
   colorsFolder.addColor(config, 'background').name('Background').onChange(() => update('background'));
 
   const entityColorsFolder = colorsFolder.addFolder('Entity Colors');
+  folders.entityColors = entityColorsFolder;
   entityColorsFolder.addColor(config.entityColors, 'person').name('Person').onChange(() => update('entityColors.person'));
   entityColorsFolder.addColor(config.entityColors, 'organization').name('Organization').onChange(() => update('entityColors.organization'));
   entityColorsFolder.addColor(config.entityColors, 'project').name('Project').onChange(() => update('entityColors.project'));
@@ -112,6 +183,7 @@ export function initDesignPanel(onUpdate) {
   entityColorsFolder.close();
 
   const memoryColorsFolder = colorsFolder.addFolder('Memory Colors');
+  folders.memoryColors = memoryColorsFolder;
   memoryColorsFolder.addColor(config.memoryColors, 'fact').name('Fact').onChange(() => update('memoryColors.fact'));
   memoryColorsFolder.addColor(config.memoryColors, 'commitment').name('Commitment').onChange(() => update('memoryColors.commitment'));
   memoryColorsFolder.addColor(config.memoryColors, 'learning').name('Learning').onChange(() => update('memoryColors.learning'));
@@ -144,6 +216,7 @@ export function initDesignPanel(onUpdate) {
 
   // ── Nodes ──────────────────────────────────────────────────
   const nodesFolder = gui.addFolder('Nodes');
+  folders.nodes = nodesFolder;
   nodesFolder.add(config.nodes, 'emissiveIntensity', 0, 1, 0.05).name('Emissive').onChange(() => update('nodes.emissiveIntensity'));
   nodesFolder.add(config.nodes, 'glowSize', 1, 10, 0.5).name('Glow Size').onChange(() => update('nodes.glowSize'));
   nodesFolder.add(config.nodes, 'glowIntensity', 0, 1, 0.05).name('Glow Intensity').onChange(() => update('nodes.glowIntensity'));
@@ -154,6 +227,7 @@ export function initDesignPanel(onUpdate) {
 
   // ── Links ──────────────────────────────────────────────────
   const linksFolder = gui.addFolder('Links');
+  folders.links = linksFolder;
   linksFolder.add(config.links, 'curvature', 0, 0.5, 0.01).name('Curvature').onChange(() => update('links.curvature'));
   linksFolder.add(config.links, 'tubeRadius', 0.05, 0.5, 0.01).name('Tube Radius').onChange(() => update('links.tubeRadius'));
   linksFolder.add(config.links, 'highlightRadius', 1, 3, 0.1).name('Highlight Multiplier').onChange(() => update('links.highlightRadius'));
@@ -244,6 +318,7 @@ export function initDesignPanel(onUpdate) {
 
   // ── Simulation ─────────────────────────────────────────────
   const simFolder = gui.addFolder('Force Simulation');
+  folders.simulation = simFolder;
   simFolder.add(config.simulation, 'chargeEntity', -500, 0, 10).name('Entity Charge').onChange(() => update('simulation.chargeEntity'));
   simFolder.add(config.simulation, 'chargePattern', -300, 0, 10).name('Pattern Charge').onChange(() => update('simulation.chargePattern'));
   simFolder.add(config.simulation, 'chargeMemory', -100, 0, 5).name('Memory Charge').onChange(() => update('simulation.chargeMemory'));
@@ -303,6 +378,15 @@ export function initDesignPanel(onUpdate) {
     if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       // Don't toggle if typing in an input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // Smart navigation: if panel is open and node is selected, jump to relevant section
+      if (visible && getSelectedNodeCallback) {
+        const selectedNode = getSelectedNodeCallback();
+        if (selectedNode && focusSectionForNode(selectedNode)) {
+          return; // Don't toggle, we navigated instead
+        }
+      }
+
       togglePanel();
     }
   });

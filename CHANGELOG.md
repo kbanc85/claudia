@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.17.2 (2026-02-03)
+
+### Fixed
+
+- **Windows visualizer installer** - Fixed PowerShell parse errors on Windows caused by parentheses being interpreted as subexpressions when inside interpolated strings. Changed tree view output to use string concatenation.
+- **Streamlined install flow** - Gateway now auto-installs like the visualizer (no prompt). Installation only asks one question: whether to set up the memory system. Memory -> Visualizer -> Gateway all install in sequence.
+
+---
+
 ## 1.17.1 (2026-02-03)
 
 ### Docs

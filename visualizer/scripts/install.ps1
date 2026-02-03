@@ -84,9 +84,9 @@ New-Item -ItemType Directory -Force -Path $THREEJS_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BIN_DIR | Out-Null
 
 Write-Host "  ${GREEN}✓${NC} Created $CLAUDIA_DIR"
-Write-Host "    ${DIM}├── visualizer\        (API backend)${NC}"
-Write-Host "    ${DIM}├── visualizer-threejs\ (3D frontend)${NC}"
-Write-Host "    ${DIM}└── bin\               (launcher)${NC}"
+Write-Host ("    " + $DIM + "    visualizer          - API backend" + $NC)
+Write-Host ("    " + $DIM + "    visualizer-threejs  - 3D frontend" + $NC)
+Write-Host ("    " + $DIM + "    bin                 - launcher" + $NC)
 
 Write-Host ""
 Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

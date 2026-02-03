@@ -157,7 +157,6 @@ async function main() {
   };
 
   const setupMemory = await askYesNo(`\n${colors.yellow}?${colors.reset} Set up enhanced memory system? (recommended) [y/n]: `);
-  const setupGateway = await askYesNo(`${colors.yellow}?${colors.reset} Set up messaging gateway (Telegram/Slack)? [y/n]: `);
   rl.close();
 
   // Helper: seed demo database using spawn (safe, no shell injection)
@@ -299,13 +298,9 @@ async function main() {
     showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled);
   }
 
-  // Helper: run gateway if requested, then finish
+  // Helper: run gateway setup (auto-install like visualizer), then finish
   function maybeRunGateway(memoryInstalled, visualizerInstalled) {
-    if (setupGateway) {
-      runGatewaySetup((gatewayOk) => finishInstall(memoryInstalled, visualizerInstalled, gatewayOk));
-    } else {
-      finishInstall(memoryInstalled, visualizerInstalled, false);
-    }
+    runGatewaySetup((gatewayOk) => finishInstall(memoryInstalled, visualizerInstalled, gatewayOk));
   }
 
   // Helper: auto-install visualizer after memory (if memory was installed), then chain to gateway

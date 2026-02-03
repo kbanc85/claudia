@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { config } from './config.js';
-import { initDesignPanel } from './design-panel.js';
+import { initDesignPanel, setSelectedNodeCallback } from './design-panel.js';
 import { applyTheme, loadThemePreference } from './themes.js';
 
 import {
@@ -26,6 +26,7 @@ import {
   addLink,
   updateNodeData,
   getGraphData,
+  getSelectedNode,
   setSelectedNode,
   highlightNeighborhood,
   clearSelection,
@@ -173,6 +174,9 @@ async function init() {
 
     // Initialize design panel (no need for separate onConfigUpdate since panel calls it)
     initDesignPanel(handleConfigUpdate);
+
+    // Provide selected node callback for smart H-key navigation
+    setSelectedNodeCallback(() => getSelectedNode());
 
   } catch (err) {
     console.error('Failed to initialize:', err);
