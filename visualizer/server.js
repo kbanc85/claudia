@@ -12,7 +12,7 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { openDatabase, findDbPath, closeDatabase, getDb } from './lib/database.js';
+import { openDatabase, findDbPath, closeDatabase, getDb, listDatabases, getProjectHash } from './lib/database.js';
 import { buildGraph } from './lib/graph.js';
 import { getProjectedPositions } from './lib/projection.js';
 import { createEventStream, stopPolling } from './lib/events.js';
@@ -44,7 +44,12 @@ function parseArgs() {
 const config = parseArgs();
 const app = express();
 
+// Track current database for UI
+let currentDbPath = null;
+let currentProjectDir = null;
+
 app.use(cors());
+app.use(express.json());
 // Serve Vite build output (dist/) if it exists, fallback to public/ for styles
 import { existsSync } from 'fs';
 const distDir = join(__dirname, 'dist');
@@ -252,6 +257,76 @@ app.get('/api/events', (req, res) => {
   createEventStream(req, res);
 });
 
+// ── Database management ─────────────────────────────────────────────
+
+app.get('/api/databases', (req, res) => {
+  try {
+    const databases = listDatabases();
+
+    // Enrich with entity counts and mark current
+    const enriched = databases.map(db => {
+      const isCurrent = db.path === currentDbPath;
+      let entityCount = 0;
+
+      if (isCurrent) {
+        try {
+          const currentDb = getDb();
+          entityCount = currentDb.prepare('SELECT COUNT(*) as c FROM entities').get().c;
+        } catch { /* ignore */ }
+      }
+
+      return {
+        ...db,
+        isCurrent,
+        entityCount: isCurrent ? entityCount : null,
+        label: db.hash === 'claudia' ? 'Default' : db.hash.slice(0, 8)
+      };
+    });
+
+    res.json({
+      databases: enriched,
+      current: currentDbPath
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/database/switch', (req, res) => {
+  try {
+    const { path: dbPath, projectDir } = req.body;
+
+    if (!dbPath && !projectDir) {
+      return res.status(400).json({ error: 'Provide either path or projectDir' });
+    }
+
+    let targetPath = dbPath;
+    if (!targetPath && projectDir) {
+      targetPath = findDbPath(projectDir);
+    }
+
+    if (!targetPath) {
+      return res.status(404).json({ error: 'Database not found for given project' });
+    }
+
+    // Close current and open new
+    closeDatabase();
+    openDatabase(targetPath);
+    currentDbPath = targetPath;
+    currentProjectDir = projectDir || null;
+
+    console.log(`Switched to database: ${targetPath}`);
+
+    res.json({
+      success: true,
+      path: targetPath,
+      message: 'Database switched. Refresh graph to see new data.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start server ────────────────────────────────────────────────────
 
 function start() {
@@ -267,6 +342,8 @@ function start() {
 
   console.log(`Opening database: ${dbPath}`);
   openDatabase(dbPath);
+  currentDbPath = dbPath;
+  currentProjectDir = config.projectDir || null;
 
   app.listen(config.port, () => {
     console.log(`\n  Claudia Brain Visualizer`);

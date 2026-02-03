@@ -17,6 +17,7 @@ let timelineRange = { start: null, end: null };
 let onFocusNode = null;
 let onFilterNodes = null;
 let onResetFilter = null;
+let onDatabaseSwitch = null;
 
 const TYPE_COLORS = {
   person: '#fbbf24', organization: '#60a5fa', project: '#34d399',
@@ -30,12 +31,14 @@ export function initUI(data, callbacks) {
   onFocusNode = callbacks.focusNode;
   onFilterNodes = callbacks.filterNodes;
   onResetFilter = callbacks.resetFilter;
+  onDatabaseSwitch = callbacks.databaseSwitch;
 
   initSearch();
   initFilters();
   initDetailPanel();
   initTimeline();
   initSettings();
+  initDatabaseSelector();
 }
 
 export function setGraphData(data) {
@@ -449,6 +452,83 @@ function initSettings() {
   const current = getQuality();
   const currentRadio = panel.querySelector(`input[value="${current}"]`);
   if (currentRadio) currentRadio.checked = true;
+}
+
+// ── Database selector ────────────────────────────────────────
+
+async function initDatabaseSelector() {
+  const selector = document.getElementById('db-selector');
+  if (!selector) return;
+
+  try {
+    const response = await fetch('/api/databases');
+    const data = await response.json();
+
+    selector.replaceChildren();
+
+    if (!data.databases || data.databases.length === 0) {
+      const opt = document.createElement('option');
+      opt.textContent = 'No databases found';
+      opt.disabled = true;
+      selector.appendChild(opt);
+      return;
+    }
+
+    for (const db of data.databases) {
+      const opt = document.createElement('option');
+      opt.value = db.path;
+      opt.textContent = db.label + (db.isCurrent ? ' ●' : '');
+      if (db.isCurrent) {
+        opt.selected = true;
+        if (db.entityCount !== null) {
+          opt.textContent = `${db.label} (${db.entityCount})`;
+        }
+      }
+      selector.appendChild(opt);
+    }
+
+    selector.addEventListener('change', async () => {
+      const selectedPath = selector.value;
+      if (!selectedPath) return;
+
+      selector.disabled = true;
+      try {
+        const switchResponse = await fetch('/api/database/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: selectedPath })
+        });
+
+        const result = await switchResponse.json();
+
+        if (result.success) {
+          // Refresh the selector to show new current
+          await initDatabaseSelector();
+          // Notify main.js to reload graph
+          if (onDatabaseSwitch) onDatabaseSwitch();
+        } else {
+          console.error('Failed to switch database:', result.error);
+          alert('Failed to switch database: ' + result.error);
+        }
+      } catch (err) {
+        console.error('Database switch error:', err);
+        alert('Error switching database');
+      } finally {
+        selector.disabled = false;
+      }
+    });
+
+  } catch (err) {
+    console.error('Failed to load databases:', err);
+    const opt = document.createElement('option');
+    opt.textContent = 'Error loading';
+    opt.disabled = true;
+    selector.replaceChildren(opt);
+  }
+}
+
+export async function refreshDatabaseSelector() {
+  await initDatabaseSelector();
 }
 
 // ── Stats HUD ───────────────────────────────────────────────

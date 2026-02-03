@@ -30,7 +30,8 @@ import {
   clearSelection,
   filterNodes,
   resetFilter,
-  getNodePositions
+  getNodePositions,
+  disposeGraph
 } from './graph.js';
 
 import { getAllNodeMeshes, ENTITY_COLORS, MEMORY_COLORS } from './nodes.js';
@@ -137,7 +138,8 @@ async function init() {
     initUI(graphData, {
       focusNode: handleFocusNode,
       filterNodes: filterNodes,
-      resetFilter: resetFilter
+      resetFilter: resetFilter,
+      databaseSwitch: handleDatabaseSwitch
     });
 
     // Node picking
@@ -334,6 +336,37 @@ function handleNodeClick(node) {
 
   // Pause auto-orbit temporarily
   pauseOrbit();
+}
+
+// ── Database switch ──────────────────────────────────────────
+
+async function handleDatabaseSwitch() {
+  console.log('Database switched, reloading graph...');
+
+  try {
+    // Dispose existing graph (meshes, simulation, links)
+    disposeGraph();
+
+    // Fetch new graph data
+    const response = await fetch('/api/graph');
+    graphData = await response.json();
+
+    console.log(`Reloaded ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+
+    // Re-initialize graph with new data
+    initGraph(graphData, scene);
+
+    // Update UI with new data
+    setGraphData(graphData);
+
+    // Refresh stats and timeline
+    refreshStats();
+    refreshTimeline();
+
+  } catch (err) {
+    console.error('Failed to reload graph after database switch:', err);
+    alert('Failed to reload graph: ' + err.message);
+  }
 }
 
 // ── Camera focus ────────────────────────────────────────────

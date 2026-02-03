@@ -147,6 +147,47 @@ body {
   gap: 12px;
 }
 
+/* ── Database selector ────────────────────────────────────── */
+
+#db-selector-container {
+  position: relative;
+}
+
+#db-selector {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 4px 24px 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23606080' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  min-width: 120px;
+}
+
+#db-selector:hover {
+  background-color: rgba(129, 140, 248, 0.08);
+  border-color: var(--border-bright);
+}
+
+#db-selector:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+#db-selector option {
+  background: var(--surface-hover);
+  color: var(--text);
+  padding: 8px;
+}
+
 #fps-counter {
   font-size: 11px;
   color: var(--text-dim);

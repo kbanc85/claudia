@@ -24,7 +24,8 @@ import {
   getAllNodeMeshes,
   removeNodeMesh,
   addLabel,
-  updateLabelPosition
+  updateLabelPosition,
+  disposeAllNodes
 } from './nodes.js';
 
 import {
@@ -297,5 +298,12 @@ export function disposeGraph() {
     simulation.stop();
     simulation = null;
   }
-  disposeLinks();
+  if (scene) {
+    disposeAllNodes(scene);
+    disposeLinks(scene);
+  }
+  nodePositions.clear();
+  highlightNodes.clear();
+  highlightLinks.clear();
+  selectedNode = null;
 }
