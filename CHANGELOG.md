@@ -2,6 +2,21 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.13.1 (2026-02-03)
+
+### Demo Mode
+
+Safe, isolated demo installations for testing and demos.
+
+### Added
+
+- **`--demo` installer flag** -- `npx get-claudia my-demo --demo` creates an installation pre-populated with realistic fake data. Perfect for testing features or giving demos without using real data.
+- **Demo database isolation** -- Demo data lives in `~/.claudia/demo/`, completely separate from real data in `~/.claudia/memory/`. Safety checks prevent accidental writes to production data.
+- **`seed_demo.py` script** -- Manually seed demo data with 12 people, 3 organizations, 3 projects, relationships with varying dormancy, commitments (some overdue), patterns, predictions, and past session episodes.
+- **`CLAUDIA_DEMO_MODE` env var** -- Set to `1` to use demo database. The installer configures this automatically with `--demo`.
+
+---
+
 ## 1.13.0 (2026-02-02)
 
 ### Relationship Intelligence
