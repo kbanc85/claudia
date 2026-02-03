@@ -1,0 +1,26 @@
+{
+  "name": "claudia-brain-visualizer",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Real-time 3D visualization of Claudia's memory system (Babylon.js 8)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node --watch server.js"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^8.0.0",
+    "@babylonjs/gui": "^8.0.0",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "d3-force-3d": "^3.0.5",
+    "express": "^4.21.0",
+    "umap-js": "^1.4.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

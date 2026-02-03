@@ -9,26 +9,49 @@ Launch the Claudia Brain Visualizer, a real-time 3D visualization of my memory s
 ## Prerequisites
 
 The visualizer requires:
-1. **Memory daemon** running (provides the graph API)
-2. **Vite dev server** running (serves the Three.js app)
+1. **Memory daemon** running on port 3848 (handles embeddings)
+2. **API server** running on port 3849 (serves graph data from database)
+3. **Vite dev server** running on port 5173/5174 (Three.js frontend)
+
+The API server must be started with `--project-dir` pointing to the current Claudia installation to access the correct per-project database.
 
 ---
 
 ## Launch
 
-### Step 1: Check if visualizer is already running
+### Step 1: Identify the current project directory
+
+The project directory is the Claudia installation root (where `context/me.md` lives). This is needed for database isolation.
+
+```bash
+# The Claudia installation directory (where this command is being run from)
+PROJECT_DIR="$(pwd)"
+echo "PROJECT_DIR:$PROJECT_DIR"
+```
+
+### Step 2: Check if visualizer frontend is already running
 
 ```bash
 if curl -s http://localhost:5173 > /dev/null 2>&1; then
-  echo "VISUALIZER_RUNNING:5173"
+  echo "FRONTEND_RUNNING:5173"
 elif curl -s http://localhost:5174 > /dev/null 2>&1; then
-  echo "VISUALIZER_RUNNING:5174"
+  echo "FRONTEND_RUNNING:5174"
 else
-  echo "VISUALIZER_NOT_RUNNING"
+  echo "FRONTEND_NOT_RUNNING"
 fi
 ```
 
-### Step 2: Check if memory daemon is running
+### Step 3: Check if API server is running
+
+```bash
+if curl -s http://localhost:3849/health > /dev/null 2>&1; then
+  echo "API_RUNNING"
+else
+  echo "API_NOT_RUNNING"
+fi
+```
+
+### Step 4: Check if memory daemon is running
 
 ```bash
 if curl -s http://localhost:3848/health > /dev/null 2>&1; then
@@ -38,10 +61,13 @@ else
 fi
 ```
 
-### Step 3: Find the visualizer directory
+### Step 5: Find the visualizer directories
 
 ```bash
 VISUALIZER_DIR=""
+BACKEND_DIR=""
+
+# Find Three.js frontend
 for dir in \
   "$HOME/.claudia/visualizer-threejs" \
   "$(dirname "$(which get-claudia 2>/dev/null)")/../lib/node_modules/get-claudia/visualizer-threejs" \
@@ -52,23 +78,67 @@ for dir in \
   fi
 done
 
+# Find API backend (in visualizer/ sibling directory)
+for dir in \
+  "$HOME/.claudia/visualizer" \
+  "$(dirname "$(which get-claudia 2>/dev/null)")/../lib/node_modules/get-claudia/visualizer" \
+  "$(npm root -g 2>/dev/null)/get-claudia/visualizer"; do
+  if [ -d "$dir" ] && [ -f "$dir/server.js" ]; then
+    BACKEND_DIR="$dir"
+    break
+  fi
+done
+
 if [ -z "$VISUALIZER_DIR" ]; then
   echo "VISUALIZER_NOT_FOUND"
 else
   echo "VISUALIZER_FOUND:$VISUALIZER_DIR"
 fi
+
+if [ -z "$BACKEND_DIR" ]; then
+  echo "BACKEND_NOT_FOUND"
+else
+  echo "BACKEND_FOUND:$BACKEND_DIR"
+fi
 ```
 
-### Step 4: Start visualizer if not running
+### Step 6: Start API backend if not running
 
-If **VISUALIZER_NOT_RUNNING** and **VISUALIZER_FOUND**:
+If **API_NOT_RUNNING** and **BACKEND_FOUND**:
+
+```bash
+cd "$BACKEND_DIR"
+
+# Install deps if needed
+if [ ! -d "node_modules" ]; then
+  echo "Installing backend dependencies..."
+  npm install 2>&1
+fi
+
+# Start API server with project directory for database isolation
+nohup node server.js --project-dir "$PROJECT_DIR" > /tmp/claudia-brain-api.log 2>&1 &
+API_PID=$!
+sleep 2
+
+# Check if started successfully
+if curl -s http://localhost:3849/health > /dev/null 2>&1; then
+  echo "API_STARTED"
+else
+  echo "API_FAILED"
+  tail -10 /tmp/claudia-brain-api.log
+fi
+```
+
+### Step 7: Start frontend if not running
+
+If **FRONTEND_NOT_RUNNING** and **VISUALIZER_FOUND**:
 
 ```bash
 cd "$VISUALIZER_DIR"
 
 # Install deps if needed
 if [ ! -d "node_modules" ]; then
-  echo "Installing dependencies..."
+  echo "Installing frontend dependencies..."
   npm install 2>&1
 fi
 
@@ -79,16 +149,16 @@ sleep 3
 
 # Check if started successfully
 if curl -s http://localhost:5173 > /dev/null 2>&1; then
-  echo "STARTED:5173"
+  echo "FRONTEND_STARTED:5173"
 elif curl -s http://localhost:5174 > /dev/null 2>&1; then
-  echo "STARTED:5174"
+  echo "FRONTEND_STARTED:5174"
 else
-  echo "FAILED"
+  echo "FRONTEND_FAILED"
   tail -20 /tmp/claudia-brain.log
 fi
 ```
 
-### Step 5: Open in browser
+### Step 8: Open in browser
 
 ```bash
 PORT="${PORT:-5173}"
@@ -108,6 +178,8 @@ Your brain is already live at http://localhost:[PORT]
 ```
 **Brain Visualizer**
 Launched at http://localhost:[PORT]
+
+Viewing database for: [PROJECT_DIR]
 
 What you're seeing:
 - **Entities** (people, orgs, projects, concepts) as colored nodes
@@ -133,17 +205,31 @@ cd ~/.claudia && python -m claudia_memory
 Then try `/brain` again.
 ```
 
+**If API server failed:**
+```
+The API server couldn't start. Check the log:
+```bash
+tail -50 /tmp/claudia-brain-api.log
+```
+
+Common issues:
+- Port 3849 already in use
+- Database not found for this project
+- Missing node_modules (run `npm install` in the visualizer directory)
+```
+
 **If visualizer not found:**
 ```
-The Brain Visualizer isn't installed. It ships with the visualizer-threejs directory in the Claudia package.
+The Brain Visualizer isn't installed. It ships with the visualizer and visualizer-threejs directories in the Claudia package.
 
 To install manually:
-1. Copy visualizer-threejs/ to ~/.claudia/visualizer-threejs
-2. Run `npm install` in that directory
-3. Try `/brain` again
+1. Copy visualizer/ to ~/.claudia/visualizer
+2. Copy visualizer-threejs/ to ~/.claudia/visualizer-threejs
+3. Run `npm install` in both directories
+4. Try `/brain` again
 ```
 
-**If failed:**
+**If frontend failed:**
 Show the log output and suggest checking `/tmp/claudia-brain.log`.
 
 ---

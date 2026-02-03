@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claudia Brain</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- Babylon.js canvas -->
+  <canvas id="renderCanvas"></canvas>
+
+  <!-- Top HUD bar -->
+  <div id="hud-bar">
+    <div id="hud-title">
+      <span class="hud-logo">&#x2B22;</span>
+      <span>Claudia Brain</span>
+      <span id="activity-pulse" class="pulse"></span>
+    </div>
+    <div id="hud-stats">
+      <div class="stat"><span id="stat-entities">0</span> entities</div>
+      <div class="stat"><span id="stat-memories">0</span> memories</div>
+      <div class="stat"><span id="stat-patterns">0</span> patterns</div>
+      <div class="stat"><span id="stat-relationships">0</span> relationships</div>
+    </div>
+    <div id="hud-controls">
+      <span id="fps-counter">-- FPS</span>
+      <span id="engine-info"></span>
+      <div id="settings-container">
+        <button id="settings-btn" title="Quality Settings">&#x2699;</button>
+        <div id="settings-panel" class="hidden">
+          <div class="settings-title">Quality</div>
+          <label class="settings-option"><input type="radio" name="quality" value="low"><span>Low</span><span class="settings-desc">No bloom, no particles</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="medium"><span>Medium</span><span class="settings-desc">Bloom, particles</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="high" checked><span>High</span><span class="settings-desc">Full effects</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="ultra"><span>Ultra</span><span class="settings-desc">Full-res, max glow</span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left sidebar -->
+  <div id="sidebar">
+    <div id="search-container">
+      <input type="text" id="search-input" placeholder="Search entities & memories..." autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+    <div id="filters">
+      <h3>Node Types</h3>
+      <div id="type-filters"></div>
+      <h3>Memory Types</h3>
+      <div id="memory-filters"></div>
+    </div>
+    <div id="legend"></div>
+  </div>
+
+  <!-- Right detail panel (slides in on node click) -->
+  <div id="detail-panel" class="hidden">
+    <button id="detail-close">&times;</button>
+    <div id="detail-content"></div>
+  </div>
+
+  <!-- Bottom timeline -->
+  <div id="timeline-container">
+    <div id="timeline-bar">
+      <input type="range" id="timeline-slider" min="0" max="100" value="100">
+      <div id="timeline-labels">
+        <span id="timeline-start"></span>
+        <span id="timeline-current"></span>
+        <span id="timeline-end">Now</span>
+      </div>
+    </div>
+    <div id="timeline-controls">
+      <button id="timeline-play" title="Play/Pause">&#9654;</button>
+      <button id="timeline-speed" title="Speed">1x</button>
+    </div>
+    <div id="timeline-density"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
