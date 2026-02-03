@@ -106,6 +106,15 @@ npx get-claudia .
 
 This upgrades framework files while preserving your data (context/, people/, projects/).
 
+**Add the Brain Visualizer to an existing install:**
+```bash
+# macOS/Linux
+bash "$(npm root -g)/get-claudia/visualizer/scripts/install.sh"
+
+# Windows (PowerShell)
+& "$(npm root -g)\get-claudia\visualizer\scripts\install.ps1"
+```
+
 ---
 
 ## Demo Mode
