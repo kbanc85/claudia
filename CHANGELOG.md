@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.18.1 (2026-02-03)
+
+### Fixed
+
+- **PowerShell 5.1 compatibility** - Fixed parse errors in both visualizer and gateway Windows installers. PowerShell 5.1 (default on Windows 10) had issues with here-strings containing code structures, Unicode characters in interpolated strings, and the `&&` operator. All installers now use string arrays, explicit concatenation, and ASCII-safe symbols.
+
+---
+
 ## 1.18.0 (2026-02-03)
 
 ### Brain Visualizer: Real-Time Settings & Smart Navigation
