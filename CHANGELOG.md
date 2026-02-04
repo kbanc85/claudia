@@ -2,6 +2,37 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.21.1 (2026-02-04)
+
+### Bulletproof Memory
+
+Claudia now verifies the memory system is working at session start and enforces source preservation as a hard requirement.
+
+### Fixed
+
+- **Python 3.14 compatibility** - Fixed `asyncio.get_event_loop()` deprecation in standalone daemon mode that was crashing the health endpoint.
+
+### Added
+
+- **`/diagnose` skill** - Full diagnostic tool that checks MCP tools, daemon process, health endpoint, and database. Provides specific fix instructions for each failure mode.
+- **Memory verification at session start** - Claudia now checks that `memory.*` tools are available before proceeding. If missing, warns user and suggests `/diagnose`.
+- **Hard source preservation requirement** - "STOP. File it FIRST." is now a hard stop in the workflow, not a suggestion.
+
+### Changed
+
+- **Session start protocol** - Now has explicit 4-step verification: check tools → load context → catch up → greet.
+- **`/ingest-sources` workflow** - Now files each source during Phase 2 (extraction), not Phase 5 (after everything). File-Then-Extract, not Extract-Then-File.
+- **`memory-manager` skill** - Added "Hard Requirements" section at top making source preservation non-negotiable.
+- **`hooks.json`** - Added `memory_verification` and `source_filing` notes.
+
+### Why This Matters
+
+Before: Claudia could read 40 transcripts, extract to a dashboard, but never file the sources. Next session, no provenance.
+
+After: She literally cannot proceed past "read source" without filing it first. And if memory tools aren't available, she warns you immediately instead of silently failing.
+
+---
+
 ## 1.21.0 (2026-02-04)
 
 ### The Reflections Release
