@@ -32,10 +32,13 @@ from ..services.recall import (
     get_hub_entities,
     get_project_network,
     get_recall_service,
+    get_reflection_by_id,
+    get_reflections,
     recall,
     recall_about,
     recall_episodes,
     search_entities,
+    search_reflections,
     trace_memory,
 )
 from ..services.ingest import get_ingest_service
@@ -46,6 +49,9 @@ from ..services.remember import (
     get_remember_service,
     get_unsummarized_turns,
     relate_entities,
+    store_reflection,
+    update_reflection,
+    delete_reflection,
     remember_entity,
     remember_fact,
     remember_message,
@@ -439,6 +445,42 @@ async def list_tools() -> ListToolsResult:
                         "items": {"type": "string"},
                         "description": "Main topics discussed in the session",
                     },
+                    "reflections": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": {"type": "string"},
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["observation", "pattern", "learning", "question"],
+                                    "default": "observation",
+                                    "description": (
+                                        "observation: User behavior/preference noticed. "
+                                        "pattern: Recurring theme across sessions. "
+                                        "learning: How to work better with this user. "
+                                        "question: Worth revisiting later."
+                                    ),
+                                },
+                                "about": {
+                                    "type": "string",
+                                    "description": "Entity name this reflection is about (optional)",
+                                },
+                                "importance": {
+                                    "type": "number",
+                                    "default": 0.7,
+                                    "description": "Importance 0-1 (default 0.7, higher than regular memories)",
+                                },
+                            },
+                            "required": ["content", "type"],
+                        },
+                        "description": (
+                            "Persistent reflections from /meditate. These are user-approved "
+                            "observations, patterns, learnings, and questions that decay very slowly "
+                            "and inform future sessions. Generate 1-3 reflections per session capturing "
+                            "cross-session patterns or communication insights."
+                        ),
+                    },
                 },
                 "required": ["episode_id", "narrative"],
             },
@@ -454,6 +496,55 @@ async def list_tools() -> ListToolsResult:
             inputSchema={
                 "type": "object",
                 "properties": {},
+            },
+        ),
+        Tool(
+            name="memory.reflections",
+            description=(
+                "Get or search persistent reflections (observations, patterns, learnings, questions) "
+                "from past /meditate sessions. Reflections are user-approved insights that decay "
+                "very slowly and inform future interactions. Use this to retrieve cross-session "
+                "patterns about user preferences and communication styles."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Semantic search query (optional). If omitted, returns recent high-importance reflections.",
+                    },
+                    "types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["observation", "pattern", "learning", "question"],
+                        },
+                        "description": "Filter by reflection types (optional)",
+                    },
+                    "about": {
+                        "type": "string",
+                        "description": "Filter to reflections about a specific entity (optional)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Maximum results to return",
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["get", "search", "update", "delete"],
+                        "default": "get",
+                        "description": "Action: get (list), search (semantic), update, delete",
+                    },
+                    "reflection_id": {
+                        "type": "integer",
+                        "description": "Reflection ID (required for update/delete actions)",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "New content (for update action)",
+                    },
+                },
             },
         ),
         Tool(
@@ -1149,8 +1240,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.end_session":
+            episode_id = arguments["episode_id"]
             result = end_session(
-                episode_id=arguments["episode_id"],
+                episode_id=episode_id,
                 narrative=arguments["narrative"],
                 facts=arguments.get("facts"),
                 commitments=arguments.get("commitments"),
@@ -1158,6 +1250,22 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 relationships=arguments.get("relationships"),
                 key_topics=arguments.get("key_topics"),
             )
+
+            # Process reflections if provided
+            reflections_input = arguments.get("reflections", [])
+            reflections_stored = 0
+            for ref in reflections_input:
+                ref_id = store_reflection(
+                    content=ref["content"],
+                    reflection_type=ref.get("type", "observation"),
+                    episode_id=episode_id,
+                    about_entity=ref.get("about"),
+                    importance=ref.get("importance", 0.7),
+                )
+                if ref_id:
+                    reflections_stored += 1
+            result["reflections_stored"] = reflections_stored
+
             return CallToolResult(
                 content=[
                     TextContent(
@@ -1180,6 +1288,95 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     )
                 ]
             )
+
+        elif name == "memory.reflections":
+            action = arguments.get("action", "get")
+            limit = arguments.get("limit", 10)
+            types = arguments.get("types")
+            about = arguments.get("about")
+            query = arguments.get("query")
+
+            if action == "delete":
+                reflection_id = arguments.get("reflection_id")
+                if not reflection_id:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": "reflection_id required for delete"}))]
+                    )
+                success = delete_reflection(reflection_id)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps({"deleted": success, "reflection_id": reflection_id}))]
+                )
+
+            elif action == "update":
+                reflection_id = arguments.get("reflection_id")
+                new_content = arguments.get("content")
+                if not reflection_id:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": "reflection_id required for update"}))]
+                    )
+                success = update_reflection(reflection_id, content=new_content)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps({"updated": success, "reflection_id": reflection_id}))]
+                )
+
+            elif action == "search" and query:
+                results = search_reflections(query, limit=limit, reflection_types=types)
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({
+                                "reflections": [
+                                    {
+                                        "id": r.id,
+                                        "content": r.content,
+                                        "type": r.reflection_type,
+                                        "importance": r.importance,
+                                        "confidence": r.confidence,
+                                        "about_entity": r.about_entity,
+                                        "first_observed": r.first_observed_at,
+                                        "last_confirmed": r.last_confirmed_at,
+                                        "times_confirmed": r.aggregation_count,
+                                        "score": r.score,
+                                    }
+                                    for r in results
+                                ],
+                                "count": len(results),
+                            }),
+                        )
+                    ]
+                )
+
+            else:  # action == "get" (default)
+                results = get_reflections(
+                    limit=limit,
+                    reflection_types=types,
+                    about_entity=about,
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({
+                                "reflections": [
+                                    {
+                                        "id": r.id,
+                                        "content": r.content,
+                                        "type": r.reflection_type,
+                                        "importance": r.importance,
+                                        "confidence": r.confidence,
+                                        "about_entity": r.about_entity,
+                                        "first_observed": r.first_observed_at,
+                                        "last_confirmed": r.last_confirmed_at,
+                                        "times_confirmed": r.aggregation_count,
+                                    }
+                                    for r in results
+                                ],
+                                "count": len(results),
+                            }),
+                        )
+                    ]
+                )
 
         elif name == "memory.batch":
             operations = arguments.get("operations", [])

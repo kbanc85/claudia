@@ -663,6 +663,163 @@ class RememberService:
         )
         return result
 
+    def store_reflection(
+        self,
+        content: str,
+        reflection_type: str,
+        episode_id: Optional[int] = None,
+        about_entity: Optional[str] = None,
+        importance: float = 0.7,
+        confidence: float = 0.8,
+    ) -> Optional[int]:
+        """
+        Store a reflection (observation, pattern, learning, question) from /meditate.
+
+        Reflections are user-approved persistent learnings that decay very slowly
+        (0.999 daily vs 0.995 for regular memories). They capture cross-session
+        patterns that inform future interactions.
+
+        Args:
+            content: The reflection text
+            reflection_type: 'observation', 'pattern', 'learning', 'question'
+            episode_id: Optional episode this reflection came from
+            about_entity: Optional entity name this reflection is about
+            importance: Starting importance (default 0.7, higher than regular memories)
+            confidence: How confident we are (default 0.8, user-approved = high)
+
+        Returns:
+            Reflection ID or None if duplicate
+        """
+        # Check for near-duplicate
+        ref_hash = content_hash(content)
+        existing = self.db.get_one(
+            "reflections", where="content_hash = ?", where_params=(ref_hash,)
+        )
+        if existing:
+            # Duplicate content - confirm the existing one instead of creating new
+            self.db.update(
+                "reflections",
+                {
+                    "last_confirmed_at": datetime.utcnow().isoformat(),
+                    "aggregation_count": existing["aggregation_count"] + 1,
+                    "confidence": min(1.0, existing["confidence"] + 0.05),
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+                "id = ?",
+                (existing["id"],),
+            )
+            logger.debug(f"Confirmed existing reflection {existing['id']}")
+            return existing["id"]
+
+        # Find entity if specified
+        entity_id = None
+        if about_entity:
+            entity_id = self._find_or_create_entity(about_entity)
+
+        # Insert new reflection
+        now = datetime.utcnow().isoformat()
+        reflection_id = self.db.insert(
+            "reflections",
+            {
+                "episode_id": episode_id,
+                "reflection_type": reflection_type,
+                "content": content,
+                "content_hash": ref_hash,
+                "about_entity_id": entity_id,
+                "importance": importance,
+                "confidence": confidence,
+                "decay_rate": 0.999,  # Very slow decay
+                "aggregation_count": 1,
+                "first_observed_at": now,
+                "last_confirmed_at": now,
+                "created_at": now,
+            },
+        )
+
+        # Generate and store embedding
+        embedding = embed_sync(content)
+        if embedding:
+            try:
+                self.db.execute(
+                    "INSERT OR REPLACE INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)",
+                    (reflection_id, json.dumps(embedding)),
+                )
+            except Exception as e:
+                logger.warning(f"Could not store reflection embedding: {e}")
+
+        logger.debug(f"Stored reflection [{reflection_type}]: {content[:50]}...")
+        return reflection_id
+
+    def update_reflection(
+        self,
+        reflection_id: int,
+        content: Optional[str] = None,
+        importance: Optional[float] = None,
+    ) -> bool:
+        """
+        Update an existing reflection (for natural language editing).
+
+        Args:
+            reflection_id: The reflection to update
+            content: New content (if changing)
+            importance: New importance (if changing)
+
+        Returns:
+            True if updated, False if not found
+        """
+        existing = self.db.get_one(
+            "reflections", where="id = ?", where_params=(reflection_id,)
+        )
+        if not existing:
+            return False
+
+        update_data = {"updated_at": datetime.utcnow().isoformat()}
+
+        if content is not None:
+            update_data["content"] = content
+            update_data["content_hash"] = content_hash(content)
+            # Re-generate embedding
+            embedding = embed_sync(content)
+            if embedding:
+                try:
+                    self.db.execute(
+                        "INSERT OR REPLACE INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)",
+                        (reflection_id, json.dumps(embedding)),
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not update reflection embedding: {e}")
+
+        if importance is not None:
+            update_data["importance"] = importance
+
+        self.db.update("reflections", update_data, "id = ?", (reflection_id,))
+        logger.debug(f"Updated reflection {reflection_id}")
+        return True
+
+    def delete_reflection(self, reflection_id: int) -> bool:
+        """
+        Delete a reflection.
+
+        Args:
+            reflection_id: The reflection to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        count = self.db.delete("reflections", "id = ?", (reflection_id,))
+        if count > 0:
+            # Also delete embedding
+            try:
+                self.db.execute(
+                    "DELETE FROM reflection_embeddings WHERE reflection_id = ?",
+                    (reflection_id,),
+                )
+            except Exception:
+                pass
+            logger.debug(f"Deleted reflection {reflection_id}")
+            return True
+        return False
+
     def get_unsummarized_turns(self) -> List[Dict[str, Any]]:
         """
         Find episodes with buffered turns that were never summarized.
@@ -935,3 +1092,18 @@ def end_session(episode_id: int, narrative: str, **kwargs) -> Dict[str, Any]:
 def get_unsummarized_turns() -> List[Dict[str, Any]]:
     """Find episodes with buffered turns that were never summarized"""
     return get_remember_service().get_unsummarized_turns()
+
+
+def store_reflection(content: str, reflection_type: str, **kwargs) -> Optional[int]:
+    """Store a reflection from /meditate"""
+    return get_remember_service().store_reflection(content, reflection_type, **kwargs)
+
+
+def update_reflection(reflection_id: int, **kwargs) -> bool:
+    """Update an existing reflection"""
+    return get_remember_service().update_reflection(reflection_id, **kwargs)
+
+
+def delete_reflection(reflection_id: int) -> bool:
+    """Delete a reflection"""
+    return get_remember_service().delete_reflection(reflection_id)

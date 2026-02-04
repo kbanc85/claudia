@@ -453,7 +453,9 @@ Call memory.end_session with:
 ├── commitments: Promises made [{content, about, importance}]
 ├── entities: New/updated entities [{name, type, description, aliases}]
 ├── relationships: Observed relationships [{source, target, relationship}]
-└── key_topics: Main topics discussed ["topic1", "topic2"]
+├── key_topics: Main topics discussed ["topic1", "topic2"]
+└── reflections: Learnings about working with this user (see /meditate skill)
+    [{content, type: observation|pattern|learning|question, about?}]
 ```
 
 **Writing the narrative:**
@@ -519,6 +521,83 @@ When session ends (or at reasonable checkpoints):
 
 *Last updated: [date]*
 ```
+
+---
+
+## Reflections (Enhanced Memory)
+
+Reflections are persistent learnings about working with this user. Unlike memories (facts about the world), reflections capture communication preferences, work patterns, and how to be more helpful.
+
+### What Are Reflections
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| `observation` | User behavior noticed | "Prefers bullet points over paragraphs" |
+| `pattern` | Recurring theme | "Mondays involve financial review" |
+| `learning` | How to work better | "Direct questions get better responses" |
+| `question` | Worth revisiting | "How did the Acme negotiation resolve?" |
+
+### Generating Reflections
+
+Reflections are typically generated via the `/meditate` skill at session end, but can be created anytime:
+
+```
+1. User says "let's wrap up" or "/meditate"
+2. Review the session and identify 1-3 insights
+3. Present to user for approval
+4. Store via memory.end_session with reflections array
+```
+
+### Retrieving Reflections
+
+When user asks about what you've learned:
+
+```
+"What have you learned about me?"
+"Show me your reflections"
+"Any observations about how I work?"
+
+→ Call memory.reflections (action: "get", limit: 20)
+→ Format nicely, grouped by type
+→ Mention timeline (first observed, times confirmed)
+```
+
+### Editing Reflections
+
+Users can modify reflections via natural language:
+
+```
+User: "That thing about me preferring bullet points - that's only for technical content."
+
+1. Call memory.reflections (action: "search", query: "bullet points")
+2. Find the relevant reflection
+3. Call memory.reflections (action: "update", reflection_id: X, content: "...")
+4. Confirm: "Updated. I'll keep that distinction in mind."
+```
+
+```
+User: "Delete the reflection about Monday mornings"
+
+1. Search for the reflection
+2. Call memory.reflections (action: "delete", reflection_id: X)
+3. Confirm: "Done, I've removed that."
+```
+
+### How Reflections Surface
+
+Reflections are loaded automatically via `memory.session_context` or `memory.briefing` and inform:
+- Communication style (don't announce, just apply)
+- When to surface vs stay silent
+- How to format output
+- What questions to ask
+
+### Reflection Decay
+
+Reflections decay very slowly (0.999 daily, ~2 year half-life) because they're user-approved. Well-confirmed reflections (3+ times) decay even slower (0.9995).
+
+### Without Enhanced Memory
+
+When the memory daemon is unavailable, reflections are stored in `context/learnings.md` under a "Reflections" heading.
 
 ---
 

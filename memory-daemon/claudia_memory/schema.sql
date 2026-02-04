@@ -342,3 +342,58 @@ VALUES (8, 'Add valid_at, invalid_at to relationships for bi-temporal tracking')
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (9, 'Add _meta table for database identification and workspace path tracking');
+
+-- ============================================================================
+-- REFLECTIONS: Persistent learnings and observations (from /meditate)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS reflections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER REFERENCES episodes(id),
+
+    -- Type and content
+    reflection_type TEXT NOT NULL CHECK (reflection_type IN ('observation', 'pattern', 'learning', 'question')),
+    content TEXT NOT NULL,
+    content_hash TEXT,  -- For deduplication
+
+    -- Optional entity association
+    about_entity_id INTEGER REFERENCES entities(id),
+
+    -- Scoring (reflections are user-approved, so start high)
+    importance REAL DEFAULT 0.7,
+    confidence REAL DEFAULT 0.8,
+
+    -- Very slow decay (reflections are long-term learnings)
+    decay_rate REAL DEFAULT 0.999,
+
+    -- Aggregation tracking
+    aggregated_from TEXT,  -- JSON array of reflection IDs this merged from
+    aggregation_count INTEGER DEFAULT 1,
+
+    -- Timeline tracking (pattern evolution)
+    first_observed_at TEXT DEFAULT (datetime('now')),
+    last_confirmed_at TEXT DEFAULT (datetime('now')),
+
+    -- Embedding for semantic search
+    embedding BLOB,
+
+    -- Timestamps
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT,
+    surfaced_count INTEGER DEFAULT 0,
+    last_surfaced_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_reflections_type ON reflections(reflection_type);
+CREATE INDEX IF NOT EXISTS idx_reflections_importance ON reflections(importance DESC);
+CREATE INDEX IF NOT EXISTS idx_reflections_entity ON reflections(about_entity_id);
+CREATE INDEX IF NOT EXISTS idx_reflections_episode ON reflections(episode_id);
+
+-- Reflection embeddings for semantic search
+CREATE VIRTUAL TABLE IF NOT EXISTS reflection_embeddings USING vec0(
+    reflection_id INTEGER PRIMARY KEY,
+    embedding FLOAT[384]
+);
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (10, 'Add reflections table and reflection_embeddings for /meditate skill');

@@ -103,6 +103,25 @@ class ConsolidateService:
             (decay_rate, datetime.utcnow().isoformat()),
         )
 
+        # Decay reflections using per-row decay_rate
+        # Reflections decay very slowly by default (0.999)
+        # Aggregated reflections (3+) decay even slower (0.9995)
+        try:
+            self.db.execute(
+                """
+                UPDATE reflections
+                SET importance = importance * decay_rate,
+                    updated_at = ?
+                WHERE importance > 0.01
+                """,
+                (datetime.utcnow().isoformat(),),
+            )
+            reflections_result = self.db.execute("SELECT changes()", fetch=True)
+            reflections_decayed = reflections_result[0][0] if reflections_result else 0
+        except Exception as e:
+            logger.debug(f"Reflection decay skipped (table may not exist): {e}")
+            reflections_decayed = 0
+
         logger.info(
             f"Decay applied: decay_rate={decay_rate}"
         )
@@ -111,6 +130,7 @@ class ConsolidateService:
             "memories_decayed": self.db.execute(
                 "SELECT changes()", fetch=True
             )[0][0] if self.db.execute("SELECT changes()", fetch=True) else 0,
+            "reflections_decayed": reflections_decayed,
         }
 
     def boost_accessed_memories(self) -> int:
@@ -1413,6 +1433,150 @@ class ConsolidateService:
 
         return count
 
+    def aggregate_reflections(self) -> int:
+        """
+        Aggregate semantically similar reflections during consolidation.
+
+        Finds reflection pairs with high cosine similarity (>0.85) and
+        merges them while preserving timeline information. The merged
+        reflection gets:
+        - Combined aggregation_count
+        - Earliest first_observed_at
+        - Latest last_confirmed_at
+        - Slower decay rate if aggregation_count >= 3
+
+        Returns:
+            Count of reflection pairs merged
+        """
+        threshold = 0.85  # High threshold since reflections are already curated
+        merged_count = 0
+
+        try:
+            # Find reflections with embeddings
+            rows = self.db.execute(
+                """
+                SELECT r.id, r.content, r.reflection_type, r.importance,
+                       r.aggregation_count, r.first_observed_at, r.last_confirmed_at,
+                       re.embedding
+                FROM reflections r
+                JOIN reflection_embeddings re ON r.id = re.reflection_id
+                WHERE r.importance > 0.1
+                ORDER BY r.importance DESC
+                """,
+                fetch=True,
+            ) or []
+
+            if len(rows) < 2:
+                return 0
+
+            # Parse embeddings
+            reflections_with_emb = []
+            for row in rows:
+                if row["embedding"]:
+                    try:
+                        emb = json.loads(row["embedding"]) if isinstance(row["embedding"], str) else row["embedding"]
+                        reflections_with_emb.append({
+                            "id": row["id"],
+                            "content": row["content"],
+                            "type": row["reflection_type"],
+                            "importance": row["importance"],
+                            "aggregation_count": row["aggregation_count"],
+                            "first_observed_at": row["first_observed_at"],
+                            "last_confirmed_at": row["last_confirmed_at"],
+                            "embedding": emb,
+                        })
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+            # Pairwise similarity, same type only
+            already_merged = set()
+            for i in range(len(reflections_with_emb)):
+                if reflections_with_emb[i]["id"] in already_merged:
+                    continue
+                for j in range(i + 1, len(reflections_with_emb)):
+                    if reflections_with_emb[j]["id"] in already_merged:
+                        continue
+
+                    # Only merge same type
+                    if reflections_with_emb[i]["type"] != reflections_with_emb[j]["type"]:
+                        continue
+
+                    sim = _cosine_similarity(
+                        reflections_with_emb[i]["embedding"],
+                        reflections_with_emb[j]["embedding"],
+                    )
+                    if sim >= threshold:
+                        # Keep the one with higher aggregation_count * importance
+                        score_i = reflections_with_emb[i]["aggregation_count"] * reflections_with_emb[i]["importance"]
+                        score_j = reflections_with_emb[j]["aggregation_count"] * reflections_with_emb[j]["importance"]
+
+                        if score_i >= score_j:
+                            primary = reflections_with_emb[i]
+                            duplicate = reflections_with_emb[j]
+                        else:
+                            primary = reflections_with_emb[j]
+                            duplicate = reflections_with_emb[i]
+
+                        self._merge_reflection_pair(primary, duplicate)
+                        already_merged.add(duplicate["id"])
+                        merged_count += 1
+
+        except Exception as e:
+            logger.debug(f"Reflection aggregation skipped (table may not exist): {e}")
+
+        if merged_count > 0:
+            logger.info(f"Aggregated {merged_count} similar reflection pairs")
+        return merged_count
+
+    def _merge_reflection_pair(self, primary: Dict, duplicate: Dict) -> None:
+        """
+        Merge a duplicate reflection into the primary.
+
+        Preserves timeline: earliest first_observed_at, latest last_confirmed_at.
+        Combines aggregation counts. Adjusts decay rate for well-confirmed reflections.
+        """
+        # Calculate merged values
+        new_aggregation_count = primary["aggregation_count"] + duplicate["aggregation_count"]
+        new_first_observed = min(primary["first_observed_at"], duplicate["first_observed_at"])
+        new_last_confirmed = max(primary["last_confirmed_at"], duplicate["last_confirmed_at"])
+
+        # Slow decay for well-confirmed reflections
+        new_decay_rate = 0.9995 if new_aggregation_count >= 3 else 0.999
+
+        # Boost importance slightly for confirmed patterns
+        new_importance = min(1.0, primary["importance"] + 0.05)
+
+        # Track which reflections were merged
+        existing = self.db.get_one("reflections", where="id = ?", where_params=(primary["id"],))
+        aggregated_from = json.loads(existing["aggregated_from"] or "[]") if existing else []
+        aggregated_from.append(duplicate["id"])
+
+        # Update primary
+        self.db.update(
+            "reflections",
+            {
+                "aggregation_count": new_aggregation_count,
+                "first_observed_at": new_first_observed,
+                "last_confirmed_at": new_last_confirmed,
+                "decay_rate": new_decay_rate,
+                "importance": new_importance,
+                "aggregated_from": json.dumps(aggregated_from),
+                "updated_at": datetime.utcnow().isoformat(),
+            },
+            "id = ?",
+            (primary["id"],),
+        )
+
+        # Suppress duplicate (don't delete, minimize importance)
+        self.db.update(
+            "reflections",
+            {"importance": 0.001, "updated_at": datetime.utcnow().isoformat()},
+            "id = ?",
+            (duplicate["id"],),
+        )
+
+        logger.debug(f"Merged reflection {duplicate['id']} into {primary['id']}")
+
     def run_full_consolidation(self) -> Dict[str, Any]:
         """
         Run complete consolidation: decay, patterns, predictions.
@@ -1430,6 +1594,9 @@ class ConsolidateService:
 
         # Merge near-duplicate memories
         results["merged"] = self.merge_similar_memories()
+
+        # Aggregate similar reflections
+        results["reflections_aggregated"] = self.aggregate_reflections()
 
         # Detect patterns
         patterns = self.detect_patterns()
@@ -1479,3 +1646,8 @@ def get_predictions(**kwargs) -> List[Dict]:
 def run_full_consolidation() -> Dict[str, Any]:
     """Run complete consolidation"""
     return get_consolidate_service().run_full_consolidation()
+
+
+def aggregate_reflections() -> int:
+    """Aggregate similar reflections"""
+    return get_consolidate_service().aggregate_reflections()

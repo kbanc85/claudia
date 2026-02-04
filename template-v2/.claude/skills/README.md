@@ -104,6 +104,7 @@ argument-hint: [arg]             # Optional: show in /skill [arg] help
 | `databases/` | Memory database management | "which database?" |
 | `map-connections/` | Extract relationships | "who knows who?" |
 | `brain/` | 3D memory visualizer | "show your brain" |
+| `meditate/` | End-of-session reflection | "let's wrap up", "end the session" |
 
 ### Explicit Only (`/skill-name`)
 

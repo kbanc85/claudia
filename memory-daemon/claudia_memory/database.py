@@ -488,6 +488,61 @@ class Database:
             conn.commit()
             logger.info("Applied migration 9: database metadata table")
 
+        if current_version < 10:
+            # Migration 10: Add reflections table for /meditate skill
+            migration_stmts = [
+                """CREATE TABLE IF NOT EXISTS reflections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    episode_id INTEGER REFERENCES episodes(id),
+                    reflection_type TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    content_hash TEXT,
+                    about_entity_id INTEGER REFERENCES entities(id),
+                    importance REAL DEFAULT 0.7,
+                    confidence REAL DEFAULT 0.8,
+                    decay_rate REAL DEFAULT 0.999,
+                    aggregated_from TEXT,
+                    aggregation_count INTEGER DEFAULT 1,
+                    first_observed_at TEXT DEFAULT (datetime('now')),
+                    last_confirmed_at TEXT DEFAULT (datetime('now')),
+                    embedding BLOB,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT,
+                    surfaced_count INTEGER DEFAULT 0,
+                    last_surfaced_at TEXT
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_reflections_type ON reflections(reflection_type)",
+                "CREATE INDEX IF NOT EXISTS idx_reflections_importance ON reflections(importance DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_reflections_entity ON reflections(about_entity_id)",
+                "CREATE INDEX IF NOT EXISTS idx_reflections_episode ON reflections(episode_id)",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "already exists" not in str(e).lower():
+                        logger.warning(f"Migration 10 statement failed: {e}")
+
+            # Try to create reflection_embeddings virtual table
+            try:
+                conn.execute(
+                    """CREATE VIRTUAL TABLE IF NOT EXISTS reflection_embeddings USING vec0(
+                        reflection_id INTEGER PRIMARY KEY,
+                        embedding FLOAT[384]
+                    )"""
+                )
+            except sqlite3.OperationalError as e:
+                if "no such module: vec0" in str(e):
+                    logger.warning("Skipping reflection_embeddings virtual table: sqlite-vec not available")
+                else:
+                    logger.warning(f"Could not create reflection_embeddings: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (10, 'Add reflections table and reflection_embeddings for /meditate skill')"
+            )
+            conn.commit()
+            logger.info("Applied migration 10: reflections table")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.

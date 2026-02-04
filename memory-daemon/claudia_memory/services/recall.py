@@ -52,6 +52,23 @@ class EntityResult:
     last_mentioned: Optional[str]
 
 
+@dataclass
+class ReflectionResult:
+    """A reflection from /meditate"""
+
+    id: int
+    content: str
+    reflection_type: str  # observation, pattern, learning, question
+    importance: float
+    confidence: float
+    about_entity: Optional[str]  # Entity name if linked
+    first_observed_at: str
+    last_confirmed_at: str
+    aggregation_count: int  # How many times confirmed
+    episode_id: Optional[int]
+    score: float = 0.0  # Search relevance score
+
+
 class RecallService:
     """Search and retrieve memories"""
 
@@ -1542,6 +1559,202 @@ class RecallService:
             logger.debug(f"Dormant relationship detection failed: {e}")
             return []
 
+    def get_reflections(
+        self,
+        limit: int = 20,
+        reflection_types: Optional[List[str]] = None,
+        min_importance: float = 0.1,
+        about_entity: Optional[str] = None,
+    ) -> List[ReflectionResult]:
+        """
+        Get reflections with optional filtering.
+
+        Args:
+            limit: Maximum results to return
+            reflection_types: Filter by types (observation, pattern, learning, question)
+            min_importance: Minimum importance threshold
+            about_entity: Filter to reflections about a specific entity
+
+        Returns:
+            List of ReflectionResult ordered by importance then recency
+        """
+        sql = """
+            SELECT r.*, e.name as entity_name
+            FROM reflections r
+            LEFT JOIN entities e ON r.about_entity_id = e.id
+            WHERE r.importance >= ?
+        """
+        params: list = [min_importance]
+
+        if reflection_types:
+            placeholders = ", ".join(["?" for _ in reflection_types])
+            sql += f" AND r.reflection_type IN ({placeholders})"
+            params.extend(reflection_types)
+
+        if about_entity:
+            canonical = self.extractor.canonical_name(about_entity)
+            sql += " AND e.canonical_name = ?"
+            params.append(canonical)
+
+        sql += " ORDER BY r.importance DESC, r.last_confirmed_at DESC LIMIT ?"
+        params.append(limit)
+
+        rows = self.db.execute(sql, tuple(params), fetch=True) or []
+
+        return [
+            ReflectionResult(
+                id=row["id"],
+                content=row["content"],
+                reflection_type=row["reflection_type"],
+                importance=row["importance"],
+                confidence=row["confidence"],
+                about_entity=row["entity_name"],
+                first_observed_at=row["first_observed_at"],
+                last_confirmed_at=row["last_confirmed_at"],
+                aggregation_count=row["aggregation_count"],
+                episode_id=row["episode_id"],
+                score=row["importance"],
+            )
+            for row in rows
+        ]
+
+    def search_reflections(
+        self,
+        query: str,
+        limit: int = 10,
+        reflection_types: Optional[List[str]] = None,
+    ) -> List[ReflectionResult]:
+        """
+        Semantic search for reflections.
+
+        Uses vector similarity to find reflections relevant to a query.
+
+        Args:
+            query: What to search for
+            limit: Maximum results
+            reflection_types: Filter by types
+
+        Returns:
+            List of ReflectionResult ordered by relevance
+        """
+        query_embedding = embed_sync(query)
+
+        results: List[ReflectionResult] = []
+
+        if query_embedding:
+            try:
+                sql = """
+                    SELECT r.*, e.name as entity_name, (1.0 / (1.0 + re.distance)) as vector_score
+                    FROM reflection_embeddings re
+                    JOIN reflections r ON r.id = re.reflection_id
+                    LEFT JOIN entities e ON r.about_entity_id = e.id
+                    WHERE re.embedding MATCH ?
+                """
+                params: list = [json.dumps(query_embedding)]
+
+                if reflection_types:
+                    placeholders = ", ".join(["?" for _ in reflection_types])
+                    sql += f" AND r.reflection_type IN ({placeholders})"
+                    params.extend(reflection_types)
+
+                sql += " ORDER BY vector_score DESC LIMIT ?"
+                params.append(limit)
+
+                rows = self.db.execute(sql, tuple(params), fetch=True) or []
+
+                for row in rows:
+                    results.append(
+                        ReflectionResult(
+                            id=row["id"],
+                            content=row["content"],
+                            reflection_type=row["reflection_type"],
+                            importance=row["importance"],
+                            confidence=row["confidence"],
+                            about_entity=row["entity_name"],
+                            first_observed_at=row["first_observed_at"],
+                            last_confirmed_at=row["last_confirmed_at"],
+                            aggregation_count=row["aggregation_count"],
+                            episode_id=row["episode_id"],
+                            score=row["vector_score"],
+                        )
+                    )
+
+            except Exception as e:
+                logger.debug(f"Reflection vector search failed: {e}")
+
+        # Fallback to keyword search if vector search failed or returned nothing
+        if not results:
+            sql = """
+                SELECT r.*, e.name as entity_name
+                FROM reflections r
+                LEFT JOIN entities e ON r.about_entity_id = e.id
+                WHERE r.content LIKE ?
+            """
+            params = [f"%{query}%"]
+
+            if reflection_types:
+                placeholders = ", ".join(["?" for _ in reflection_types])
+                sql += f" AND r.reflection_type IN ({placeholders})"
+                params.extend(reflection_types)
+
+            sql += " ORDER BY r.importance DESC LIMIT ?"
+            params.append(limit)
+
+            rows = self.db.execute(sql, tuple(params), fetch=True) or []
+
+            for row in rows:
+                results.append(
+                    ReflectionResult(
+                        id=row["id"],
+                        content=row["content"],
+                        reflection_type=row["reflection_type"],
+                        importance=row["importance"],
+                        confidence=row["confidence"],
+                        about_entity=row["entity_name"],
+                        first_observed_at=row["first_observed_at"],
+                        last_confirmed_at=row["last_confirmed_at"],
+                        aggregation_count=row["aggregation_count"],
+                        episode_id=row["episode_id"],
+                        score=0.5,  # Default score for keyword match
+                    )
+                )
+
+        return results
+
+    def get_reflection_by_id(self, reflection_id: int) -> Optional[ReflectionResult]:
+        """
+        Get a single reflection by ID.
+
+        Args:
+            reflection_id: The reflection ID
+
+        Returns:
+            ReflectionResult or None if not found
+        """
+        row = self.db.get_one(
+            "reflections r LEFT JOIN entities e ON r.about_entity_id = e.id",
+            columns=["r.*", "e.name as entity_name"],
+            where="r.id = ?",
+            where_params=(reflection_id,),
+        )
+
+        if not row:
+            return None
+
+        return ReflectionResult(
+            id=row["id"],
+            content=row["content"],
+            reflection_type=row["reflection_type"],
+            importance=row["importance"],
+            confidence=row["confidence"],
+            about_entity=row["entity_name"],
+            first_observed_at=row["first_observed_at"],
+            last_confirmed_at=row["last_confirmed_at"],
+            aggregation_count=row["aggregation_count"],
+            episode_id=row["episode_id"],
+            score=row["importance"],
+        )
+
     def _keyword_search(
         self,
         query: str,
@@ -1666,3 +1879,18 @@ def get_hub_entities(min_connections: int = 5, entity_type: Optional[str] = None
 def get_dormant_relationships(days: int = 60, min_strength: float = 0.3, limit: int = 20) -> List[Dict[str, Any]]:
     """Find relationships with no recent activity"""
     return get_recall_service().get_dormant_relationships(days, min_strength, limit)
+
+
+def get_reflections(**kwargs) -> List[ReflectionResult]:
+    """Get reflections with optional filtering"""
+    return get_recall_service().get_reflections(**kwargs)
+
+
+def search_reflections(query: str, **kwargs) -> List[ReflectionResult]:
+    """Semantic search for reflections"""
+    return get_recall_service().search_reflections(query, **kwargs)
+
+
+def get_reflection_by_id(reflection_id: int) -> Optional[ReflectionResult]:
+    """Get a single reflection by ID"""
+    return get_recall_service().get_reflection_by_id(reflection_id)
