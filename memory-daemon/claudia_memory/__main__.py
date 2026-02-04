@@ -114,8 +114,9 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
         else:
             # Run as standalone daemon (for testing)
             logger.info("Running in standalone mode (no MCP)")
+            import time
             while not _shutdown_requested:
-                asyncio.get_event_loop().run_until_complete(asyncio.sleep(1))
+                time.sleep(1)
 
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received")

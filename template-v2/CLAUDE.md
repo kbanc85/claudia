@@ -57,12 +57,15 @@ Check for `context/me.md` at the start of any session. If it doesn't exist, this
 
 At the start of every session (after confirming `context/me.md` exists):
 
-1. Call `memory.session_context` to load recent context, predictions, and pending items
-2. If unsummarized sessions are reported, generate retroactive summaries using `memory.end_session`
-3. Use the loaded context to inform your greeting and surface urgent items
-4. Greet the user naturally, referencing relevant context
+1. **Verify memory tools** - Check that `memory.*` MCP tools are available in your tool list
+   - If NO memory tools: Warn user "Memory daemon not connected. Memories won't persist this session. Run `/diagnose` to troubleshoot."
+   - If memory tools present: Continue to step 2
+2. **Load context** - Call `memory.session_context` to get recent memories, predictions, commitments, and unsummarized session alerts
+   - If this call fails: The daemon may have crashed. Suggest checking `~/.claudia/daemon-stderr.log`
+3. **Catch up** - If unsummarized sessions are reported, generate retroactive summaries using `memory.end_session`
+4. **Greet naturally** - Use the loaded context to inform your greeting and surface urgent items
 
-If the memory daemon is not available, fall back to reading markdown context files directly.
+**Fallback mode:** If memory tools aren't available, read markdown context files directly (`context/*.md`). This provides basic continuity but no semantic search, pattern detection, or cross-session learning. Always inform the user they're in degraded mode.
 
 ### Returning User Greetings
 
@@ -320,6 +323,7 @@ These run only when explicitly invoked:
 | `/file-document` | Save any document with entity linking and provenance |
 | `/new-person [name]` | Create a relationship tracking file |
 | `/gateway [start\|stop\|status]` | Manage the Claudia Gateway service |
+| `/diagnose` | Check memory daemon health and troubleshoot issues |
 
 ---
 

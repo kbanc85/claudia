@@ -2,7 +2,7 @@
   "hooks": [
     {
       "event": "session_start",
-      "description": "Load context and catch up on unsummarized sessions",
+      "description": "Verify memory system, load context, catch up on unsummarized sessions",
       "behavior": {
         "action": "load_memory",
         "files": [
@@ -13,6 +13,11 @@
           "context/waiting.md"
         ],
         "on_missing_me": "trigger_onboarding",
+        "memory_verification": {
+          "step_1_check_tools": "BEFORE anything else, verify you have access to memory.* MCP tools. If no memory tools are available, inform the user: 'Memory daemon not connected. Run the /diagnose command or check ~/.claudia/daemon-stderr.log for errors.'",
+          "step_2_health_check": "Call memory.session_context. If it fails or returns an error, the daemon may be crashed. Suggest: 'Memory daemon may need restart. Check: curl http://localhost:3848/health'",
+          "fallback": "If memory tools unavailable, proceed with markdown-only mode but WARN the user that memories won't persist."
+        },
         "enhanced_memory": {
           "context_load": "Call memory.session_context to get a formatted context block with recent memories, predictions, commitments, and unsummarized session alerts. This replaces individual calls to memory.recall and memory.predictions.",
           "catch_up": "If unsummarized sessions are reported in the context block, review buffered turns and call memory.end_session with a retroactive narrative and structured extractions for each.",
@@ -49,9 +54,11 @@
   ],
   "notes": {
     "implementation": "These hooks define intended behaviors. Claude Code will execute them as behavioral guidelines rather than traditional script execution.",
-    "session_start": "At session start, Claudia should read context files to restore memory. If me.md is missing, onboarding should begin. If enhanced memory is available, check for unsummarized sessions first and generate retroactive summaries before proceeding.",
+    "memory_verification": "CRITICAL: At session start, verify memory tools are available BEFORE proceeding. If memory.* tools don't appear in available tools, the daemon isn't connected. This is a hard requirement for full Claudia functionality.",
+    "session_start": "At session start: (1) Verify memory tools available, (2) Call memory.session_context, (3) Read context files, (4) Check for unsummarized sessions. If me.md is missing, trigger onboarding.",
     "session_end": "Before session ends, Claudia should generate a session summary (enhanced memory) or update context files (markdown fallback). The summary includes both a free-form narrative and structured extractions.",
     "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding.",
-    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via memory.buffer_turn. This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start."
+    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via memory.buffer_turn. This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start.",
+    "source_filing": "CRITICAL: When processing transcripts, emails, or documents, ALWAYS call memory.file BEFORE extracting information. The Source Preservation principle (#12) is non-negotiable. Raw sources must be filed for provenance."
   }
 }

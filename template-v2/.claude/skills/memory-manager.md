@@ -6,6 +6,47 @@
 
 ---
 
+## Hard Requirements
+
+These are non-negotiable. Violating them defeats the purpose of the memory system.
+
+### 1. Source Preservation is MANDATORY
+
+When processing source material (transcripts, emails, documents):
+
+**STOP. File it FIRST.**
+
+```
+User shares transcript/email/document
+         ↓
+    ┌─────────────────────────────────┐
+    │  CALL memory.file IMMEDIATELY   │
+    │  with the FULL raw content      │
+    │  Do NOT summarize, extract, or  │
+    │  process until it's filed.      │
+    └─────────────────────────────────┘
+         ↓
+    Then extract memories/entities
+         ↓
+    Then generate output (dashboards, summaries, etc.)
+```
+
+**If you find yourself reading multiple source documents** without calling `memory.file` for each one, **STOP and fix it**. Go back and file each source before continuing.
+
+### 2. Verify Memory Tools at Session Start
+
+Before greeting the user:
+1. Check that `memory.*` tools are in your available tools
+2. If missing: Warn user "Memory daemon not connected. Run /diagnose."
+3. Call `memory.session_context` to load context
+4. If this fails: Warn user about degraded mode
+
+### 3. Buffer Turns During Sessions
+
+Call `memory.buffer_turn` for each meaningful exchange. This ensures nothing is lost if the session ends abruptly.
+
+---
+
 ## Output Rules
 
 When processing memory operations (storing, recalling, updating files, creating person/project files):

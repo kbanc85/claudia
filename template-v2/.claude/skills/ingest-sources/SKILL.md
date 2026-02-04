@@ -54,7 +54,16 @@ User provides one of:
 
 Show inventory to user before proceeding. This prevents partial processing.
 
-### Phase 2: Structured Extraction
+### Phase 2: File-Then-Extract (Per Document)
+
+**CRITICAL:** For each document, file it BEFORE extracting. This ensures provenance.
+
+```
+For each source in inventory:
+    1. READ the full content
+    2. CALL memory.file immediately (do not skip!)
+    3. THEN extract entities/facts/commitments
+```
 
 Process each document systematically. Use `IngestService` (via local Ollama) when available, or extract directly.
 
@@ -158,15 +167,13 @@ Before proceeding:
 
 After user confirms verification:
 
-**1. File all sources:**
+**1. Verify all sources filed:**
+Sources were already filed during Phase 2 (File-Then-Extract). Verify the file count matches:
 ```
-Call memory.file for each source:
-├── content: Full raw text
-├── filename: [original or YYYY-MM-DD-entity-topic.md]
-├── source_type: transcript | email | document | upload
-├── about: [entities mentioned]
-└── summary: One-line description
+Confirm: [N] sources filed to ~/.claudia/files/
 ```
+
+If any sources weren't filed in Phase 2, file them now before proceeding.
 
 Files are auto-routed to entity folders:
 - `people/sarah-chen/transcripts/...`

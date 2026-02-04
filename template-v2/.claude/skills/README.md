@@ -118,6 +118,7 @@ argument-hint: [arg]             # Optional: show in /skill [arg] help
 | `file-document/` | Save documents with provenance |
 | `new-person/` | Create relationship file |
 | `gateway/` | Manage Gateway service |
+| `diagnose/` | Check memory daemon health |
 
 ## Creating Custom Skills
 
