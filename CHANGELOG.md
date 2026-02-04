@@ -2,6 +2,34 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.21.0 (2026-02-04)
+
+### The Reflections Release
+
+Claudia can now generate persistent learnings about how to work with you. These reflections decay much slower than regular memories and compound over time.
+
+### Added
+
+- **`/meditate` skill** - End-of-session reflection workflow. Claudia reviews the conversation, generates 1-3 learnings (observations, patterns, learnings, questions), and presents them for your approval before storing.
+- **Reflections table** - Schema v10 migration with 4 reflection types, content hashing for duplicate detection, and aggregation tracking for confirmed patterns.
+- **`memory.reflections` MCP tool** - CRUD operations for reflections with get, search, update, and delete actions.
+- **Slow decay model** - Reflections decay at 0.999 daily (~693 day half-life) vs memories at 0.995 (~138 days). Well-confirmed reflections (3+ aggregation) decay even slower at 0.9995.
+- **Reflection aggregation** - ConsolidateService merges semantically similar reflections (>85% cosine similarity) while preserving timeline (first observed, last confirmed).
+- **Natural language editing** - Tell Claudia "that reflection about Monday mornings is wrong" and she'll find and update it.
+
+### Changed
+
+- **`memory.end_session`** - Now accepts a `reflections` array parameter for storing approved reflections alongside the session narrative.
+- **`memory-manager` skill** - New "Reflections (Enhanced Memory)" section documenting the full reflection lifecycle.
+
+### Why This Matters
+
+Before: Each session started fresh. Claudia remembered facts, but not meta-learnings about working with you.
+
+After: "You prefer bullet points for technical content but conversational flow for discussions" persists across sessions. Claudia adapts to your style, remembers what works, and compounds that knowledge over time.
+
+---
+
 ## 1.20.0 (2026-02-04)
 
 ### The Skills Migration
