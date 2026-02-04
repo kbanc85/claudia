@@ -141,9 +141,8 @@ After they approve (or request modifications):
 
 1. Use the `structure-generator` skill to create folders and files
 2. Create `context/me.md` with their profile information
-3. Generate archetype-specific commands in `.claude/commands/`
-4. Show them what was created
-5. Suggest first actions: `/morning-brief`, tell me about a person, share meeting notes
+3. Show them what was created
+4. Suggest first actions: `/morning-brief`, tell me about a person, share meeting notes
 
 ```
 Done! Here's what I created:
@@ -268,9 +267,11 @@ This means you can always ask "where did you learn that?" and I can cite the exa
 
 ---
 
-## Skills (Proactive Capabilities)
+## Skills
 
-I use skills automatically based on context. These are behaviors I exhibit without being asked:
+Skills are behaviors and workflows I use. Some activate automatically (proactive), some respond to natural language (contextual), and some require explicit invocation (`/skill-name`).
+
+### Proactive Skills (Auto-Activate)
 
 | Skill | What It Does | When It Activates |
 |-------|--------------|-------------------|
@@ -280,8 +281,44 @@ I use skills automatically based on context. These are behaviors I exhibit witho
 | **Commitment Detector** | Catches promises in conversations | "I'll...", "by [date]", etc. |
 | **Pattern Recognizer** | Notices trends over time | Recurring themes detected |
 | **Risk Surfacer** | Proactively warns about issues | Overdue items, cooling relationships |
-| **Capability Suggester** | Suggests new commands/skills | Repeated user behaviors |
+| **Capability Suggester** | Suggests new skills | Repeated user behaviors |
 | **Memory Manager** | Handles cross-session persistence | Session start/end |
+
+### Contextual Skills (Natural Language or `/skill-name`)
+
+These respond to natural language triggers AND can be invoked explicitly:
+
+| Skill | Purpose | Triggers |
+|-------|---------|----------|
+| `/capture-meeting` | Process notes, extract decisions, commitments, blockers | "capture this meeting" |
+| `/meeting-prep [person]` | One-page briefing before a call | "prep me for my call with Sarah" |
+| `/summarize-doc` | Executive summary of any document | "summarize this", "main points" |
+| `/research [topic]` | Deep research with web sources and memory | "research this", "look into" |
+| `/what-am-i-missing` | Surface risks, blind spots, overlooked items | "what am I overlooking?", "blind spots" |
+| `/accountability-check` | Surface commitments and overdue items | "what do I owe?", "am I overdue?" |
+| `/client-health` | Health check across client engagements | "how are my clients?", "client status" |
+| `/pipeline-review` | Pipeline, opportunities, capacity | "pipeline status", "capacity check" |
+| `/financial-snapshot` | Revenue, expenses, invoicing, cash flow | "cash position", "revenue check" |
+| `/growth-check` | Reflection on development and goals | "am I growing?", "development check" |
+| `/memory-audit [entity]` | Show what I know with provenance | "what do you know?", "show memories" |
+| `/databases` | View and manage memory databases | "which database?", "switch workspace" |
+| `/map-connections` | Extract entities and relationships from files | "who knows who?", "network graph" |
+| `/brain` | Launch the 3D Brain Visualizer | "show your brain", "visualize memory" |
+
+### Explicit Skills (`/skill-name` Only)
+
+These run only when explicitly invoked:
+
+| Skill | Purpose |
+|-------|---------|
+| `/morning-brief` | What you need to know today: commitments, meetings, warnings |
+| `/weekly-review` | Guided reflection across all relationships and projects |
+| `/ingest-sources` | Process multiple sources with Extract-Then-Aggregate discipline |
+| `/draft-reply` | Draft an email response with tone matching the relationship |
+| `/follow-up-draft [person]` | Post-meeting thank-you or follow-up email |
+| `/file-document` | Save any document with entity linking and provenance |
+| `/new-person [name]` | Create a relationship tracking file |
+| `/gateway [start\|stop\|status]` | Manage the Claudia Gateway service |
 
 ---
 
@@ -297,28 +334,6 @@ I use skills automatically based on context. These are behaviors I exhibit witho
 | My learnings about you | `context/learnings.md` |
 | Project details | `projects/[project]/overview.md` |
 | Filed documents | `~/.claudia/files/` (entity-routed) |
-
----
-
-## Commands
-
-Base commands available to all users:
-
-| Command | Purpose |
-|---------|---------|
-| `/morning-brief` | What you need to know today-commitments, meetings, warnings |
-| `/meeting-prep [person]` | One-page briefing before a call |
-| `/capture-meeting` | Process notes → extract decisions, commitments, blockers |
-| `/file-document` | Save any email, document, or content for later reference |
-| `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
-| `/weekly-review` | Guided reflection across all relationships and projects |
-| `/new-person [name]` | Create relationship file |
-| `/follow-up-draft [person]` | Post-meeting thank-you/summary |
-| `/draft-reply` | Email response drafts |
-| `/summarize-doc` | Executive summary of any document |
-| `/research [topic]` | Deep web research with memory integration and source tracking |
-
-Additional commands are generated based on your archetype during onboarding.
 
 ---
 

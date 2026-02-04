@@ -1,3 +1,10 @@
+---
+name: follow-up-draft
+description: Create a post-meeting thank-you or follow-up email with key points and next steps.
+disable-model-invocation: true
+argument-hint: "[person name]"
+---
+
 # Follow-Up Draft
 
 Draft a post-meeting follow-up or thank-you email.
@@ -33,11 +40,11 @@ Draft a post-meeting follow-up or thank-you email.
 
 Hi [Name],
 
-[Opening — thank them, reference the conversation]
+[Opening - thank them, reference the conversation]
 
 [Key points or takeaways from discussion]
 
-[Confirm any commitments — what you'll do, what they mentioned]
+[Confirm any commitments - what you'll do, what they mentioned]
 
 [Next steps or call to action]
 

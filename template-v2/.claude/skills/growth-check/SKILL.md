@@ -1,6 +1,11 @@
+---
+name: growth-check
+description: Periodic reflection on development, skills, learning, and progress toward goals. Triggers on "am I growing?", "development check", "personal growth review".
+---
+
 # Growth Check
 
-A periodic reflection on development—where you're going, what you're learning, and what's worth capturing. Best used monthly or quarterly, whenever you want to zoom out.
+A periodic reflection on development - where you're going, what you're learning, and what's worth capturing. Best used monthly or quarterly, whenever you want to zoom out.
 
 ## When to Use
 
@@ -28,7 +33,7 @@ If they shared a future direction during onboarding:
 - "What's changed in how you think about this?"
 
 If they didn't share one:
-- "We never talked about the bigger picture. Where are you trying to go? Not just this quarter—what are you building toward?"
+- "We never talked about the bigger picture. Where are you trying to go? Not just this quarter - what are you building toward?"
 
 ### 3. Skills Development
 
@@ -79,47 +84,47 @@ Looking ahead:
 ## Output Format
 
 ```
-## Growth Check — [Date]
+## Growth Check - [Date]
 
-### 🎯 Future Direction
+### Future Direction
 **Where you're heading:** [Their stated goal/vision]
 **Current feeling:** [Their assessment]
 **Shifts:** [Any changes in direction]
 
-### 🌱 Skills Development
+### Skills Development
 **Getting better at:**
-- [Skill 1] — [evidence/progress]
-- [Skill 2] — [evidence/progress]
+- [Skill 1] - [evidence/progress]
+- [Skill 2] - [evidence/progress]
 
 **Worth developing:**
 - [Area to focus on]
 
-### 🔧 Methodology Improvements
+### Methodology Improvements
 **What's working better:**
 - [Process or approach]
 
 **Stopped doing:**
 - [Thing that wasn't serving]
 
-### 💡 Insights Worth Capturing
-- [Insight 1] — could become [content type]
-- [Insight 2] — worth documenting
+### Insights Worth Capturing
+- [Insight 1] - could become [content type]
+- [Insight 2] - worth documenting
 
-### 👥 Relationship Investments
+### Relationship Investments
 **Paying off:**
 - [Person/relationship]
 
 **Worth cultivating:**
 - [Person to reach out to]
 
-### 🪞 Honest Assessment
+### Honest Assessment
 **Avoiding:**
 - [What's being avoided]
 
 **Playing safe:**
 - [Where to be bolder]
 
-### 🎯 Next Period Focus
+### Next Period Focus
 **Primary focus:** [The one thing]
 **Skill commitment:** [What to develop]
 **Definition of progress:** [What would feel good]
@@ -130,7 +135,7 @@ Looking ahead:
 
 ## Tone
 
-- Reflective and spacious—this isn't a sprint
+- Reflective and spacious - this isn't a sprint
 - Curious rather than judgmental
 - Celebrate genuine progress
 - Honest about stagnation without making it heavy
@@ -139,7 +144,7 @@ Looking ahead:
 
 ## Depth
 
-Can be 20 minutes or an hour depending on where they are. Read the energy and adjust. Not every section needs deep exploration—focus on what's alive for them.
+Can be 20 minutes or an hour depending on where they are. Read the energy and adjust. Not every section needs deep exploration - focus on what's alive for them.
 
 ## Updates
 

@@ -1,3 +1,9 @@
+---
+name: client-health
+description: Health check across active client engagements showing status, deliverables, and concerns. Triggers on "how are my clients?", "client status", "client health check".
+argument-hint: "[client name or 'summary']"
+---
+
 # Client Health
 
 Health check across all active client engagements. Available for Consultant and Solo Professional archetypes.
@@ -37,15 +43,15 @@ For each client folder in `clients/`:
 ## Output Format
 
 ```
-## Client Health — [Date]
+## Client Health - [Date]
 
 ### Summary
 
 | Status | Count | Details |
 |--------|-------|---------|
-| 🟢 On Track | X | [Names] |
-| 🟡 Attention Needed | X | [Names] |
-| 🔴 At Risk | X | [Names] |
+| On Track | X | [Names] |
+| Attention Needed | X | [Names] |
+| At Risk | X | [Names] |
 
 - **Total active clients:** X
 - **Open commitments:** X
@@ -54,7 +60,7 @@ For each client folder in `clients/`:
 
 ---
 
-### 🟢 On Track
+### On Track
 
 #### [Client Name]
 **Phase:** [Current phase]
@@ -62,17 +68,17 @@ For each client folder in `clients/`:
 **Health:** All good
 
 **Active Work:**
-- [Deliverable] — on track for [Date]
+- [Deliverable] - on track for [Date]
 
 **Open Items:** X (none overdue)
 
 ---
 
-### 🟡 Attention Needed
+### Attention Needed
 
 #### [Client Name]
 **Phase:** [Current phase]
-**Last Contact:** [Date] — X days ago
+**Last Contact:** [Date] - X days ago
 **Health:** Needs attention
 
 **Concerns:**
@@ -87,7 +93,7 @@ For each client folder in `clients/`:
 
 ---
 
-### 🔴 At Risk
+### At Risk
 
 #### [Client Name]
 **Phase:** [Current phase]
@@ -140,21 +146,21 @@ For each client folder in `clients/`:
 
 ## Health Scoring
 
-### 🟢 On Track
+### On Track
 - Recent contact (within expected cadence)
 - No overdue deliverables
 - Positive or neutral stakeholder sentiment
 - No active blockers
 - Invoices paid or not yet due
 
-### 🟡 Attention Needed
+### Attention Needed
 - Contact overdue by 1 week+
 - Deliverable at risk (due soon, not complete)
 - Stakeholder concerns raised
 - Minor blocker active
 - Invoice overdue by less than 2 weeks
 
-### 🔴 At Risk
+### At Risk
 - Contact overdue by 2+ weeks
 - Deliverable overdue
 - Stakeholder actively unhappy

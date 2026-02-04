@@ -1,3 +1,8 @@
+---
+name: what-am-i-missing
+description: Surface risks, blind spots, and overlooked items across commitments and relationships. Triggers on "what am I overlooking?", "blind spots", "what's falling through the cracks".
+---
+
 # What Am I Missing
 
 Surface risks, blind spots, and overlooked items across all areas.
@@ -40,44 +45,44 @@ Looking at the bigger picture:
 ## Output Format
 
 ```
-## What You Might Be Missing — [Date]
+## What You Might Be Missing - [Date]
 
-### ⚠️ Commitment Risks
+### Commitment Risks
 
 **Overdue:**
-- [Item] was due [date] — [impact]
+- [Item] was due [date] - [impact]
 
 **At Risk:**
-- [Item] due [date] — [concern]
+- [Item] due [date] - [concern]
 
-### 👥 Relationship Risks
+### Relationship Risks
 
 **Cooling:**
-- [Person] — last contact [X] days ago
-  → Was: [relationship context]
-  → Risk: [what could happen]
+- [Person] - last contact [X] days ago
+  -> Was: [relationship context]
+  -> Risk: [what could happen]
 
 **Open Loops:**
-- Promised [thing] to [person] — [status]
+- Promised [thing] to [person] - [status]
 
-### ⏳ Waiting Risks
+### Waiting Risks
 
 **Overdue from Others:**
-- [Item] from [person] — expected [date]
-  → Impact: [why this matters]
-  → Suggested action: [what to do]
+- [Item] from [person] - expected [date]
+  -> Impact: [why this matters]
+  -> Suggested action: [what to do]
 
-### 🔄 Pattern Risks
+### Pattern Risks
 
-- [Pattern] — seen [X] times recently
-  → Concern: [why it matters]
-  → Suggestion: [what to consider]
+- [Pattern] - seen [X] times recently
+  -> Concern: [why it matters]
+  -> Suggestion: [what to consider]
 
-### 🎯 Strategic Blind Spots
+### Strategic Blind Spots
 
 - [Thing being neglected]
-  → Why it matters: [impact]
-  → Suggestion: [action]
+  -> Why it matters: [impact]
+  -> Suggestion: [action]
 
 ### Summary
 

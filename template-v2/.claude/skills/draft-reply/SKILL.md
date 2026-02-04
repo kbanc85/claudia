@@ -1,3 +1,9 @@
+---
+name: draft-reply
+description: Draft an email response with tone matching the relationship context. Shows draft for approval.
+disable-model-invocation: true
+---
+
 # Draft Reply
 
 Draft a response to an email or message.

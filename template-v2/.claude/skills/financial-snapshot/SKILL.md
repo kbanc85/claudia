@@ -1,3 +1,8 @@
+---
+name: financial-snapshot
+description: Quick view of revenue, expenses, invoicing, and cash flow with key metrics. Triggers on "cash position", "revenue check", "financial overview", "money status".
+---
+
 # Financial Snapshot
 
 Quick view of your financial position: revenue, expenses, invoicing, and cash flow.
@@ -27,7 +32,7 @@ Quick view of your financial position: revenue, expenses, invoicing, and cash fl
 ## Output Format
 
 ```
-## Financial Snapshot — [Date]
+## Financial Snapshot - [Date]
 
 ### This Month: [Month Year]
 
@@ -116,9 +121,9 @@ Break down by revenue stream: sponsorships, products, affiliate, etc.
 
 | Stream | This Month | Last Month | Trend |
 |--------|------------|------------|-------|
-| Sponsorships | $X | $X | ↑/→/↓ |
-| Products | $X | $X | ↑/→/↓ |
-| Affiliate | $X | $X | ↑/→/↓ |
+| Sponsorships | $X | $X | up/flat/down |
+| Products | $X | $X | up/flat/down |
+| Affiliate | $X | $X | up/flat/down |
 ```
 
 ## Tone

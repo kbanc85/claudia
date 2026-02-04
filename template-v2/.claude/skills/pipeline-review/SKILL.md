@@ -1,3 +1,8 @@
+---
+name: pipeline-review
+description: Review active pipeline, opportunities, capacity, and stalled items needing attention. Triggers on "pipeline status", "capacity check", "what's in the pipeline".
+---
+
 # Pipeline Review
 
 Review your active pipeline, opportunities, and capacity.
@@ -27,7 +32,7 @@ Review your active pipeline, opportunities, and capacity.
 ## Output Format
 
 ```
-## Pipeline Review — [Date]
+## Pipeline Review - [Date]
 
 ### Summary
 - Active engagements: X ($Y total value)
@@ -39,7 +44,7 @@ Review your active pipeline, opportunities, and capacity.
 
 | Client/Deal | Stage | Value | Health | Next Action |
 |-------------|-------|-------|--------|-------------|
-| [Name] | [Stage] | $X | 🟢/🟡/🔴 | [Action] |
+| [Name] | [Stage] | $X | On Track / At Risk | [Action] |
 
 ### Prospecting Pipeline
 

@@ -1,3 +1,10 @@
+---
+name: new-person
+description: Create a relationship tracking file for a person with contact info and history.
+disable-model-invocation: true
+argument-hint: "[name]"
+---
+
 # New Person
 
 Create a new relationship file for tracking someone.
@@ -38,7 +45,7 @@ Save to `people/[name-slug].md`
 | Field | Value |
 |-------|-------|
 | Last Contact | [Today's date] |
-| Relationship Health | 🟢 Active |
+| Relationship Health | Active |
 | Sentiment | Positive / Neutral / Unknown |
 
 ## Contact
@@ -94,7 +101,7 @@ Want me to:
 
 ## Name Handling
 
-- Create slug from name: "Sarah Chen" → "sarah-chen.md"
+- Create slug from name: "Sarah Chen" -> "sarah-chen.md"
 - Handle duplicates: Add identifier if needed ("sarah-chen-acme.md")
 - Non-Latin names: Preserve original, add romanization if provided
 

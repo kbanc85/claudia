@@ -1,3 +1,9 @@
+---
+name: research
+description: Deep research on a topic with web sources, memory integration, and stored findings. Triggers on "research this", "look into", "find out about", "dig into".
+argument-hint: "[topic or question]"
+---
+
 # Research
 
 Deep research on a topic, grounded in web sources and connected to Claudia's memory.
@@ -26,13 +32,13 @@ If the topic is clear and narrow, skip this and go straight to work.
 
 ```
 memory.recall([topic]):
-├── Existing knowledge found → Surface it
+├── Existing knowledge found -> Surface it
 │   "I have some context on this from [date]:
 │    [summary of stored facts]
 │    Want me to verify this is still current?"
-├── Stale knowledge found → Note it
+├── Stale knowledge found -> Note it
 │   "Last time I looked into this was [date]. Let me refresh."
-└── Nothing found → Proceed to web research
+└── Nothing found -> Proceed to web research
 ```
 
 ### 3. Research

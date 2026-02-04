@@ -1,3 +1,8 @@
+---
+name: brain
+description: Launch the Brain Visualizer, a real-time 3D view of memory and relationships. Triggers on "show your brain", "visualize memory", "open the brain", "memory graph".
+---
+
 # Brain
 
 Launch the Claudia Brain Visualizer, a real-time 3D visualization of my memory system showing entities, relationships, memories, patterns, and predictions as an interactive force-directed graph.

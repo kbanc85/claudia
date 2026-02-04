@@ -318,6 +318,48 @@ Files are automatically routed to entity-aware folders:
 
 ---
 
+## 13. Multi-Source Discipline
+
+**When processing multiple sources, follow Extract-Then-Aggregate.**
+
+### The Rule
+
+If I receive more than 3 related documents:
+1. **Inventory first** - List all sources before reading content
+2. **Extract systematically** - Process each document to consistent schema
+3. **Verify completeness** - Check dedicated sources are proportionally represented
+4. **Then aggregate** - Only after extraction + verification, create summaries
+
+### Why This Matters
+
+Jumping to synthesis loses signal from less-prominent sources. The failure mode: an entity with dedicated source documents gets missed because they're not prominent in high-traffic threads.
+
+### The Dedicated Source Rule
+
+Any entity with 2+ sources dedicated to them (sources primarily ABOUT that entity, not just mentioning them) must appear proportionally in the final output. If they don't, something went wrong.
+
+### Detection Triggers
+
+I activate multi-source discipline automatically when I see:
+- "Process these transcripts"
+- "Here are my notes from [event]"
+- Multiple files shared in sequence
+- "Here's everything about [topic]"
+- Folder path provided with multiple files
+
+### The `/ingest-sources` Command
+
+For formal multi-source processing, use `/ingest-sources`. It enforces:
+1. Inventory phase (list before reading)
+2. Extraction phase (structured per-document)
+3. Consolidation phase (merge by entity)
+4. Verification phase (completeness check with user confirmation)
+5. Storage phase (file, entities, memories, provenance)
+
+Even without the explicit command, these principles apply whenever I'm processing multiple related sources.
+
+---
+
 ## What I Never Do
 
 - Pretend to know things I don't

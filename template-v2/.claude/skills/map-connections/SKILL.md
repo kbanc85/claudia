@@ -1,12 +1,18 @@
+---
+name: map-connections
+description: Scan context files to extract entities and relationships into the memory system. Triggers on "who knows who?", "network graph", "map my connections", "extract relationships".
+argument-hint: "[--incremental] [file-path]"
+---
+
 # Map Connections
 
 Scan context files to extract entities, relationships, and build a connection graph. This command populates the memory system with structured relationship data from markdown files.
 
 ## Usage
 
-- `/map-connections` — Full scan of people/, projects/, context/
-- `/map-connections --incremental` — Only scan files modified since last run
-- `/map-connections [file-path]` — Scan a specific file
+- `/map-connections` -- Full scan of people/, projects/, context/
+- `/map-connections --incremental` -- Only scan files modified since last run
+- `/map-connections [file-path]` -- Scan a specific file
 
 ## Trigger Words
 
@@ -20,9 +26,9 @@ Use this command when the user says:
 ### 1. Gather Files
 
 Scan these directories for markdown files:
-- `people/` — Relationship files
-- `projects/` — Project documentation
-- `context/` — User context files
+- `people/` - Relationship files
+- `projects/` - Project documentation
+- `context/` - User context files
 
 For incremental mode, check file modification times against the last run timestamp (stored in `context/.map-connections-last-run`).
 
@@ -36,8 +42,8 @@ Track: filename, content, modification time
 For each file, extract:
 
 **Entity Name:** From filename or first heading
-- `people/sarah-chen.md` → "Sarah Chen" (type: person)
-- `projects/website-redesign.md` → "Website Redesign" (type: project)
+- `people/sarah-chen.md` -> "Sarah Chen" (type: person)
+- `projects/website-redesign.md` -> "Website Redesign" (type: project)
 - First `# Heading` in file overrides filename-based name
 
 **Mentioned Entities:** Scan file content for:
@@ -56,22 +62,22 @@ For each file, extract:
 Identify explicit and implicit relationships:
 
 **Explicit Relationships (High Confidence: 0.9)**
-- "works with [Name]" → `works_with`
-- "client of [Name]" → `client_of`
-- "reports to [Name]" → `reports_to`
-- "invested in [Project]" → `invested_in`
-- "manages [Name]" → `manages`
-- "partner at [Org]" → `partner_at`
-- "advisor to [Name/Org]" → `advisor_to`
+- "works with [Name]" -> `works_with`
+- "client of [Name]" -> `client_of`
+- "reports to [Name]" -> `reports_to`
+- "invested in [Project]" -> `invested_in`
+- "manages [Name]" -> `manages`
+- "partner at [Org]" -> `partner_at`
+- "advisor to [Name/Org]" -> `advisor_to`
 
 **Co-mention Relationships (Medium Confidence: 0.6)**
-- Two people mentioned in the same file → `mentioned_with`
-- People in the same project file → `collaborates_on`
+- Two people mentioned in the same file -> `mentioned_with`
+- People in the same project file -> `collaborates_on`
 
 **Inferred Relationships (Low Confidence: 0.3)**
-- Same city + same industry → `likely_connected`
-- Same organization → `colleagues`
-- Same community group → `community_connection`
+- Same city + same industry -> `likely_connected`
+- Same organization -> `colleagues`
+- Same community group -> `community_connection`
 
 ### 4. Deduplicate and Resolve
 
@@ -107,7 +113,7 @@ When updating existing relationships, take the maximum strength.
 Output format:
 
 ```markdown
-## 🗺️ Connection Map Results
+## Connection Map Results
 
 **Scan completed:** [timestamp]
 **Files processed:** [count]
@@ -138,7 +144,7 @@ Output format:
 
 | Relationship | Change |
 |--------------|--------|
-| Sarah Chen → client_of → Beta Inc | strength: 0.6 → 0.9 |
+| Sarah Chen -> client_of -> Beta Inc | strength: 0.6 -> 0.9 |
 
 ### Summary
 

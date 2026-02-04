@@ -1,3 +1,9 @@
+---
+name: memory-audit
+description: Show everything Claudia knows with provenance tracing and entity counts. Triggers on "what do you know?", "show memories", "memory audit", "what do you remember about".
+argument-hint: "[entity name]"
+---
+
 # Memory Audit
 
 Show what Claudia knows. Verify claims trace to sources. Surface gaps.
@@ -23,7 +29,7 @@ Call memory.documents (no filters) to count documents.
 
 Display:
 ```
-## Memory Audit — [Date]
+## Memory Audit - [Date]
 
 | Category       | Count |
 |----------------|-------|
@@ -136,7 +142,7 @@ Call memory.documents with entity=[entity name]
 Display:
 ```
 ### Documents (N)
-- [filename] ([source_type], [date]) — [summary snippet]
+- [filename] ([source_type], [date]) - [summary snippet]
 ```
 
 ### 5. Provenance Chains
@@ -151,10 +157,10 @@ Display:
 ### Provenance
 
 **"[memory content]"** (commitment, importance: 0.9)
-├── Source: session_summary (episode 42)
-├── Episode: "Discussed Q2 goals with Sarah..."
-├── Document: meeting-sarah-q2.md (transcript)
-└── Verified: yes (2026-01-15)
+|- Source: session_summary (episode 42)
+|- Episode: "Discussed Q2 goals with Sarah..."
+|- Document: meeting-sarah-q2.md (transcript)
+|- Verified: yes (2026-01-15)
 ```
 
 ---
@@ -162,7 +168,7 @@ Display:
 ## Output Rules
 
 - Use the structured output format with emoji headers
-- End with a horizontal rule
+- End structured output blocks with a markdown horizontal rule
 - If the memory system is not available, say so clearly
 - Keep entity audit focused: no padding, no speculation
 - Provenance chains are the most important part: if a memory has no source, flag it

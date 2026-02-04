@@ -1,3 +1,10 @@
+---
+name: gateway
+description: Start, stop, or check status of the Claudia Gateway service for messaging integrations.
+disable-model-invocation: true
+argument-hint: "[start|stop|status]"
+---
+
 # Gateway
 
 Manage the Claudia Gateway service (Telegram, Slack) from within a session. Start, stop, or check status without needing a separate terminal.
@@ -49,7 +56,7 @@ tail -20 /tmp/claudia-gateway.log 2>/dev/null
 
 If running:
 ```
-**📡 Gateway Status**
+**Gateway Status**
 - **Status:** Running (PID [pid])
 - **Provider:** [Ollama/Anthropic, from log output]
 - **Channels:** [Telegram/Slack, from log output]
@@ -126,7 +133,7 @@ fi
 
 If verified:
 ```
-**📡 Gateway Started**
+**Gateway Started**
 - **PID:** [pid]
 - **Provider:** [parsed from log]
 - **Channels:** [parsed from log]
@@ -176,7 +183,7 @@ fi
 
 If stopped cleanly:
 ```
-"**📡 Gateway stopped.** Telegram messages will queue until you start it again."
+"**Gateway stopped.** Telegram messages will queue until you start it again."
 ```
 
 If still running (unlikely):
@@ -194,6 +201,5 @@ rm ~/.claudia/gateway.pid 2>/dev/null
 ## Tone
 
 - Keep it brief and operational
-- Use the 📡 emoji prefix for gateway status output
 - If something fails, be specific about the error and suggest fixes
 - Don't over-explain what the gateway is if the user already knows (they invoked the command)

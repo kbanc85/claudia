@@ -1,3 +1,9 @@
+---
+name: accountability-check
+description: Surface all commitments, overdue items, and things you're waiting on by relationship. Triggers on "what do I owe?", "am I overdue?", "check my commitments".
+argument-hint: "[person name or 'overdue']"
+---
+
 # Accountability Check
 
 Surface all commitments, overdue items, and things you're waiting on from others.
@@ -33,14 +39,14 @@ Scan relevant folders for:
 ## Output Format
 
 ```
-## Accountability Check — [Date]
+## Accountability Check - [Date]
 
 ### Summary
 - My commitments: X total (Y due this week)
 - Overdue items: X (oldest: Y days)
 - Waiting on others: X items
 
-### 🔴 Overdue (Needs Immediate Attention)
+### Overdue (Needs Immediate Attention)
 
 | What | To | Was Due | Days Late | Impact |
 |------|-----|---------|-----------|--------|
@@ -49,13 +55,13 @@ Scan relevant folders for:
 **Recovery Actions:**
 - [Item]: [What to do now]
 
-### 🟡 Due This Week
+### Due This Week
 
 | What | To | Due | Status | Notes |
 |------|-----|-----|--------|-------|
 | [Item] | [Person] | [Date] | On Track / At Risk | |
 
-### 🟢 Due Later
+### Due Later
 
 | What | To | Due | Notes |
 |------|-----|-----|-------|
@@ -74,10 +80,10 @@ Scan relevant folders for:
 
 #### [Person/Client Name]
 **I Owe:**
-- [Item] — due [Date]
+- [Item] - due [Date]
 
 **They Owe:**
-- [Item] — since [Date]
+- [Item] - since [Date]
 
 [Repeat for key relationships with open items]
 

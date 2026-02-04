@@ -1,3 +1,9 @@
+---
+name: file-document
+description: Store a document, email, or text for future reference with entity linking and provenance.
+disable-model-invocation: true
+---
+
 # File Document
 
 Store any document, email, or text for future reference with proper entity linking and provenance tracking.
@@ -53,7 +59,7 @@ Call memory.file with:
 ### 4. Confirm
 
 ```
-**📁 Document Filed**
+**Filed**
 
 **File:** [filename]
 **Location:** [storage path]
@@ -154,7 +160,7 @@ If you also extract facts from the document:
 2. Extract memories using memory.remember or memory.batch
 3. Call memory.file again with `memory_ids=[...]` to link provenance
 
-This creates the chain: memory → document → file on disk.
+This creates the chain: memory -> document -> file on disk.
 
 ## Quality Checklist
 

@@ -1,3 +1,9 @@
+---
+name: databases
+description: View all Claudia memory databases, switch between them, manage isolation. Triggers on "which database?", "switch workspace", "show databases", "list databases".
+argument-hint: "[list|use|info|delete] [hash]"
+---
+
 # Databases
 
 View all Claudia memory databases, see what's in each, and switch between them.
@@ -76,13 +82,13 @@ du -h ~/.claudia/demo/*.db 2>/dev/null
 Present the results in a clean table:
 
 ```
-## 📊 Claudia Databases
+## Claudia Databases
 
 ### Production (~/.claudia/memory/)
 
 | # | Hash | Workspace | Size | People | Memories | Last Active |
 |---|------|-----------|------|--------|----------|-------------|
-| → | a1b2c3d4e5f6 | ~/projects/startup | 2.3 MB | 18 | 127 | 2h ago |
+| > | a1b2c3d4e5f6 | ~/projects/startup | 2.3 MB | 18 | 127 | 2h ago |
 |   | 9z8y7x6w5v4u | ~/work/client-a | 890 KB | 3 | 22 | 3d ago |
 |   | x7y8z9a0b1c2 | Unknown (legacy) | 156 KB | 0 | 5 | 14d ago |
 
@@ -92,14 +98,14 @@ Present the results in a clean table:
 |---|------|-------------|------|--------|----------|-------------|
 |   | claudia-demo.db | Global demo | 1.1 MB | 12 | 19 | 1d ago |
 
-→ = currently active
+> = currently active
 
 ---
 
 **Actions:**
-• `/databases use <hash>` - Switch to a different database
-• `/databases info <hash>` - Deep dive into a specific database
-• `/databases delete <hash>` - Delete a database (with confirmation)
+- `/databases use <hash>` - Switch to a different database
+- `/databases info <hash>` - Deep dive into a specific database
+- `/databases delete <hash>` - Delete a database (with confirmation)
 ```
 
 Format "Last Active" as relative time (e.g., "2h ago", "3d ago", "14d ago").
@@ -132,7 +138,7 @@ sqlite3 "~/.claudia/memory/<hash>.db" "SELECT value FROM _meta WHERE key = 'work
 Before switching, warn the user:
 
 ```
-⚠️ **Database Switch**
+**Database Switch**
 
 You're about to switch from:
   **Current:** [current workspace path] ([current hash])
@@ -175,7 +181,7 @@ Then edit the file to add:
 ### Step 5: Confirm and instruct user
 
 ```
-✅ **Database switched to:** [target hash]
+**Database switched to:** [target hash]
    **Workspace:** [target workspace path]
 
 **Action required:** Restart Claude Code for the change to take effect.
@@ -242,7 +248,7 @@ LIMIT 15
 ### Output Format
 
 ```
-## 📊 Database Info: [hash]
+## Database Info: [hash]
 
 **Workspace:** [path]
 **Size:** [file size]
@@ -284,8 +290,8 @@ LIMIT 15
 ---
 
 **Actions:**
-• `/databases use [hash]` - Switch to this database
-• `/databases delete [hash]` - Delete this database
+- `/databases use [hash]` - Switch to this database
+- `/databases delete [hash]` - Delete this database
 ```
 
 ---
@@ -299,7 +305,7 @@ Delete a database with explicit confirmation.
 If the user is trying to delete the currently active database, refuse:
 
 ```
-❌ Cannot delete the currently active database.
+Cannot delete the currently active database.
 
 Switch to a different database first using `/databases use <other-hash>`, then try again.
 ```
@@ -325,7 +331,7 @@ SELECT
 ### Step 3: Show warning and require explicit confirmation
 
 ```
-⚠️ **Delete Database**
+**Delete Database**
 
 You're about to **permanently delete** the database:
   **Hash:** [hash]
@@ -355,7 +361,7 @@ rm ~/.claudia/memory/<hash>.db-wal 2>/dev/null
 ### Step 5: Confirm deletion
 
 ```
-✅ **Database deleted:** [hash]
+**Database deleted:** [hash]
 
 The following files were removed:
 - ~/.claudia/memory/[hash].db
@@ -368,7 +374,6 @@ The following files were removed:
 ## Tone
 
 - Keep output clean and scannable
-- Use the 📊 emoji prefix for database output
 - For destructive actions (delete, switch), be explicit about consequences
 - Show relative times for "Last Active" (2h ago, 3d ago, etc.)
 - When showing workspace paths, collapse home directory to `~` for readability

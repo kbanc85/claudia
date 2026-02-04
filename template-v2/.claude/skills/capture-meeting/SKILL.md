@@ -1,3 +1,8 @@
+---
+name: capture-meeting
+description: Process meeting notes or transcript to extract decisions, commitments, and insights. Use when user shares transcript or says "capture this meeting", "here are my notes from the call".
+---
+
 # Capture Meeting
 
 Process meeting notes or transcript to extract decisions, commitments, and insights.
@@ -7,6 +12,7 @@ Process meeting notes or transcript to extract decisions, commitments, and insig
 - "Here's a transcript from [client/person]"
 - "Process these meeting notes"
 - "Here are my notes from the call with [person]"
+- "Capture this meeting"
 - `/capture-meeting`
 
 ## Input

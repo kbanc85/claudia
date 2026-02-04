@@ -1,9 +1,20 @@
+---
+name: meeting-prep
+description: One-page briefing before a call or meeting. Use when user says "prep me for my call with [person]" or "meeting prep for [person]".
+argument-hint: [person or meeting name]
+---
+
 # Meeting Prep
 
 One-page briefing before a call or meeting.
 
 ## Usage
 `/meeting-prep [person or meeting name]`
+
+Or naturally:
+- "Prep me for my call with Sarah"
+- "Meeting prep for the Acme quarterly"
+- "What should I know before talking to Jim?"
 
 ## What to Gather
 
