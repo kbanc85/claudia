@@ -338,6 +338,85 @@ memory.batch({
 
 Use `memory.batch` for mid-session entity creation (e.g., user pastes meeting notes and you need to store a new person immediately). Use `memory.end_session` for the full session wrap-up. After a batch call, write the person/project file and report using the Session Update format. Do not narrate between operations.
 
+### Document Filing (Source Preservation)
+
+**Critical:** When the user shares raw source material (transcripts, emails, documents), file it BEFORE or IMMEDIATELY AFTER extracting memories. This creates provenance: every fact can trace back to its source.
+
+#### When to File
+
+| User Action | File It? | Source Type |
+|-------------|----------|-------------|
+| Pastes meeting transcript | **Yes** | `transcript` |
+| Shares email content to act on | **Yes** | `gmail` |
+| Uploads or pastes document | **Yes** | `upload` |
+| Shares research/web content | **Yes** | `capture` |
+| Asks a question | No | - |
+| Casual conversation | No | - |
+
+#### How to File
+
+```
+Call memory.file with:
+├── content: The full raw text (do not summarize)
+├── filename: YYYY-MM-DD-[entity]-[topic].md (e.g., "2026-02-04-sarah-chen-kickoff.md")
+├── source_type: "transcript", "gmail", "upload", or "capture"
+├── summary: One-line description of what this is
+├── about: [list of entity names mentioned]
+└── memory_ids: [list of memory IDs if you already extracted memories]
+```
+
+#### The Filing Flow
+
+1. **User shares source material** (transcript, email, document)
+2. **File immediately** using `memory.file`
+3. **Extract memories** using `memory.batch` or `memory.remember`
+4. **If you extracted first**, call `memory.file` again with `memory_ids` to link provenance
+
+#### Example: Transcript Processing
+
+```
+User: "Here's the transcript from my call with Sarah Chen about the rebrand project"
+
+1. Call memory.file:
+   - content: [full transcript text]
+   - filename: "2026-02-04-sarah-chen-rebrand.md"
+   - source_type: "transcript"
+   - summary: "Call with Sarah Chen re: rebrand project kickoff"
+   - about: ["Sarah Chen", "Rebrand Project"]
+
+2. Call memory.batch with extracted facts, entities, relationships
+
+3. Update people/sarah-chen.md with new context
+
+4. Report to user using Session Update format
+```
+
+#### Example: Email Processing
+
+```
+User: "Here's an email from Jim about the partnership. I need to respond."
+
+1. Call memory.file:
+   - content: [full email text]
+   - filename: "2026-02-04-jim-partnership.md"
+   - source_type: "gmail"
+   - summary: "Jim Ferry re: partnership terms"
+   - about: ["Jim Ferry"]
+
+2. Extract any facts/commitments to memory
+
+3. Help draft the reply
+
+4. The email is now filed and searchable
+```
+
+#### Why This Matters
+
+- User can ask "where did you learn that?" and you can cite the source
+- Original context preserved for later human review
+- Facts can be verified against source material
+- Nothing important lives only in conversation context (which compresses away)
+
 ---
 
 ## During Session (Markdown Fallback)

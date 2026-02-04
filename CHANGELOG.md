@@ -2,6 +2,33 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.19.0 (2026-02-04)
+
+### The Source Preservation Release
+
+Claudia now files raw source material (transcripts, emails, documents) before extracting from it. Every fact she remembers can trace back to its source.
+
+### Added
+
+- **Source Preservation principle (#12)** - New core principle: always file raw sources before extraction. Added to `claudia-principles.md` with clear guidance on what gets filed, how, and why.
+- **`/file-document` command** - Ad-hoc document capture for emails, research, contracts, and any content worth keeping. Files are automatically routed to entity-aware folders (`people/`, `clients/`, `projects/`).
+- **Document Filing guidance** - New section in `memory-manager.md` skill with explicit flows for when and how to file different document types.
+
+### Changed
+
+- **`/capture-meeting` workflow** - Filing is now Step 1 (mandatory), not Step 3 (suggested). Quality checklist now requires "Raw transcript/notes filed" verification.
+- **Core Behavior #8** - Added "Source Preservation" to CLAUDE.md core behaviors, explaining the provenance chain and file routing.
+- **File locations table** - Added "Filed documents" row pointing to `~/.claudia/files/` (entity-routed).
+- **Commands table** - Added `/file-document` command.
+
+### Why This Matters
+
+Before: Claudia would extract facts into person files and memory, but the full transcript lived only in conversation context (which compresses away).
+
+After: Raw sources are filed first, creating a provenance chain. Ask "where did you learn that?" and she can cite the exact document, email, or transcript.
+
+---
+
 ## 1.18.1 (2026-02-03)
 
 ### Fixed

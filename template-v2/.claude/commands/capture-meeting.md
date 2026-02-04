@@ -19,12 +19,31 @@ User provides one of:
 
 ## Processing Steps
 
-### 1. Identify Participants
+### 1. File the Source Material (MANDATORY)
+
+**Always file the raw transcript/notes FIRST.** This is not optional. Source preservation creates provenance: every extracted fact can trace back to where it came from.
+
+```
+Call memory.file with:
+├── content: The FULL raw transcript/notes text (do not summarize)
+├── filename: YYYY-MM-DD-[person]-[topic].md
+├── source_type: "transcript"
+├── summary: Brief 1-line summary of the meeting
+├── about: [list of participant entity names]
+```
+
+The file is automatically routed to the right folder:
+- `people/sarah-chen/transcripts/2026-02-04-kickoff.md`
+- `clients/acme-corp/transcripts/2026-02-04-quarterly.md`
+
+**Even for brief notes:** If the user shared more than a few sentences, file it. Better to have it than wish you did.
+
+### 2. Identify Participants
 - Who was in the meeting?
 - Which person files to update?
 - Any new people to track?
 
-### 2. Extract Key Information
+### 3. Extract Key Information
 
 **Decisions Made:**
 - What was decided?
@@ -49,18 +68,7 @@ User provides one of:
 - Main themes discussed
 - Important context shared
 
-### 3. Store Transcript & Link Provenance
-
-If the user provided a full transcript or substantial meeting notes:
-
-```
-Call memory.file with:
-├── content: The raw transcript/notes text
-├── filename: YYYY-MM-DD-[person]-[topic].md
-├── source_type: "transcript"
-├── summary: Brief 1-line summary of the meeting
-├── about: [list of participant entity names]
-```
+### 4. Link Provenance
 
 After extracting memories (facts, commitments) via memory.batch or memory.remember:
 ```
@@ -69,13 +77,15 @@ to the memories extracted from it. This creates the provenance chain:
 memory -> document -> file on disk.
 ```
 
-### 4. Organize
+Now the user can ask "where did you learn that Sarah prefers async communication?" and you can point to the exact transcript.
 
-- Save notes to appropriate location
+### 5. Organize
+
 - Update person files with new context
 - Link commitments and waiting items
+- Create files for new people if needed
 
-### 5. Synthesize
+### 6. Synthesize
 
 Create a summary that captures:
 - What happened (brief)
@@ -141,6 +151,8 @@ Ask for confirmation on:
 
 ## Quality Checklist
 
+- [ ] **Raw transcript/notes filed** (memory.file called with full content)
+- [ ] Memories linked to source document (provenance chain complete)
 - [ ] Every action item has an owner
 - [ ] Every commitment has a deadline (even approximate)
 - [ ] Sentiment signals noted but not over-interpreted
