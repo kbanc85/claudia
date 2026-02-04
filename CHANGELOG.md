@@ -2,6 +2,28 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.20.0 (2026-02-04)
+
+### The Skills Migration
+
+All 22 commands are now skills. Claudia responds to natural language, not just slash commands.
+
+### Changed
+
+- **Commands → Skills** - Every command converted to a skill directory with YAML frontmatter. Skills activate contextually based on what you say.
+- **8 explicit-only skills** - Some workflows still require `/skill-name`: `/brain`, `/databases`, `/capture-meeting`, `/file-document`, `/gateway`, `/ingest-sources`, `/memory-audit`, `/new-person`
+- **14 contextual skills** - The rest respond to natural language triggers. Say "check my pipeline" instead of `/pipeline-review`. Ask "what am I missing?" instead of running a command.
+- **Updated CLAUDE.md** - Complete skills reference with trigger examples and invocation patterns.
+- **Updated skills README** - Tables showing explicit vs contextual skills with descriptions.
+
+### Why This Matters
+
+Before: You had to remember `/command-name` syntax and what each command did.
+
+After: Just tell Claudia what you need. She recognizes intent and activates the right workflow. Explicit skills remain for precision when you want it.
+
+---
+
 ## 1.19.0 (2026-02-04)
 
 ### The Source Preservation Release
