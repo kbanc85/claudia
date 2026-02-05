@@ -2,6 +2,32 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.23.0 (2026-02-05)
+
+### Proactive Memory
+
+Claudia now captures important information as it happens, not just at session end. Context compaction can't steal what's already stored.
+
+### Added
+
+- **PreCompact hook** - Fires before context compaction, triggers `/flush` endpoint to checkpoint the database and injects recovery reminders into compacted context.
+- **`/flush` endpoint** - New daemon endpoint forces WAL checkpoint to ensure all buffered data is durably written.
+- **Proactive capture rules** - New behavioral guidelines for storing commitments, entities, and relationships mid-conversation instead of waiting for session end.
+- **Turn buffering tests** - 7 new tests covering the full session lifecycle (buffer_turn, end_session, get_unsummarized).
+
+### Changed
+
+- **`commitment-detector` skill** - Now calls `memory.remember` immediately when a commitment is detected, before adding to markdown.
+- **`memory-manager` skill** - Rewrote "Proactive Capture Rules" section with Claudia's personality. Explains the why (context compaction risk) not just the what (call these tools).
+
+### Why This Matters
+
+Before: Important information could be lost if context compacted before session end, or if the user closed the terminal abruptly.
+
+After: Commitments, entities, and relationships are stored as they're discovered. The PreCompact hook provides a safety net. Turn buffering catches orphaned sessions.
+
+---
+
 ## 1.22.0 (2026-02-05)
 
 ### The Learning Loop
