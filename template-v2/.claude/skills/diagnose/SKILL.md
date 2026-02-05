@@ -1,7 +1,6 @@
 ---
 name: diagnose
 description: Check memory daemon health and troubleshoot connectivity issues. Use when memory tools aren't working, at session start if something seems wrong, or when user asks about memory status.
-disable-model-invocation: true
 ---
 
 # Diagnose

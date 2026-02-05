@@ -199,6 +199,12 @@ class Database:
             # schema_migrations table doesn't exist yet, schema.sql will create it
             return
 
+        # Check if migrations actually completed (columns exist)
+        effective_version = self._check_migration_integrity(conn)
+        if effective_version is not None:
+            logger.info(f"Migration integrity check: effective version is {effective_version}, not {current_version}")
+            current_version = effective_version
+
         if current_version < 2:
             # Migration 2: Add turn_buffer, episode narrative columns, episode_embeddings
             migration_stmts = [
@@ -543,6 +549,22 @@ class Database:
             conn.commit()
             logger.info("Applied migration 10: reflections table")
 
+        if current_version < 11:
+            # Migration 11: Add compound index for fast source lookup on documents
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_documents_source_lookup ON documents(source_type, source_ref)"
+                )
+            except sqlite3.OperationalError as e:
+                if "already exists" not in str(e).lower():
+                    logger.warning(f"Migration 11 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (11, 'Add compound index for fast source lookup on documents')"
+            )
+            conn.commit()
+            logger.info("Applied migration 11: source lookup index")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -589,6 +611,34 @@ class Database:
                 logger.warning(f"FTS5 not available in this SQLite build: {e}")
             else:
                 logger.warning(f"FTS5 setup failed: {e}")
+
+    def _get_table_columns(self, conn: sqlite3.Connection, table: str) -> set:
+        """Get column names for a table."""
+        result = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {row[1] for row in result}  # row[1] is column name
+
+    def _check_migration_integrity(self, conn: sqlite3.Connection) -> Optional[int]:
+        """Check if migrations completed properly by verifying expected columns exist.
+
+        Returns the effective schema version based on what actually exists,
+        which may be lower than what schema_migrations claims.
+        Returns None if all migrations completed properly.
+        """
+        # Migration 8 added valid_at, invalid_at to relationships
+        rel_cols = self._get_table_columns(conn, "relationships")
+        if "invalid_at" not in rel_cols or "valid_at" not in rel_cols:
+            logger.warning("Migration 8 incomplete: relationships missing bi-temporal columns")
+            return 7  # Force re-run from migration 8
+
+        # Migration 10 added reflections table
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        if "reflections" not in tables:
+            logger.warning("Migration 10 incomplete: reflections table missing")
+            return 9  # Force re-run from migration 10
+
+        return None  # All good
 
     def _store_workspace_path(self, conn: sqlite3.Connection) -> None:
         """Store workspace path in _meta table for database identification.

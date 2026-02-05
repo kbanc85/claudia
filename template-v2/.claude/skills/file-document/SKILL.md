@@ -1,7 +1,6 @@
 ---
 name: file-document
 description: Store a document, email, or text for future reference with entity linking and provenance.
-disable-model-invocation: true
 ---
 
 # File Document

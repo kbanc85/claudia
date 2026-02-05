@@ -1,7 +1,6 @@
 ---
 name: morning-brief
 description: Daily digest of commitments, warnings, and relationship health. Use when starting your day or asking "what's on my plate".
-disable-model-invocation: true
 ---
 
 # Morning Brief

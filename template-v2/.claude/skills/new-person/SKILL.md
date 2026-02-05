@@ -1,7 +1,6 @@
 ---
 name: new-person
 description: Create a relationship tracking file for a person with contact info and history.
-disable-model-invocation: true
 argument-hint: "[name]"
 ---
 

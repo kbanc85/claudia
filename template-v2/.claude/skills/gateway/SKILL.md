@@ -1,7 +1,6 @@
 ---
 name: gateway
 description: Start, stop, or check status of the Claudia Gateway service for messaging integrations.
-disable-model-invocation: true
 argument-hint: "[start|stop|status]"
 ---
 
