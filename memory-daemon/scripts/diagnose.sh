@@ -184,3 +184,6 @@ else
 fi
 
 echo ""
+
+# Exit with appropriate code for automated checks
+exit $ISSUES_FOUND

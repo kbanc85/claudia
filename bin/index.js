@@ -293,9 +293,49 @@ async function main() {
     }
   }
 
+  // Helper: run system health check after install
+  function runSystemHealthCheck(callback) {
+    const diagnoseScript = isWindows
+      ? join(homedir(), '.claudia', 'diagnose.ps1')
+      : join(homedir(), '.claudia', 'diagnose.sh');
+
+    if (!existsSync(diagnoseScript)) {
+      // Diagnose script not installed yet - skip check
+      callback(true);
+      return;
+    }
+
+    console.log(`\n${colors.cyan}Running system health check...${colors.reset}`);
+
+    const spawnCmd = isWindows ? powershellPath : 'bash';
+    const spawnArgs = isWindows
+      ? ['-ExecutionPolicy', 'Bypass', '-File', diagnoseScript]
+      : [diagnoseScript];
+
+    const healthCheck = spawn(spawnCmd, spawnArgs, {
+      stdio: 'inherit'
+    });
+
+    healthCheck.on('close', (code) => {
+      callback(code === 0);
+    });
+
+    healthCheck.on('error', () => {
+      // If health check fails to run, continue anyway
+      callback(true);
+    });
+  }
+
   // Helper: finish install after optional components
   function finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled) {
-    showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled);
+    if (memoryInstalled) {
+      // Run health check when memory system was installed
+      runSystemHealthCheck((healthy) => {
+        showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, healthy);
+      });
+    } else {
+      showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, true);
+    }
   }
 
   // Helper: run gateway setup (auto-install like visualizer), then finish
@@ -397,19 +437,30 @@ async function main() {
   // Memory skipped or failed to spawn -- continue with visualizer/gateway
   maybeRunVisualizer(false);
 
-  function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled) {
+  function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, systemHealthy = true) {
     // Show next steps - different message based on what was installed
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
     if (memoryInstalled) {
-      console.log(`
+      if (systemHealthy) {
+        console.log(`
 ${colors.bold}Next:${colors.reset}
 ${cdStep}  ${colors.cyan}claude${colors.reset}
   ${colors.dim}Memory system ready!${colors.reset}
 
 ${colors.dim}If Claude was already running elsewhere, restart it to activate memory tools.${colors.reset}
-${colors.dim}Troubleshooting: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}
 `);
+      } else {
+        console.log(`
+${colors.yellow}Some issues were detected above.${colors.reset}
+${colors.dim}You can fix them now, or Claudia will work in fallback mode until they're resolved.${colors.reset}
+${colors.dim}Re-run diagnostics anytime: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}
+
+${colors.bold}Next:${colors.reset}
+${cdStep}  ${colors.cyan}claude${colors.reset}
+  ${colors.dim}Claudia will help you troubleshoot with /diagnose${colors.reset}
+`);
+      }
     } else {
       console.log(`
 ${colors.bold}Next:${colors.reset}
