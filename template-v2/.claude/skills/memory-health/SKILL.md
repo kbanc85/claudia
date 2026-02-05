@@ -1,6 +1,7 @@
 ---
 name: memory-health
 description: Check memory system health and data quality. Use when user asks "how's my memory?", "system health", "memory stats", "data quality", "how's my brain?", or for periodic self-diagnostics.
+effort-level: medium
 ---
 
 # Memory Health

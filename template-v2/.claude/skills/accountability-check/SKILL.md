@@ -2,6 +2,7 @@
 name: accountability-check
 description: Surface all commitments, overdue items, and things you're waiting on by relationship. Triggers on "what do I owe?", "am I overdue?", "check my commitments".
 argument-hint: "[person name or 'overdue']"
+effort-level: low
 ---
 
 # Accountability Check

@@ -3,6 +3,7 @@ name: document-archivist
 description: PRIMARY handler for pasted content. Formats, adds provenance, prepares for filing.
 model: haiku
 dispatch-category: content-intake
+dispatch-tier: task
 auto-dispatch: true
 ---
 

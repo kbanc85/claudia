@@ -1130,6 +1130,12 @@ async def list_tools() -> ListToolsResult:
                         "type": "integer",
                         "description": "How long the dispatch took in milliseconds",
                     },
+                    "dispatch_tier": {
+                        "type": "string",
+                        "enum": ["task", "native_team"],
+                        "description": "Dispatch mechanism: 'task' for Task tool (Haiku agents), 'native_team' for native agent teams (Sonnet agents)",
+                        "default": "task",
+                    },
                     "required_claudia_judgment": {
                         "type": "boolean",
                         "description": "Whether Claudia needed to review/modify the result",
@@ -1935,6 +1941,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     "duration_ms": arguments.get("duration_ms"),
                     "required_claudia_judgment": 1 if arguments.get("required_claudia_judgment", False) else 0,
                     "judgment_reason": arguments.get("judgment_reason"),
+                    "dispatch_tier": arguments.get("dispatch_tier", "task"),
                 },
             )
             return CallToolResult(

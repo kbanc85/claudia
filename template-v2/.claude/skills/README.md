@@ -120,6 +120,34 @@ argument-hint: [arg]             # Optional: show in /skill [arg] help
 | `gateway/` | Manage Gateway service |
 | `diagnose/` | Check memory daemon health |
 
+## Effort Levels
+
+Skills declare an `effort-level` in their YAML frontmatter to signal how much thinking budget a task requires. This maps to the model's extended thinking capability.
+
+| Level | Thinking Budget | Use For |
+|-------|----------------|---------|
+| **low** | Minimal | Structured data assembly, health checks, quick lookups |
+| **medium** | Standard | Drafts, formatting, entity processing, file operations |
+| **high** | Extended | Pattern analysis, strategic thinking, multi-step reasoning |
+| **max** | Full context | Deep analysis, multi-source ingestion, comprehensive synthesis |
+
+```yaml
+---
+name: my-skill
+description: What this skill does.
+effort-level: medium
+---
+```
+
+### Effort Level Reference
+
+| Effort | Skills |
+|--------|--------|
+| **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose |
+| **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, gateway, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher |
+| **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
+| **max** | ingest-sources, pipeline-review, deep-context |
+
 ## Creating Custom Skills
 
 ### 1. Choose Invocation Mode

@@ -1,6 +1,11 @@
-# Structure Evolution Skill
+---
+name: structure-evolution
+description: Periodically analyze the user's workflow and proactively suggest structural improvements to their Claudia setup.
+user-invocable: false
+effort-level: high
+---
 
-**Purpose:** Periodically analyze the user's workflow and proactively suggest structural improvements to their Claudia setup.
+# Structure Evolution Skill
 
 **Triggers:**
 - Every 2 weeks (or after 10+ sessions)

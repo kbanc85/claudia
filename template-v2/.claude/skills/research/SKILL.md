@@ -2,6 +2,7 @@
 name: research
 description: Deep research on a topic with web sources, memory integration, and stored findings. Triggers on "research this", "look into", "find out about", "dig into".
 argument-hint: "[topic or question]"
+effort-level: high
 ---
 
 # Research

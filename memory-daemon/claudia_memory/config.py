@@ -34,7 +34,7 @@ class MemoryConfig:
     pattern_detection_interval_hours: int = 24
 
     # Search settings
-    max_recall_results: int = 20
+    max_recall_results: int = 50
     vector_weight: float = 0.50  # Weight for vector similarity in ranking
     importance_weight: float = 0.25  # Weight for importance score
     recency_weight: float = 0.10  # Weight for recency

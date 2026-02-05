@@ -1,6 +1,10 @@
-# Concierge Skill
+---
+name: concierge
+description: Context-aware web research that connects findings to Claudia's memory, relationships, and accumulated knowledge. Not just fetching pages - researching with purpose.
+effort-level: high
+---
 
-**Purpose:** Context-aware web research that connects findings to Claudia's memory, relationships, and accumulated knowledge. Not just fetching pages - researching with purpose.
+# Concierge Skill
 
 **Triggers:**
 - User asks about something that may require current external information

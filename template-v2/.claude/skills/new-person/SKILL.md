@@ -2,6 +2,7 @@
 name: new-person
 description: Create a relationship tracking file for a person with contact info and history.
 argument-hint: "[name]"
+effort-level: medium
 ---
 
 # New Person

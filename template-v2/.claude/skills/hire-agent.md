@@ -2,6 +2,7 @@
 name: hire-agent
 description: Suggests new agents based on repeated task patterns.
 user-invocable: false
+effort-level: high
 ---
 
 # Hire Agent

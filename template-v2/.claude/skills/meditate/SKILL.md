@@ -1,6 +1,7 @@
 ---
 name: meditate
 description: End-of-session reflection. Generate persistent learnings about user preferences, communication patterns, and cross-session insights. Captures what Claude learns about working with this user.
+effort-level: high
 ---
 
 # Meditate

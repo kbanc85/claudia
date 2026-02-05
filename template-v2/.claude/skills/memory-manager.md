@@ -1,6 +1,11 @@
-# Memory Manager Skill
+---
+name: memory-manager
+description: Handle cross-session persistence using the enhanced memory system (MCP) with fallback to markdown files.
+user-invocable: false
+effort-level: medium
+---
 
-**Purpose:** Handle cross-session persistence using the enhanced memory system (MCP) with fallback to markdown files.
+# Memory Manager Skill
 
 **Triggers:** Session start (load) and session end (save).
 
@@ -422,7 +427,9 @@ These bypass buffering because losing them to context compaction would be genuin
 
 #### If Compaction Already Happened
 
-If you see `CONTEXT COMPACTION OCCURRED` in your context, it means the safety net just activated. Now you need to recover what you can:
+With the 1M context window, compaction happens less frequently, but it can still occur during very long sessions. For deep full-context analysis, consider using `/deep-context` which pulls 100-200 memories across multiple dimensions.
+
+If you see a context compaction advisory, review what you can recover:
 
 1. Review what remains in your context
 2. Call `memory.remember` for any commitments you can piece together

@@ -1,14 +1,14 @@
 #!/bin/bash
-# PreCompact hook: Emergency checkpoint before context compaction
-# Returns JSON with additionalContext to remind Claudia to persist critical data
+# PreCompact hook: Advisory checkpoint before context compaction
+# Returns JSON with additionalContext to help Claudia recover gracefully
 
 # Signal daemon to flush WAL (ensures all buffered data is durable)
 curl -s "http://localhost:3848/flush" 2>/dev/null || true
 
-# Inject reminder into compacted context
+# Inject advisory into compacted context
 cat <<EOF
 {
-  "additionalContext": "CONTEXT COMPACTION OCCURRED. Before continuing, check: (1) Were any commitments discussed? If so, call memory.remember for each with type='commitment' and importance=0.9. (2) Were new people discussed in detail? Call memory.entity for each. (3) Were relationships mentioned (X works with Y, X reports to Y)? Call memory.relate for each. (4) Call memory.buffer_turn with a summary of recent exchanges if not already buffered."
+  "additionalContext": "Context compaction advisory: If important information was discussed recently, ensure it has been stored. Check: (1) Commitments: call memory.remember with type='commitment' for any promises not yet stored. (2) People: call memory.entity for anyone discussed in detail. (3) Relationships: call memory.relate for connections mentioned. (4) Buffer: call memory.buffer_turn with a summary if recent exchanges weren't buffered. With 1M context, compaction is less frequent, but proactive capture remains good practice."
 }
 EOF
 exit 0

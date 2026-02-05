@@ -2,6 +2,43 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.25.0 (2026-02-05)
+
+### Opus 4.6 Integration
+
+Claudia now leverages Claude Opus 4.6's expanded capabilities: native agent teams, deeper recall from the 1M context window, effort levels for skills, and a new /deep-context skill for comprehensive analysis.
+
+### Added
+
+- **Two-tier agent dispatch** - Agents now dispatch via two mechanisms: Tier 1 (Task tool) for fast, structured Haiku agents (Document Archivist, Document Processor, Schedule Analyst), and Tier 2 (Native Agent Teams) for Research Scout, which gets independent context and multi-turn tool access.
+- **Effort levels** - All 39 skills now declare an `effort-level` (low/medium/high/max) in YAML frontmatter, signaling how much thinking budget each task requires.
+- **`/deep-context` skill** - Full-context deep analysis that pulls 100-200 memories across multiple dimensions (entity, semantic, connected entities, temporal sweep) for meeting prep, relationship analysis, and strategic planning. Effort level: max.
+- **`dispatch_tier` field** - `memory.agent_dispatch` now tracks whether each dispatch used Task tool ("task") or native agent teams ("native_team").
+- **Briefing packets** - Tier 2 agents receive structured briefing packets with task context, relevant entities, and constraints since they don't have direct memory access.
+- **Database migration v14** - Adds `dispatch_tier` column to `agent_dispatches` table.
+- **Skills README effort table** - Documents all effort levels and explains the system.
+
+### Changed
+
+- **`max_recall_results` bumped to 50** - Up from 20, leveraging the 1M context window for richer recall.
+- **Pre-compact hook** - Tone changed from alarm ("CONTEXT COMPACTION OCCURRED") to advisory, reflecting that compaction is less frequent with 1M context.
+- **Agent dispatcher** - Rewritten with two-tier architecture, briefing packet construction, and effort routing guidance.
+- **Agent definitions** - All four agents now include `dispatch-tier` in frontmatter (task or native_team).
+- **Research Scout** - Added briefing expectations section for native team dispatch.
+- **Agents README** - Updated with two-tier architecture diagram and dispatch-tier in agent definition format.
+- **CLAUDE.md "My Team" section** - Updated to describe two-tier dispatch system.
+- **Memory manager** - Added `/deep-context` reference and note about reduced compaction frequency.
+- **11 proactive skills** - Added YAML frontmatter with `name`, `description`, and `effort-level` (previously had `**Purpose:**` header format only).
+- **Native agent teams enabled** - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set in settings.local.json.
+
+### Why This Matters
+
+Before: All agents dispatched identically via Task tool. Skills had no thinking budget signal. Recall was capped at 20 results. Deep analysis required manual memory queries.
+
+After: Research Scout operates as a true autonomous teammate with its own context and tools. Skills declare effort levels so the model allocates appropriate thinking. Recall can pull up to 50 results for richer context. `/deep-context` automates comprehensive 100-200 memory pulls for strategic analysis.
+
+---
+
 ## 1.24.0 (2026-02-05)
 
 ### Trust North Star + Agent Team

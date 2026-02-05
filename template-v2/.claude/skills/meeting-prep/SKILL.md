@@ -2,6 +2,7 @@
 name: meeting-prep
 description: One-page briefing before a call or meeting. Use when user says "prep me for my call with [person]" or "meeting prep for [person]".
 argument-hint: [person or meeting name]
+effort-level: medium
 ---
 
 # Meeting Prep

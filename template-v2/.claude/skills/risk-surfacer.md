@@ -1,6 +1,11 @@
-# Risk Surfacer Skill
+---
+name: risk-surfacer
+description: Proactively identify and surface potential problems before they become crises.
+user-invocable: false
+effort-level: high
+---
 
-**Purpose:** Proactively identify and surface potential problems before they become crises.
+# Risk Surfacer Skill
 
 **Triggers:** Operates continuously, surfaces risks during morning brief, weekly review, or when directly relevant.
 

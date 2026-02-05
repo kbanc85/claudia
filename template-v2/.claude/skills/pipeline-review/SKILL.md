@@ -1,6 +1,7 @@
 ---
 name: pipeline-review
 description: Review active pipeline, opportunities, capacity, and stalled items needing attention. Triggers on "pipeline status", "capacity check", "what's in the pipeline".
+effort-level: max
 ---
 
 # Pipeline Review

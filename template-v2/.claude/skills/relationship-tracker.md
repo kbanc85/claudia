@@ -1,6 +1,11 @@
-# Relationship Tracker Skill
+---
+name: relationship-tracker
+description: Surface relevant context when people are mentioned in conversation, and track relationship health over time.
+user-invocable: false
+effort-level: high
+---
 
-**Purpose:** Surface relevant context when people are mentioned in conversation, and track relationship health over time.
+# Relationship Tracker Skill
 
 **Triggers:** Activates automatically when any person name is mentioned in conversation.
 

@@ -1,6 +1,11 @@
-# Commitment Detector Skill
+---
+name: commitment-detector
+description: Automatically detect promises and commitments in conversation and offer to track them.
+user-invocable: false
+effort-level: high
+---
 
-**Purpose:** Automatically detect promises and commitments in conversation and offer to track them.
+# Commitment Detector Skill
 
 **Triggers:** Activates when language patterns suggest a commitment has been made.
 

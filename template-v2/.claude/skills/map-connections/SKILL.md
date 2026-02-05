@@ -2,6 +2,7 @@
 name: map-connections
 description: Scan context files to extract entities and relationships into the memory system. Triggers on "who knows who?", "network graph", "map my connections", "extract relationships".
 argument-hint: "[--incremental] [file-path]"
+effort-level: high
 ---
 
 # Map Connections

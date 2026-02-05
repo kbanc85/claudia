@@ -1,6 +1,10 @@
-# Connector Discovery Skill
+---
+name: connector-discovery
+description: Help users connect their external tools in a gentle, non-technical way. Recommend solutions based on what works best, explain everything in plain language.
+effort-level: high
+---
 
-**Purpose:** Help users connect their external tools in a gentle, non-technical way. Recommend solutions based on what works best, explain everything in plain language.
+# Connector Discovery Skill
 
 **Triggers:**
 - Invoked during onboarding Phase 3.5 (after archetype detection)

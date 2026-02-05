@@ -405,6 +405,9 @@ VALUES (11, 'Add compound index for fast source lookup on documents');
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (13, 'Add origin_type to memories, agent_dispatches table for Trust North Star');
 
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (14, 'Add dispatch_tier to agent_dispatches for native agent team support');
+
 -- ============================================================================
 -- AGENT DISPATCHES: Track delegated tasks to sub-agents
 -- ============================================================================
@@ -422,6 +425,7 @@ CREATE TABLE IF NOT EXISTS agent_dispatches (
     judgment_reason TEXT,
     episode_id INTEGER REFERENCES episodes(id),
     user_approved INTEGER DEFAULT 1,
+    dispatch_tier TEXT DEFAULT 'task',
     metadata TEXT
 );
 

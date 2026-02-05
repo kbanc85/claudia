@@ -2,6 +2,7 @@
 name: draft-reply
 description: Draft an email response with tone matching the relationship context. Shows draft for approval.
 disable-model-invocation: true
+effort-level: medium
 ---
 
 # Draft Reply

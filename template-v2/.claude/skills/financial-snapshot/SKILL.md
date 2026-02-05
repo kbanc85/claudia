@@ -1,6 +1,7 @@
 ---
 name: financial-snapshot
 description: Quick view of revenue, expenses, invoicing, and cash flow with key metrics. Triggers on "cash position", "revenue check", "financial overview", "money status".
+effort-level: low
 ---
 
 # Financial Snapshot

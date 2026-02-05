@@ -1,6 +1,11 @@
-# Capability Suggester Skill
+---
+name: capability-suggester
+description: Notice repeated user behaviors and suggest new commands, workflows, or structure to streamline their work.
+user-invocable: false
+effort-level: high
+---
 
-**Purpose:** Notice repeated user behaviors and suggest new commands, workflows, or structure to streamline their work.
+# Capability Suggester Skill
 
 **Triggers:** Activates when patterns of repeated behavior reach a threshold.
 

@@ -1,6 +1,11 @@
-# Pattern Recognizer Skill
+---
+name: pattern-recognizer
+description: Notice trends, recurring themes, and patterns across conversations and surface them when relevant.
+user-invocable: false
+effort-level: high
+---
 
-**Purpose:** Notice trends, recurring themes, and patterns across conversations and surface them when relevant.
+# Pattern Recognizer Skill
 
 **Triggers:** Operates continuously in background, surfaces observations when patterns reach significance threshold.
 

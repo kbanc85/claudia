@@ -2,6 +2,7 @@
 name: gateway
 description: Start, stop, or check status of the Claudia Gateway service for messaging integrations.
 argument-hint: "[start|stop|status]"
+effort-level: medium
 ---
 
 # Gateway

@@ -1,6 +1,7 @@
 ---
 name: fix-duplicates
 description: Find and merge duplicate entities. Use when user says "clean up duplicates", "merge these people", "fix duplicate entities", "dedupe my contacts", or when you notice potential duplicates during conversation.
+effort-level: medium
 ---
 
 # Fix Duplicates

@@ -2,6 +2,7 @@
 name: client-health
 description: Health check across active client engagements showing status, deliverables, and concerns. Triggers on "how are my clients?", "client status", "client health check".
 argument-hint: "[client name or 'summary']"
+effort-level: low
 ---
 
 # Client Health

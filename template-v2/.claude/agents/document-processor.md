@@ -3,6 +3,7 @@ name: document-processor
 description: Extracts structured data from documents. Tables, lists, action items.
 model: haiku
 dispatch-category: extraction
+dispatch-tier: task
 auto-dispatch: true
 ---
 

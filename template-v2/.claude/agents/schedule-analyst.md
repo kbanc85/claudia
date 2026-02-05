@@ -3,6 +3,7 @@ name: schedule-analyst
 description: Calendar pattern analysis. Analyzes scheduling patterns and availability.
 model: haiku
 dispatch-category: analysis
+dispatch-tier: task
 auto-dispatch: false
 ---
 

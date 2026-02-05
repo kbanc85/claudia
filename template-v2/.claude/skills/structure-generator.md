@@ -1,6 +1,11 @@
-# Structure Generator Skill
+---
+name: structure-generator
+description: Create personalized folder structures and files based on user archetype, business depth preferences, and workflow needs.
+user-invocable: false
+effort-level: medium
+---
 
-**Purpose:** Create personalized folder structures and files based on user archetype, business depth preferences, and workflow needs.
+# Structure Generator Skill
 
 **Triggers:** Invoked by the onboarding skill after archetype detection, or when user requests structure changes.
 

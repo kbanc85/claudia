@@ -1,6 +1,7 @@
 ---
 name: file-document
 description: Store a document, email, or text for future reference with entity linking and provenance.
+effort-level: medium
 ---
 
 # File Document

@@ -680,6 +680,22 @@ class Database:
             conn.commit()
             logger.info("Applied migration 13: Trust North Star (origin_type, agent_dispatches)")
 
+        if current_version < 14:
+            # Migration 14: Add dispatch_tier to agent_dispatches for native agent teams
+            try:
+                conn.execute(
+                    "ALTER TABLE agent_dispatches ADD COLUMN dispatch_tier TEXT DEFAULT 'task'"
+                )
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    logger.warning(f"Migration 14 statement failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (14, 'Add dispatch_tier to agent_dispatches for native agent team support')"
+            )
+            conn.commit()
+            logger.info("Applied migration 14: dispatch_tier for native agent teams")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -776,6 +792,12 @@ class Database:
         if "agent_dispatches" not in tables:
             logger.warning("Migration 13 incomplete: agent_dispatches table missing")
             return 12
+
+        # Migration 14 added dispatch_tier to agent_dispatches
+        dispatch_cols = self._get_table_columns(conn, "agent_dispatches")
+        if "dispatch_tier" not in dispatch_cols:
+            logger.warning("Migration 14 incomplete: agent_dispatches missing dispatch_tier column")
+            return 13
 
         return None  # All good
 

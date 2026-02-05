@@ -1,6 +1,7 @@
 ---
 name: brain
 description: Launch the Brain Visualizer, a real-time 3D view of memory and relationships. Triggers on "show your brain", "visualize memory", "open the brain", "memory graph".
+effort-level: medium
 ---
 
 # Brain

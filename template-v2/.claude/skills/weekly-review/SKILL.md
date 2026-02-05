@@ -1,6 +1,7 @@
 ---
 name: weekly-review
 description: Guided weekly reflection across all relationships, commitments, and projects. Use at end of week or when user says "let's do a weekly review".
+effort-level: high
 ---
 
 # Weekly Review

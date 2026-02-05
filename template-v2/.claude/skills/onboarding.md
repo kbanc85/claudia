@@ -1,6 +1,11 @@
-# Onboarding Skill
+---
+name: onboarding
+description: Guide new users through a conversational discovery flow to create a personalized Claudia setup.
+user-invocable: false
+effort-level: medium
+---
 
-**Purpose:** Guide new users through a conversational discovery flow to create a personalized Claudia setup.
+# Onboarding Skill
 
 **Triggers:** This skill activates when `context/me.md` does not exist.
 

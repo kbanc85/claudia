@@ -1,6 +1,7 @@
 ---
 name: what-am-i-missing
 description: Surface risks, blind spots, and overlooked items across commitments and relationships. Triggers on "what am I overlooking?", "blind spots", "what's falling through the cracks".
+effort-level: high
 ---
 
 # What Am I Missing
