@@ -2,6 +2,39 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.22.0 (2026-02-05)
+
+### The Learning Loop
+
+Claudia's memory system now actually learns from experience. She can fix mistakes, merge duplicates, track what changed, and measure her own health.
+
+### Added
+
+- **Audit logging** - Full audit trail for all memory operations. Every merge, correction, deletion, and creation is logged with timestamps and details.
+- **Metrics system** - System health metrics collected daily at 5am. Track entity counts, memory stats, data quality indicators over time.
+- **Entity merge tool** - `memory.merge_entities` combines duplicate entities, preserving all references (memories, relationships, aliases).
+- **Entity delete tool** - `memory.delete_entity` soft-deletes with reason tracking. Historical references preserved.
+- **Memory correction tool** - `memory.correct` updates content while preserving history in `corrected_from` field.
+- **Memory invalidation tool** - `memory.invalidate` marks memories as no longer true without destroying them.
+- **Fuzzy duplicate detection** - `find_duplicate_entities()` uses SequenceMatcher for similarity scoring.
+- **`/fix-duplicates` skill** - Find and merge duplicate entities through natural language.
+- **`/memory-health` skill** - System health dashboard showing entity counts, memory stats, and data quality.
+- **49 new tests** - Comprehensive coverage for audit, metrics, entity management, and corrections.
+
+### Changed
+
+- **Database migration v12** - Added `audit_log` and `metrics` tables, soft-delete columns on entities, correction columns on memories.
+- **Scheduler** - Added daily metrics collection job at 5am.
+- **`memory-manager` skill** - New "User Corrections" section with triggers and workflow for fixing mistakes.
+
+### Why This Matters
+
+Before: Memory mistakes were permanent. Duplicates accumulated. No way to know if the system was healthy.
+
+After: Say "that's not right about Sarah" and Claudia corrects it. Run `/fix-duplicates` to clean up. Check `/memory-health` to see how the system is doing. Full audit trail for accountability.
+
+---
+
 ## 1.21.1 (2026-02-04)
 
 ### Bulletproof Memory
