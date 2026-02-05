@@ -626,6 +626,60 @@ class Database:
             conn.commit()
             logger.info("Applied migration 12: audit logging, metrics, soft-delete/correction columns")
 
+        if current_version < 13:
+            # Migration 13: Trust North Star - origin_type on memories, agent_dispatches table
+            migration_stmts = [
+                # Origin type for memory provenance tracking
+                "ALTER TABLE memories ADD COLUMN origin_type TEXT DEFAULT 'inferred'",
+                # Agent dispatches table for tracking sub-agent tasks
+                """CREATE TABLE IF NOT EXISTS agent_dispatches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_name TEXT NOT NULL,
+                    dispatch_category TEXT NOT NULL,
+                    task_summary TEXT,
+                    started_at TEXT DEFAULT (datetime('now')),
+                    completed_at TEXT,
+                    duration_ms INTEGER,
+                    success INTEGER DEFAULT 1,
+                    required_claudia_judgment INTEGER DEFAULT 0,
+                    judgment_reason TEXT,
+                    episode_id INTEGER REFERENCES episodes(id),
+                    user_approved INTEGER DEFAULT 1,
+                    metadata TEXT
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_agent_dispatches_agent ON agent_dispatches(agent_name)",
+                "CREATE INDEX IF NOT EXISTS idx_agent_dispatches_category ON agent_dispatches(dispatch_category)",
+                "CREATE INDEX IF NOT EXISTS idx_agent_dispatches_started ON agent_dispatches(started_at DESC)",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    err_str = str(e).lower()
+                    if "duplicate column" not in err_str and "already exists" not in err_str:
+                        logger.warning(f"Migration 13 statement failed: {e}")
+
+            # Grandfather existing memories: high-importance from conversation = user_stated
+            try:
+                conn.execute(
+                    """UPDATE memories SET origin_type = 'user_stated'
+                       WHERE origin_type IS NULL
+                         AND source = 'conversation'
+                         AND importance >= 0.9"""
+                )
+                conn.execute(
+                    """UPDATE memories SET origin_type = 'inferred'
+                       WHERE origin_type IS NULL"""
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 13 grandfather failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (13, 'Add origin_type to memories, agent_dispatches table for Trust North Star')"
+            )
+            conn.commit()
+            logger.info("Applied migration 13: Trust North Star (origin_type, agent_dispatches)")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -713,6 +767,15 @@ class Database:
         if "invalidated_at" not in memory_cols or "corrected_at" not in memory_cols:
             logger.warning("Migration 12 incomplete: memories missing correction/invalidation columns")
             return 11
+
+        # Migration 13 added origin_type to memories, agent_dispatches table
+        if "origin_type" not in memory_cols:
+            logger.warning("Migration 13 incomplete: memories missing origin_type column")
+            return 12
+
+        if "agent_dispatches" not in tables:
+            logger.warning("Migration 13 incomplete: agent_dispatches table missing")
+            return 12
 
         return None  # All good
 

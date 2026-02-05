@@ -401,3 +401,30 @@ VALUES (10, 'Add reflections table and reflection_embeddings for /meditate skill
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (11, 'Add compound index for fast source lookup on documents');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (13, 'Add origin_type to memories, agent_dispatches table for Trust North Star');
+
+-- ============================================================================
+-- AGENT DISPATCHES: Track delegated tasks to sub-agents
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_dispatches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_name TEXT NOT NULL,
+    dispatch_category TEXT NOT NULL,
+    task_summary TEXT,
+    started_at TEXT DEFAULT (datetime('now')),
+    completed_at TEXT,
+    duration_ms INTEGER,
+    success INTEGER DEFAULT 1,
+    required_claudia_judgment INTEGER DEFAULT 0,
+    judgment_reason TEXT,
+    episode_id INTEGER REFERENCES episodes(id),
+    user_approved INTEGER DEFAULT 1,
+    metadata TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_dispatches_agent ON agent_dispatches(agent_name);
+CREATE INDEX IF NOT EXISTS idx_agent_dispatches_category ON agent_dispatches(dispatch_category);
+CREATE INDEX IF NOT EXISTS idx_agent_dispatches_started ON agent_dispatches(started_at DESC);

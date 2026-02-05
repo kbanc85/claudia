@@ -37,6 +37,10 @@ class RecallResult:
     source: Optional[str] = None
     source_id: Optional[str] = None
     source_context: Optional[str] = None
+    # Trust North Star fields
+    confidence: float = 1.0  # How confident we are in this memory
+    verification_status: str = "pending"  # pending, verified, flagged, contradicts
+    origin_type: str = "inferred"  # user_stated, extracted, inferred, corrected
 
 
 @dataclass
@@ -330,6 +334,11 @@ class RecallService:
         source_id_val = row["source_id"] if "source_id" in row_keys else None
         source_context_val = row["source_context"] if "source_context" in row_keys else None
 
+        # Trust North Star fields (may not exist in older DBs)
+        confidence_val = row["confidence"] if "confidence" in row_keys else 1.0
+        verification_status_val = row["verification_status"] if "verification_status" in row_keys else "pending"
+        origin_type_val = row["origin_type"] if "origin_type" in row_keys else "inferred"
+
         return RecallResult(
             id=row["id"],
             content=row["content"],
@@ -342,6 +351,9 @@ class RecallService:
             source=source_val,
             source_id=source_id_val,
             source_context=source_context_val,
+            confidence=confidence_val,
+            verification_status=verification_status_val,
+            origin_type=origin_type_val,
         )
 
     def _rrf_score(

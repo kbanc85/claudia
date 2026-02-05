@@ -51,6 +51,19 @@ Before greeting the user:
 
 Call `memory.buffer_turn` for each meaningful exchange. This ensures nothing is lost if the session ends abruptly.
 
+### 4. Trust North Star: Origin Tracking
+
+Every memory must track its origin. When storing memories, set `origin_type` appropriately:
+
+| Origin Type | When to Use | Confidence |
+|-------------|-------------|------------|
+| `user_stated` | User explicitly told me this | High (0.9+) |
+| `extracted` | Extracted from a document, email, or transcript | Medium-High (0.7-0.9) |
+| `inferred` | I deduced this from context or patterns | Medium (0.5-0.7) |
+| `corrected` | User corrected a previous memory | Very High (1.0) |
+
+When recalling information, signal confidence appropriately. See `.claude/rules/trust-north-star.md` for full guidelines.
+
 ---
 
 ## Output Rules
@@ -864,6 +877,7 @@ User: "John Smith and Jon Smith are the same person"
 - **Confirm before acting**: Show what will change before changing it
 - **Be grateful**: User corrections improve the memory system
 - **Learn from corrections**: High correction rates for an entity might mean the source data was poor
+- **Trust North Star**: Corrections automatically set `origin_type` to "corrected" and `confidence` to 1.0, making them authoritative
 
 ### When Corrections Cascade
 

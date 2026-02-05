@@ -140,6 +140,7 @@ class RememberService:
         source_id: Optional[str] = None,
         source_context: Optional[str] = None,
         metadata: Optional[Dict] = None,
+        origin_type: Optional[str] = None,
     ) -> Optional[int]:
         """
         Store a discrete fact/memory.
@@ -154,6 +155,7 @@ class RememberService:
             source_id: Reference to source
             source_context: One-line breadcrumb describing the source material
             metadata: Additional metadata
+            origin_type: 'user_stated', 'extracted', 'inferred', 'corrected' (Trust North Star)
 
         Returns:
             Memory ID or None if duplicate
@@ -186,6 +188,16 @@ class RememberService:
         if "importance" in guard_result.adjustments:
             importance = guard_result.adjustments["importance"]
 
+        # Determine origin_type (Trust North Star)
+        # Auto-detect if not provided: high-importance from conversation = user_stated
+        if origin_type is None:
+            if source == "conversation" and importance >= 0.9:
+                origin_type = "user_stated"
+            elif source in ("transcript", "email", "document", "session_summary"):
+                origin_type = "extracted"
+            else:
+                origin_type = "inferred"
+
         # Insert new memory
         insert_data = {
             "content": content,
@@ -198,6 +210,7 @@ class RememberService:
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat(),
             "metadata": json.dumps(metadata) if metadata else None,
+            "origin_type": origin_type,
         }
         if source_context:
             insert_data["source_context"] = source_context
@@ -784,6 +797,8 @@ class RememberService:
                 "corrected_from": original_content,
                 "updated_at": now,
                 "metadata": json.dumps(existing_meta),
+                "origin_type": "corrected",  # Trust North Star: user corrections are canonical
+                "confidence": 1.0,  # User corrections have maximum confidence
             },
             "id = ?",
             (memory_id,),

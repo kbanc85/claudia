@@ -45,6 +45,10 @@ from ..services.recall import (
 )
 from ..services.ingest import get_ingest_service
 from ..services.documents import get_document_service
+from ..services.audit import (
+    get_entity_audit_history,
+    get_memory_audit_history,
+)
 from ..services.remember import (
     buffer_turn,
     correct_memory,
@@ -1069,6 +1073,76 @@ async def list_tools() -> ListToolsResult:
                 "required": ["memory_id"],
             },
         ),
+        Tool(
+            name="memory.audit_history",
+            description=(
+                "Get the full audit trail for an entity or memory. "
+                "Use when the user asks 'where did you learn that?' or wants to trace "
+                "the provenance of information. Shows all operations (creates, merges, "
+                "corrections, deletions) with timestamps."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "integer",
+                        "description": "Entity ID to get audit history for",
+                    },
+                    "memory_id": {
+                        "type": "integer",
+                        "description": "Memory ID to get audit history for",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of entries (default 20)",
+                        "default": 20,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.agent_dispatch",
+            description=(
+                "Log when Claudia delegates a task to a sub-agent. "
+                "Tracks agent performance, duration, and whether Claudia's judgment was required."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_name": {
+                        "type": "string",
+                        "description": "Name of the agent (document-archivist, research-scout, etc.)",
+                    },
+                    "dispatch_category": {
+                        "type": "string",
+                        "description": "Category: content-intake, research, extraction, analysis",
+                    },
+                    "task_summary": {
+                        "type": "string",
+                        "description": "Brief description of the task",
+                    },
+                    "success": {
+                        "type": "boolean",
+                        "description": "Whether the dispatch succeeded",
+                        "default": True,
+                    },
+                    "duration_ms": {
+                        "type": "integer",
+                        "description": "How long the dispatch took in milliseconds",
+                    },
+                    "required_claudia_judgment": {
+                        "type": "boolean",
+                        "description": "Whether Claudia needed to review/modify the result",
+                        "default": False,
+                    },
+                    "judgment_reason": {
+                        "type": "string",
+                        "description": "Why Claudia's judgment was required (if applicable)",
+                    },
+                },
+                "required": ["agent_name", "dispatch_category"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -1806,6 +1880,72 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     TextContent(
                         type="text",
                         text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.audit_history":
+            # Get audit history for entity or memory
+            entity_id = arguments.get("entity_id")
+            memory_id = arguments.get("memory_id")
+            limit = arguments.get("limit", 20)
+
+            if entity_id:
+                history = get_entity_audit_history(entity_id)
+            elif memory_id:
+                history = get_memory_audit_history(memory_id)
+            else:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"error": "Either entity_id or memory_id is required"}),
+                        )
+                    ],
+                    isError=True,
+                )
+
+            # Apply limit
+            history = history[:limit]
+
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "entity_id": entity_id,
+                            "memory_id": memory_id,
+                            "history": history,
+                            "count": len(history),
+                        }),
+                    )
+                ]
+            )
+
+        elif name == "memory.agent_dispatch":
+            # Log an agent dispatch
+            db = get_db()
+            dispatch_id = db.insert(
+                "agent_dispatches",
+                {
+                    "agent_name": arguments["agent_name"],
+                    "dispatch_category": arguments["dispatch_category"],
+                    "task_summary": arguments.get("task_summary"),
+                    "success": 1 if arguments.get("success", True) else 0,
+                    "duration_ms": arguments.get("duration_ms"),
+                    "required_claudia_judgment": 1 if arguments.get("required_claudia_judgment", False) else 0,
+                    "judgment_reason": arguments.get("judgment_reason"),
+                },
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "dispatch_id": dispatch_id,
+                            "agent_name": arguments["agent_name"],
+                            "success": True,
+                        }),
                     )
                 ]
             )
