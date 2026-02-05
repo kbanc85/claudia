@@ -66,6 +66,15 @@ class MemoryScheduler:
             replace_existing=True,
         )
 
+        # Daily at 5am: Collect system metrics
+        self.scheduler.add_job(
+            self._run_metrics_collection,
+            CronTrigger(hour=5, minute=0),
+            id="daily_metrics",
+            name="Daily metrics collection",
+            replace_existing=True,
+        )
+
         # Daily at 6am: Generate predictions for the day
         self.scheduler.add_job(
             self._run_prediction_generation,
@@ -193,6 +202,20 @@ class MemoryScheduler:
             logger.debug(f"Memory verification complete: {result}")
         except Exception as e:
             logger.exception("Error in memory verification")
+
+    def _run_metrics_collection(self) -> None:
+        """Run daily metrics collection"""
+        try:
+            logger.debug("Running metrics collection")
+            from ..services.metrics import get_metrics_service
+            result = get_metrics_service().collect_and_store()
+            logger.info(
+                f"Metrics collection complete: "
+                f"{result['entities']['total']} entities, "
+                f"{result['memories']['total']} memories"
+            )
+        except Exception as e:
+            logger.exception("Error in metrics collection")
 
 
 # Global scheduler instance

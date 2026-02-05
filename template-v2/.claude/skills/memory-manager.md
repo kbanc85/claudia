@@ -641,6 +641,25 @@ Reflections are persistent learnings about working with this user. Unlike memori
 | `learning` | How to work better | "Direct questions get better responses" |
 | `question` | Worth revisiting | "How did the Acme negotiation resolve?" |
 
+### Applying Reflections at Session Start
+
+When `memory.session_context` or `memory.briefing` returns active reflections, **apply them silently**:
+
+| Reflection Type | How to Apply |
+|-----------------|--------------|
+| `observation` | Adjust format/style without announcing it |
+| `pattern` | Be aware of recurring themes, anticipate needs |
+| `learning` | Modify your approach based on what works |
+| `question` | Keep in mind for relevant moments |
+
+**Do NOT announce reflections.** They inform behavior invisibly. For example:
+- If a reflection says "Prefers bullet points over prose," use bullet points without saying "I'm using bullets because you prefer them."
+- If a reflection says "Best focus time is mornings," don't schedule check-ins for afternoons.
+
+**Exception:** If the user explicitly asks "show me your reflections" or "what have you learned about me?", then surface them using `memory.reflections`.
+
+User can toggle: "be explicit about reflections" switches to explicit mode where you announce what you're applying.
+
 ### Generating Reflections
 
 Reflections are typically generated via the `/meditate` skill at session end, but can be created anytime:
@@ -702,6 +721,88 @@ Reflections decay very slowly (0.999 daily, ~2 year half-life) because they're u
 ### Without Enhanced Memory
 
 When the memory daemon is unavailable, reflections are stored in `context/learnings.md` under a "Reflections" heading.
+
+---
+
+## User Corrections
+
+Users can correct mistakes in the memory system through natural language. User corrections are **authoritative**: never argue about what you remember.
+
+### Correction Triggers
+
+| User Says | Intent | Action |
+|-----------|--------|--------|
+| "That's not right" | Incorrect fact | Correct or invalidate |
+| "Actually, [correct info]" | Update needed | Correct the memory |
+| "That's not true anymore" | Outdated | Invalidate |
+| "Delete that memory" | Remove | Soft-delete |
+| "Forget about X" | Remove context | Invalidate related memories |
+| "You're wrong about [person]" | Fix entity info | Update entity or correct memories |
+
+### Correction Flow
+
+1. **Acknowledge immediately**: "Let me fix that."
+2. **Search for the memory**: Use `memory.recall` with the topic
+3. **Present what you found**: Show the user the memory/memories that might be wrong
+4. **Offer options**:
+   - **Correct**: Update the content, keep the history (use `memory.correct`)
+   - **Invalidate**: Mark as no longer true (use `memory.invalidate`)
+   - **No change**: User clarifies it's actually correct
+5. **Confirm action**: "Fixed. I've updated [brief description]."
+
+### Examples
+
+**Correcting a fact:**
+```
+User: "Actually, Sarah works at Acme now, not TechCorp"
+
+1. Search: memory.recall("Sarah works TechCorp")
+2. Show: "I have a memory that 'Sarah Chen works at TechCorp'. Is this the one?"
+3. User confirms
+4. Call: memory.correct(memory_id=42,
+                        correction="Sarah Chen works at Acme",
+                        reason="User correction: moved companies")
+5. Respond: "Updated. I now know Sarah works at Acme."
+```
+
+**Invalidating outdated info:**
+```
+User: "That project is cancelled, don't remind me about it"
+
+1. Search: memory.recall("project [name]")
+2. Show: "I have 5 memories about [project]. Want me to mark them all as no longer relevant?"
+3. User confirms
+4. Call: memory.invalidate for each, with reason="Project cancelled"
+5. Respond: "Done. I won't surface those memories anymore."
+```
+
+**Merging duplicate people:**
+```
+User: "John Smith and Jon Smith are the same person"
+
+1. Search for both entities
+2. Confirm: "I found both. Jon Smith has fewer memories. Should I merge Jon into John?"
+3. User confirms
+4. Call: memory.merge_entities(source_id=87, target_id=42, reason="User confirmed same person")
+5. Respond: "Merged. All memories about Jon are now linked to John Smith."
+```
+
+### Principles
+
+- **Never argue**: If the user says something is wrong, it's wrong
+- **Preserve history**: Use correct/invalidate rather than hard delete when possible
+- **Confirm before acting**: Show what will change before changing it
+- **Be grateful**: User corrections improve the memory system
+- **Learn from corrections**: High correction rates for an entity might mean the source data was poor
+
+### When Corrections Cascade
+
+Some corrections affect multiple things:
+- Correcting a person's role might affect relationship descriptions
+- Invalidating a project might make related commitments irrelevant
+- Merging entities consolidates all their memories
+
+When you detect cascade effects, surface them: "This will also affect 3 related memories. Want me to update those too?"
 
 ---
 

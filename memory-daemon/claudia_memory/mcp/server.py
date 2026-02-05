@@ -27,7 +27,9 @@ from ..services.consolidate import (
 )
 from ..services.recall import (
     fetch_by_ids,
+    find_duplicate_entities,
     find_path,
+    get_active_reflections,
     get_dormant_relationships,
     get_hub_entities,
     get_project_network,
@@ -45,9 +47,13 @@ from ..services.ingest import get_ingest_service
 from ..services.documents import get_document_service
 from ..services.remember import (
     buffer_turn,
+    correct_memory,
+    delete_entity,
     end_session,
     get_remember_service,
     get_unsummarized_turns,
+    invalidate_memory,
+    merge_entities,
     relate_entities,
     store_reflection,
     update_reflection,
@@ -657,6 +663,7 @@ async def list_tools() -> ListToolsResult:
                 "Load relevant context at session start. Call this FIRST at the beginning of every session "
                 "(after confirming context/me.md exists). Returns a pre-formatted context block with: "
                 "unsummarized sessions needing catch-up, recent memories (48h), active predictions, "
+                "active reflections (user preferences and learnings to apply silently), "
                 "active commitments, and recent episode narratives. If unsummarized sessions are "
                 "reported, generate retroactive summaries using memory.end_session."
             ),
@@ -961,6 +968,105 @@ async def list_tools() -> ListToolsResult:
                     },
                 },
                 "required": ["text"],
+            },
+        ),
+        Tool(
+            name="memory.merge_entities",
+            description=(
+                "Merge two duplicate entities into one. All memories, relationships, "
+                "and reflections referencing the source entity will be moved to the target. "
+                "The source entity's name becomes an alias of the target. Use when "
+                "duplicates are found via find_duplicate_entities or user reports."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_id": {
+                        "type": "integer",
+                        "description": "Entity ID to merge FROM (will be soft-deleted)",
+                    },
+                    "target_id": {
+                        "type": "integer",
+                        "description": "Entity ID to merge INTO (will be kept)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional reason for the merge (e.g., 'duplicate', 'same person')",
+                    },
+                },
+                "required": ["source_id", "target_id"],
+            },
+        ),
+        Tool(
+            name="memory.delete_entity",
+            description=(
+                "Soft-delete an entity. Sets deleted_at timestamp but preserves "
+                "all historical data (memories, relationships). Use when an entity "
+                "is no longer relevant or was created in error."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "integer",
+                        "description": "Entity ID to delete",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional reason for deletion",
+                    },
+                },
+                "required": ["entity_id"],
+            },
+        ),
+        Tool(
+            name="memory.correct",
+            description=(
+                "Correct a memory's content while preserving history. "
+                "Use when the user says 'that's not right', 'actually...', "
+                "or identifies incorrect information. The original content is "
+                "saved in corrected_from for audit trail."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "memory_id": {
+                        "type": "integer",
+                        "description": "Memory ID to correct",
+                    },
+                    "correction": {
+                        "type": "string",
+                        "description": "The corrected content",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional reason for the correction",
+                    },
+                },
+                "required": ["memory_id", "correction"],
+            },
+        ),
+        Tool(
+            name="memory.invalidate",
+            description=(
+                "Mark a memory as no longer true (soft delete). "
+                "Use when facts become outdated, the user says to forget something, "
+                "or information was wrong. The memory is preserved for history "
+                "but excluded from future queries."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "memory_id": {
+                        "type": "integer",
+                        "description": "Memory ID to invalidate",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why this memory is no longer valid",
+                    },
+                },
+                "required": ["memory_id"],
             },
         ),
     ]
@@ -1646,6 +1752,64 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 ]
             )
 
+        elif name == "memory.merge_entities":
+            result = merge_entities(
+                source_id=arguments["source_id"],
+                target_id=arguments["target_id"],
+                reason=arguments.get("reason"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.delete_entity":
+            result = delete_entity(
+                entity_id=arguments["entity_id"],
+                reason=arguments.get("reason"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.correct":
+            result = correct_memory(
+                memory_id=arguments["memory_id"],
+                correction=arguments["correction"],
+                reason=arguments.get("reason"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.invalidate":
+            result = invalidate_memory(
+                memory_id=arguments["memory_id"],
+                reason=arguments.get("reason"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
         else:
             return CallToolResult(
                 content=[
@@ -1752,6 +1916,16 @@ def _build_briefing() -> str:
             lines.append(f"**Top prediction:** [{p['prediction_type']}] {p['content'][:100]}")
     except Exception as e:
         logger.debug(f"Briefing prediction failed: {e}")
+
+    # 4b. Active reflections count + top 1
+    try:
+        reflections = get_active_reflections(limit=3, min_importance=0.6)
+        if reflections:
+            top_r = reflections[0]
+            rtype = top_r.reflection_type or "observation"
+            lines.append(f"**Active reflections:** {len(reflections)} ({rtype}: {top_r.content[:80]}...)")
+    except Exception as e:
+        logger.debug(f"Briefing reflections failed: {e}")
 
     # 5. Recent activity count (24h)
     try:
@@ -1882,14 +2056,14 @@ def _build_session_context(token_budget: str = "normal") -> str:
     Assemble a pre-formatted session context block for session start.
 
     Token budget tiers control how much data is returned:
-    - brief:  5 memories, 3 predictions, 2 episodes, 3 commitments
-    - normal: 10 memories, 5 predictions, 3 episodes, 5 commitments
-    - full:   20 memories, 10 predictions, 5 episodes, 10 commitments
+    - brief:  5 memories, 3 predictions, 2 episodes, 3 commitments, 3 reflections
+    - normal: 10 memories, 5 predictions, 3 episodes, 5 commitments, 5 reflections
+    - full:   20 memories, 10 predictions, 5 episodes, 10 commitments, 8 reflections
     """
     budgets = {
-        "brief":  {"memories": 5,  "predictions": 3,  "episodes": 2, "commitments": 3},
-        "normal": {"memories": 10, "predictions": 5,  "episodes": 3, "commitments": 5},
-        "full":   {"memories": 20, "predictions": 10, "episodes": 5, "commitments": 10},
+        "brief":  {"memories": 5,  "predictions": 3,  "episodes": 2, "commitments": 3, "reflections": 3},
+        "normal": {"memories": 10, "predictions": 5,  "episodes": 3, "commitments": 5, "reflections": 5},
+        "full":   {"memories": 20, "predictions": 10, "episodes": 5, "commitments": 10, "reflections": 8},
     }
     limits = budgets.get(token_budget, budgets["normal"])
 
@@ -1950,6 +2124,24 @@ def _build_session_context(token_budget: str = "normal") -> str:
             sections.append("")
     except Exception as e:
         logger.debug(f"Could not fetch predictions: {e}")
+
+    # 3b. Active reflections (learnings about working with user)
+    try:
+        reflections = get_active_reflections(
+            limit=limits.get("reflections", 5),
+            min_importance=0.6,
+        )
+        if reflections:
+            sections.append(f"## Active Reflections ({len(reflections)})\n")
+            sections.append("*Apply silently unless user asks. Observations inform style, learnings modify approach.*\n")
+            for r in reflections:
+                rtype = r.reflection_type or "observation"
+                about = f" [{r.about_entity}]" if r.about_entity else ""
+                count = f" (confirmed {r.aggregation_count}x)" if r.aggregation_count > 1 else ""
+                sections.append(f"- **{rtype}**{about}: {r.content}{count}")
+            sections.append("")
+    except Exception as e:
+        logger.debug(f"Could not fetch reflections: {e}")
 
     # 4. Active commitments (7 days)
     try:

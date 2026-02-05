@@ -565,6 +565,67 @@ class Database:
             conn.commit()
             logger.info("Applied migration 11: source lookup index")
 
+        if current_version < 12:
+            # Migration 12: Audit logging, metrics, and soft-delete/correction columns
+            migration_stmts = [
+                # Audit log table for operation tracking
+                """CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT DEFAULT (datetime('now')),
+                    operation TEXT NOT NULL,
+                    details TEXT,
+                    session_id TEXT,
+                    user_initiated INTEGER DEFAULT 0,
+                    entity_id INTEGER,
+                    memory_id INTEGER
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_audit_log_operation ON audit_log(operation)",
+                "CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_id)",
+                "CREATE INDEX IF NOT EXISTS idx_audit_log_memory ON audit_log(memory_id)",
+                # Metrics table for system health tracking
+                """CREATE TABLE IF NOT EXISTS metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT DEFAULT (datetime('now')),
+                    metric_name TEXT NOT NULL,
+                    metric_value REAL NOT NULL,
+                    dimensions TEXT
+                )""",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_name_timestamp ON metrics(metric_name, timestamp DESC)",
+                # Soft-delete columns on entities
+                "ALTER TABLE entities ADD COLUMN deleted_at TEXT",
+                "ALTER TABLE entities ADD COLUMN deleted_reason TEXT",
+                # Correction and invalidation columns on memories
+                "ALTER TABLE memories ADD COLUMN corrected_at TEXT",
+                "ALTER TABLE memories ADD COLUMN corrected_from TEXT",
+                "ALTER TABLE memories ADD COLUMN invalidated_at TEXT",
+                "ALTER TABLE memories ADD COLUMN invalidated_reason TEXT",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    err_str = str(e).lower()
+                    if "duplicate column" not in err_str and "already exists" not in err_str:
+                        logger.warning(f"Migration 12 statement failed: {e}")
+
+            # Indexes for querying corrected/invalidated memories
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memories_invalidated ON memories(invalidated_at)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_deleted ON entities(deleted_at)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 12 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (12, 'Add audit_log, metrics tables, soft-delete on entities, correction/invalidation on memories')"
+            )
+            conn.commit()
+            logger.info("Applied migration 12: audit logging, metrics, soft-delete/correction columns")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -637,6 +698,21 @@ class Database:
         if "reflections" not in tables:
             logger.warning("Migration 10 incomplete: reflections table missing")
             return 9  # Force re-run from migration 10
+
+        # Migration 12 added audit_log, metrics tables and soft-delete/correction columns
+        if "audit_log" not in tables or "metrics" not in tables:
+            logger.warning("Migration 12 incomplete: audit_log or metrics table missing")
+            return 11  # Force re-run from migration 12
+
+        entity_cols = self._get_table_columns(conn, "entities")
+        if "deleted_at" not in entity_cols:
+            logger.warning("Migration 12 incomplete: entities missing deleted_at column")
+            return 11
+
+        memory_cols = self._get_table_columns(conn, "memories")
+        if "invalidated_at" not in memory_cols or "corrected_at" not in memory_cols:
+            logger.warning("Migration 12 incomplete: memories missing correction/invalidation columns")
+            return 11
 
         return None  # All good
 

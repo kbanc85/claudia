@@ -25,6 +25,15 @@ from .guards import validate_entity, validate_memory, validate_relationship
 logger = logging.getLogger(__name__)
 
 
+def _audit_log(operation: str, **kwargs) -> None:
+    """Lazy import and call audit logging to avoid circular imports."""
+    try:
+        from .audit import audit_log
+        audit_log(operation, **kwargs)
+    except Exception as e:
+        logger.debug(f"Could not log audit entry: {e}")
+
+
 class RememberService:
     """Store and manage memories"""
 
@@ -224,6 +233,14 @@ class RememberService:
                         pass  # Duplicate link, ignore
 
         logger.debug(f"Remembered {memory_type}: {content[:50]}...")
+
+        # Audit log
+        _audit_log(
+            "memory_create",
+            details={"type": memory_type, "source": source, "importance": importance},
+            memory_id=memory_id,
+        )
+
         return memory_id
 
     def remember_entity(
@@ -307,6 +324,13 @@ class RememberService:
                     )
                 except Exception as e:
                     logger.warning(f"Could not store entity embedding: {e}")
+
+            # Audit log for new entity
+            _audit_log(
+                "entity_create",
+                details={"name": name, "type": entity_type},
+                entity_id=entity_id,
+            )
 
         # Add aliases
         if aliases:
@@ -460,6 +484,407 @@ class RememberService:
                     "metadata": json.dumps(metadata) if metadata else None,
                 },
             )
+
+    def merge_entities(
+        self,
+        source_id: int,
+        target_id: int,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Merge source entity into target entity.
+
+        Updates all references to point to target, adds source name as alias of target,
+        then soft-deletes the source entity. Preserves full history.
+
+        Args:
+            source_id: Entity ID to merge FROM (will be deleted)
+            target_id: Entity ID to merge INTO (will be kept)
+            reason: Optional reason for the merge
+
+        Returns:
+            Dict with merge statistics
+        """
+        now = datetime.utcnow().isoformat()
+        result = {
+            "source_id": source_id,
+            "target_id": target_id,
+            "aliases_moved": 0,
+            "memories_moved": 0,
+            "relationships_moved": 0,
+            "reflections_moved": 0,
+            "success": False,
+        }
+
+        # Verify both entities exist
+        source = self.db.get_one("entities", where="id = ?", where_params=(source_id,))
+        target = self.db.get_one("entities", where="id = ?", where_params=(target_id,))
+
+        if not source:
+            result["error"] = f"Source entity {source_id} not found"
+            return result
+        if not target:
+            result["error"] = f"Target entity {target_id} not found"
+            return result
+
+        # 1. Add source name as alias of target
+        try:
+            self.db.insert(
+                "entity_aliases",
+                {
+                    "entity_id": target_id,
+                    "alias": source["name"],
+                    "canonical_alias": source["canonical_name"],
+                    "created_at": now,
+                },
+            )
+            result["aliases_moved"] += 1
+        except Exception:
+            pass  # Duplicate alias, ignore
+
+        # 2. Move source's aliases to target
+        source_aliases = self.db.execute(
+            "SELECT * FROM entity_aliases WHERE entity_id = ?",
+            (source_id,),
+            fetch=True,
+        ) or []
+        for alias in source_aliases:
+            try:
+                self.db.insert(
+                    "entity_aliases",
+                    {
+                        "entity_id": target_id,
+                        "alias": alias["alias"],
+                        "canonical_alias": alias["canonical_alias"],
+                        "created_at": now,
+                    },
+                )
+                result["aliases_moved"] += 1
+            except Exception:
+                pass  # Duplicate alias, ignore
+        # Delete moved aliases from source
+        self.db.execute("DELETE FROM entity_aliases WHERE entity_id = ?", (source_id,))
+
+        # 3. Update memory_entities references
+        memories_updated = self.db.execute(
+            """
+            UPDATE memory_entities SET entity_id = ?
+            WHERE entity_id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM memory_entities me2
+                WHERE me2.memory_id = memory_entities.memory_id
+                  AND me2.entity_id = ?
+              )
+            """,
+            (target_id, source_id, target_id),
+        )
+        # Delete any remaining duplicates
+        self.db.execute(
+            "DELETE FROM memory_entities WHERE entity_id = ?", (source_id,)
+        )
+        result["memories_moved"] = memories_updated or 0
+
+        # 4. Update relationships (both source and target directions)
+        # Update where source entity is the source
+        rels_source = self.db.execute(
+            """
+            UPDATE relationships SET source_entity_id = ?, updated_at = ?
+            WHERE source_entity_id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM relationships r2
+                WHERE r2.source_entity_id = ?
+                  AND r2.target_entity_id = relationships.target_entity_id
+                  AND r2.relationship_type = relationships.relationship_type
+              )
+            """,
+            (target_id, now, source_id, target_id),
+        )
+        # Update where source entity is the target
+        rels_target = self.db.execute(
+            """
+            UPDATE relationships SET target_entity_id = ?, updated_at = ?
+            WHERE target_entity_id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM relationships r2
+                WHERE r2.source_entity_id = relationships.source_entity_id
+                  AND r2.target_entity_id = ?
+                  AND r2.relationship_type = relationships.relationship_type
+              )
+            """,
+            (target_id, now, source_id, target_id),
+        )
+        # Delete any remaining duplicates
+        self.db.execute(
+            "DELETE FROM relationships WHERE source_entity_id = ? OR target_entity_id = ?",
+            (source_id, source_id),
+        )
+        result["relationships_moved"] = (rels_source or 0) + (rels_target or 0)
+
+        # 5. Update reflections about_entity_id
+        reflections_updated = self.db.execute(
+            "UPDATE reflections SET about_entity_id = ? WHERE about_entity_id = ?",
+            (target_id, source_id),
+        )
+        result["reflections_moved"] = reflections_updated or 0
+
+        # 6. Merge attributes (target wins on conflicts, but preserve metadata)
+        if source["description"] and not target["description"]:
+            self.db.update(
+                "entities",
+                {"description": source["description"]},
+                "id = ?",
+                (target_id,),
+            )
+
+        source_meta = json.loads(source["metadata"] or "{}")
+        target_meta = json.loads(target["metadata"] or "{}")
+        # Merge: source values fill in target gaps
+        merged_meta = {**source_meta, **target_meta}
+        merged_meta["merged_from"] = merged_meta.get("merged_from", [])
+        merged_meta["merged_from"].append({
+            "entity_id": source_id,
+            "name": source["name"],
+            "merged_at": now,
+            "reason": reason,
+        })
+        self.db.update(
+            "entities",
+            {"metadata": json.dumps(merged_meta), "updated_at": now},
+            "id = ?",
+            (target_id,),
+        )
+
+        # 7. Soft-delete source entity
+        self.db.update(
+            "entities",
+            {
+                "deleted_at": now,
+                "deleted_reason": f"Merged into entity {target_id}" + (f": {reason}" if reason else ""),
+            },
+            "id = ?",
+            (source_id,),
+        )
+
+        result["success"] = True
+        logger.info(f"Merged entity {source_id} ({source['name']}) into {target_id} ({target['name']})")
+
+        # Audit log
+        _audit_log(
+            "entity_merge",
+            details={
+                "source_name": source["name"],
+                "target_name": target["name"],
+                "reason": reason,
+                "aliases_moved": result["aliases_moved"],
+                "memories_moved": result["memories_moved"],
+                "relationships_moved": result["relationships_moved"],
+            },
+            entity_id=target_id,
+            user_initiated=True,
+        )
+
+        return result
+
+    def delete_entity(
+        self,
+        entity_id: int,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Soft-delete an entity.
+
+        Sets deleted_at timestamp. Does NOT remove references (memories, relationships)
+        as they may have historical value.
+
+        Args:
+            entity_id: Entity to delete
+            reason: Optional reason for deletion
+
+        Returns:
+            Dict with deletion status
+        """
+        entity = self.db.get_one("entities", where="id = ?", where_params=(entity_id,))
+        if not entity:
+            return {"success": False, "error": f"Entity {entity_id} not found"}
+
+        now = datetime.utcnow().isoformat()
+        self.db.update(
+            "entities",
+            {
+                "deleted_at": now,
+                "deleted_reason": reason or "User requested deletion",
+            },
+            "id = ?",
+            (entity_id,),
+        )
+
+        logger.info(f"Soft-deleted entity {entity_id} ({entity['name']}): {reason}")
+
+        # Audit log
+        _audit_log(
+            "entity_delete",
+            details={"name": entity["name"], "reason": reason},
+            entity_id=entity_id,
+            user_initiated=True,
+        )
+
+        return {
+            "success": True,
+            "entity_id": entity_id,
+            "name": entity["name"],
+            "deleted_at": now,
+        }
+
+    def correct_memory(
+        self,
+        memory_id: int,
+        correction: str,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Correct a memory's content, preserving history.
+
+        Stores original content in corrected_from, updates content,
+        and sets corrected_at timestamp for audit trail.
+
+        Args:
+            memory_id: Memory to correct
+            correction: New corrected content
+            reason: Optional reason for the correction
+
+        Returns:
+            Dict with correction status
+        """
+        memory = self.db.get_one("memories", where="id = ?", where_params=(memory_id,))
+        if not memory:
+            return {"success": False, "error": f"Memory {memory_id} not found"}
+
+        now = datetime.utcnow().isoformat()
+        original_content = memory["content"]
+
+        # Build metadata with correction history
+        existing_meta = json.loads(memory["metadata"] or "{}")
+        corrections_history = existing_meta.get("corrections", [])
+        corrections_history.append({
+            "original": original_content,
+            "corrected_to": correction,
+            "reason": reason,
+            "corrected_at": now,
+        })
+        existing_meta["corrections"] = corrections_history
+
+        # Update the memory
+        new_hash = content_hash(correction)
+        self.db.update(
+            "memories",
+            {
+                "content": correction,
+                "content_hash": new_hash,
+                "corrected_at": now,
+                "corrected_from": original_content,
+                "updated_at": now,
+                "metadata": json.dumps(existing_meta),
+            },
+            "id = ?",
+            (memory_id,),
+        )
+
+        # Re-generate embedding for new content
+        embedding = embed_sync(correction)
+        if embedding:
+            try:
+                self.db.execute(
+                    "INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
+                    (memory_id, json.dumps(embedding)),
+                )
+            except Exception as e:
+                logger.warning(f"Could not update memory embedding: {e}")
+
+        logger.info(f"Corrected memory {memory_id}: '{original_content[:50]}...' -> '{correction[:50]}...'")
+
+        # Audit log
+        _audit_log(
+            "memory_correct",
+            details={
+                "original_content": original_content[:200],
+                "corrected_content": correction[:200],
+                "reason": reason,
+            },
+            memory_id=memory_id,
+            user_initiated=True,
+        )
+
+        return {
+            "success": True,
+            "memory_id": memory_id,
+            "original_content": original_content,
+            "corrected_content": correction,
+            "corrected_at": now,
+        }
+
+    def invalidate_memory(
+        self,
+        memory_id: int,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Mark a memory as no longer true (soft delete).
+
+        Sets invalidated_at timestamp but preserves the memory for
+        historical queries. Use when facts become outdated or were wrong.
+
+        Args:
+            memory_id: Memory to invalidate
+            reason: Why the memory is no longer valid
+
+        Returns:
+            Dict with invalidation status
+        """
+        memory = self.db.get_one("memories", where="id = ?", where_params=(memory_id,))
+        if not memory:
+            return {"success": False, "error": f"Memory {memory_id} not found"}
+
+        now = datetime.utcnow().isoformat()
+
+        # Build metadata with invalidation reason
+        existing_meta = json.loads(memory["metadata"] or "{}")
+        existing_meta["invalidation"] = {
+            "reason": reason or "User requested invalidation",
+            "invalidated_at": now,
+        }
+
+        self.db.update(
+            "memories",
+            {
+                "invalidated_at": now,
+                "invalidated_reason": reason or "User requested invalidation",
+                "updated_at": now,
+                "metadata": json.dumps(existing_meta),
+            },
+            "id = ?",
+            (memory_id,),
+        )
+
+        logger.info(f"Invalidated memory {memory_id} ({memory['content'][:50]}...): {reason}")
+
+        # Audit log
+        _audit_log(
+            "memory_invalidate",
+            details={
+                "content": memory["content"][:200],
+                "reason": reason or "User requested invalidation",
+            },
+            memory_id=memory_id,
+            user_initiated=True,
+        )
+
+        return {
+            "success": True,
+            "memory_id": memory_id,
+            "content": memory["content"],
+            "invalidated_at": now,
+            "reason": reason,
+        }
 
     def buffer_turn(
         self,
@@ -1107,3 +1532,23 @@ def update_reflection(reflection_id: int, **kwargs) -> bool:
 def delete_reflection(reflection_id: int) -> bool:
     """Delete a reflection"""
     return get_remember_service().delete_reflection(reflection_id)
+
+
+def merge_entities(source_id: int, target_id: int, reason: Optional[str] = None) -> Dict[str, Any]:
+    """Merge source entity into target entity"""
+    return get_remember_service().merge_entities(source_id, target_id, reason)
+
+
+def delete_entity(entity_id: int, reason: Optional[str] = None) -> Dict[str, Any]:
+    """Soft-delete an entity"""
+    return get_remember_service().delete_entity(entity_id, reason)
+
+
+def correct_memory(memory_id: int, correction: str, reason: Optional[str] = None) -> Dict[str, Any]:
+    """Correct a memory, preserving history"""
+    return get_remember_service().correct_memory(memory_id, correction, reason)
+
+
+def invalidate_memory(memory_id: int, reason: Optional[str] = None) -> Dict[str, Any]:
+    """Mark a memory as no longer true"""
+    return get_remember_service().invalidate_memory(memory_id, reason)

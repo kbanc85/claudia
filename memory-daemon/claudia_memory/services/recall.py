@@ -10,6 +10,7 @@ import logging
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -802,6 +803,99 @@ class RecallService:
             )
             for row in rows
         ]
+
+    def find_duplicate_entities(
+        self,
+        threshold: float = 0.85,
+        entity_type: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        Find potential duplicate entities using fuzzy name matching.
+
+        Uses SequenceMatcher ratio with first-letter boost.
+
+        Args:
+            threshold: Similarity threshold (0.85 = 85% similar)
+            entity_type: Filter to specific entity type
+            limit: Maximum pairs to return
+
+        Returns:
+            List of dicts with entity pairs and similarity scores
+        """
+        # Get all non-deleted entities
+        sql = """
+            SELECT id, name, canonical_name, type, importance
+            FROM entities
+            WHERE deleted_at IS NULL
+        """
+        params = []
+        if entity_type:
+            sql += " AND type = ?"
+            params.append(entity_type)
+
+        entities = self.db.execute(sql, tuple(params), fetch=True) or []
+
+        duplicates = []
+        seen_pairs = set()
+
+        for i, e1 in enumerate(entities):
+            for e2 in entities[i + 1:]:
+                # Skip if already processed or different types
+                if e1["type"] != e2["type"]:
+                    continue
+
+                pair_key = (min(e1["id"], e2["id"]), max(e1["id"], e2["id"]))
+                if pair_key in seen_pairs:
+                    continue
+                seen_pairs.add(pair_key)
+
+                # Calculate similarity
+                ratio = self._name_similarity(e1["canonical_name"], e2["canonical_name"])
+
+                if ratio >= threshold:
+                    duplicates.append({
+                        "entity_1": {
+                            "id": e1["id"],
+                            "name": e1["name"],
+                            "type": e1["type"],
+                            "importance": e1["importance"],
+                        },
+                        "entity_2": {
+                            "id": e2["id"],
+                            "name": e2["name"],
+                            "type": e2["type"],
+                            "importance": e2["importance"],
+                        },
+                        "similarity": round(ratio, 3),
+                    })
+
+                    if len(duplicates) >= limit:
+                        break
+            if len(duplicates) >= limit:
+                break
+
+        # Sort by similarity descending
+        duplicates.sort(key=lambda x: x["similarity"], reverse=True)
+        return duplicates
+
+    def _name_similarity(self, name1: str, name2: str) -> float:
+        """
+        Calculate name similarity using SequenceMatcher with first-letter boost.
+
+        Same first letter gets a 0.05 boost (helps catch typos).
+        """
+        if not name1 or not name2:
+            return 0.0
+
+        # Base similarity
+        ratio = SequenceMatcher(None, name1.lower(), name2.lower()).ratio()
+
+        # First letter boost
+        if name1[0].lower() == name2[0].lower():
+            ratio = min(1.0, ratio + 0.05)
+
+        return ratio
 
     def get_recent_memories(
         self,
@@ -1618,6 +1712,54 @@ class RecallService:
             for row in rows
         ]
 
+    def get_active_reflections(
+        self,
+        limit: int = 5,
+        min_importance: float = 0.6,
+    ) -> List[ReflectionResult]:
+        """
+        Get high-value reflections for session context.
+
+        These are reflections that should silently influence behavior at session start.
+        Returns reflections ordered by importance then recency.
+
+        Args:
+            limit: Maximum results to return (default 5 for session context)
+            min_importance: Minimum importance threshold (default 0.6)
+
+        Returns:
+            List of ReflectionResult ordered by importance then recency
+        """
+        rows = self.db.execute(
+            """
+            SELECT r.*, e.name as entity_name
+            FROM reflections r
+            LEFT JOIN entities e ON r.about_entity_id = e.id
+            WHERE r.importance >= ?
+            ORDER BY r.importance DESC, r.last_confirmed_at DESC
+            LIMIT ?
+            """,
+            (min_importance, limit),
+            fetch=True,
+        ) or []
+
+        return [
+            ReflectionResult(
+                id=row["id"],
+                content=row["content"],
+                reflection_type=row["reflection_type"],
+                importance=row["importance"],
+                confidence=row["confidence"],
+                about_entity=row["entity_name"],
+                first_observed_at=row["first_observed_at"],
+                last_confirmed_at=row["last_confirmed_at"],
+                aggregation_count=row["aggregation_count"],
+                episode_id=row["episode_id"],
+                score=row["importance"],
+            )
+            for row in rows
+        ]
+
     def search_reflections(
         self,
         query: str,
@@ -1894,3 +2036,13 @@ def search_reflections(query: str, **kwargs) -> List[ReflectionResult]:
 def get_reflection_by_id(reflection_id: int) -> Optional[ReflectionResult]:
     """Get a single reflection by ID"""
     return get_recall_service().get_reflection_by_id(reflection_id)
+
+
+def get_active_reflections(limit: int = 5, min_importance: float = 0.6) -> List[ReflectionResult]:
+    """Get high-value reflections for session context"""
+    return get_recall_service().get_active_reflections(limit, min_importance)
+
+
+def find_duplicate_entities(threshold: float = 0.85, entity_type: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    """Find potential duplicate entities using fuzzy matching"""
+    return get_recall_service().find_duplicate_entities(threshold, entity_type, limit)
