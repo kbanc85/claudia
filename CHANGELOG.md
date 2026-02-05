@@ -2,6 +2,43 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.24.0 (2026-02-05)
+
+### Trust North Star + Agent Team
+
+Claudia now has a team of specialized agents and a foundational commitment to accuracy. Trust is her #1 priority, and she has help.
+
+### Added
+
+- **Trust North Star rule** - Core principle: every memory must be accurate and traceable. New `origin_type` field tracks whether information came from the user directly, was extracted from documents, was inferred, or was corrected.
+- **Origin tracking** - Memories now track `origin_type` (user_stated, extracted, inferred, corrected) with auto-detection based on source and importance.
+- **`memory.audit_history` tool** - Get the full audit trail for any entity or memory. Answer "where did you learn that?" with precision.
+- **`memory.agent_dispatch` tool** - Log when Claudia delegates tasks to her agent team, track performance and judgment requirements.
+- **Agent team** - Four specialized sub-agents that help Claudia work faster:
+  - **Document Archivist** (Haiku) - PRIMARY entry point for pasted content, adds provenance
+  - **Research Scout** (Sonnet) - Web searches, fact-finding, synthesis
+  - **Document Processor** (Haiku) - Extracts structured data from documents
+  - **Schedule Analyst** (Haiku) - Calendar pattern analysis
+- **`agent-dispatcher` skill** - Core logic for when and how to delegate to agents.
+- **`hire-agent` skill** - Suggests new agents based on repeated task patterns.
+- **Database migration v13** - Adds `origin_type` column to memories, `agent_dispatches` table for tracking.
+
+### Changed
+
+- **RecallResult** - Now includes `confidence`, `verification_status`, and `origin_type` fields.
+- **`remember_fact()`** - Now accepts `origin_type` parameter with auto-detection fallback.
+- **`correct_memory()`** - Automatically sets `origin_type=corrected` and `confidence=1.0`.
+- **CLAUDE.md** - Added "My Team" section describing Claudia's agent team.
+- **`memory-manager` skill** - Added Trust North Star reference and origin tracking requirement.
+
+### Why This Matters
+
+Before: Claudia could confidently state something she'd inferred, with no way to distinguish it from what the user actually said. Processing large documents blocked the conversation.
+
+After: Every memory has traceable provenance. "Where did you learn that?" has an answer. Pasted content goes to the Document Archivist for processing while Claudia stays responsive. Trust is earned through accuracy.
+
+---
+
 ## 1.23.0 (2026-02-05)
 
 ### Proactive Memory
