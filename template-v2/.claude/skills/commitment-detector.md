@@ -64,9 +64,18 @@
    - Due: Deadline
    - Context: Any relevant notes
 
-3. **Add to context/commitments.md**
+3. **Persist to memory immediately** - Call `memory.remember` with:
+   - `content`: The commitment text (e.g., "Send proposal to Sarah by Friday")
+   - `type`: "commitment"
+   - `about`: [person name if applicable]
+   - `importance`: 0.9
+   - `source`: "conversation"
 
-4. **Link to person file if relevant**
+   This ensures the commitment survives context compaction and can be recalled semantically. Do not skip this step.
+
+4. **Add to context/commitments.md**
+
+5. **Link to person file if relevant**
 
 ### If Deadline is Unclear
 

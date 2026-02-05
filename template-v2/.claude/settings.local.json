@@ -12,6 +12,19 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh\"",
+            "timeout": 5000,
+            "statusMessage": "Preserving context..."
+          }
+        ]
+      }
     ]
   }
 }

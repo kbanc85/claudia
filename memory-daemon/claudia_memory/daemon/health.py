@@ -35,6 +35,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self._send_status_response()
         elif self.path == "/stats":
             self._send_stats_response()
+        elif self.path == "/flush":
+            self._send_flush_response()
         else:
             self.send_error(404, "Not Found")
 
@@ -124,6 +126,32 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.exception("Error getting stats")
+            self.send_error(500, str(e))
+
+    def _send_flush_response(self):
+        """Force WAL checkpoint and return status.
+
+        Called by the PreCompact hook to ensure all buffered data is durably
+        written before context compaction occurs.
+        """
+        try:
+            db = get_db()
+            # TRUNCATE mode: checkpoint and reset WAL to zero length
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)", fetch=False)
+
+            response = {
+                "status": "flushed",
+                "timestamp": datetime.utcnow().isoformat(),
+                "message": "WAL checkpoint complete",
+            }
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+
+        except Exception as e:
+            logger.exception("Error flushing WAL")
             self.send_error(500, str(e))
 
 

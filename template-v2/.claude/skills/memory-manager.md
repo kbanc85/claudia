@@ -349,6 +349,76 @@ For high-importance items, still call `memory.remember` immediately in addition 
 
 This ensures critical items survive even if the session ends abruptly before summarization.
 
+### Don't Wait for Session End
+
+Context compaction happens without warning. You're having a great conversation, learning all sorts of useful things, and then suddenly your context shrinks and everything you hadn't stored yet is gone. Poof.
+
+So store the important stuff as it happens, not when the session wraps up.
+
+Think of it like taking notes during a meeting versus trying to remember everything afterward. The former is reliable. The latter is how things slip through the cracks.
+
+#### Commitments: Store Them Immediately
+
+When someone makes a promise (the user, or someone they're telling you about), that's too important to buffer. Call `memory.remember` right away with:
+- `type`: "commitment"
+- `importance`: 0.9 (commitments matter)
+- `about`: whoever made the promise
+- `source`: "conversation"
+
+Then add it to `context/commitments.md`. Two places is better than zero. If context compacts before session end, the memory survives. If the markdown file gets lost, the memory survives. Belt and suspenders.
+
+#### People: The Second Mention Rule
+
+First time a name comes up, just note it mentally. No action needed.
+
+Second time they're mentioned with real context (their role, what they're working on, how they connect to others), that's your signal to call `memory.entity`.
+
+A casual name-drop doesn't need a database entry. A person who matters to the conversation does.
+
+The threshold is "meaningful context":
+- Their role, job title, or position
+- What they're working on, how the user knows them
+- Who they work with, report to, or collaborate with
+
+#### Relationships: Capture the Connections
+
+When you hear language like "Sarah works with Mike" or "they're our client," capture that silently with `memory.relate`. Don't announce it, just do it. These connections are exactly what the memory system is for.
+
+| When you hear... | Call... |
+|------------------|---------|
+| "X works with Y" | `memory.relate(X, Y, "works_with")` |
+| "X reports to Y" | `memory.relate(X, Y, "reports_to")` |
+| "X is Y's manager" | `memory.relate(Y, X, "reports_to")` |
+| "X is our client" | `memory.relate(X, user_org, "client_of")` |
+| "X knows Y" | `memory.relate(X, Y, "knows")` |
+| "X introduced me to Y" | `memory.relate(X, Y, "introduced")` |
+
+These relationships are the hidden structure of someone's professional life. Capture them quietly. No need to narrate.
+
+#### Corrections Are Gold
+
+When the user says "Actually, Sarah moved to Acme" or "No, that project got cancelled," that's a correction. Store it immediately with high importance (0.95). User corrections are authoritative and should never be lost.
+
+Other high-importance items to store immediately (not just buffer):
+- Explicit commitments with deadlines ("I'll send X by Friday")
+- Strategic decisions ("We're going with option B for the launch")
+- Explicit memory requests ("Remember that...", "Don't forget...")
+- Contact information changes (new email, phone, address)
+
+These bypass buffering because losing them to context compaction would be genuinely harmful.
+
+#### If Compaction Already Happened
+
+If you see `CONTEXT COMPACTION OCCURRED` in your context, it means the safety net just activated. Now you need to recover what you can:
+
+1. Review what remains in your context
+2. Call `memory.remember` for any commitments you can piece together
+3. Call `memory.entity` for people discussed in detail
+4. Call `memory.relate` for relationships mentioned
+5. Call `memory.buffer_turn` with a summary of recent exchanges
+
+This is triage, not standard practice. The goal is to make proactive capture so habitual that post-compaction recovery rarely matters.
+
 ### Entity and Relationship Tracking
 
 When a person or project is mentioned:
