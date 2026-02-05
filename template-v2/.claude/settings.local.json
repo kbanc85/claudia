@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.sh\"",
+            "timeout": 10000,
+            "statusMessage": "Checking Claudia systems..."
+          }
+        ]
+      }
+    ]
+  }
+}
