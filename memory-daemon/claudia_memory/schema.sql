@@ -270,6 +270,7 @@ CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(file_hash);
 CREATE INDEX IF NOT EXISTS idx_documents_lifecycle ON documents(lifecycle);
 CREATE INDEX IF NOT EXISTS idx_documents_source_type ON documents(source_type);
 CREATE INDEX IF NOT EXISTS idx_documents_workspace ON documents(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_documents_source_lookup ON documents(source_type, source_ref);
 
 -- Links documents to entities (people, projects, etc.)
 CREATE TABLE IF NOT EXISTS entity_documents (
@@ -397,3 +398,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS reflection_embeddings USING vec0(
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (10, 'Add reflections table and reflection_embeddings for /meditate skill');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (11, 'Add compound index for fast source lookup on documents');

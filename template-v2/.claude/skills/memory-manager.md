@@ -14,24 +14,30 @@ These are non-negotiable. Violating them defeats the purpose of the memory syste
 
 When processing source material (transcripts, emails, documents):
 
-**STOP. File it FIRST.**
+**STOP. Check for duplicates, then file it FIRST.**
 
 ```
 User shares transcript/email/document
          ↓
     ┌─────────────────────────────────┐
-    │  CALL memory.file IMMEDIATELY   │
-    │  with the FULL raw content      │
-    │  Do NOT summarize, extract, or  │
-    │  process until it's filed.      │
+    │  1. CHECK for duplicates first  │
+    │     (by source_type + source_ref)│
+    │  2. If new: CALL memory.file    │
+    │     with the FULL raw content   │
+    │  3. ASK user about extraction   │
+    │     (don't auto-extract)        │
     └─────────────────────────────────┘
          ↓
-    Then extract memories/entities
+    If user says "extract now":
          ↓
-    Then generate output (dashboards, summaries, etc.)
+    Extract and present for verification
+         ↓
+    Store verified memories/entities
 ```
 
 **If you find yourself reading multiple source documents** without calling `memory.file` for each one, **STOP and fix it**. Go back and file each source before continuing.
+
+**If you find yourself auto-extracting without asking**, **STOP**. File first, then ask if the user wants extraction now or later. This keeps you responsive during long documents.
 
 ### 2. Verify Memory Tools at Session Start
 
@@ -408,28 +414,81 @@ Call memory.file with:
 
 #### The Filing Flow
 
-1. **User shares source material** (transcript, email, document)
-2. **File immediately** using `memory.file`
-3. **Extract memories** using `memory.batch` or `memory.remember`
-4. **If you extracted first**, call `memory.file` again with `memory_ids` to link provenance
+1. **Check for duplicates first**
+   - If source has an identifiable ID (email message-id, URL, file hash):
+   - Query documents: `SELECT * FROM documents WHERE source_type = ? AND source_ref = ?`
+   - If found: "I already have this filed at [path]. Want me to pull up what I extracted?"
+   - If not found: Continue to step 2
+
+2. **File immediately** using `memory.file` with full content
+   - Do NOT automatically extract in the same turn
+
+3. **Ask about extraction**
+   - "Filed at people/sarah-chen/transcripts/2026-02-04-kickoff.md"
+   - "Want me to extract the people, relationships, and commitments now, or later?"
+
+4. **If user says "now" or "yes, extract"**
+   - Read the filed document
+   - Extract entities (people mentioned)
+   - Extract relationships (how they're connected)
+   - Extract commitments (promises made)
+   - Present findings for user verification before storing
+   - Store verified info via memory.batch
+
+5. **If user says "later"**
+   - Done. User can ask "extract that transcript" anytime later
+
+#### Why Not Auto-Extract?
+
+- **Accuracy**: User verifies "Sarah and Jim are colleagues" (not competitors)
+- **Responsiveness**: Claudia stays available for conversation
+- **Focus**: Extraction targets relationships and commitments (Claudia's mission)
+- **Control**: User decides when to invest time in extraction
+
+#### Duplicate Detection
+
+Before filing any source with an external identifier:
+
+| Source Type | Identifier to Check |
+|-------------|---------------------|
+| Gmail | Message-ID header |
+| Transcript | File path or content hash |
+| Upload | Filename + size, or content hash |
+| URL/Capture | URL |
+
+Query pattern:
+```python
+existing = db.get_one(
+    "documents",
+    where="source_type = ? AND source_ref = ?",
+    where_params=(source_type, source_identifier)
+)
+```
+
+If exists, surface it: "I filed this on [date]. Summary: [summary]. Want me to show what I extracted?"
 
 #### Example: Transcript Processing
 
 ```
 User: "Here's the transcript from my call with Sarah Chen about the rebrand project"
 
-1. Call memory.file:
+1. Check if this transcript was filed before (by content hash or filename)
+
+2. Call memory.file:
    - content: [full transcript text]
    - filename: "2026-02-04-sarah-chen-rebrand.md"
    - source_type: "transcript"
    - summary: "Call with Sarah Chen re: rebrand project kickoff"
    - about: ["Sarah Chen", "Rebrand Project"]
 
-2. Call memory.batch with extracted facts, entities, relationships
+3. Ask: "Filed. Want me to extract people, relationships, and commitments now?"
 
-3. Update people/sarah-chen.md with new context
+4. If user says yes:
+   - Extract and present findings for verification
+   - Store verified info via memory.batch
+   - Update people/sarah-chen.md with new context
 
-4. Report to user using Session Update format
+5. Report using Session Update format
 ```
 
 #### Example: Email Processing
@@ -437,16 +496,19 @@ User: "Here's the transcript from my call with Sarah Chen about the rebrand proj
 ```
 User: "Here's an email from Jim about the partnership. I need to respond."
 
-1. Call memory.file:
+1. Check if this email was filed before (by Message-ID header if available)
+
+2. Call memory.file:
    - content: [full email text]
    - filename: "2026-02-04-jim-partnership.md"
    - source_type: "gmail"
+   - source_ref: "<message-id@example.com>" (if available)
    - summary: "Jim Ferry re: partnership terms"
    - about: ["Jim Ferry"]
 
-2. Extract any facts/commitments to memory
-
-3. Help draft the reply
+3. Since user needs to respond, help draft the reply immediately
+   - Extraction can happen after the reply is sent
+   - Or user can say "extract this too" and we do both
 
 4. The email is now filed and searchable
 ```
@@ -457,6 +519,7 @@ User: "Here's an email from Jim about the partnership. I need to respond."
 - Original context preserved for later human review
 - Facts can be verified against source material
 - Nothing important lives only in conversation context (which compresses away)
+- Long documents don't block Claudia from being responsive
 
 ---
 
