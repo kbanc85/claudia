@@ -302,3 +302,54 @@ Edit `template-v2/CLAUDE.md` "How I Carry Myself" section
 
 **Changing safety rules:**
 Edit `template-v2/.claude/rules/claudia-principles.md` (requires strong justification)
+
+## Session Log
+
+### Feb 5, 2026
+**The Learning Loop -- Memory Quality System v1.22.0**
+
+Claudia's memory system now actually learns from experience. She can fix mistakes, merge duplicates, track what changed, and measure her own health.
+
+**New Services:**
+- `services/audit.py` -- Full audit trail for all memory operations. Logs every merge, correction, deletion with timestamps and details.
+- `services/metrics.py` -- System health metrics collection with trending. Track entity counts, memory stats, data quality over time.
+
+**New MCP Tools:**
+- `memory.merge_entities` -- Merge duplicate entities, preserving all references (memories, relationships, aliases)
+- `memory.delete_entity` -- Soft-delete with reason tracking (historical references preserved)
+- `memory.correct` -- Update memory content while preserving history in `corrected_from` field
+- `memory.invalidate` -- Mark memories as no longer true without destroying them
+- `memory.system_health` -- Get current system health metrics
+- `memory.find_duplicates` -- Find potential duplicate entities using fuzzy matching
+
+**New Skills:**
+- `/fix-duplicates` -- Find and merge duplicate entities through natural language
+- `/memory-health` -- System health dashboard showing entity counts, memory stats, and data quality
+
+**Database Migration v12:**
+- `audit_log` table for operation tracking
+- `metrics` table for time-series health data
+- Soft-delete columns on entities (`deleted_at`, `deleted_reason`)
+- Correction columns on memories (`corrected_at`, `corrected_from`, `invalidated_at`, `invalidated_reason`)
+
+**Files Created:**
+- `memory-daemon/claudia_memory/services/audit.py` -- AuditService with log(), get_recent(), get_entity_history(), get_memory_history()
+- `memory-daemon/claudia_memory/services/metrics.py` -- MetricsService with record(), collect_system_health(), get_trend(), collect_and_store()
+- `memory-daemon/tests/test_audit.py` -- 12 tests
+- `memory-daemon/tests/test_metrics.py` -- 12 tests
+- `memory-daemon/tests/test_entity_management.py` -- 13 tests (merge, delete, fuzzy matching)
+- `memory-daemon/tests/test_corrections.py` -- 12 tests (correct, invalidate)
+- `template-v2/.claude/skills/fix-duplicates/SKILL.md`
+- `template-v2/.claude/skills/memory-health/SKILL.md`
+
+**Files Modified:**
+- `memory-daemon/claudia_memory/services/remember.py` -- Added merge_entities(), delete_entity(), correct_memory(), invalidate_memory(), audit logging calls
+- `memory-daemon/claudia_memory/services/recall.py` -- Added find_duplicate_entities() with SequenceMatcher fuzzy matching
+- `memory-daemon/claudia_memory/mcp/server.py` -- 6 new tool definitions
+- `memory-daemon/claudia_memory/database.py` -- Migration v12
+- `memory-daemon/claudia_memory/daemon/scheduler.py` -- Daily metrics collection job at 5am
+- `template-v2/.claude/skills/memory-manager.md` -- User Corrections section
+
+**Released:** `get-claudia@1.22.0` (14 files changed, 2,737 insertions)
+
+**Stats:** 49 new tests, 0 regressions
