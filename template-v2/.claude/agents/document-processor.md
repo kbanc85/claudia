@@ -131,6 +131,73 @@ Return this exact JSON structure:
 }
 ```
 
+### Memory Operations (for batch storage pipeline)
+
+When Claudia dispatches you with `extraction_type: "memory_operations"`, return ready-to-store operations matching the `memory.batch` input format. This lets Claudia pipe your output directly into `memory.batch` after review, skipping manual composition.
+
+```json
+{
+  "extraction_type": "memory_operations",
+  "source_summary": "Extracted 7 memories from call with Ford Perry",
+  "memory_operations": [
+    {
+      "op": "remember",
+      "content": "Ford Perry prefers async communication over calls",
+      "type": "preference",
+      "importance": 0.7,
+      "about": ["Ford Perry"],
+      "source_context": "2026-02-04 call with Ford Perry re: partnership"
+    },
+    {
+      "op": "remember",
+      "content": "Ford committed to sending the revised proposal by Friday Feb 7",
+      "type": "commitment",
+      "importance": 0.9,
+      "about": ["Ford Perry"],
+      "source_context": "2026-02-04 call with Ford Perry re: partnership"
+    },
+    {
+      "op": "entity",
+      "name": "Ford Perry",
+      "type": "person",
+      "description": "Potential partner, CEO of Perry Ventures"
+    },
+    {
+      "op": "relate",
+      "source": "Kamil Banc",
+      "target": "Ford Perry",
+      "relationship": "potential_partner",
+      "strength": 0.6
+    }
+  ],
+  "confidence": 0.85,
+  "ambiguities": [],
+  "needs_claudia_judgment": true,
+  "judgment_reason": "Review extracted memories for accuracy before batch storage"
+}
+```
+
+**Memory operation field reference:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `op` | Yes | `"remember"`, `"entity"`, or `"relate"` |
+| `content` | For remember | The memory text (preserve exact wording for commitments) |
+| `type` | For remember | `"fact"`, `"preference"`, `"observation"`, `"commitment"`, `"decision"` |
+| `importance` | For remember | 0.0-1.0 (commitments default 0.9, facts 0.7, observations 0.6) |
+| `about` | For remember | Entity names this memory relates to |
+| `source_context` | For remember | One-line breadcrumb: "YYYY-MM-DD [source] re: [topic]" |
+| `name` | For entity | Entity name |
+| `source`/`target` | For relate | Entity names for relationship |
+| `relationship` | For relate | Relationship type (works_with, client_of, etc.) |
+
+**When to use memory_operations extraction:**
+- Processing transcripts where Claudia needs structured memories
+- Processing emails where facts, commitments, and relationships need capturing
+- Any document where multiple memory operations are expected
+
+**Always set `needs_claudia_judgment: true`** for memory_operations. Claudia must review before storing.
+
 ## Deadline Confidence
 
 | Level | Meaning |

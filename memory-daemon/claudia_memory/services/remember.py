@@ -141,6 +141,7 @@ class RememberService:
         source_context: Optional[str] = None,
         metadata: Optional[Dict] = None,
         origin_type: Optional[str] = None,
+        _precomputed_embedding: Optional[List[float]] = None,
     ) -> Optional[int]:
         """
         Store a discrete fact/memory.
@@ -217,8 +218,8 @@ class RememberService:
 
         memory_id = self.db.insert("memories", insert_data)
 
-        # Generate and store embedding
-        embedding = embed_sync(content)
+        # Store embedding (use precomputed if available, otherwise generate)
+        embedding = _precomputed_embedding or embed_sync(content)
         if embedding:
             try:
                 self.db.execute(
@@ -263,6 +264,7 @@ class RememberService:
         description: Optional[str] = None,
         aliases: Optional[List[str]] = None,
         metadata: Optional[Dict] = None,
+        _precomputed_embedding: Optional[List[float]] = None,
     ) -> int:
         """
         Create or update an entity.
@@ -326,9 +328,9 @@ class RememberService:
                 },
             )
 
-            # Generate and store embedding
+            # Store embedding (use precomputed if available, otherwise generate)
             embed_text = f"{name}. {description or ''}"
-            embedding = embed_sync(embed_text)
+            embedding = _precomputed_embedding or embed_sync(embed_text)
             if embedding:
                 try:
                     self.db.execute(
@@ -1512,12 +1514,12 @@ def remember_message(content: str, role: str = "user", **kwargs) -> Dict[str, An
 
 
 def remember_fact(content: str, **kwargs) -> Optional[int]:
-    """Store a discrete fact"""
+    """Store a discrete fact. Pass _precomputed_embedding to skip Ollama call."""
     return get_remember_service().remember_fact(content, **kwargs)
 
 
 def remember_entity(name: str, **kwargs) -> int:
-    """Create or update an entity"""
+    """Create or update an entity. Pass _precomputed_embedding to skip Ollama call."""
     return get_remember_service().remember_entity(name, **kwargs)
 
 

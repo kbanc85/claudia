@@ -68,10 +68,36 @@ User shares transcript/email/document
          ↓
     If user says "extract now":
          ↓
-    Extract and present for verification
+    Use agent-accelerated extraction (see below)
          ↓
-    Store verified memories/entities
+    Review agent output, then store verified memories/entities
 ```
+
+**Agent-Accelerated Extraction (Preferred for transcripts and emails)**
+
+For transcripts, emails, and longer documents, use the Document Processor agent (Haiku) instead of composing `memory.batch` operations manually. Manual composition takes 2+ minutes of thinking time; the agent returns structured operations in ~10-20 seconds.
+
+```
+Dispatch Document Processor (Haiku) with:
+├── The filed document content
+├── extraction_type: "memory_operations"
+└── Context: participant names, topic, date
+         ↓
+Agent returns memory_operations[] array
+(facts, commitments, entities, relationships)
+         ↓
+Review agent output (Claudia's judgment layer):
+├── Verify commitment wording is accurate
+├── Check importance scores
+├── Confirm entity names match existing entities
+└── Remove or adjust questionable extractions
+         ↓
+Call memory.batch with reviewed operations
+```
+
+**When to use agent extraction:** Transcripts (3+ paragraphs), emails with multiple topics, documents with commitments or relationship context.
+
+**When to extract manually:** Very short notes (1-2 sentences), single-fact corrections, quick entity creation.
 
 **If you find yourself reading multiple source documents** without calling `memory.file` for each one, **STOP and fix it**. Go back and file each source before continuing.
 

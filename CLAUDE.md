@@ -137,6 +137,8 @@ pytest tests/test_recall.py::test_name # Single test function
 
 python -m claudia_memory              # Run daemon (MCP mode, stdio)
 python -m claudia_memory --consolidate # Run just consolidation
+python -m claudia_memory --tui        # Brain Monitor TUI dashboard
+claudia-brain                          # Same TUI via entry point
 curl http://localhost:3848/health      # Health check
 ```
 
@@ -150,12 +152,14 @@ Pattern:
 ```python
 # In database.py _run_migrations():
 if current_version < N:
-    self.conn.executescript("""
-        ALTER TABLE ... ADD COLUMN ...;
-        -- etc
-    """)
-    self.conn.execute("PRAGMA user_version = N")
+    conn.execute("ALTER TABLE ... ADD COLUMN ...")
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (N, 'Description of migration')"
+    )
+    conn.commit()
 ```
+
+**Gotcha:** `schema.sql` is parsed line-by-line splitting on `;` at line endings. `CREATE TRIGGER` statements contain internal semicolons and must go in `database.py` migration code instead (see existing FTS5 and dispatch_tier triggers).
 
 Also add integrity checks in `_check_migration_integrity()` if the migration adds columns that could fail silently (e.g., ALTER TABLE on a table that might not exist).
 
@@ -268,6 +272,7 @@ claudia/
 │   │   ├── mcp/server.py    ← 20+ MCP tool definitions
 │   │   ├── daemon/          ← Scheduler (APScheduler) + health check (port 3848)
 │   │   ├── extraction/      ← Entity extraction (spaCy or regex fallback)
+│   │   ├── tui/             ← Brain Monitor terminal dashboard (Textual)
 │   │   └── services/        ← Remember, Recall, Consolidate, Ingest, Documents,
 │   │                           Audit, Metrics, Verify, Guards, Filestore
 │   ├── scripts/             ← Install, migrate, diagnose, seed scripts

@@ -50,7 +50,33 @@ The file is automatically routed to the right folder:
 - Which person files to update?
 - Any new people to track?
 
-### 3. Extract Key Information
+### 3. Extract Key Information (Agent-Accelerated)
+
+**Preferred: Dispatch Document Processor for extraction.** Instead of composing memory operations manually (which takes 2+ minutes of thinking time), dispatch the Document Processor agent (Haiku) with the transcript content and `extraction_type: "memory_operations"`. The agent returns ready-to-store operations in ~10-20 seconds.
+
+**Agent pipeline workflow:**
+```
+1. Dispatch Document Processor (Haiku) with:
+   - The full transcript text
+   - extraction_type: "memory_operations"
+   - Context: participant names, meeting topic, date
+
+2. Agent returns memory_operations[] array with:
+   - Facts, preferences, observations
+   - Commitments with deadlines
+   - Entity definitions
+   - Relationship links
+
+3. Review agent output (judgment layer):
+   - Verify commitment wording is accurate
+   - Check importance scores are reasonable
+   - Confirm entity names match existing entities
+   - Adjust or remove any questionable extractions
+
+4. Call memory.batch with the reviewed operations
+```
+
+**Fallback: Manual extraction** (use when agent is unavailable or for very short notes)
 
 **Decisions Made:**
 - What was decided?

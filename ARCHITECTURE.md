@@ -296,7 +296,7 @@ claudia/
 ├── CONTRIBUTING.md               # Contribution guidelines
 ├── CODE_OF_CONDUCT.md            # Community standards
 ├── SECURITY.md                   # Security policy
-├── LICENSE                       # Apache 2.0
+├── LICENSE                       # PolyForm Noncommercial 1.0.0
 └── NOTICE                        # Attribution
 ```
 
