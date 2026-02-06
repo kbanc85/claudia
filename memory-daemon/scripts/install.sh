@@ -4,6 +4,9 @@
 
 set -e
 
+# Non-interactive mode (set by parent installer)
+NONINTERACTIVE="${CLAUDIA_NONINTERACTIVE:-0}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -52,8 +55,10 @@ run_with_spinner() {
     fi
 }
 
-# Clear screen and show banner
-clear
+# Clear screen and show banner (skip clear when called from parent installer)
+if [ "$NONINTERACTIVE" != "1" ]; then
+    clear
+fi
 
 # Claudia pixel art banner (matching the NPX installer)
 W='\033[97m'  # white
@@ -139,14 +144,10 @@ if command -v ollama &> /dev/null; then
 else
     echo -e "  ${YELLOW}○${NC} Ollama not found"
     OLLAMA_AVAILABLE=false
-    echo
-    echo -e "  ${DIM}Ollama enables semantic vector search.${NC}"
-    echo -e "  ${DIM}Without it, Claudia falls back to keyword search.${NC}"
-    echo
-    read -p "  Install Ollama now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo
+
+    if [ "$NONINTERACTIVE" = "1" ]; then
+        # Auto-install Ollama in non-interactive mode
+        echo -e "  ${CYAN}Installing Ollama automatically...${NC}"
         if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &> /dev/null; then
             echo -e "  ${CYAN}Installing Ollama via Homebrew...${NC}"
             brew install ollama 2>/dev/null && OLLAMA_AVAILABLE=true
@@ -160,8 +161,34 @@ else
         if [ "$OLLAMA_AVAILABLE" = true ]; then
             echo -e "  ${GREEN}✓${NC} Ollama installed"
         else
-            echo -e "  ${YELLOW}!${NC} Ollama install failed, continuing without"
+            echo -e "  ${YELLOW}!${NC} Ollama auto-install failed, continuing without"
             echo -e "  ${DIM}Install manually: https://ollama.com/download${NC}"
+        fi
+    else
+        echo
+        echo -e "  ${DIM}Ollama enables semantic vector search.${NC}"
+        echo -e "  ${DIM}Without it, Claudia falls back to keyword search.${NC}"
+        echo
+        read -p "  Install Ollama now? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo
+            if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &> /dev/null; then
+                echo -e "  ${CYAN}Installing Ollama via Homebrew...${NC}"
+                brew install ollama 2>/dev/null && OLLAMA_AVAILABLE=true
+            fi
+
+            if [ "$OLLAMA_AVAILABLE" = false ]; then
+                echo -e "  ${CYAN}Installing Ollama...${NC}"
+                curl -fsSL https://ollama.com/install.sh | sh 2>/dev/null && OLLAMA_AVAILABLE=true
+            fi
+
+            if [ "$OLLAMA_AVAILABLE" = true ]; then
+                echo -e "  ${GREEN}✓${NC} Ollama installed"
+            else
+                echo -e "  ${YELLOW}!${NC} Ollama install failed, continuing without"
+                echo -e "  ${DIM}Install manually: https://ollama.com/download${NC}"
+            fi
         fi
     fi
 fi

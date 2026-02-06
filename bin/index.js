@@ -3,8 +3,7 @@
 import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync, spawn } from 'child_process';
-import { createInterface } from 'readline';
+import { spawn } from 'child_process';
 import { homedir } from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +30,35 @@ const colors = {
   boldCyan: '\x1b[1;36m',
 };
 
+// Read version from package.json
+function getVersion() {
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+// Typewriter effect - writes text char by char
+function typewriter(text, color = '') {
+  return new Promise((resolve) => {
+    const reset = color ? colors.reset : '';
+    let i = 0;
+    process.stdout.write(color);
+    const interval = setInterval(() => {
+      if (i < text.length) {
+        process.stdout.write(text[i]);
+        i++;
+      } else {
+        process.stdout.write(reset + '\n');
+        clearInterval(interval);
+        resolve();
+      }
+    }, 25);
+  });
+}
+
 // Pixel art banner - "CLAUDIA" text + portrait (double-width for square pixels)
 const b = colors.cyan;    // blue pixels
 const y = colors.yellow;  // yellow pixels (hair)
@@ -53,14 +81,18 @@ ${b}${px}${px}${r}${_}${b}${px}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${
                   ${w}${px}${r}${_}${w}${px}${r}
 `;
 
-const banner = `
-${bannerArt}
-${colors.dim}Agentic executive assistant. Learns and adapts to how you work.${colors.reset}
-${colors.dim}by Kamil Banc${colors.reset}
-`;
-
 async function main() {
-  console.log(banner);
+  const version = getVersion();
+
+  // Print pixel art
+  console.log(bannerArt);
+
+  // Version badge + tagline + attribution (all yellow)
+  console.log(`   ${colors.boldYellow}CLAUDIA${colors.reset} ${colors.yellow}v${version}${colors.reset}`);
+  await typewriter('   Agentic executive assistant. Learns and adapts to how you work.', colors.yellow);
+  console.log(`   ${colors.yellow}by Kamil Banc${colors.reset}`);
+  console.log(`   ${colors.yellow}${'─'.repeat(40)}${colors.reset}`);
+  console.log();
 
   // Determine target directory and flags
   const args = process.argv.slice(2);
@@ -77,7 +109,7 @@ async function main() {
   const displayDir = isCurrentDir ? 'current directory' : targetDir;
 
   if (isDemoMode) {
-    console.log(`${colors.yellow}🎭 Demo mode${colors.reset} - Will seed with example data after install`);
+    console.log(`${colors.yellow}Demo mode${colors.reset} - Will seed with example data after install`);
   }
 
   // Check if directory already exists with Claudia files
@@ -89,7 +121,7 @@ async function main() {
 
     if (hasClaudioFiles) {
       isUpgrade = true;
-      console.log(`\n${colors.cyan}✓${colors.reset} Found existing Claudia instance. Upgrading framework files...`);
+      console.log(`${colors.cyan}✓${colors.reset} Found existing Claudia instance. Upgrading framework files...`);
     }
   }
 
@@ -106,7 +138,7 @@ async function main() {
       cpSync(templatePath, targetPath, { recursive: true });
       console.log(`${colors.green}✓${colors.reset} Installed in ${displayDir}`);
     } catch (error) {
-      console.error(`\n${colors.yellow}⚠${colors.reset}  Error copying files: ${error.message}`);
+      console.error(`\n${colors.yellow}!${colors.reset}  Error copying files: ${error.message}`);
       process.exit(1);
     }
   } else {
@@ -134,30 +166,13 @@ async function main() {
       console.log(`${colors.green}✓${colors.reset} Updated ${upgraded} framework components (skills, commands, rules, identity)`);
       console.log(`${colors.dim}  Your data (context/, people/, projects/) was preserved.${colors.reset}`);
     } catch (error) {
-      console.error(`\n${colors.yellow}⚠${colors.reset}  Error upgrading files: ${error.message}`);
+      console.error(`\n${colors.yellow}!${colors.reset}  Error upgrading files: ${error.message}`);
       process.exit(1);
     }
   }
 
   // Show what's new in this release
   showWhatsNew(isUpgrade);
-
-  // Interactive setup prompts
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  const askYesNo = (question) => {
-    return new Promise((resolve) => {
-      rl.question(question, (answer) => {
-        resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
-      });
-    });
-  };
-
-  const setupMemory = await askYesNo(`\n${colors.yellow}?${colors.reset} Set up enhanced memory system? (recommended) [y/n]: `);
-  rl.close();
 
   // Helper: seed demo database using spawn (safe, no shell injection)
   function seedDemoDatabase(targetPath, mcpPath, callback) {
@@ -205,7 +220,7 @@ async function main() {
 
   // Helper: run visualizer install script and call back when done (auto-install, no prompt)
   function runVisualizerSetup(callback) {
-    console.log(`\n${colors.cyan}Setting up brain visualizer...${colors.reset}`);
+    console.log(`\n${colors.boldYellow}━━━ Phase 2/3: Brain Visualizer ━━━${colors.reset}\n`);
 
     const visualizerScriptPath = isWindows
       ? join(__dirname, '..', 'visualizer', 'scripts', 'install.ps1')
@@ -248,7 +263,7 @@ async function main() {
 
   // Helper: run gateway install script and call back when done
   function runGatewaySetup(callback) {
-    console.log(`\n${colors.cyan}Setting up messaging gateway...${colors.reset}`);
+    console.log(`\n${colors.boldYellow}━━━ Phase 3/3: Messaging Gateway ━━━${colors.reset}\n`);
 
     const gatewayScriptPath = isWindows
       ? join(__dirname, '..', 'gateway', 'scripts', 'install.ps1')
@@ -269,7 +284,8 @@ async function main() {
         stdio: 'inherit',
         env: {
           ...process.env,
-          CLAUDIA_GATEWAY_UPGRADE: isUpgrade ? '1' : '0'
+          CLAUDIA_GATEWAY_UPGRADE: isUpgrade ? '1' : '0',
+          CLAUDIA_GATEWAY_SKIP_SETUP: '1'
         }
       });
 
@@ -354,135 +370,119 @@ async function main() {
     }
   }
 
-  if (setupMemory) {
-    console.log(`\n${colors.cyan}Setting up enhanced memory system...${colors.reset}`);
+  // Memory system always installs (no prompt)
+  console.log(`\n${colors.boldYellow}━━━ Phase 1/3: Memory System ━━━${colors.reset}\n`);
 
-    const memoryDaemonPath = isWindows
-      ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
-      : join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
+  const memoryDaemonPath = isWindows
+    ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
+    : join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
 
-    if (existsSync(memoryDaemonPath)) {
-      try {
-        // Run the install script, passing project path for upgrades
-        const spawnCmd = isWindows ? powershellPath : 'bash';
-        const spawnArgs = isWindows
-          ? ['-ExecutionPolicy', 'Bypass', '-File', memoryDaemonPath]
-          : [memoryDaemonPath];
-        const result = spawn(spawnCmd, spawnArgs, {
-          stdio: 'inherit',
-          env: {
-            ...process.env,
-            CLAUDIA_PROJECT_PATH: isUpgrade ? targetPath : ''
+  if (existsSync(memoryDaemonPath)) {
+    try {
+      // Run the install script, passing project path for upgrades
+      const spawnCmd = isWindows ? powershellPath : 'bash';
+      const spawnArgs = isWindows
+        ? ['-ExecutionPolicy', 'Bypass', '-File', memoryDaemonPath]
+        : [memoryDaemonPath];
+      const result = spawn(spawnCmd, spawnArgs, {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          CLAUDIA_PROJECT_PATH: isUpgrade ? targetPath : '',
+          CLAUDIA_NONINTERACTIVE: '1'
+        }
+      });
+
+      result.on('close', (code) => {
+        let memoryOk = false;
+        if (code === 0) {
+          console.log(`${colors.green}✓${colors.reset} Memory system installed`);
+          memoryOk = true;
+
+          // Update .mcp.json if it exists
+          const mcpPath = join(targetPath, '.mcp.json');
+          const mcpExamplePath = join(targetPath, '.mcp.json.example');
+
+          if (existsSync(mcpExamplePath) && !existsSync(mcpPath)) {
+            // Read example and add memory server
+            let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
+            mcpConfig.mcpServers = mcpConfig.mcpServers || {};
+
+            const home = homedir();
+            const pythonCmd = isWindows
+              ? join(home, '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
+              : `${process.env.HOME}/.claudia/daemon/venv/bin/python`;
+
+            mcpConfig.mcpServers['claudia-memory'] = {
+              command: pythonCmd,
+              args: ['-m', 'claudia_memory.mcp.server'],
+              _description: 'Claudia memory system with vector search'
+            };
+            writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
+            console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
           }
-        });
 
-        result.on('close', (code) => {
-          let memoryOk = false;
-          if (code === 0) {
-            console.log(`${colors.green}✓${colors.reset} Memory system installed`);
-            memoryOk = true;
-
-            // Update .mcp.json if it exists
-            const mcpPath = join(targetPath, '.mcp.json');
-            const mcpExamplePath = join(targetPath, '.mcp.json.example');
-
-            if (existsSync(mcpExamplePath) && !existsSync(mcpPath)) {
-              // Read example and add memory server
-              let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
-              mcpConfig.mcpServers = mcpConfig.mcpServers || {};
-
-              const home = homedir();
-              const pythonCmd = isWindows
-                ? join(home, '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
-                : `${process.env.HOME}/.claudia/daemon/venv/bin/python`;
-
-              mcpConfig.mcpServers['claudia-memory'] = {
-                command: pythonCmd,
-                args: ['-m', 'claudia_memory.mcp.server'],
-                _description: 'Claudia memory system with vector search'
-              };
-              writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
-              console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
-            }
-
-            // Seed demo database if --demo flag was passed
-            if (isDemoMode) {
-              const mcpPathForDemo = join(targetPath, '.mcp.json');
-              seedDemoDatabase(targetPath, mcpPathForDemo, () => maybeRunVisualizer(memoryOk));
-              return; // Wait for demo seed to complete
-            }
+          // Seed demo database if --demo flag was passed
+          if (isDemoMode) {
+            const mcpPathForDemo = join(targetPath, '.mcp.json');
+            seedDemoDatabase(targetPath, mcpPathForDemo, () => maybeRunVisualizer(memoryOk));
+            return; // Wait for demo seed to complete
+          }
+        } else {
+          console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
+          if (isWindows) {
+            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${memoryDaemonPath}"${colors.reset}`);
           } else {
-            console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
-            if (isWindows) {
-              console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${memoryDaemonPath}"${colors.reset}`);
-            } else {
-              console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
-            }
+            console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
           }
+        }
 
-          // Chain visualizer setup (auto), then gateway (if requested)
-          maybeRunVisualizer(memoryOk);
-        });
+        // Chain visualizer setup (auto), then gateway
+        maybeRunVisualizer(memoryOk);
+      });
 
-        return; // Wait for spawn to complete
-      } catch (error) {
-        console.log(`${colors.yellow}!${colors.reset} Could not set up memory system: ${error.message}`);
-        console.log(`  You can set it up later manually.`);
-      }
-    } else {
-      console.log(`${colors.yellow}!${colors.reset} Memory daemon files not found. Skipping.`);
+      return; // Wait for spawn to complete
+    } catch (error) {
+      console.log(`${colors.yellow}!${colors.reset} Could not set up memory system: ${error.message}`);
+      console.log(`  You can set it up later manually.`);
     }
+  } else {
+    console.log(`${colors.yellow}!${colors.reset} Memory daemon files not found. Skipping.`);
   }
 
-  // Memory skipped or failed to spawn -- continue with visualizer/gateway
+  // Memory failed to spawn -- continue with visualizer/gateway
   maybeRunVisualizer(false);
 
   function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, systemHealthy = true) {
-    // Show next steps - different message based on what was installed
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
-    if (memoryInstalled) {
-      if (systemHealthy) {
-        console.log(`
-${colors.bold}Next:${colors.reset}
-${cdStep}  ${colors.cyan}claude${colors.reset}
-  ${colors.dim}Memory system ready!${colors.reset}
+    // Installation summary
+    console.log(`\n${colors.boldYellow}━━━ Installation Complete ━━━${colors.reset}\n`);
 
-${colors.dim}If Claude was already running elsewhere, restart it to activate memory tools.${colors.reset}
-`);
-      } else {
-        console.log(`
-${colors.yellow}Some issues were detected above.${colors.reset}
-${colors.dim}You can fix them now, or Claudia will work in fallback mode until they're resolved.${colors.reset}
-${colors.dim}Re-run diagnostics anytime: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}
+    const check = `${colors.green}✓${colors.reset}`;
+    const warn = `${colors.yellow}○${colors.reset}`;
 
-${colors.bold}Next:${colors.reset}
-${cdStep}  ${colors.cyan}claude${colors.reset}
-  ${colors.dim}Claudia will help you troubleshoot with /diagnose${colors.reset}
-`);
-      }
-    } else {
-      console.log(`
-${colors.bold}Next:${colors.reset}
-${cdStep}  ${colors.cyan}claude${colors.reset}
-  ${colors.dim}Say hi!${colors.reset}
-
-${colors.dim}She'll introduce herself and set things up for you.${colors.reset}
-`);
-    }
-
-    if (visualizerInstalled) {
-      console.log(`${colors.bold}Brain Visualizer:${colors.reset}
-  ${colors.dim}See your memory in 3D:${colors.reset}  ${colors.cyan}/brain${colors.reset}
-`);
-    }
+    console.log(`${memoryInstalled ? check : warn} Memory system    ${memoryInstalled ? 'Active' : 'Skipped'}`);
+    console.log(`${visualizerInstalled ? check : warn} Brain visualizer ${visualizerInstalled ? 'Active' : 'Skipped'}`);
+    console.log(`${gatewayInstalled ? check : warn} Gateway          ${gatewayInstalled ? 'Installed' : 'Skipped'}`);
 
     if (gatewayInstalled) {
-      console.log(`${colors.bold}Gateway:${colors.reset}
-  ${colors.dim}If claudia-gateway isn't found, open a new terminal or run:${colors.reset}
-  ${colors.cyan}~/.claudia/bin/claudia-gateway start${colors.reset}
-  ${colors.dim}See ~/.claudia/gateway.json for settings.${colors.reset}
+      console.log(`${colors.yellow}->${colors.reset} Configure tokens: ~/.claudia/gateway.json`);
+    }
+
+    if (!systemHealthy) {
+      console.log(`\n${colors.yellow}Some issues were detected above.${colors.reset}`);
+      console.log(`${colors.dim}You can fix them now, or Claudia will work in fallback mode until they're resolved.${colors.reset}`);
+      console.log(`${colors.dim}Re-run diagnostics anytime: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}`);
+    }
+
+    console.log(`
+${colors.bold}Next:${colors.reset}
+${cdStep}  ${colors.cyan}claude${colors.reset}
 `);
+
+    if (memoryInstalled) {
+      console.log(`${colors.dim}If Claude was already running elsewhere, restart it to activate memory tools.${colors.reset}`);
     }
   }
 }
@@ -503,20 +503,17 @@ ${line}
   ${header}
 ${line}
 
-  ${bc}Document Storage${r}   ${d}Files, transcripts, and emails are stored${r}
-                      ${d}and linked to people and memories.${r}
+  ${bc}Zero-Prompt Install${r}  ${d}Everything installs automatically.${r}
+                       ${d}No questions, smart defaults, graceful fallbacks.${r}
 
-  ${bc}Provenance${r}         ${d}Every fact traces back to its source.${r}
-                      ${d}Ask "how do you know that?" and Claudia shows her work.${r}
+  ${bc}Gateway Auto-Setup${r}   ${d}Messaging gateway installs with everything.${r}
+                       ${d}Configure tokens at your own pace.${r}
 
-  ${bc}Graph Traversal${r}    ${d}Ask about a person, see their connected${r}
-                      ${d}network of people and projects.${r}
+  ${bc}Document Storage${r}     ${d}Files, transcripts, and emails are stored${r}
+                       ${d}and linked to people and memories.${r}
 
-  ${bc}Smart Briefing${r}     ${d}Session startup is now ~500 tokens, not${r}
-                      ${d}thousands. Full context pulled on demand.${r}
-
-  ${bc}/memory-audit${r}      ${d}New command. See everything Claudia knows${r}
-                      ${d}about a person, with source chains.${r}
+  ${bc}Provenance${r}           ${d}Every fact traces back to its source.${r}
+                       ${d}Ask "how do you know that?" and Claudia shows her work.${r}
 
 ${line}
 `);

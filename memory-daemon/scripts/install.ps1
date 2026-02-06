@@ -3,6 +3,9 @@
 
 $ErrorActionPreference = "Continue"
 
+# Non-interactive mode (set by parent installer)
+$NonInteractive = $env:CLAUDIA_NONINTERACTIVE
+
 # Colors via ANSI escape sequences (Windows Terminal / PowerShell 7+ support)
 $ESC = [char]27
 $RED = "$ESC[0;31m"
@@ -23,8 +26,10 @@ $VENV_SCRIPTS = Join-Path $VENV_DIR "Scripts"
 $VENV_PYTHON = Join-Path $VENV_SCRIPTS "python.exe"
 $VENV_PIP = Join-Path $VENV_SCRIPTS "pip.exe"
 
-# Banner
-Clear-Host
+# Banner (skip clear when called from parent installer)
+if ($NonInteractive -ne "1") {
+    Clear-Host
+}
 Write-Host ""
 Write-Host "${CYAN}████${NC}  ${CYAN}██${NC}      ${CYAN}██${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}████${NC}    ${CYAN}██${NC}    ${CYAN}██${NC}"
 Write-Host "${CYAN}██${NC}    ${CYAN}██${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}"
@@ -97,14 +102,10 @@ try {
     $OLLAMA_AVAILABLE = $true
 } catch {
     Write-Host "  ${YELLOW}○${NC} Ollama not found"
-    Write-Host ""
-    Write-Host "  ${DIM}Ollama enables semantic vector search.${NC}"
-    Write-Host "  ${DIM}Without it, Claudia falls back to keyword search.${NC}"
-    Write-Host ""
-    $installChoice = Read-Host "  Install Ollama now? (y/n)"
-    if ($installChoice -match '^[Yy]') {
-        Write-Host ""
-        # Try winget first (built into Windows 10/11)
+
+    if ($NonInteractive -eq "1") {
+        # Auto-install Ollama in non-interactive mode
+        Write-Host "  ${CYAN}Installing Ollama automatically...${NC}"
         $wingetInstalled = $false
         try {
             $null = & winget --version 2>&1
@@ -115,7 +116,6 @@ try {
             Write-Host "  ${CYAN}Installing Ollama via winget...${NC}"
             try {
                 & winget install Ollama.Ollama --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
-                # Refresh PATH so ollama is found in this session
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
                 $null = & ollama --version 2>&1
                 Write-Host "  ${GREEN}✓${NC} Ollama installed via winget"
@@ -126,23 +126,67 @@ try {
         }
 
         if (-not $OLLAMA_AVAILABLE) {
-            # Download and run installer directly
             Write-Host "  ${CYAN}Downloading Ollama installer...${NC}"
             $ollamaInstaller = "$env:TEMP\OllamaSetup.exe"
             try {
                 Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" -OutFile $ollamaInstaller -UseBasicParsing
                 Write-Host "  ${CYAN}Installing Ollama...${NC}"
                 Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
-                # Refresh PATH
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
                 $null = & ollama --version 2>&1
                 Write-Host "  ${GREEN}✓${NC} Ollama installed"
                 $OLLAMA_AVAILABLE = $true
             } catch {
-                Write-Host "  ${YELLOW}!${NC} Ollama install failed, continuing without"
+                Write-Host "  ${YELLOW}!${NC} Ollama auto-install failed, continuing without"
                 Write-Host "  ${DIM}Install manually: https://ollama.com/download/windows${NC}"
             } finally {
                 Remove-Item -Path $ollamaInstaller -ErrorAction SilentlyContinue
+            }
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  ${DIM}Ollama enables semantic vector search.${NC}"
+        Write-Host "  ${DIM}Without it, Claudia falls back to keyword search.${NC}"
+        Write-Host ""
+        $installChoice = Read-Host "  Install Ollama now? (y/n)"
+        if ($installChoice -match '^[Yy]') {
+            Write-Host ""
+            $wingetInstalled = $false
+            try {
+                $null = & winget --version 2>&1
+                $wingetInstalled = $true
+            } catch {}
+
+            if ($wingetInstalled) {
+                Write-Host "  ${CYAN}Installing Ollama via winget...${NC}"
+                try {
+                    & winget install Ollama.Ollama --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
+                    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+                    $null = & ollama --version 2>&1
+                    Write-Host "  ${GREEN}✓${NC} Ollama installed via winget"
+                    $OLLAMA_AVAILABLE = $true
+                } catch {
+                    Write-Host "  ${YELLOW}!${NC} winget install failed"
+                }
+            }
+
+            if (-not $OLLAMA_AVAILABLE) {
+                Write-Host "  ${CYAN}Downloading Ollama installer...${NC}"
+                $ollamaInstaller = "$env:TEMP\OllamaSetup.exe"
+                try {
+                    Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" -OutFile $ollamaInstaller -UseBasicParsing
+                    Write-Host "  ${CYAN}Installing Ollama...${NC}"
+                    Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
+                    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+                    $null = & ollama --version 2>&1
+                    Write-Host "  ${GREEN}✓${NC} Ollama installed"
+                    $OLLAMA_AVAILABLE = $true
+                } catch {
+                    Write-Host "  ${YELLOW}!${NC} Ollama install failed, continuing without"
+                    Write-Host "  ${DIM}Install manually: https://ollama.com/download/windows${NC}"
+                } finally {
+                    Remove-Item -Path $ollamaInstaller -ErrorAction SilentlyContinue
+                }
             }
         }
     }

@@ -22,8 +22,13 @@ $BIN_DIR = Join-Path $CLAUDIA_DIR "bin"
 # Upgrade mode
 $IS_UPGRADE = $env:CLAUDIA_GATEWAY_UPGRADE -eq "1"
 
-# Banner
-Clear-Host
+# Skip interactive setup wizard (set by parent installer)
+$SkipSetup = $env:CLAUDIA_GATEWAY_SKIP_SETUP
+
+# Banner (skip clear when called from parent installer)
+if ($SkipSetup -ne "1") {
+    Clear-Host
+}
 Write-Host ""
 Write-Host ($CYAN + "####" + $NC + "  " + $CYAN + "##" + $NC + "      " + $CYAN + "##" + $NC + "    " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "####" + $NC + "    " + $CYAN + "##" + $NC + "    " + $CYAN + "##" + $NC)
 Write-Host ($CYAN + "##" + $NC + "    " + $CYAN + "##" + $NC + "    " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC + "  " + $CYAN + "##" + $NC)
@@ -304,6 +309,16 @@ Write-Host "  |                                                           |"
 Write-Host "  +-----------------------------------------------------------+"
 Write-Host $NC
 
+# Skip interactive wizard when called from parent installer
+if ($SkipSetup -eq "1") {
+    Write-Host ("  " + $GREEN + "[OK]" + $NC + " Gateway ready")
+    Write-Host ""
+    Write-Host ("  " + $BOLD + "Configure messaging:" + $NC)
+    Write-Host ("    " + $DIM + "Edit " + $CONFIG_FILE + " to add Telegram or Slack tokens." + $NC)
+    Write-Host ("    " + $DIM + "See: https://github.com/kbanc85/claudia#gateway" + $NC)
+    Write-Host ""
+} else {
+
 # Offer interactive setup guide
 Write-Host "  The gateway needs a chat platform (Telegram or Slack) to"
 Write-Host ("  receive your messages. " + $BOLD + "Want a step-by-step setup guide?" + $NC)
@@ -533,6 +548,8 @@ if ($showGuide -match "^[Yy]") {
         Write-Host ""
     }
 }
+
+} # end SkipSetup else block
 
 Write-Host ($BOLD + "Security reminders:" + $NC)
 Write-Host ""

@@ -4,6 +4,9 @@
 
 set -e
 
+# Skip interactive setup wizard (set by parent installer)
+SKIP_SETUP="${CLAUDIA_GATEWAY_SKIP_SETUP:-0}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -30,8 +33,10 @@ elif [ -n "$BASH_VERSION" ] || [ "$(basename "$SHELL")" = "bash" ]; then
     SHELL_RC="$HOME/.bashrc"
 fi
 
-# Clear screen and show banner
-clear
+# Clear screen and show banner (skip clear when called from parent installer)
+if [ "$SKIP_SETUP" != "1" ]; then
+    clear
+fi
 
 # Claudia pixel art banner (matching the NPX installer)
 W='\033[97m'  # white
@@ -364,6 +369,17 @@ cat << 'EOF'
 EOF
 echo -e "${NC}"
 
+# Skip interactive wizard when called from parent installer
+if [ "$SKIP_SETUP" = "1" ]; then
+    echo -e "  ${GREEN}✓${NC} Gateway ready"
+    echo
+    echo -e "  ${BOLD}Configure messaging:${NC}"
+    echo -e "    ${DIM}Edit ~/.claudia/gateway.json to add Telegram or Slack tokens.${NC}"
+    echo -e "    ${DIM}See: https://github.com/kbanc85/claudia#gateway${NC}"
+    echo
+
+else
+
 # Offer interactive setup guide
 echo -e "  The gateway needs a chat platform (Telegram or Slack) to"
 echo -e "  receive your messages. ${BOLD}Want a step-by-step setup guide?${NC}"
@@ -600,6 +616,8 @@ if [[ "$SHOW_GUIDE" =~ ^[Yy] ]]; then
         echo
     fi
 fi
+
+fi # end SKIP_SETUP else block
 
 echo -e "${BOLD}Security reminders:${NC}"
 echo

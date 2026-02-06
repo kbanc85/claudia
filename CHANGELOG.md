@@ -2,6 +2,29 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.27.0 (2026-02-06)
+
+### Zero-Prompt Seamless Install
+
+The installer no longer asks any questions. Everything installs automatically with smart defaults.
+
+### Changed
+
+- **Zero-prompt installer** - Memory system, brain visualizer, and messaging gateway all install automatically. No interactive prompts. Ollama auto-installs via Homebrew (macOS) or winget/direct download (Windows).
+- **Modern banner** - Version badge, typewriter tagline, and "by Kamil Banc" all render in yellow. Phase indicators (1/3, 2/3, 3/3) show progress through memory, visualizer, and gateway setup.
+- **Gateway auto-install** - Gateway installs silently alongside the memory system. Interactive Telegram/Slack wizard skipped during main install; users configure tokens at their own pace via `~/.claudia/gateway.json`.
+- **Installation summary** - Final output shows a status table for all three components (Memory, Visualizer, Gateway) with Active/Skipped/Installed status.
+- **What's New updated** - Highlights zero-prompt install, gateway auto-setup, document storage, and provenance.
+
+### Technical
+
+- `CLAUDIA_NONINTERACTIVE=1` env var passed to `memory-daemon/scripts/install.sh` and `install.ps1` to auto-install Ollama without prompting. LLM model selection menu preserved (meaningful user choice).
+- `CLAUDIA_GATEWAY_SKIP_SETUP=1` env var passed to `gateway/scripts/install.sh` and `install.ps1` to skip the interactive Telegram/Slack wizard.
+- Removed `readline` import from `bin/index.js` (no longer needed).
+- All scripts remain fully interactive when run standalone (env vars default to 0).
+
+---
+
 ## 1.26.0 (2026-02-05)
 
 ### The Full Sweep
