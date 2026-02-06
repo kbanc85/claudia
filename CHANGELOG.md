@@ -2,6 +2,25 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.28.3 (2026-02-06)
+
+### Resilient Memory Tools
+
+Claudia's memory tools now defend against two classes of LLM serialization errors that caused silent failures during session wrap-up.
+
+### Fixed
+
+- **String-serialized arrays** - LLMs sometimes send array parameters as JSON strings (e.g., `'["Alice"]'` instead of `["Alice"]`). All 16 top-level array parameters across 10 MCP tools now accept both native arrays and JSON strings, with transparent runtime coercion.
+- **Missing episode_id in end_session** - When `buffer_turn` was never called during a session, `end_session` would fail because `episode_id` was required. It's now optional with automatic episode creation.
+
+### Added
+
+- **Parallel batch embeddings** - `memory.batch` now collects all texts upfront and embeds them in parallel before executing operations, reducing latency for multi-operation calls.
+- **Agent-accelerated extraction** - Document Processor agent gains `memory_operations` extraction type, returning ready-to-store `memory.batch` operations. Capture-meeting and memory-manager skills updated to use the agent pipeline.
+- **16 new tests** for LLM coercion defense (coerce utility, episode auto-creation, schema validation).
+
+---
+
 ## 1.28.2 (2026-02-06)
 
 ### Fixed
