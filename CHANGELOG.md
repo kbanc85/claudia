@@ -2,6 +2,34 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.26.0 (2026-02-05)
+
+### The Full Sweep
+
+13 improvements across skills, config, tests, and security in a single pass.
+
+### Added
+
+- **Skill disambiguation rules** in agent-dispatcher: clear routing tables for content processing (meeting vs email vs extraction) and research vs analysis queries, with cost-minimizing priority rule.
+- **MCP tool reference** in memory-manager: complete catalog of all 33 memory tools grouped by category (Core, Session, Documents, Analysis, Trust, Network, Gateway, Admin).
+- **Config validation** in memory daemon: warn-and-reset for out-of-range values (decay rate, max results, importance threshold, ranking weight sum).
+- **`dispatch_tier` constraint trigger**: database now rejects invalid tier values (must be 'task' or 'native_team').
+- **Gateway test expansion**: 7 new tests covering deepMerge (4 cases), PID file operations (3 cases), and structure-based config loading.
+- **Dispatch tier integrity test**: verifies the trigger rejects invalid values with `IntegrityError`.
+
+### Changed
+
+- **`/deep-context` memory budget fixed**: was 190-270 (exceeded stated 100-200), now capped at 180. Added deduplication step, edge case handling (entity not found, sparse connections, daemon unavailable, contradictions).
+- **Archetype phantom commands removed**: all 5 archetypes referenced `.claude/commands/` files that don't exist as standalone skills. Removed phantom file references, kept inline template content.
+- **CLAUDE.md/principles redundancy reduced**: condensed duplicate Safety First and Source Preservation sections in CLAUDE.md to brief references to `claudia-principles.md`.
+- **Consolidation error handling**: phase-level try/except wrapping (decay, merging, pattern detection, predictions) so one failure doesn't abort the entire consolidation run.
+- **Node engine requirement**: bumped from >=14.0.0 to >=18.0.0 (Node 14 EOL'd April 2023).
+- **Gateway config security**: warns when Telegram/Slack tokens are stored in plaintext config file instead of environment variables.
+- **Greeting instruction**: changed impossible "never the same greeting twice" to practical "change it up frequently".
+- **Structure generator**: archetype commands described as built-in templates, not separate command files.
+
+---
+
 ## 1.25.0 (2026-02-05)
 
 ### Opus 4.6 Integration
