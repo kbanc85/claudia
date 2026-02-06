@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.28.1 (2026-02-06)
+
+### Don't Let Me Forget
+
+Claudia no longer silently falls back to markdown when the memory daemon is off. She now detects why the daemon is down and proactively offers to fix it.
+
+### Changed
+
+- **Proactive daemon startup** - Session health check hook now detects whether the daemon is installed but stopped vs never installed, and provides the exact platform-specific restart command (launchctl on macOS, systemd on Linux).
+- **No silent degradation** - Memory manager skill and session start protocol updated to always tell the user what they're missing and offer to fix it, rather than quietly operating at reduced capability.
+- **Crash log surfacing** - Health check hook now includes recent daemon error log lines in its output to help diagnose issues faster.
+
+---
+
 ## 1.28.0 (2026-02-06)
 
 ### Brain Monitor
