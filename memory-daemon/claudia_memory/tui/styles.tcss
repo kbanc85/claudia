@@ -1,0 +1,92 @@
+/* Claudia Brain Monitor v2 - Compact Futuristic HUD
+ *
+ * No borders. Color and spacing for separation.
+ * Deep space background with amber/cyan/emerald/violet accents.
+ *
+ * Color palette:
+ *   Background:  #050510 (deep space)
+ *   Text:        #c8c8e0 (soft lavender)
+ *   Bright:      #e8e8f8 (near-white)
+ *   Accent:      #818cf8 (indigo)
+ *   Hair:        #fbbf24 (amber)
+ *   Body:        #67e8f9 (cyan)
+ */
+
+Screen {
+    background: #050510;
+    color: #c8c8e0;
+    layout: vertical;
+}
+
+/* ── Main area (identity + right column) ────── */
+
+#main {
+    height: auto;
+    background: #050510;
+}
+
+/* ── Identity sidebar ────────────────────────── */
+
+#identity {
+    width: 26;
+    height: auto;
+    background: #050510;
+}
+
+/* ── Right column (constellation + landscape) ── */
+
+#right {
+    width: 1fr;
+    height: auto;
+    background: #050510;
+}
+
+/* ── Constellation ───────────────────────────── */
+
+#constellation {
+    height: auto;
+    min-height: 4;
+    background: #050510;
+}
+
+/* ── Memory Landscape ────────────────────────── */
+
+#landscape {
+    height: auto;
+    min-height: 4;
+    background: #050510;
+}
+
+/* ── Neural Pulse strip (bottom, full width) ─── */
+
+#pulse {
+    height: auto;
+    max-height: 3;
+    background: #050510;
+}
+
+/* ── Entity type colors ───────────────────────── */
+
+.entity-person {
+    color: #fbbf24;
+}
+
+.entity-organization {
+    color: #60a5fa;
+}
+
+.entity-project {
+    color: #34d399;
+}
+
+.entity-concept {
+    color: #c084fc;
+}
+
+.entity-location {
+    color: #fb923c;
+}
+
+.entity-unlinked {
+    color: #6b7280;
+}

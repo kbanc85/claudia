@@ -104,6 +104,7 @@ argument-hint: [arg]             # Optional: show in /skill [arg] help
 | `databases/` | Memory database management | "which database?" |
 | `map-connections/` | Extract relationships | "who knows who?" |
 | `brain/` | 3D memory visualizer | "show your brain" |
+| `brain-monitor/` | Terminal memory dashboard | "brain monitor", "memory dashboard" |
 | `meditate/` | End-of-session reflection | "let's wrap up", "end the session" |
 
 ### Explicit Only (`/skill-name`)
@@ -143,7 +144,7 @@ effort-level: medium
 
 | Effort | Skills |
 |--------|--------|
-| **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose |
+| **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor |
 | **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, gateway, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher |
 | **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
 | **max** | ingest-sources, pipeline-review, deep-context |

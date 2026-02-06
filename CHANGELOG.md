@@ -2,6 +2,27 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.28.0 (2026-02-06)
+
+### Brain Monitor
+
+A real-time terminal dashboard for watching Claudia's memory system. Four live panels show neural activity, daemon health, entity constellations, and memory landscapes, all updating in your terminal.
+
+### Added
+
+- **Brain Monitor TUI** - Textual-based terminal dashboard (`python -m claudia_memory --tui`) with four widgets: Neural Pulse (write/read/link activity), Identity (daemon health + stats), Constellation (entity dot grid), and Landscape (importance distribution).
+- **`/brain-monitor` skill** - Launch the TUI dashboard from any Claudia session. Simple one-command launch with background execution.
+- **`claudia-brain` CLI entry point** - Direct command to launch the Brain Monitor without the `python -m` invocation.
+- **TUI auto-install** - `textual>=0.80.0` now installs automatically during memory daemon setup (both fresh installs and upgrades).
+
+### Changed
+
+- Install scripts (`install.sh`, `install.ps1`) now use `pip install -e ".[tui]"` instead of plain `-e .` to include the TUI extra.
+- `requirements.txt` includes `textual>=0.80.0` as a core dependency.
+- `pyproject.toml` declares `[tui]` optional extra and includes `tui/*.tcss` in package data.
+
+---
+
 ## 1.27.0 (2026-02-06)
 
 ### Zero-Prompt Seamless Install

@@ -410,7 +410,7 @@ echo -e "  ${CYAN}◐${NC} Installing dependencies..."
 echo -e "    ${DIM}$(random_message)${NC}"
 "$VENV_DIR/bin/pip" install --upgrade pip > /dev/null 2>&1
 "$VENV_DIR/bin/pip" install -r "$DAEMON_DIR/requirements.txt" > /dev/null 2>&1
-"$VENV_DIR/bin/pip" install -e "$DAEMON_DIR" > /dev/null 2>&1
+"$VENV_DIR/bin/pip" install -e "$DAEMON_DIR[tui]" > /dev/null 2>&1
 echo -e "  ${GREEN}✓${NC} Dependencies installed"
 
 # Install spaCy

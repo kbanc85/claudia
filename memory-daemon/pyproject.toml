@@ -37,9 +37,13 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
 ]
+tui = [
+    "textual>=0.80.0",
+]
 
 [project.scripts]
 claudia-memory = "claudia_memory.__main__:main"
+claudia-brain = "claudia_memory.tui.app:run_brain_monitor"
 
 [project.urls]
 Homepage = "https://github.com/kbanc85/claudia"
@@ -49,7 +53,7 @@ Repository = "https://github.com/kbanc85/claudia"
 where = ["."]
 
 [tool.setuptools.package-data]
-claudia_memory = ["schema.sql"]
+claudia_memory = ["schema.sql", "tui/*.tcss"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

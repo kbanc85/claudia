@@ -163,6 +163,11 @@ def main():
         type=str,
         help="Project directory for database isolation (creates project-specific database)",
     )
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch the Brain Monitor terminal dashboard (requires: pip install claudia-memory[tui])",
+    )
 
     args = parser.parse_args()
 
@@ -197,6 +202,13 @@ def main():
         except Exception as e:
             print(f"Health check failed: {e}")
             sys.exit(1)
+        return
+
+    if args.tui:
+        # Launch Brain Monitor TUI
+        from .tui.app import run_brain_monitor
+
+        run_brain_monitor(db_path=get_config().db_path)
         return
 
     # Run the daemon

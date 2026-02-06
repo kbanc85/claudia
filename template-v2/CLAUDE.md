@@ -302,6 +302,7 @@ These respond to natural language triggers AND can be invoked explicitly:
 | `/databases` | View and manage memory databases | "which database?", "switch workspace" |
 | `/map-connections` | Extract entities and relationships from files | "who knows who?", "network graph" |
 | `/brain` | Launch the 3D Brain Visualizer | "show your brain", "visualize memory" |
+| `/brain-monitor` | Terminal dashboard for real-time memory stats | "brain monitor", "memory dashboard" |
 | `/meditate` | End-of-session reflection, generate persistent learnings | "let's wrap up", "end the session" |
 
 ### Explicit Skills (`/skill-name` Only)

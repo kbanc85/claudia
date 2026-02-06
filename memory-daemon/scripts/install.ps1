@@ -308,7 +308,7 @@ $reqFile = Join-Path $DAEMON_DIR "requirements.txt"
 $ErrorActionPreference = "SilentlyContinue"
 & $VENV_PIP install --upgrade pip 2>&1 | Out-Null
 & $VENV_PIP install -r $reqFile 2>&1 | Out-Null
-& $VENV_PIP install -e $DAEMON_DIR 2>&1 | Out-Null
+& $VENV_PIP install -e "$DAEMON_DIR[tui]" 2>&1 | Out-Null
 $ErrorActionPreference = "Continue"
 Write-Host "  ${GREEN}✓${NC} Dependencies installed"
 

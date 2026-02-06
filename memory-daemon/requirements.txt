@@ -4,6 +4,9 @@ httpx>=0.25.0
 apscheduler>=3.10.0
 mcp>=1.0.0
 
+# TUI dashboard
+textual>=0.80.0
+
 # Optional: NLP for better entity extraction
 # spacy>=3.7.0
 # Run: python -m spacy download en_core_web_sm
