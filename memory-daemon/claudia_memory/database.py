@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 import threading
 from contextlib import contextmanager
 from datetime import datetime
@@ -62,18 +63,34 @@ class Database:
             except ImportError:
                 logger.debug("sqlite_vec package not installed")
             except Exception as e:
-                logger.debug(f"sqlite_vec package failed: {e}")
+                logger.warning(f"sqlite_vec package installed but load() failed: {e}")
 
             # Method 2: Try native extension loading (for systems with pre-installed sqlite-vec)
             if not loaded:
                 try:
                     conn.enable_load_extension(True)
-                    sqlite_vec_paths = [
-                        "vec0",  # If installed system-wide
-                        "/usr/local/lib/sqlite-vec/vec0",
-                        "/opt/homebrew/lib/sqlite-vec/vec0",
-                        str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
-                    ]
+                    sqlite_vec_paths = ["vec0"]  # System-wide
+
+                    if sys.platform == "win32":
+                        # Try to find vec0.dll in the sqlite-vec package directory
+                        try:
+                            import sqlite_vec as _sv
+                            pkg_dir = Path(_sv.__file__).parent
+                            for dll in pkg_dir.rglob("vec0*"):
+                                if dll.suffix in (".dll", ".so"):
+                                    sqlite_vec_paths.append(str(dll.with_suffix("")))
+                        except ImportError:
+                            pass
+                        sqlite_vec_paths.extend([
+                            str(Path(sys.executable).parent / "DLLs" / "vec0"),
+                            str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
+                        ])
+                    else:
+                        sqlite_vec_paths.extend([
+                            "/usr/local/lib/sqlite-vec/vec0",
+                            "/opt/homebrew/lib/sqlite-vec/vec0",
+                            str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
+                        ])
 
                     for path in sqlite_vec_paths:
                         try:
@@ -92,10 +109,18 @@ class Database:
                     logger.debug(f"Extension loading failed: {e}")
 
             if not loaded:
-                logger.warning(
-                    "sqlite-vec not available. Vector search will be disabled. "
-                    "Install with: pip install sqlite-vec"
-                )
+                if sys.platform == "win32":
+                    logger.warning(
+                        "sqlite-vec not available. Vector search will be disabled. "
+                        "Install with: pip install sqlite-vec  "
+                        "If already installed but failing, ensure your Python and "
+                        "sqlite-vec architectures match (both 64-bit or both 32-bit)."
+                    )
+                else:
+                    logger.warning(
+                        "sqlite-vec not available. Vector search will be disabled. "
+                        "Install with: pip install sqlite-vec"
+                    )
 
             self._local.connection = conn
 

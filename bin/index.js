@@ -415,7 +415,7 @@ async function main() {
 
             mcpConfig.mcpServers['claudia-memory'] = {
               command: pythonCmd,
-              args: ['-m', 'claudia_memory.mcp.server'],
+              args: ['-m', 'claudia_memory', '--project-dir', '${workspaceFolder}'],
               _description: 'Claudia memory system with vector search'
             };
             writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));

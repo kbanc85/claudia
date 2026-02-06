@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.sh\"",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.py\" 2>/dev/null || bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.sh\" 2>/dev/null || echo {\"additionalContext\":\"Health check skipped (no python3/python/bash on PATH).\"}",
             "timeout": 10000,
             "statusMessage": "Checking Claudia systems..."
           }
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh\"",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\" 2>/dev/null || bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh\" 2>/dev/null || echo {\"additionalContext\":\"Pre-compact hook skipped.\"}",
             "timeout": 5000,
             "statusMessage": "Preserving context..."
           }

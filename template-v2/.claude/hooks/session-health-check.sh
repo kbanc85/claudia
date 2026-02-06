@@ -3,7 +3,12 @@
 # Returns JSON with additionalContext to inform Claudia of memory system status
 # Provides actionable guidance when daemon is down
 
+# Try curl first, fall back to PowerShell for Windows environments without curl
 if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
+  echo '{"additionalContext": "Memory system healthy."}'
+  exit 0
+elif command -v powershell.exe &>/dev/null && \
+     powershell.exe -Command "(Invoke-WebRequest -Uri 'http://localhost:3848/health' -UseBasicParsing -TimeoutSec 5).Content" 2>/dev/null | grep -q "healthy"; then
   echo '{"additionalContext": "Memory system healthy."}'
   exit 0
 fi
@@ -25,6 +30,17 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     CONTEXT="$CONTEXT Daemon is installed (systemd service exists) but not running. Suggest: 'Your memory daemon is installed but stopped. Want me to try starting it? I can run: systemctl --user start claudia-memory'"
   else
     CONTEXT="$CONTEXT Daemon is NOT installed. Suggest: 'The memory daemon hasn\u0027t been set up yet. Want me to install it? I can run the installer for you.'"
+  fi
+elif [[ "$OSTYPE" == msys* ]] || [[ "$OSTYPE" == cygwin* ]] || [[ "$OSTYPE" == MINGW* ]]; then
+  # Windows via Git Bash
+  TASK_STATUS=""
+  if command -v powershell.exe &>/dev/null; then
+    TASK_STATUS=$(powershell.exe -Command "(Get-ScheduledTask -TaskName 'ClaudiaMemoryDaemon' -ErrorAction SilentlyContinue).State" 2>/dev/null)
+  fi
+  if [ -n "$TASK_STATUS" ]; then
+    CONTEXT="$CONTEXT Daemon is installed (Task Scheduler, state: $TASK_STATUS). Suggest: 'Your memory daemon is installed but not responding. Want me to check the logs and try restarting it?'"
+  else
+    CONTEXT="$CONTEXT Daemon is NOT installed as a scheduled task. Suggest: 'The memory daemon hasn\u0027t been set up yet. Want me to install it? I can run the installer for you.'"
   fi
 fi
 

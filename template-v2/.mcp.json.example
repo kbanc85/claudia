@@ -5,7 +5,8 @@
       "_disabled": true,
       "command": "~/.claudia/daemon/venv/bin/python",
       "args": ["-m", "claudia_memory", "--project-dir", "${workspaceFolder}"],
-      "_setup": "Run: ~/.claudia/daemon/scripts/install.sh"
+      "_setup": "Run: ~/.claudia/daemon/scripts/install.sh",
+      "_windows": "On Windows, change command to: %USERPROFILE%\\.claudia\\daemon\\venv\\Scripts\\python.exe"
     },
 
     "gmail": {
