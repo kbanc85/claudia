@@ -30,13 +30,9 @@ claudia/
 │   │   ├── follow-up-draft.md
 │   │   ├── draft-reply.md
 │   │   ├── summarize-doc.md
-│   │   ├── client-status.md        ← Archetype-specific
-│   │   ├── proposal-draft.md       ← Archetype-specific
 │   │   ├── pipeline-review.md      ← Business command
 │   │   ├── financial-snapshot.md   ← Business command
-│   │   ├── client-health.md        ← Archetype-specific
-│   │   ├── accountability-check.md ← Business command
-│   │   └── engagement-review.md    ← Archetype-specific
+│   │   └── accountability-check.md ← Business command
 │   ├── skills/
 │   ├── hooks/
 │   └── rules/

@@ -145,6 +145,14 @@ export function loadConfig() {
       merged.ollama.model = readClaudiaConfig();
     }
 
+    // Warn if tokens are stored in the config file rather than env vars
+    if (userConfig.channels?.telegram?.token) {
+      log.warn('Telegram token found in gateway.json. Consider using TELEGRAM_BOT_TOKEN env var instead.');
+    }
+    if (userConfig.channels?.slack?.botToken) {
+      log.warn('Slack bot token found in gateway.json. Consider using SLACK_BOT_TOKEN env var instead.');
+    }
+
     log.info('Loaded gateway config', { path: CONFIG_PATH });
     return merged;
   } catch (err) {

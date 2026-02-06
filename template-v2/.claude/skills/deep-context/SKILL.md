@@ -1,6 +1,6 @@
 ---
 name: deep-context
-description: Full-context deep analysis for meeting prep, relationship analysis, or strategic planning. Pulls 100-200 memories across multiple dimensions for comprehensive synthesis. Use when "deep dive", "full context", "everything about", "strategic analysis", or when preparing for important meetings.
+description: Full-context deep analysis for meeting prep, relationship analysis, or strategic planning. Pulls up to 180 memories across multiple dimensions for comprehensive synthesis. Use when "deep dive", "full context", "everything about", "strategic analysis", or when preparing for important meetings.
 effort-level: max
 ---
 
@@ -36,21 +36,21 @@ memory.recall(query=[target + context], limit=50)
 
 Broad semantic search to catch memories that reference the entity indirectly or discuss related topics.
 
-### Step 3: Connected Entities (limit=20 each, top 5 connections)
+### Step 3: Connected Entities (limit=10 each, top 3 connections)
 
-From the relationships returned in Step 1, identify the top 5 connected entities and pull context on each:
+From the relationships returned in Step 1, identify the top 3 connected entities (ranked by: relationship strength, then recency of last interaction, then number of shared memories) and pull context on each:
 
 ```
-For each of top 5 related entities:
-  memory.about(entity=[connected], limit=20)
+For each of top 3 related entities:
+  memory.about(entity=[connected], limit=10)
 ```
 
 This surfaces the network around the target: who they work with, what those people are doing, shared context.
 
-### Step 4: Temporal Sweep (limit=50)
+### Step 4: Temporal Sweep (limit=30)
 
 ```
-memory.recall(query=[target], limit=50, types=["observation", "learning", "commitment"])
+memory.recall(query=[target], limit=30, types=["observation", "learning", "commitment"])
 ```
 
 Pull time-sensitive items: observations that reveal trends, learnings that inform approach, commitments that need tracking.
@@ -62,6 +62,17 @@ memory.recall(query="session with [target]", limit=20)
 ```
 
 Find session narratives that mention the target to understand the arc of the relationship over time.
+
+### Step 6: Deduplicate
+
+Deduplicate results by memory ID across all steps before synthesis. If a memory appears in multiple steps, keep the instance with richer context (e.g., the one returned with entity relationships rather than a bare recall hit).
+
+## Edge Cases
+
+- **Entity not found**: If Step 1 returns 0 results, return early: "No memories about [entity]. Try a different name or spelling."
+- **Sparse connections**: If fewer than 3 connections exist, pull all available. Skip Step 3 entirely if 0 connections.
+- **Daemon unavailable**: Fall back to reading `context/` files and `people/*.md` directly. Note degraded mode in output.
+- **Contradictions**: When Step 1 and Step 2 return conflicting data, include both with `origin_type` labels so the user can resolve.
 
 ## Synthesis Format
 
@@ -113,4 +124,4 @@ After gathering all data, synthesize into this structure:
 
 ## Performance Notes
 
-This skill makes 8-12 memory calls. It's designed for the 1M context window where pulling 100-200 memories is practical without compaction risk. For quick lookups, use `memory.about` directly. Reserve `/deep-context` for when you need the full picture.
+This skill makes 6-8 memory calls (Steps 1-5 plus up to 3 connected entity lookups). Total memory budget: ~180 max (50+50+30+30+20). Designed for the 1M context window where pulling this many memories is practical without compaction risk. For quick lookups, use `memory.about` directly. Reserve `/deep-context` for when you need the full picture.

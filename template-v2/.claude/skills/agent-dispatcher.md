@@ -61,6 +61,30 @@ For agents that need independent context, multi-turn execution, and their own to
 | Calendar analysis | Schedule Analyst | 1 | "analyze my schedule", "how's my workload?" |
 | Complex extraction | Document Processor | 1 | Extraction involving relationship-sensitive content |
 
+## Disambiguation Rules
+
+When multiple skills or agents could handle the same input:
+
+### Content Processing
+| User Input | Primary Skill | Why |
+|-----------|--------------|-----|
+| Pastes meeting transcript | `capture-meeting` | Has participants, decisions, action items |
+| Pastes email or letter | Document Archivist (Tier 1) | Filing + format detection |
+| "Extract action items from this" | Document Processor (Tier 1) | Explicit extraction request |
+| "Summarize this document" | `summarize-doc` | Generic summary, no extraction |
+| Multiple docs at once | `/ingest-sources` | Multi-source discipline applies |
+
+### Research vs Analysis
+| User Input | Primary Skill | Why |
+|-----------|--------------|-----|
+| "Research X" | Research Scout (Tier 2) | Needs web search, external data |
+| "What do you know about X?" | `memory.about` directly | Memory lookup, no research needed |
+| "Deep dive on X" | `/deep-context` | Full memory analysis, no web needed |
+| "What am I missing?" | `/what-am-i-missing` | Risk/blind-spot surface, not research |
+
+### Priority Rule
+When still ambiguous: prefer the **cheaper** skill first. Tier 1 > contextual skill > Tier 2. Only escalate if the simpler option can't satisfy the request.
+
 ## Dispatch Protocol
 
 ### Step 1: Announce Briefly

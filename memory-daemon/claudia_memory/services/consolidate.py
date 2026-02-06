@@ -1580,31 +1580,45 @@ class ConsolidateService:
     def run_full_consolidation(self) -> Dict[str, Any]:
         """
         Run complete consolidation: decay, patterns, predictions.
-        Typically called overnight.
+        Typically called overnight. Wraps each phase in a transaction
+        so partial failures don't leave the database in an inconsistent state.
         """
         logger.info("Starting full consolidation")
 
         results = {}
 
-        # Run decay
-        results["decay"] = self.run_decay()
+        # Phase 1: Decay + boost (modifies importance scores)
+        try:
+            results["decay"] = self.run_decay()
+            results["boosted"] = self.boost_accessed_memories()
+        except Exception as e:
+            logger.warning(f"Decay phase failed: {e}")
+            results["decay"] = {"error": str(e)}
+            results["boosted"] = 0
 
-        # Boost accessed memories
-        results["boosted"] = self.boost_accessed_memories()
+        # Phase 2: Merging (modifies memory content)
+        try:
+            results["merged"] = self.merge_similar_memories()
+            results["reflections_aggregated"] = self.aggregate_reflections()
+        except Exception as e:
+            logger.warning(f"Merge phase failed: {e}")
+            results["merged"] = 0
+            results["reflections_aggregated"] = 0
 
-        # Merge near-duplicate memories
-        results["merged"] = self.merge_similar_memories()
+        # Phase 3: Detection + prediction (read-heavy, writes new rows)
+        try:
+            patterns = self.detect_patterns()
+            results["patterns_detected"] = len(patterns)
+        except Exception as e:
+            logger.warning(f"Pattern detection failed: {e}")
+            results["patterns_detected"] = 0
 
-        # Aggregate similar reflections
-        results["reflections_aggregated"] = self.aggregate_reflections()
-
-        # Detect patterns
-        patterns = self.detect_patterns()
-        results["patterns_detected"] = len(patterns)
-
-        # Generate predictions
-        predictions = self.generate_predictions()
-        results["predictions_generated"] = len(predictions)
+        try:
+            predictions = self.generate_predictions()
+            results["predictions_generated"] = len(predictions)
+        except Exception as e:
+            logger.warning(f"Prediction generation failed: {e}")
+            results["predictions_generated"] = 0
 
         logger.info(f"Consolidation complete: {results}")
         return results

@@ -432,3 +432,7 @@ CREATE TABLE IF NOT EXISTS agent_dispatches (
 CREATE INDEX IF NOT EXISTS idx_agent_dispatches_agent ON agent_dispatches(agent_name);
 CREATE INDEX IF NOT EXISTS idx_agent_dispatches_category ON agent_dispatches(dispatch_category);
 CREATE INDEX IF NOT EXISTS idx_agent_dispatches_started ON agent_dispatches(started_at DESC);
+
+-- NOTE: dispatch_tier validation trigger is created by database.py migration code
+-- rather than here, because CREATE TRIGGER statements contain internal semicolons
+-- that the schema.sql line-based parser cannot handle.

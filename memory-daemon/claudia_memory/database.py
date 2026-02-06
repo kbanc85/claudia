@@ -690,6 +690,16 @@ class Database:
                 if "duplicate column" not in str(e).lower():
                     logger.warning(f"Migration 14 statement failed: {e}")
 
+            # Add validation trigger for dispatch_tier
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS validate_dispatch_tier
+                BEFORE INSERT ON agent_dispatches
+                WHEN NEW.dispatch_tier NOT IN ('task', 'native_team')
+                BEGIN
+                    SELECT RAISE(ABORT, 'dispatch_tier must be task or native_team');
+                END
+            """)
+
             conn.execute(
                 "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (14, 'Add dispatch_tier to agent_dispatches for native agent team support')"
             )
@@ -742,6 +752,26 @@ class Database:
                 logger.warning(f"FTS5 not available in this SQLite build: {e}")
             else:
                 logger.warning(f"FTS5 setup failed: {e}")
+
+        # dispatch_tier validation trigger: ensure it exists regardless of migration path.
+        # Like FTS5 triggers, CREATE TRIGGER contains internal semicolons that the
+        # schema.sql line-based parser can't handle.
+        try:
+            check = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger' AND name='validate_dispatch_tier'"
+            ).fetchone()
+            if not check:
+                conn.execute("""
+                    CREATE TRIGGER IF NOT EXISTS validate_dispatch_tier
+                    BEFORE INSERT ON agent_dispatches
+                    WHEN NEW.dispatch_tier NOT IN ('task', 'native_team')
+                    BEGIN
+                        SELECT RAISE(ABORT, 'dispatch_tier must be task or native_team');
+                    END
+                """)
+                conn.commit()
+        except sqlite3.OperationalError as e:
+            logger.debug(f"dispatch_tier trigger setup skipped: {e}")
 
     def _get_table_columns(self, conn: sqlite3.Connection, table: str) -> set:
         """Get column names for a table."""

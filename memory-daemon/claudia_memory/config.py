@@ -5,10 +5,13 @@ Loads settings from ~/.claudia/config.json with sensible defaults.
 """
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -152,7 +155,23 @@ class MemoryConfig:
         # Ensure log directory exists
         config.log_path.parent.mkdir(parents=True, exist_ok=True)
 
+        config._validate()
         return config
+
+    def _validate(self):
+        """Validate config values are within acceptable bounds."""
+        if not (0 < self.decay_rate_daily <= 1.0):
+            logger.warning(f"decay_rate_daily={self.decay_rate_daily} out of range (0,1], using default 0.995")
+            self.decay_rate_daily = 0.995
+        if self.max_recall_results < 1 or self.max_recall_results > 200:
+            logger.warning(f"max_recall_results={self.max_recall_results} out of range [1,200], using default 50")
+            self.max_recall_results = 50
+        if self.min_importance_threshold < 0 or self.min_importance_threshold > 1.0:
+            logger.warning(f"min_importance_threshold={self.min_importance_threshold} out of range [0,1], using default 0.1")
+            self.min_importance_threshold = 0.1
+        weights = self.vector_weight + self.importance_weight + self.recency_weight + self.fts_weight
+        if abs(weights - 1.0) > 0.01:
+            logger.warning(f"Ranking weights sum to {weights:.3f}, not 1.0. Results may be skewed.")
 
     def save(self) -> None:
         """Save current configuration to ~/.claudia/config.json"""

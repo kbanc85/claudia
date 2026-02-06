@@ -11,13 +11,11 @@ Claudia is an agentic executive assistant framework that runs on Claude Code. It
 
 Both layers are core to how Claudia works. The template layer defines *who* Claudia is. The memory system defines *what she remembers*.
 
-This repository contains:
-- `bin/index.js` - NPM installer CLI that bootstraps new Claudia instances
-- `template-v2/` - Current template with minimal seed files (recommended)
-- `memory-daemon/` - Python memory system with SQLite database, vector search, and background services
+This repository also contains:
+- `gateway/` - Multi-channel messaging bridge (Telegram, Slack) with Anthropic/Ollama provider auto-detection
+- `visualizer-threejs/` - 3D brain visualization (Three.js + D3-Force-3D) with live parameter controls
 - `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package)
-- `template/` - Legacy template with pre-built examples
-- `assets/` - Banner art and demo assets
+- `template/` - Legacy template (deprecated)
 
 For full architectural diagrams and pipeline explanations, see `ARCHITECTURE.md`.
 
@@ -33,79 +31,74 @@ Installation flow:
 3. Onboarding skill detects missing `context/me.md` and initiates discovery
 4. Structure generator creates personalized folders/files based on user's archetype
 
-**Skills** (`.claude/skills/`)
-- Proactive behaviors that activate based on context
-- Examples: `onboarding.md`, `commitment-detector.md`, `pattern-recognizer.md`
-- Skills invoke other skills and use commands
+**Skills** (`.claude/skills/`) - Proactive behaviors with YAML frontmatter declaring `effort-level` (low/medium/high/max). Activate based on context. Examples: `commitment-detector.md`, `pattern-recognizer.md`.
 
-**Commands** (`.claude/commands/`)
-- User-invocable workflows via `/command-name`
-- Examples: `/morning-brief`, `/meeting-prep`, `/capture-meeting`
-- Commands read/write to context files and people files
+**Commands** (`.claude/commands/`) - User-invocable workflows via `/command-name`. Examples: `/morning-brief`, `/meeting-prep`, `/capture-meeting`.
 
-**Rules** (`.claude/rules/`)
-- Global behavioral principles in `claudia-principles.md`
-- Always active, guide all interactions
+**Rules** (`.claude/rules/`) - Global behavioral principles. `claudia-principles.md` (10 core principles) and `trust-north-star.md` (provenance tracking).
 
-**Context Files** (generated in `context/`)
-- `me.md` - User profile (presence indicates onboarding complete)
-- `commitments.md` - Active promises being tracked
-- `waiting.md` - Items waiting on others
-- `patterns.md` - Observed behavioral patterns
-- `learnings.md` - Claudia's memory about working with this user
+**Agents** (`.claude/agents/`) - Two-tier dispatch system:
+- Tier 1 (Task tool): Document Archivist, Document Processor, Schedule Analyst (Haiku, fast structured work)
+- Tier 2 (Native Agent Teams): Research Scout (Sonnet, independent context, multi-turn research)
+- Dispatch logic in `skills/agent-dispatcher.md`, tracked via `memory.agent_dispatch` MCP tool
 
-**People Files** (generated in `people/`)
-- Relationship-centric organization
-- Template-based structure for consistency
-- Tracks communication history, commitments, sentiment
+**Hooks** (`.claude/hooks/`) - Session lifecycle handlers:
+- `session-health-check.sh` - SessionStart: pings memory daemon, reports status
+- `pre-compact.sh` - PreCompact: calls `/flush` endpoint, injects recovery reminders
 
 ### Memory System (`memory-daemon/`)
 
 The memory system is a standalone Python application that gives Claudia persistent, semantically searchable memory. It communicates with Claude Code via MCP (Model Context Protocol) over stdio.
 
 **Database** - SQLite with sqlite-vec extension
-- 10+ tables: entities, memories, relationships, patterns, predictions, episodes, messages, and more
+- 14+ tables: entities, memories, relationships, patterns, predictions, episodes, messages, documents, reflections, audit_log, metrics, agent_dispatches, and vector tables
 - 3 vector tables (384-dimensional embeddings) for semantic search
 - WAL mode for crash safety; content hashing for deduplication
-- Per-project isolation via workspace folder hash
-- Schema defined in `memory-daemon/claudia_memory/schema.sql`
+- Per-project isolation via workspace folder hash (`~/.claudia/memory/{hash}.db`)
+- Bi-temporal tracking on relationships (`valid_at`/`invalid_at`)
+- Soft-delete on entities (`deleted_at`/`deleted_reason`), corrections on memories (`corrected_at`/`corrected_from`)
+- Schema defined in `schema.sql` with 14 migrations in `database.py`
 
-**Service layers** (`memory-daemon/claudia_memory/services/`)
-- `RememberService` - Stores facts, entities, relationships; generates embeddings; deduplicates
-- `RecallService` - Semantic search with multi-factor ranking (60% vector similarity, 30% importance, 10% recency); rehearsal effect boosts accessed memories
-- `ConsolidateService` - Importance decay, pattern detection (cooling relationships, overdue commitments, communication styles), prediction generation
+**Service layers** (`services/`)
+- `RememberService` (`remember.py`) - Stores facts, entities, relationships; generates embeddings; deduplicates; merges entities; soft-deletes; corrections and invalidation; audit logging
+- `RecallService` (`recall.py`) - Hybrid ranking (50% vector, 25% importance, 10% recency, 15% FTS); RRF scoring option; graph proximity signals; rehearsal effect; duplicate entity detection
+- `ConsolidateService` (`consolidate.py`) - Importance decay, pattern detection (cooling relationships, overdue commitments), near-duplicate memory merging (cosine > 0.92), prediction generation
+- `IngestService` (`ingest.py`) - Cognitive extraction: text in, structured entities/memories out
+- `DocumentsService` (`documents.py`) - Document storage, deduplication, entity linking
+- `AuditService` (`audit.py`) - Full audit trail for memory operations
+- `MetricsService` (`metrics.py`) - System health metrics with trending
+- `VerifyService` (`verify.py`) - Background verification cascade (deterministic first, LLM fallback)
+- `guards.py` - Validation on writes (content length, importance clamping, deadline detection, near-duplicate warning)
 
-**Background daemon** (`memory-daemon/claudia_memory/daemon/`)
-- Scheduled consolidation tasks (hourly decay, 6-hourly pattern detection, daily full consolidation)
-- Health check endpoint on port 3848
-- Graceful shutdown with signal handling
-
-**MCP tools** exposed to Claude Code (`memory-daemon/claudia_memory/mcp/server.py`):
-- `memory.remember` - Store facts, preferences, observations, learnings
-- `memory.recall` - Semantic search across all memories
+**MCP tools** exposed to Claude Code (`mcp/server.py`):
+- `memory.remember` - Store facts, preferences, observations, learnings (accepts `origin_type`)
+- `memory.recall` - Semantic search across all memories (max 50 results)
 - `memory.about` - Retrieve all context about a specific entity
 - `memory.relate` - Create/strengthen relationships between entities
-- `memory.predictions` - Get proactive suggestions and insights
-- `memory.consolidate` - Trigger manual consolidation
 - `memory.entity` - Create/update entity information
 - `memory.search_entities` - Search entities by name or description
-- `memory.buffer_turn` - Buffer a conversation turn for session capture
-- `memory.end_session` - End session and create episode summary
-- `memory.unsummarized` - Get buffered turns not yet summarized
+- `memory.predictions` - Get proactive suggestions and insights
+- `memory.prediction_feedback` - Mark predictions as acted on (feeds engagement ratio)
+- `memory.consolidate` - Trigger manual consolidation
 - `memory.batch` - Batch multiple memory operations in one call
-- `memory.trace` - Trace provenance and source history of a memory
+- `memory.trace` - Trace provenance and source history
+- `memory.correct` - Update memory content (preserves history in `corrected_from`)
+- `memory.invalidate` - Mark memories as no longer true
+- `memory.merge_entities` - Merge duplicate entities, preserving all references
+- `memory.delete_entity` - Soft-delete with reason tracking
+- `memory.find_duplicates` - Fuzzy matching for potential duplicates
+- `memory.system_health` - Current system health metrics
+- `memory.audit_history` - Full provenance trail ("where did you learn that?")
+- `memory.agent_dispatch` - Track agent delegation performance (`dispatch_tier` field)
+- `memory.file` - Store documents
+- `memory.buffer_turn` / `memory.end_session` / `memory.session_context` - Session lifecycle
 
-**Dependencies:** Ollama (local embeddings via all-minilm:l6-v2 + optional cognitive models like Qwen3/SmolLM3), sqlite-vec, APScheduler, spaCy (optional NLP)
+**Background daemon** (`daemon/`)
+- Scheduled jobs via APScheduler (hourly decay, 6-hourly pattern detection, daily full consolidation, daily metrics at 5am)
+- Health check endpoint on port 3848 (includes `/flush` for WAL checkpoint)
+- Graceful shutdown with signal handling
 
-### Cognitive Tools (`memory-daemon/claudia_memory/extraction/` and `language_model.py`)
-
-Optional local LLM pipeline for structured extraction from unstructured text. Uses Ollama models (Qwen3, SmolLM3, Llama 3.2) to extract entities and memories from meetings, emails, and documents.
-
-- `LanguageModelService` (`language_model.py`) - Async/sync Ollama client for local LLM generation
-- `EntityExtractor` (`extraction/entity_extractor.py`) - NLP extraction using spaCy (preferred) or regex fallback
-- `IngestService` (`services/ingest.py`) - Orchestrates extraction: text goes in, structured entities/memories come out. Claude applies judgment to results.
-
-Four extraction modes: meeting, email, document, general. All processing is local.
+**Dependencies:** Ollama (local embeddings via all-minilm:l6-v2 + optional LLM models), sqlite-vec, APScheduler, httpx, spaCy (optional NLP)
 
 ### Archetype System
 
@@ -116,103 +109,103 @@ Claudia detects user archetypes during onboarding:
 - **Solo Professional** - Mix of clients and projects
 - **Content Creator** - Audience, content, collaborations
 
-Each archetype gets custom folder structures and commands (see `template-v2/.claude/skills/structure-generator.md` for specifics).
+Each archetype gets custom folder structures and commands (see `template-v2/.claude/skills/structure-generator.md`).
 
 ## Development Workflow
 
 ### Testing the Installer
 
 ```bash
-# From repo root
 cd claudia
-node bin/index.js ../test-install
-
-# Or test in current directory
-node bin/index.js .
+node bin/index.js ../test-install     # Fresh install
+node bin/index.js .                    # Upgrade in place
+node bin/index.js ../test-install --demo  # With demo database
 ```
-
-### Modifying Templates
-
-**Template v2 (current):**
-- Edit files in `template-v2/`
-- Changes apply to new installations only
-- Test by creating fresh installation
-
-**Key template files:**
-- `template-v2/CLAUDE.md` - Claudia's core identity and behavior
-- `template-v2/.claude/rules/claudia-principles.md` - Global principles
-- `template-v2/.claude/skills/onboarding.md` - First-run experience
-- `template-v2/.claude/skills/structure-generator.md` - Archetype structures
-
-### Testing Onboarding Flow
-
-To trigger onboarding in a Claudia instance:
-1. Delete `context/me.md` from the instance
-2. Start `claude` in that directory
-3. Onboarding skill activates automatically
-
-### Adding New Skills
-
-1. Create `[skill-name].md` in `template-v2/.claude/skills/`
-2. Follow structure of existing skills:
-   - **Purpose** - What it does
-   - **Triggers** - When it activates
-   - **Behavior** - Detailed workflow
-3. Update `template-v2/.claude/skills/README.md` if needed
-
-### Adding New Commands
-
-1. Create `[command-name].md` in `template-v2/.claude/commands/`
-2. Define clear sections:
-   - What to surface/do
-   - Format/structure
-   - Tone guidelines
-   - Edge cases
-3. Add to archetype-specific command lists in `structure-generator.md` if appropriate
 
 ### Working on the Memory Daemon
 
-The memory system is a Python application in `memory-daemon/`.
-
 ```bash
-# Set up development environment
 cd memory-daemon
 python -m venv venv
 source venv/bin/activate
 pip install -e ".[dev]"
 
-# Run unit tests (uses asyncio_mode = auto via pyproject.toml)
-pytest tests/
-pytest tests/test_database.py -v     # Single test file
+pytest tests/                          # All unit tests
+pytest tests/test_database.py -v       # Single test file
+pytest tests/test_recall.py::test_name # Single test function
+./test.sh                              # Full suite: unit + integration + daemon startup
 
-# One-click full test suite (unit + integration + daemon startup)
-./test.sh
-
-# Run the daemon directly (MCP mode, connects via stdio)
-python -m claudia_memory
-
-# Run just consolidation
-python -m claudia_memory --consolidate
-
-# Check health endpoint
-curl http://localhost:3848/health
+python -m claudia_memory              # Run daemon (MCP mode, stdio)
+python -m claudia_memory --consolidate # Run just consolidation
+curl http://localhost:3848/health      # Health check
 ```
 
-**Key files to know:**
-- `schema.sql` - All table definitions. Change this when adding new data types.
-- `services/remember.py` - Write path. How memories, entities, and relationships get stored.
-- `services/recall.py` - Read path. Semantic search, scoring, and retrieval logic.
-- `services/consolidate.py` - Background maintenance. Decay, pattern detection, predictions.
-- `services/ingest.py` - Cognitive tool pipeline. Local LLM extraction of entities/memories from text.
-- `mcp/server.py` - Tool definitions exposed to Claude Code. Add new MCP tools here.
-- `language_model.py` - Ollama LLM client used by IngestService for cognitive extraction.
-- `database.py` - Connection management, thread safety, helper methods.
+### Adding a Database Migration
 
-**Migrating existing markdown data:**
+Migrations live in two places:
+1. `schema.sql` - Define new columns/tables for fresh installs
+2. `database.py` - Add migration handler in `_run_migrations()` for existing databases
+
+Pattern:
+```python
+# In database.py _run_migrations():
+if current_version < N:
+    self.conn.executescript("""
+        ALTER TABLE ... ADD COLUMN ...;
+        -- etc
+    """)
+    self.conn.execute("PRAGMA user_version = N")
+```
+
+Also add integrity checks in `_check_migration_integrity()` if the migration adds columns that could fail silently (e.g., ALTER TABLE on a table that might not exist).
+
+### Working on the Gateway
+
 ```bash
-python memory-daemon/scripts/migrate_markdown.py --dry-run
-python memory-daemon/scripts/migrate_markdown.py
+cd gateway
+npm install
+npm test                               # Node --test runner
+npm start                              # Start server
 ```
+
+Key files: `src/config.js` (config + provider detection), `src/bridge.js` (Anthropic/Ollama routing), `src/server.js` (Express HTTP).
+
+### Working on the Visualizer
+
+```bash
+cd visualizer-threejs
+npm install
+npm run dev                            # Vite dev server with HMR
+npm run build                          # Production build to dist/
+```
+
+Key files: `src/main.js` (entry + config observer), `src/graph.js` (D3-Force-3D simulation), `src/nodes.js` (Three.js node rendering), `src/design-panel.js` (lil-gui settings panel).
+
+### Modifying Templates
+
+- Edit files in `template-v2/`
+- Changes apply to new installations only
+- Test by creating fresh installation: `node bin/index.js ../test-install`
+
+**Key template files:**
+- `template-v2/CLAUDE.md` - Claudia's core identity and behavior
+- `template-v2/.claude/rules/claudia-principles.md` - 10 immutable principles
+- `template-v2/.claude/rules/trust-north-star.md` - Provenance tracking framework
+- `template-v2/.claude/skills/onboarding.md` - First-run experience
+- `template-v2/.claude/skills/agent-dispatcher.md` - Two-tier agent dispatch logic
+
+### Adding New Skills
+
+1. Create `[skill-name].md` (or `[skill-name]/SKILL.md` for complex skills) in `template-v2/.claude/skills/`
+2. Add YAML frontmatter with at minimum `effort-level` (low/medium/high/max)
+3. Include Purpose, Triggers, and Behavior sections
+4. Update `template-v2/.claude/skills/README.md`
+
+### Adding New Commands
+
+1. Create `[command-name].md` in `template-v2/.claude/commands/`
+2. Define: what to surface/do, format/structure, tone guidelines, edge cases
+3. Add to archetype-specific command lists in `structure-generator.md` if appropriate
 
 ## Publishing
 
@@ -220,20 +213,12 @@ The package is published to NPM as `get-claudia`. Update version in:
 - `package.json` (version field)
 - `CHANGELOG.md` (add release notes)
 
-Build tarball:
 ```bash
-npm pack
+npm pack      # Build tarball
+npm publish   # Publish to NPM
 ```
 
-Publish:
-```bash
-npm publish
-```
-
-## Important Design Principles
-
-### Minimal Initial Structure
-Template v2 provides only seed files. Structure grows organically based on user needs during onboarding.
+## Design Principles
 
 ### Personality Consistency
 Claudia's voice is defined in `template-v2/CLAUDE.md` and `claudia-principles.md`. All skills and commands should maintain:
@@ -245,111 +230,56 @@ Claudia's voice is defined in `template-v2/CLAUDE.md` and `claudia-principles.md
 ### Safety First
 Every external action requires explicit user approval. This is non-negotiable and enforced in `claudia-principles.md`.
 
+### Trust North Star
+Every memory tracks its origin via `origin_type` (user_stated, extracted, inferred, corrected). User corrections set `origin_type=corrected` and `confidence=1.0`. The `memory.audit_history` tool provides full provenance chains.
+
 ### Relationship-Centric
 People files are the primary organizing unit. Projects and tasks come and go; relationships persist.
 
 ### Progressive Disclosure
-Don't overwhelm users with structure upfront. Let complexity emerge from actual needs.
+Don't overwhelm users with structure upfront. Let complexity emerge from actual needs. Onboarding creates minimal seed files; structure grows organically.
+
+### Graceful Degradation
+Everything works without the memory daemon (falls back to markdown files). No required external APIs. Ollama is optional (cognitive extraction disabled without it).
 
 ## File Locations Reference
 
 ```
 claudia/
-├── bin/index.js              ← CLI installer
+├── bin/index.js              ← CLI installer (zero-dependency, ES modules)
 ├── package.json              ← NPM package config (name: get-claudia)
-├── template-v2/              ← Current template (use this)
+├── template-v2/              ← Current template
 │   ├── CLAUDE.md            ← Claudia's core identity
 │   └── .claude/
 │       ├── commands/         ← User-invocable workflows
-│       ├── skills/           ← Proactive behaviors
+│       ├── skills/           ← Proactive behaviors (YAML frontmatter with effort-level)
 │       │   └── archetypes/  ← Archetype-specific configs
-│       ├── rules/            ← Global principles
-│       └── hooks/            ← Event handlers
+│       ├── agents/           ← Two-tier agent team definitions
+│       ├── rules/            ← Global principles + trust north star
+│       └── hooks/            ← Session lifecycle (health check, pre-compact)
 ├── memory-daemon/            ← Python memory system
 │   ├── claudia_memory/
-│   │   ├── __main__.py      ← Entry point
-│   │   ├── database.py      ← SQLite + sqlite-vec connection management
-│   │   ├── schema.sql       ← Database table definitions
-│   │   ├── config.py        ← Settings and defaults
-│   │   ├── embeddings.py    ← Ollama embedding generation (384-dim)
+│   │   ├── __main__.py      ← Entry point (MCP, consolidation, health check)
+│   │   ├── database.py      ← SQLite + sqlite-vec, migrations v1-v14
+│   │   ├── schema.sql       ← 14+ table definitions
+│   │   ├── config.py        ← Settings from ~/.claudia/config.json
+│   │   ├── embeddings.py    ← Ollama 384-dim embedding generation
 │   │   ├── language_model.py ← Local LLM client for cognitive tools
-│   │   ├── mcp/server.py    ← MCP tool definitions (13 tools)
-│   │   ├── daemon/          ← Scheduler and health check (port 3848)
-│   │   ├── extraction/      ← Entity extraction (spaCy or regex)
-│   │   └── services/        ← Remember, Recall, Consolidate, Ingest
-│   ├── scripts/             ← Install and migration scripts
-│   ├── tests/               ← Pytest suite (asyncio_mode = auto)
-│   ├── test.sh              ← One-click test runner (unit + integration + daemon)
-│   └── pyproject.toml       ← Python config (requires Python 3.10+)
-├── openclaw-skills/           ← Standalone skills for OpenClaw (not in npm package)
-│   └── claudia-agent-rms/    ← Relationship management for Moltbook agents
+│   │   ├── mcp/server.py    ← 20+ MCP tool definitions
+│   │   ├── daemon/          ← Scheduler (APScheduler) + health check (port 3848)
+│   │   ├── extraction/      ← Entity extraction (spaCy or regex fallback)
+│   │   └── services/        ← Remember, Recall, Consolidate, Ingest, Documents,
+│   │                           Audit, Metrics, Verify, Guards, Filestore
+│   ├── scripts/             ← Install, migrate, diagnose, seed scripts
+│   ├── tests/               ← 25+ test files, pytest (asyncio_mode = auto)
+│   └── test.sh              ← One-click full test suite
+├── gateway/                  ← Messaging bridge (Telegram, Slack)
+│   ├── src/                 ← Express server, config, bridge (Anthropic/Ollama)
+│   ├── tests/               ← Node --test
+│   └── scripts/             ← Cross-platform installers
+├── visualizer-threejs/       ← 3D brain visualization
+│   ├── src/                 ← Three.js + D3-Force-3D + lil-gui
+│   └── vite.config.js
+├── openclaw-skills/          ← Standalone OpenClaw skills (not in npm package)
 └── template/                 ← Legacy template (deprecated)
 ```
-
-## Common Modifications
-
-**Changing onboarding questions:**
-Edit `template-v2/.claude/skills/onboarding.md` Phase 2
-
-**Adding new archetype:**
-1. Create `template-v2/.claude/skills/archetypes/[name].md`
-2. Add detection signals to `onboarding.md` Phase 3
-3. Add folder structure to `structure-generator.md`
-4. Define archetype-specific commands
-
-**Modifying Claudia's personality:**
-Edit `template-v2/CLAUDE.md` "How I Carry Myself" section
-
-**Changing safety rules:**
-Edit `template-v2/.claude/rules/claudia-principles.md` (requires strong justification)
-
-## Session Log
-
-### Feb 5, 2026
-**The Learning Loop -- Memory Quality System v1.22.0**
-
-Claudia's memory system now actually learns from experience. She can fix mistakes, merge duplicates, track what changed, and measure her own health.
-
-**New Services:**
-- `services/audit.py` -- Full audit trail for all memory operations. Logs every merge, correction, deletion with timestamps and details.
-- `services/metrics.py` -- System health metrics collection with trending. Track entity counts, memory stats, data quality over time.
-
-**New MCP Tools:**
-- `memory.merge_entities` -- Merge duplicate entities, preserving all references (memories, relationships, aliases)
-- `memory.delete_entity` -- Soft-delete with reason tracking (historical references preserved)
-- `memory.correct` -- Update memory content while preserving history in `corrected_from` field
-- `memory.invalidate` -- Mark memories as no longer true without destroying them
-- `memory.system_health` -- Get current system health metrics
-- `memory.find_duplicates` -- Find potential duplicate entities using fuzzy matching
-
-**New Skills:**
-- `/fix-duplicates` -- Find and merge duplicate entities through natural language
-- `/memory-health` -- System health dashboard showing entity counts, memory stats, and data quality
-
-**Database Migration v12:**
-- `audit_log` table for operation tracking
-- `metrics` table for time-series health data
-- Soft-delete columns on entities (`deleted_at`, `deleted_reason`)
-- Correction columns on memories (`corrected_at`, `corrected_from`, `invalidated_at`, `invalidated_reason`)
-
-**Files Created:**
-- `memory-daemon/claudia_memory/services/audit.py` -- AuditService with log(), get_recent(), get_entity_history(), get_memory_history()
-- `memory-daemon/claudia_memory/services/metrics.py` -- MetricsService with record(), collect_system_health(), get_trend(), collect_and_store()
-- `memory-daemon/tests/test_audit.py` -- 12 tests
-- `memory-daemon/tests/test_metrics.py` -- 12 tests
-- `memory-daemon/tests/test_entity_management.py` -- 13 tests (merge, delete, fuzzy matching)
-- `memory-daemon/tests/test_corrections.py` -- 12 tests (correct, invalidate)
-- `template-v2/.claude/skills/fix-duplicates/SKILL.md`
-- `template-v2/.claude/skills/memory-health/SKILL.md`
-
-**Files Modified:**
-- `memory-daemon/claudia_memory/services/remember.py` -- Added merge_entities(), delete_entity(), correct_memory(), invalidate_memory(), audit logging calls
-- `memory-daemon/claudia_memory/services/recall.py` -- Added find_duplicate_entities() with SequenceMatcher fuzzy matching
-- `memory-daemon/claudia_memory/mcp/server.py` -- 6 new tool definitions
-- `memory-daemon/claudia_memory/database.py` -- Migration v12
-- `memory-daemon/claudia_memory/daemon/scheduler.py` -- Daily metrics collection job at 5am
-- `template-v2/.claude/skills/memory-manager.md` -- User Corrections section
-
-**Released:** `get-claudia@1.22.0` (14 files changed, 2,737 insertions)
-
-**Stats:** 49 new tests, 0 regressions

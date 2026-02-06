@@ -1,6 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateExampleConfig, loadConfig } from '../src/config.js';
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import {
+  generateExampleConfig,
+  loadConfig,
+  deepMerge,
+  writePidFile,
+  readPidFile,
+  removePidFile,
+  PID_PATH,
+} from '../src/config.js';
 
 describe('Config', () => {
   it('generateExampleConfig returns valid structure', () => {
@@ -16,12 +27,75 @@ describe('Config', () => {
     assert.equal(config.gateway.port, 3849);
   });
 
-  it('loadConfig returns defaults when no config file', () => {
+  it('loadConfig returns a config with expected structure', () => {
     const config = loadConfig();
 
-    assert.equal(config.model, 'claude-sonnet-4-20250514');
-    assert.equal(config.maxTokens, 2048);
-    assert.equal(config.channels.telegram.enabled, false);
-    assert.equal(config.channels.slack.enabled, false);
+    // These fields always exist regardless of whether a config file is present
+    assert.ok(config.model);
+    assert.ok(typeof config.maxTokens === 'number');
+    assert.ok(config.channels);
+    assert.ok('telegram' in config.channels);
+    assert.ok('slack' in config.channels);
+    assert.ok(typeof config.gateway.port === 'number');
+  });
+});
+
+describe('deepMerge', () => {
+  it('merges nested objects', () => {
+    const defaults = { a: 1, nested: { x: 10, y: 20 } };
+    const overrides = { nested: { y: 99 } };
+    const result = deepMerge(defaults, overrides);
+
+    assert.equal(result.a, 1);
+    assert.equal(result.nested.x, 10);
+    assert.equal(result.nested.y, 99);
+  });
+
+  it('overrides scalar values', () => {
+    const defaults = { a: 1, b: 'hello' };
+    const overrides = { a: 42 };
+    const result = deepMerge(defaults, overrides);
+
+    assert.equal(result.a, 42);
+    assert.equal(result.b, 'hello');
+  });
+
+  it('preserves arrays from overrides', () => {
+    const defaults = { items: [1, 2] };
+    const overrides = { items: [3, 4, 5] };
+    const result = deepMerge(defaults, overrides);
+
+    assert.deepEqual(result.items, [3, 4, 5]);
+  });
+
+  it('adds new keys from overrides', () => {
+    const defaults = { a: 1 };
+    const overrides = { b: 2 };
+    const result = deepMerge(defaults, overrides);
+
+    assert.equal(result.a, 1);
+    assert.equal(result.b, 2);
+  });
+});
+
+describe('PID file operations', () => {
+  it('writes and reads PID file', () => {
+    writePidFile(12345);
+    const pid = readPidFile();
+    assert.equal(pid, 12345);
+    removePidFile();
+  });
+
+  it('returns null when PID file does not exist', () => {
+    // Ensure clean state
+    try { unlinkSync(PID_PATH); } catch {}
+    const pid = readPidFile();
+    assert.equal(pid, null);
+  });
+
+  it('removePidFile does not throw when file missing', () => {
+    try { unlinkSync(PID_PATH); } catch {}
+    // Should not throw
+    removePidFile();
   });
 });

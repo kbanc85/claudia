@@ -146,6 +146,23 @@ class TestDispatchTier:
         assert native_dispatches[0]["agent_name"] == "research-scout"
 
 
+    def test_dispatch_tier_rejects_invalid_value(self, db):
+        """dispatch_tier trigger rejects values other than 'task' or 'native_team'"""
+        import sqlite3
+
+        with pytest.raises(sqlite3.IntegrityError, match="dispatch_tier must be"):
+            db.insert(
+                "agent_dispatches",
+                {
+                    "agent_name": "bad-agent",
+                    "dispatch_category": "test",
+                    "task_summary": "Invalid tier test",
+                    "success": 1,
+                    "dispatch_tier": "invalid_tier",
+                },
+            )
+
+
 class TestMigrationV14:
     """Verify migration v14 applies cleanly"""
 

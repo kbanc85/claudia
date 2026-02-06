@@ -30,10 +30,6 @@ claudia/
 │   │   ├── follow-up-draft.md
 │   │   ├── draft-reply.md
 │   │   ├── summarize-doc.md
-│   │   ├── exec-brief.md           ← Archetype-specific
-│   │   ├── 1on1-prep.md            ← Archetype-specific
-│   │   ├── board-update.md         ← Archetype-specific
-│   │   ├── initiative-status.md    ← Archetype-specific
 │   │   ├── pipeline-review.md      ← Business command
 │   │   ├── financial-snapshot.md   ← Business command
 │   │   └── accountability-check.md ← Business command

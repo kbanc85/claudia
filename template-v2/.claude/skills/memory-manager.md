@@ -11,6 +11,39 @@ effort-level: medium
 
 ---
 
+## MCP Tool Reference
+
+All available memory tools when the daemon is connected. Skills should only reference tools from this list.
+
+### Core
+`memory.remember`, `memory.recall`, `memory.about`, `memory.entity`, `memory.relate`, `memory.search_entities`, `memory.batch`
+
+### Session Lifecycle
+`memory.session_context`, `memory.buffer_turn`, `memory.end_session`, `memory.unsummarized`, `memory.briefing`
+
+### Documents & Files
+`memory.file`, `memory.documents`
+
+### Analysis & Insights
+`memory.predictions`, `memory.prediction_feedback`, `memory.morning_context`, `memory.consolidate`, `memory.reflections`
+
+### Trust & Provenance
+`memory.trace`, `memory.correct`, `memory.invalidate`, `memory.audit_history`, `memory.merge_entities`, `memory.delete_entity`
+
+### Network Graph
+`memory.project_network`, `memory.find_path`, `memory.network_hubs`, `memory.dormant_relationships`
+
+### Agent Dispatch
+`memory.agent_dispatch`
+
+### Gateway
+`memory.telegram_inbox`
+
+### Admin
+`memory.purge`
+
+---
+
 ## Hard Requirements
 
 These are non-negotiable. Violating them defeats the purpose of the memory system.
@@ -314,7 +347,7 @@ If enhanced memory is unavailable, use traditional file loading:
 
 ## Greeting Calibration
 
-**Never use the same greeting twice.** Greetings should feel natural and personal based on context.
+**Change it up frequently.** Greetings should feel natural and personal based on context.
 
 **First session (no me.md):**
 Trigger onboarding with a warm, varied introduction. See onboarding skill for examples.

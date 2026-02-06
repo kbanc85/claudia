@@ -120,7 +120,7 @@ claudia/
     └── calendar.md
 ```
 
-**Generated Commands:**
+**Built-in Commands** (templates defined in archetype config, not separate files)**:**
 - `/client-status` - Health check all engagements
 - `/proposal-draft` - Draft new proposals
 - `/pipeline-review` - What's in your funnel
@@ -159,7 +159,7 @@ claudia/
     └── materials/
 ```
 
-**Generated Commands:**
+**Built-in Commands** (templates defined in archetype config, not separate files)**:**
 - `/exec-brief` - Leadership-focused morning brief
 - `/1on1-prep [person]` - Prepare for 1:1 meeting
 - `/board-update` - Draft board update
@@ -199,7 +199,7 @@ claudia/
     └── overview.md
 ```
 
-**Generated Commands:**
+**Built-in Commands** (templates defined in archetype config, not separate files)**:**
 - `/investor-update` - Draft investor update
 - `/pitch-prep` - Prepare for investor meeting
 - `/team-standup` - Prepare standup notes
@@ -236,7 +236,7 @@ claudia/
     └── tracking.md
 ```
 
-**Generated Commands:**
+**Built-in Commands** (templates defined in archetype config, not separate files)**:**
 - `/week-review` - Solo-focused weekly review
 - `/invoice-draft [client]` - Draft invoice
 - `/project-status` - Status across projects
@@ -275,7 +275,7 @@ claudia/
         └── overview.md
 ```
 
-**Generated Commands:**
+**Built-in Commands** (templates defined in archetype config, not separate files)**:**
 - `/content-calendar` - View/update content calendar
 - `/draft-post [platform]` - Quick social draft
 - `/audience-insights` - Review audience patterns
