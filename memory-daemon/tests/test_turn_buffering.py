@@ -160,6 +160,43 @@ class TestEndSession:
             db.close()
 
 
+    def test_end_session_nonexistent_episode(self):
+        """end_session with a non-existent episode_id should return error, not raise."""
+        db, tmpdir = _make_db()
+        try:
+            svc = _make_service(db)
+
+            # Call end_session with an episode_id that was never created
+            result = svc.end_session(
+                episode_id=9999,
+                narrative="This episode does not exist."
+            )
+
+            assert result["episode_id"] == 9999
+            assert result["narrative_stored"] is False
+            assert "error" in result
+            assert "not found" in result["error"].lower()
+        finally:
+            db.close()
+
+    def test_end_session_episode_zero(self):
+        """end_session with episode_id=0 should return error (AUTOINCREMENT starts at 1)."""
+        db, tmpdir = _make_db()
+        try:
+            svc = _make_service(db)
+
+            result = svc.end_session(
+                episode_id=0,
+                narrative="Default zero episode."
+            )
+
+            assert result["episode_id"] == 0
+            assert result["narrative_stored"] is False
+            assert "error" in result
+        finally:
+            db.close()
+
+
 class TestUnsummarized:
     """Tests for get_unsummarized_turns functionality."""
 

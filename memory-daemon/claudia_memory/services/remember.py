@@ -993,6 +993,13 @@ class RememberService:
             "relationships_stored": 0,
         }
 
+        # Validate episode exists before any DB operations
+        episode = self.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
+        if not episode:
+            result["error"] = f"Episode {episode_id} not found. Call memory.buffer_turn first to create an episode."
+            logger.warning(f"end_session called with non-existent episode_id={episode_id}")
+            return result
+
         # 1. Store narrative in episode
         update_data = {
             "narrative": narrative,

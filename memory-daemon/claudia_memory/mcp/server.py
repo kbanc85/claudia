@@ -1427,6 +1427,19 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
 
         elif name == "memory.end_session":
             episode_id = arguments["episode_id"]
+
+            # Auto-create episode if it doesn't exist (handles skipped buffer_turn)
+            svc = get_remember_service()
+            episode = svc.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
+            if not episode:
+                from datetime import datetime
+                new_id = svc.db.insert("episodes", {
+                    "started_at": datetime.utcnow().isoformat(),
+                    "source": arguments.get("source", "claude_code"),
+                })
+                logger.info(f"Auto-created episode {new_id} (requested {episode_id} did not exist)")
+                episode_id = new_id
+
             result = end_session(
                 episode_id=episode_id,
                 narrative=arguments["narrative"],
