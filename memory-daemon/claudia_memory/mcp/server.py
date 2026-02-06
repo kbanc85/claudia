@@ -66,8 +66,32 @@ from ..services.remember import (
     remember_fact,
     remember_message,
 )
+from ..embeddings import get_embedding_service
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_arg(arguments: Dict[str, Any], key: str, expected_type: type = list) -> None:
+    """Coerce a tool argument from JSON string to expected type in-place.
+
+    LLMs sometimes serialize array parameters as JSON strings instead of
+    native arrays. This transparently parses them back so handler code
+    can assume native types.
+    """
+    value = arguments.get(key)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, expected_type):
+                arguments[key] = parsed
+            else:
+                logger.warning(
+                    f"Coercion: '{key}' parsed to {type(parsed).__name__}, "
+                    f"expected {expected_type.__name__}"
+                )
+        except (json.JSONDecodeError, TypeError):
+            logger.warning(f"Could not parse '{key}' as JSON: {value[:100]}")
+
 
 # Initialize the MCP server
 server = Server("claudia-memory")
@@ -94,7 +118,7 @@ async def list_tools() -> ListToolsResult:
                         "default": "fact",
                     },
                     "about": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Entity names this memory relates to (people, projects, etc.)",
                     },
@@ -139,7 +163,7 @@ async def list_tools() -> ListToolsResult:
                         "default": 10,
                     },
                     "types": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Filter by memory types (fact, preference, observation, learning, commitment)",
                     },
@@ -153,7 +177,7 @@ async def list_tools() -> ListToolsResult:
                         "default": False,
                     },
                     "ids": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "integer"},
                         "description": "Fetch specific memories by ID (skips search). Use after a compact search to get full content.",
                     },
@@ -232,7 +256,7 @@ async def list_tools() -> ListToolsResult:
                         "default": 5,
                     },
                     "types": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Filter by type (reminder, suggestion, warning, insight)",
                     },
@@ -268,7 +292,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Description of the entity",
                     },
                     "aliases": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Alternative names or spellings",
                     },
@@ -287,7 +311,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Search query",
                     },
                     "types": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Filter by entity types",
                     },
@@ -354,7 +378,7 @@ async def list_tools() -> ListToolsResult:
                         ),
                     },
                     "facts": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {
                             "type": "object",
                             "properties": {
@@ -388,7 +412,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Structured facts, preferences, observations, learnings extracted from the session",
                     },
                     "commitments": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {
                             "type": "object",
                             "properties": {
@@ -416,7 +440,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Commitments or promises made during the session",
                     },
                     "entities": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {
                             "type": "object",
                             "properties": {
@@ -437,7 +461,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "New or updated entities mentioned during the session",
                     },
                     "relationships": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {
                             "type": "object",
                             "properties": {
@@ -451,12 +475,12 @@ async def list_tools() -> ListToolsResult:
                         "description": "Relationships between entities observed during the session",
                     },
                     "key_topics": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Main topics discussed in the session",
                     },
                     "reflections": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {
                             "type": "object",
                             "properties": {
@@ -492,7 +516,7 @@ async def list_tools() -> ListToolsResult:
                         ),
                     },
                 },
-                "required": ["episode_id", "narrative"],
+                "required": ["narrative"],
             },
         ),
         Tool(
@@ -524,7 +548,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Semantic search query (optional). If omitted, returns recent high-importance reflections.",
                     },
                     "types": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {
                             "type": "string",
                             "enum": ["observation", "pattern", "learning", "question"],
@@ -570,7 +594,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "operations": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "description": "Array of operations to execute in order",
                         "items": {
                             "type": "object",
@@ -775,12 +799,12 @@ async def list_tools() -> ListToolsResult:
                         "description": "Brief summary of the document",
                     },
                     "about": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "string"},
                         "description": "Entity names this document relates to",
                     },
                     "memory_ids": {
-                        "type": "array",
+                        "type": ["array", "string"],
                         "items": {"type": "integer"},
                         "description": "Memory IDs to link as sourced from this document",
                     },
@@ -1158,6 +1182,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
     """Handle tool calls"""
     try:
         if name == "memory.remember":
+            _coerce_arg(arguments, "about")
             memory_id = remember_fact(
                 content=arguments["content"],
                 memory_type=arguments.get("type", "fact"),
@@ -1187,6 +1212,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.recall":
+            _coerce_arg(arguments, "types")
+            _coerce_arg(arguments, "ids")
             # Direct fetch by IDs (skip search)
             if "ids" in arguments and arguments["ids"]:
                 results = fetch_by_ids(arguments["ids"])
@@ -1339,6 +1366,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.predictions":
+            _coerce_arg(arguments, "types")
             predictions = get_predictions(
                 limit=arguments.get("limit", 5),
                 prediction_types=arguments.get("types"),
@@ -1364,6 +1392,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.entity":
+            _coerce_arg(arguments, "aliases")
             entity_id = remember_entity(
                 name=arguments["name"],
                 entity_type=arguments.get("type", "person"),
@@ -1380,6 +1409,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.search_entities":
+            _coerce_arg(arguments, "types")
             results = search_entities(
                 query=arguments["query"],
                 entity_types=arguments.get("types"),
@@ -1426,19 +1456,30 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.end_session":
-            episode_id = arguments["episode_id"]
+            # Coerce all array fields (LLMs may send JSON strings)
+            for field in ("facts", "commitments", "entities", "relationships", "key_topics", "reflections"):
+                _coerce_arg(arguments, field)
 
-            # Auto-create episode if it doesn't exist (handles skipped buffer_turn)
+            # Handle missing or invalid episode_id: auto-create
+            episode_id = arguments.get("episode_id")
             svc = get_remember_service()
-            episode = svc.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
-            if not episode:
+            if episode_id is None:
                 from datetime import datetime
-                new_id = svc.db.insert("episodes", {
+                episode_id = svc.db.insert("episodes", {
                     "started_at": datetime.utcnow().isoformat(),
-                    "source": arguments.get("source", "claude_code"),
+                    "source": "claude_code",
                 })
-                logger.info(f"Auto-created episode {new_id} (requested {episode_id} did not exist)")
-                episode_id = new_id
+                logger.info(f"Auto-created episode {episode_id} (no episode_id provided)")
+            else:
+                episode = svc.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
+                if not episode:
+                    from datetime import datetime
+                    new_id = svc.db.insert("episodes", {
+                        "started_at": datetime.utcnow().isoformat(),
+                        "source": arguments.get("source", "claude_code"),
+                    })
+                    logger.info(f"Auto-created episode {new_id} (requested {episode_id} did not exist)")
+                    episode_id = new_id
 
             result = end_session(
                 episode_id=episode_id,
@@ -1489,6 +1530,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.reflections":
+            _coerce_arg(arguments, "types")
             action = arguments.get("action", "get")
             limit = arguments.get("limit", 10)
             types = arguments.get("types")
@@ -1578,7 +1620,35 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 )
 
         elif name == "memory.batch":
+            _coerce_arg(arguments, "operations")
             operations = arguments.get("operations", [])
+
+            # --- Pass 1: Collect all texts that need embeddings ---
+            embed_tasks = []  # list of (index, text) for parallel embedding
+            for i, op in enumerate(operations):
+                op_type = op.get("op")
+                if op_type == "remember":
+                    embed_tasks.append((i, op["content"]))
+                elif op_type == "entity":
+                    # Only new entities need embeddings; collect optimistically
+                    embed_text = f"{op['name']}. {op.get('description') or ''}"
+                    embed_tasks.append((i, embed_text))
+
+            # --- Parallel embedding pass ---
+            embeddings_map = {}  # index -> embedding
+            if embed_tasks:
+                try:
+                    emb_svc = get_embedding_service()
+                    texts = [text for _, text in embed_tasks]
+                    all_embeddings = await emb_svc.embed_batch(texts)
+                    for (idx, _), emb in zip(embed_tasks, all_embeddings):
+                        if emb is not None:
+                            embeddings_map[idx] = emb
+                except Exception as e:
+                    logger.warning(f"Batch parallel embedding failed, falling back to per-op: {e}")
+                    # embeddings_map stays empty; remember_fact/entity will embed individually
+
+            # --- Pass 2: Execute operations with pre-computed embeddings ---
             results = []
             for i, op in enumerate(operations):
                 op_type = op.get("op")
@@ -1590,6 +1660,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             entity_type=op.get("type", "person"),
                             description=op.get("description"),
                             aliases=op.get("aliases"),
+                            _precomputed_embedding=embeddings_map.get(i),
                         )
                         op_result["success"] = True
                         op_result["entity_id"] = entity_id
@@ -1601,6 +1672,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             importance=op.get("importance", 1.0),
                             source=op.get("source"),
                             source_context=op.get("source_context"),
+                            _precomputed_embedding=embeddings_map.get(i),
                         )
                         op_result["success"] = True
                         op_result["memory_id"] = memory_id
@@ -1716,6 +1788,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.file":
+            _coerce_arg(arguments, "about")
+            _coerce_arg(arguments, "memory_ids")
             doc_svc = get_document_service()
             result = doc_svc.file_document_from_text(
                 content=arguments["content"],
