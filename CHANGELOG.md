@@ -2,6 +2,27 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.28.4 (2026-02-06)
+
+### Windows 11 Compatibility
+
+Claudia now works on Windows 11 out of the box. A user reported five cascading failures after installing via `npx get-claudia` on Windows: hooks crashed (no bash), MCP tools didn't load (wrong entry point), sqlite-vec failed silently, and the diagnose skill only spoke Unix.
+
+### Fixed
+
+- **Hooks crash on Windows** - Session hooks hardcoded `bash` as executor, which doesn't exist on vanilla Windows. Hooks now try `python3 > python > bash` with a graceful JSON fallback. New cross-platform Python hooks (`session-health-check.py`, `pre-compact.py`) handle macOS, Linux, and Windows natively.
+- **MCP entry point bypassed __main__.py** - The installer wrote `.mcp.json` with `-m claudia_memory.mcp.server`, skipping project isolation, the health server, and background scheduling. Fixed to use `-m claudia_memory --project-dir ${workspaceFolder}`.
+- **sqlite-vec silent failure on Windows** - Method 1 failure logged at DEBUG (invisible). Upgraded to WARNING. Added Windows DLL search paths (package directory rglob, sys.executable/DLLs) and architecture mismatch guidance.
+- **Bash health check missing Windows case** - Added `msys*|cygwin*|MINGW*` OSTYPE detection with Task Scheduler status check and PowerShell `Invoke-WebRequest` fallback for curl.
+
+### Changed
+
+- **Diagnose skill is cross-platform** - Added platform detection step, Windows PowerShell equivalents for all diagnostic commands (process check, health endpoint, log tail, database query, Task Scheduler), and Windows recovery commands.
+- **New diagnose issue: wrong MCP entry point** - Detection and fix instructions for the `.mcp.json` entry point bug, helping existing users self-heal.
+- **`.mcp.json.example` Windows note** - Added `_windows` field documenting the Windows Python path.
+
+---
+
 ## 1.28.3 (2026-02-06)
 
 ### Resilient Memory Tools
