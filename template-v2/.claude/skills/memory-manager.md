@@ -81,9 +81,17 @@ User shares transcript/email/document
 
 Before greeting the user:
 1. Check that `memory.*` tools are in your available tools
-2. If missing: Warn user "Memory daemon not connected. Run /diagnose."
+2. If missing: **Do not silently fall back.** Proactively tell the user and offer to fix it:
+   - If the session-health-check hook reported the daemon is installed but stopped, offer to start it:
+     - macOS: `launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist`
+     - Linux: `systemctl --user start claudia-memory`
+   - If the daemon was never installed, offer to run the installer:
+     - `~/.claudia/daemon/scripts/install.sh` (if daemon dir exists)
+     - Or `cd [claudia-dir] && ./memory-daemon/scripts/install.sh`
+   - Briefly explain what's lost without it: "Without the daemon, I can't search memories semantically, detect patterns, track relationships across sessions, or give you proactive predictions."
+   - After starting, the user needs to restart Claude Code for MCP tools to appear
 3. Call `memory.session_context` to load context
-4. If this fails: Warn user about degraded mode
+4. If this fails: Warn user about degraded mode and suggest checking `~/.claudia/daemon-stderr.log`
 
 ### 3. Buffer Turns During Sessions
 
@@ -157,20 +165,31 @@ Do NOT:
 
 ## Memory System Detection
 
-At session start, check which memory system is available:
+At session start, check which memory system is available. **This is not optional.** The daemon is Claudia's brain. Without it she's operating at a fraction of her capability.
 
 1. **Enhanced Memory (Preferred):** Check if `memory.recall` MCP tool is available
-2. **Fallback:** Use markdown files in `context/` directory
+2. **If missing, diagnose and offer to fix** (don't silently degrade)
+3. **Fallback:** Use markdown files in `context/` directory only as last resort
 
 ```
 Session Start:
 ├── Check if memory.recall tool exists
 │   ├── YES → Use enhanced memory system
-│   └── NO → Check if this might be a restart issue
-│       ├── Check daemon health: curl -s localhost:3848/health
+│   └── NO → Check session-health-check hook output for diagnosis
+│       ├── Hook says "installed but stopped"
+│       │   → Offer to start: "Your memory daemon is installed but stopped.
+│       │     Want me to start it?" Then run the platform-specific command.
+│       │     After starting, user must restart Claude Code for MCP tools.
+│       ├── Hook says "not installed"
+│       │   → Offer to install: "The memory system hasn't been set up yet.
+│       │     Want me to run the installer?"
+│       ├── No hook output → Check daemon health: curl -s localhost:3848/health
 │       │   ├── Healthy but no MCP tools → User needs to restart Claude Code
-│       │   └── Not healthy → Fall back to markdown files
+│       │   └── Not healthy → Offer to start/install (as above)
+│       └── After offering, if user declines → Fall back to markdown files
 ```
+
+**The key behavior change:** Never silently fall back to markdown. Always tell the user and offer to fix it. The daemon makes Claudia dramatically more capable and users should know when they're missing out.
 
 ---
 

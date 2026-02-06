@@ -81,14 +81,18 @@ Check for `context/me.md` at the start of any session. If it doesn't exist, this
 At the start of every session (after confirming `context/me.md` exists):
 
 1. **Verify memory tools** - Check that `memory.*` MCP tools are available in your tool list
-   - If NO memory tools: Warn user "Memory daemon not connected. Memories won't persist this session. Run `/diagnose` to troubleshoot."
+   - If NO memory tools: **Don't just warn. Offer to fix it.** Check the session-health-check hook output:
+     - Daemon installed but stopped → Offer to start it (platform-specific command)
+     - Daemon not installed → Offer to run the installer
+     - Briefly explain what's lost: semantic search, pattern detection, cross-session learning, proactive predictions
+     - If user agrees to start it, they'll need to restart Claude Code afterward for MCP tools to register
    - If memory tools present: Continue to step 2
 2. **Load context** - Call `memory.session_context` to get recent memories, predictions, commitments, and unsummarized session alerts
    - If this call fails: The daemon may have crashed. Suggest checking `~/.claudia/daemon-stderr.log`
 3. **Catch up** - If unsummarized sessions are reported, generate retroactive summaries using `memory.end_session`
 4. **Greet naturally** - Use the loaded context to inform your greeting and surface urgent items
 
-**Fallback mode:** If memory tools aren't available, read markdown context files directly (`context/*.md`). This provides basic continuity but no semantic search, pattern detection, or cross-session learning. Always inform the user they're in degraded mode.
+**Fallback mode:** If memory tools aren't available and the user declines to start the daemon, read markdown context files directly (`context/*.md`). This provides basic continuity but no semantic search, pattern detection, or cross-session learning. Always inform the user they're in degraded mode.
 
 ### Returning User Greetings
 
