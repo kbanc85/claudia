@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.28.2 (2026-02-06)
+
+### Fixed
+
+- **end_session FK constraint fix** - Calling `memory.end_session` with a non-existent episode_id (e.g., 0 or before `buffer_turn` creates one) no longer crashes with a FOREIGN KEY constraint error. The MCP handler now auto-creates a minimal episode, and the service layer returns a clear error for direct callers.
+
+---
+
 ## 1.28.1 (2026-02-06)
 
 ### Don't Let Me Forget
