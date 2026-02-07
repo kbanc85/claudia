@@ -696,10 +696,12 @@ class RecallService:
 
         relationships = []
         for row in rel_rows:
+            row_keys = row.keys()
             rel_dict = {
                 "type": row["relationship_type"],
                 "direction": row["direction"],
                 "strength": row["strength"],
+                "origin_type": row["origin_type"] if "origin_type" in row_keys else "extracted",
                 "other_entity": (
                     row["target_name"]
                     if row["source_entity_id"] == entity["id"]
@@ -713,7 +715,6 @@ class RecallService:
             }
             # Include temporal fields when showing historical data
             if include_historical:
-                row_keys = row.keys()
                 rel_dict["valid_at"] = row["valid_at"] if "valid_at" in row_keys else None
                 rel_dict["invalid_at"] = row["invalid_at"] if "invalid_at" in row_keys else None
             relationships.append(rel_dict)

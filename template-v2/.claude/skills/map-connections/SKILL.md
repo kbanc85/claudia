@@ -60,9 +60,10 @@ For each file, extract:
 
 ### 3. Extract Relationships
 
-Identify explicit and implicit relationships:
+Identify explicit and implicit relationships. For each relationship, set `origin_type` honestly based on how you know it. The system automatically caps strength based on origin, so always use `strength: 1.0` and let the guards enforce the ceiling.
 
-**Explicit Relationships (High Confidence: 0.9)**
+**Extracted Relationships** (origin_type: "extracted", ceiling: 0.8)
+Explicitly stated in the file:
 - "works with [Name]" -> `works_with`
 - "client of [Name]" -> `client_of`
 - "reports to [Name]" -> `reports_to`
@@ -71,11 +72,10 @@ Identify explicit and implicit relationships:
 - "partner at [Org]" -> `partner_at`
 - "advisor to [Name/Org]" -> `advisor_to`
 
-**Co-mention Relationships (Medium Confidence: 0.6)**
+**Inferred Relationships** (origin_type: "inferred", ceiling: 0.5)
+Co-mentioned or contextually implied:
 - Two people mentioned in the same file -> `mentioned_with`
 - People in the same project file -> `collaborates_on`
-
-**Inferred Relationships (Low Confidence: 0.3)**
 - Same city + same industry -> `likely_connected`
 - Same organization -> `colleagues`
 - Same community group -> `community_connection`
@@ -96,18 +96,20 @@ Use `memory.batch` for efficiency:
 memory.batch operations=[
   {op: "entity", name: "Sarah Chen", type: "person", description: "CEO at Acme Corp"},
   {op: "entity", name: "Acme Corp", type: "organization"},
-  {op: "relate", source: "Sarah Chen", target: "Acme Corp", relationship: "works_at", strength: 0.9},
-  {op: "relate", source: "Sarah Chen", target: "Tom Miller", relationship: "works_with", strength: 0.6},
+  {op: "relate", source: "Sarah Chen", target: "Acme Corp", relationship: "works_at", strength: 1.0, origin_type: "extracted"},
+  {op: "relate", source: "Sarah Chen", target: "Tom Miller", relationship: "works_with", strength: 1.0, origin_type: "inferred"},
   ...
 ]
 ```
 
-For relationship strength:
-- High confidence (explicit): 0.9
-- Medium confidence (co-mention): 0.6
-- Low confidence (inferred): 0.3
+For relationship `origin_type`:
+- Explicitly stated in the file ("Sarah is CEO of Acme"): `origin_type: "extracted"`
+- Co-mentioned or contextually implied: `origin_type: "inferred"`
+- User told you directly: `origin_type: "user_stated"`
 
-When updating existing relationships, take the maximum strength.
+The system automatically caps strength based on origin. You don't need to manually calibrate. Just be honest about how you know, and always use `strength: 1.0`.
+
+When re-encountering existing relationships, the system strengthens them incrementally (scaled by origin). Repeated evidence builds trust organically.
 
 ### 6. Report Results
 
@@ -129,23 +131,23 @@ Output format:
 
 ### New Relationships ([count])
 
-| Source | Relationship | Target | Confidence |
-|--------|--------------|--------|------------|
-| Sarah Chen | works_at | Acme Corp | high (0.9) |
-| Sarah Chen | collaborates_on | Website Redesign | high (0.9) |
-| Sarah Chen | mentioned_with | Tom Miller | medium (0.6) |
+| Source | Relationship | Target | Origin |
+|--------|--------------|--------|--------|
+| Sarah Chen | works_at | Acme Corp | extracted |
+| Sarah Chen | collaborates_on | Website Redesign | extracted |
+| Sarah Chen | mentioned_with | Tom Miller | inferred |
 
 ### Inferred Connections ([count])
 
-| Entity A | Entity B | Reason | Confidence |
-|----------|----------|--------|------------|
-| Sarah Chen | Jane Doe | Same city (Palm Beach) + industry (real estate) | low (0.3) |
+| Entity A | Entity B | Reason | Origin |
+|----------|----------|--------|--------|
+| Sarah Chen | Jane Doe | Same city (Palm Beach) + industry (real estate) | inferred |
 
 ### Updated Relationships ([count])
 
 | Relationship | Change |
 |--------------|--------|
-| Sarah Chen -> client_of -> Beta Inc | strength: 0.6 -> 0.9 |
+| Sarah Chen -> client_of -> Beta Inc | strengthened (re-encountered, extracted) |
 
 ### Summary
 

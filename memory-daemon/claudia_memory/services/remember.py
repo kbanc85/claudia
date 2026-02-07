@@ -376,6 +376,7 @@ class RememberService:
         metadata: Optional[Dict] = None,
         valid_at: Optional[str] = None,
         supersedes: bool = False,
+        origin_type: str = "extracted",
     ) -> Optional[int]:
         """
         Create or strengthen a relationship between entities.
@@ -390,12 +391,15 @@ class RememberService:
             valid_at: When this relationship became true (ISO string, defaults to now)
             supersedes: If True, invalidate existing relationship of same type
                         between same entities before creating a new one
+            origin_type: How this was learned: user_stated, extracted, inferred, corrected
 
         Returns:
             Relationship ID or None
         """
-        # Run deterministic guards
-        guard_result = validate_relationship(strength)
+        from .guards import ORIGIN_STRENGTH_CEILING, REINFORCEMENT_BY_ORIGIN
+
+        # Run deterministic guards (origin-aware)
+        guard_result = validate_relationship(strength, origin_type=origin_type)
         if guard_result.warnings:
             for w in guard_result.warnings:
                 logger.warning(f"Relationship guard: {w}")
@@ -412,44 +416,56 @@ class RememberService:
         effective_valid_at = valid_at or now
 
         if supersedes:
-            # Invalidate any existing relationship of same type FROM this source entity
+            # Invalidate existing relationship of same type between same entities (atomic)
             existing_to_supersede = self.db.get_one(
                 "relationships",
-                where="source_entity_id = ? AND relationship_type = ? AND invalid_at IS NULL",
-                where_params=(source_id, relationship_type),
+                where="source_entity_id = ? AND target_entity_id = ? AND relationship_type = ? AND invalid_at IS NULL",
+                where_params=(source_id, target_id, relationship_type),
             )
             if existing_to_supersede:
-                # Invalidate the old relationship (mark when it ended)
-                self.db.update(
-                    "relationships",
-                    {
-                        "invalid_at": now,
-                        "updated_at": now,
+                with self.db.transaction() as conn:
+                    # Invalidate the old relationship (mark when it ended)
+                    conn.execute(
+                        "UPDATE relationships SET invalid_at = ?, updated_at = ? WHERE id = ?",
+                        (now, now, existing_to_supersede["id"]),
+                    )
+                    # Rename the type to free the UNIQUE constraint slot
+                    old_meta = json.loads(existing_to_supersede["metadata"] or "{}")
+                    old_meta["superseded_by_at"] = now
+                    conn.execute(
+                        "UPDATE relationships SET relationship_type = ?, metadata = ? WHERE id = ?",
+                        (
+                            f"{relationship_type}__superseded_{existing_to_supersede['id']}",
+                            json.dumps(old_meta),
+                            existing_to_supersede["id"],
+                        ),
+                    )
+
+                # Audit log for supersede
+                _audit_log(
+                    "relationship_supersede",
+                    details={
+                        "old_id": existing_to_supersede["id"],
+                        "source": source_name,
+                        "target": target_name,
+                        "type": relationship_type,
                     },
-                    "id = ?",
-                    (existing_to_supersede["id"],),
-                )
-                # Rename the type to free the UNIQUE constraint slot
-                old_meta = json.loads(existing_to_supersede["metadata"] or "{}")
-                old_meta["superseded_by_at"] = now
-                self.db.update(
-                    "relationships",
-                    {
-                        "relationship_type": f"{relationship_type}__superseded_{existing_to_supersede['id']}",
-                        "metadata": json.dumps(old_meta),
-                    },
-                    "id = ?",
-                    (existing_to_supersede["id"],),
                 )
 
+            # Supersede always sets origin_type to 'corrected' (user is correcting the record)
+            supersede_origin = "corrected"
+            ceiling = ORIGIN_STRENGTH_CEILING.get(supersede_origin, 0.5)
+            capped_strength = min(strength, ceiling)
+
             # Create new relationship
-            return self.db.insert(
+            new_id = self.db.insert(
                 "relationships",
                 {
                     "source_entity_id": source_id,
                     "target_entity_id": target_id,
                     "relationship_type": relationship_type,
-                    "strength": strength,
+                    "strength": capped_strength,
+                    "origin_type": supersede_origin,
                     "direction": direction,
                     "valid_at": effective_valid_at,
                     "created_at": now,
@@ -457,6 +473,21 @@ class RememberService:
                     "metadata": json.dumps(metadata) if metadata else None,
                 },
             )
+
+            # Audit log for create
+            _audit_log(
+                "relationship_create",
+                details={
+                    "id": new_id,
+                    "source": source_name,
+                    "target": target_name,
+                    "type": relationship_type,
+                    "origin_type": supersede_origin,
+                    "strength": capped_strength,
+                },
+            )
+
+            return new_id
 
         # Check for existing current relationship (non-supersede path)
         existing = self.db.get_one(
@@ -466,11 +497,23 @@ class RememberService:
         )
 
         if existing:
-            # Default behavior: strengthen existing relationship
-            new_strength = min(1.0, existing["strength"] + 0.1)
+            # Determine ceiling: if new origin is higher-authority, upgrade
+            existing_origin = existing["origin_type"] if "origin_type" in existing.keys() else "extracted"
+            effective_origin = existing_origin
+
+            # Origin upgrade: user_stated/corrected outrank extracted, which outranks inferred
+            origin_rank = {"inferred": 0, "extracted": 1, "user_stated": 2, "corrected": 2}
+            if origin_rank.get(origin_type, 0) > origin_rank.get(existing_origin, 0):
+                effective_origin = origin_type
+
+            ceiling = ORIGIN_STRENGTH_CEILING.get(effective_origin, 0.5)
+            increment = REINFORCEMENT_BY_ORIGIN.get(origin_type, 0.1)
+            new_strength = min(ceiling, existing["strength"] + increment)
+
             update_data = {
                 "strength": new_strength,
                 "updated_at": now,
+                "origin_type": effective_origin,
             }
             # Ensure valid_at is set on existing relationships
             row_keys = existing.keys()
@@ -485,13 +528,14 @@ class RememberService:
             return existing["id"]
         else:
             # Create new relationship
-            return self.db.insert(
+            new_id = self.db.insert(
                 "relationships",
                 {
                     "source_entity_id": source_id,
                     "target_entity_id": target_id,
                     "relationship_type": relationship_type,
                     "strength": strength,
+                    "origin_type": origin_type,
                     "direction": direction,
                     "valid_at": effective_valid_at,
                     "created_at": now,
@@ -499,6 +543,105 @@ class RememberService:
                     "metadata": json.dumps(metadata) if metadata else None,
                 },
             )
+
+            # Audit log
+            _audit_log(
+                "relationship_create",
+                details={
+                    "id": new_id,
+                    "source": source_name,
+                    "target": target_name,
+                    "type": relationship_type,
+                    "origin_type": origin_type,
+                    "strength": strength,
+                },
+            )
+
+            return new_id
+
+    def invalidate_relationship(
+        self,
+        source_name: str,
+        target_name: str,
+        relationship_type: str,
+        reason: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Invalidate a relationship without creating a replacement.
+
+        Finds the active relationship by source + target + type, marks it with
+        invalid_at, and renames the type to free the UNIQUE constraint. Atomic.
+
+        Args:
+            source_name: Source entity name
+            target_name: Target entity name
+            relationship_type: Type of relationship to invalidate
+            reason: Why this relationship is being invalidated
+
+        Returns:
+            Dict with invalidated relationship info, or None if not found
+        """
+        source_id = self._find_or_create_entity(source_name)
+        target_id = self._find_or_create_entity(target_name)
+
+        if not source_id or not target_id:
+            return None
+
+        existing = self.db.get_one(
+            "relationships",
+            where="source_entity_id = ? AND target_entity_id = ? AND relationship_type = ? AND invalid_at IS NULL",
+            where_params=(source_id, target_id, relationship_type),
+        )
+
+        if not existing:
+            return None
+
+        now = datetime.utcnow().isoformat()
+
+        with self.db.transaction() as conn:
+            # Invalidate and rename type atomically
+            old_meta = json.loads(existing["metadata"] or "{}")
+            old_meta["invalidated_reason"] = reason
+            old_meta["invalidated_at"] = now
+
+            conn.execute(
+                "UPDATE relationships SET invalid_at = ?, updated_at = ?, "
+                "relationship_type = ?, metadata = ? WHERE id = ?",
+                (
+                    now,
+                    now,
+                    f"{relationship_type}__invalidated_{existing['id']}",
+                    json.dumps(old_meta),
+                    existing["id"],
+                ),
+            )
+
+        # Audit log
+        _audit_log(
+            "relationship_invalidate",
+            details={
+                "id": existing["id"],
+                "source": source_name,
+                "target": target_name,
+                "type": relationship_type,
+                "reason": reason,
+            },
+        )
+
+        logger.info(
+            f"Invalidated relationship {existing['id']}: "
+            f"{source_name} -> {relationship_type} -> {target_name}"
+            + (f" ({reason})" if reason else "")
+        )
+
+        return {
+            "relationship_id": existing["id"],
+            "source": source_name,
+            "target": target_name,
+            "relationship_type": relationship_type,
+            "invalidated_at": now,
+            "reason": reason,
+        }
 
     def merge_entities(
         self,
@@ -1576,3 +1719,10 @@ def correct_memory(memory_id: int, correction: str, reason: Optional[str] = None
 def invalidate_memory(memory_id: int, reason: Optional[str] = None) -> Dict[str, Any]:
     """Mark a memory as no longer true"""
     return get_remember_service().invalidate_memory(memory_id, reason)
+
+
+def invalidate_relationship(
+    source: str, target: str, relationship: str, reason: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Invalidate a relationship without creating a replacement"""
+    return get_remember_service().invalidate_relationship(source, target, relationship, reason)

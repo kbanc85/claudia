@@ -139,6 +139,21 @@ class Database:
             conn.commit()
 
     @contextmanager
+    def transaction(self) -> Generator[sqlite3.Connection, None, None]:
+        """Explicit multi-step transaction. Commits on success, rolls back on error.
+
+        Use this when multiple operations must succeed or fail atomically.
+        Unlike connection(), the caller uses conn.execute() directly.
+        """
+        conn = self._get_connection()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    @contextmanager
     def cursor(self) -> Generator[sqlite3.Cursor, None, None]:
         """Context manager for database cursor"""
         with self.connection() as conn:
@@ -724,6 +739,30 @@ class Database:
             conn.commit()
             logger.info("Applied migration 14: dispatch_tier for native agent teams")
 
+        if current_version < 15:
+            # Migration 15: Add origin_type to relationships for organic trust model
+            try:
+                conn.execute(
+                    "ALTER TABLE relationships ADD COLUMN origin_type TEXT DEFAULT 'extracted'"
+                )
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    logger.warning(f"Migration 15 statement failed: {e}")
+
+            # Grandfather existing relationships: all get 'extracted' (the safe default)
+            try:
+                conn.execute(
+                    "UPDATE relationships SET origin_type = 'extracted' WHERE origin_type IS NULL"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 15 grandfather failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (15, 'Add origin_type to relationships for organic trust model')"
+            )
+            conn.commit()
+            logger.info("Applied migration 15: relationship origin_type for organic trust model")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -851,6 +890,11 @@ class Database:
         if "dispatch_tier" not in dispatch_cols:
             logger.warning("Migration 14 incomplete: agent_dispatches missing dispatch_tier column")
             return 13
+
+        # Migration 15 added origin_type to relationships
+        if "origin_type" not in rel_cols:
+            logger.warning("Migration 15 incomplete: relationships missing origin_type column")
+            return 14
 
         return None  # All good
 

@@ -346,3 +346,122 @@ class TestBatchWithParallelEmbeddings:
 
         mem2 = db.get_one("memories", where="content = ?", where_params=("Meeting scheduled for Friday",))
         assert mem2 is not None
+
+
+class TestBatchRelateForwarding:
+    """Test that batch relate operations forward origin_type and other parameters."""
+
+    def test_batch_relate_forwards_origin_type(self, db):
+        """origin_type is stored in DB when passed through batch relate."""
+        svc = _get_remember_service(db)
+
+        # Create entities first
+        svc.remember_entity(
+            name="Ford Perry",
+            entity_type="person",
+            _precomputed_embedding=_fake_embedding("Ford Perry"),
+        )
+        svc.remember_entity(
+            name="Beemok Capital",
+            entity_type="organization",
+            _precomputed_embedding=_fake_embedding("Beemok Capital"),
+        )
+
+        # Relate with inferred origin
+        rel_id = svc.relate_entities(
+            source_name="Ford Perry",
+            target_name="Beemok Capital",
+            relationship_type="works_at",
+            origin_type="inferred",
+        )
+        assert rel_id is not None
+
+        row = db.get_one("relationships", where="id = ?", where_params=(rel_id,))
+        assert row["origin_type"] == "inferred"
+        # Inferred ceiling is 0.5, so strength should be capped
+        assert row["strength"] <= 0.5
+
+    def test_batch_relate_forwards_supersedes(self, db):
+        """Batch supersede works: old relationship invalidated, new one created."""
+        svc = _get_remember_service(db)
+
+        svc.remember_entity(
+            name="Ford Perry",
+            entity_type="person",
+            _precomputed_embedding=_fake_embedding("Ford Perry"),
+        )
+        svc.remember_entity(
+            name="Acme Corp",
+            entity_type="organization",
+            _precomputed_embedding=_fake_embedding("Acme Corp"),
+        )
+
+        # Create initial relationship
+        rel1 = svc.relate_entities(
+            source_name="Ford Perry",
+            target_name="Acme Corp",
+            relationship_type="works_at",
+            origin_type="extracted",
+        )
+
+        # Supersede it
+        rel2 = svc.relate_entities(
+            source_name="Ford Perry",
+            target_name="Acme Corp",
+            relationship_type="works_at",
+            supersedes=True,
+        )
+
+        assert rel2 != rel1
+
+        # Old should be invalidated
+        old_row = db.get_one("relationships", where="id = ?", where_params=(rel1,))
+        assert old_row["invalid_at"] is not None
+
+        # New should be active with origin_type='corrected'
+        new_row = db.get_one("relationships", where="id = ?", where_params=(rel2,))
+        assert new_row["invalid_at"] is None
+        assert new_row["origin_type"] == "corrected"
+
+    def test_origin_upgrade_lifts_ceiling(self, db):
+        """Re-encountering with higher-authority origin upgrades origin_type and lifts ceiling."""
+        svc = _get_remember_service(db)
+
+        svc.remember_entity(
+            name="Ford Perry",
+            entity_type="person",
+            _precomputed_embedding=_fake_embedding("Ford Perry"),
+        )
+        svc.remember_entity(
+            name="Beemok Capital",
+            entity_type="organization",
+            _precomputed_embedding=_fake_embedding("Beemok Capital"),
+        )
+
+        # Create with inferred origin (ceiling 0.5)
+        rel_id = svc.relate_entities(
+            source_name="Ford Perry",
+            target_name="Beemok Capital",
+            relationship_type="works_at",
+            origin_type="inferred",
+        )
+
+        row1 = db.get_one("relationships", where="id = ?", where_params=(rel_id,))
+        assert row1["origin_type"] == "inferred"
+        assert row1["strength"] <= 0.5
+
+        # Re-encounter with user_stated (should upgrade origin and lift ceiling)
+        rel_id2 = svc.relate_entities(
+            source_name="Ford Perry",
+            target_name="Beemok Capital",
+            relationship_type="works_at",
+            origin_type="user_stated",
+        )
+
+        # Same relationship ID (strengthened, not replaced)
+        assert rel_id2 == rel_id
+
+        row2 = db.get_one("relationships", where="id = ?", where_params=(rel_id,))
+        assert row2["origin_type"] == "user_stated"
+        # With user_stated ceiling of 1.0 and +0.2 increment, strength should increase
+        assert row2["strength"] > row1["strength"]

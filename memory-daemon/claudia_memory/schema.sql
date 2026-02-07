@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS relationships (
     target_entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
     relationship_type TEXT NOT NULL,  -- works_with, manages, client_of, etc.
     strength REAL DEFAULT 1.0,  -- Relationship strength (decays/grows)
+    origin_type TEXT DEFAULT 'extracted',  -- user_stated, extracted, inferred, corrected
     direction TEXT DEFAULT 'bidirectional' CHECK (direction IN ('forward', 'backward', 'bidirectional')),
     valid_at TEXT,  -- When this relationship became true in the real world
     invalid_at TEXT,  -- When this relationship was superseded (NULL = current)
@@ -407,6 +408,9 @@ VALUES (13, 'Add origin_type to memories, agent_dispatches table for Trust North
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (14, 'Add dispatch_tier to agent_dispatches for native agent team support');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (15, 'Add origin_type to relationships for organic trust model');
 
 -- ============================================================================
 -- AGENT DISPATCHES: Track delegated tasks to sub-agents

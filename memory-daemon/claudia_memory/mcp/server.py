@@ -57,6 +57,7 @@ from ..services.remember import (
     get_remember_service,
     get_unsummarized_turns,
     invalidate_memory,
+    invalidate_relationship,
     merge_entities,
     relate_entities,
     store_reflection,
@@ -239,6 +240,16 @@ async def list_tools() -> ListToolsResult:
                         "type": "boolean",
                         "description": "If true, invalidate existing relationship of same type between same entities and create new one",
                         "default": False,
+                    },
+                    "origin_type": {
+                        "type": "string",
+                        "description": "How this was learned: user_stated, extracted, inferred, corrected",
+                        "default": "extracted",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "Relationship direction: forward, backward, or bidirectional",
+                        "default": "bidirectional",
                     },
                 },
                 "required": ["source", "target", "relationship"],
@@ -638,6 +649,23 @@ async def list_tools() -> ListToolsResult:
                                 "strength": {
                                     "type": "number",
                                     "description": "Relationship strength 0.0-1.0 (for 'relate' op)",
+                                },
+                                "origin_type": {
+                                    "type": "string",
+                                    "description": "How this was learned: user_stated, extracted, inferred (for 'relate' op)",
+                                },
+                                "supersedes": {
+                                    "type": "boolean",
+                                    "description": "Invalidate existing relationship of same type (for 'relate' op)",
+                                    "default": False,
+                                },
+                                "valid_at": {
+                                    "type": "string",
+                                    "description": "When this relationship became true (for 'relate' op)",
+                                },
+                                "direction": {
+                                    "type": "string",
+                                    "description": "Relationship direction (for 'relate' op)",
                                 },
                             },
                             "required": ["op"],
@@ -1061,6 +1089,37 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.invalidate_relationship",
+            description=(
+                "Mark a relationship as incorrect or ended without creating a replacement. "
+                "Use when the user says a relationship is wrong, or when someone leaves a "
+                "company, ends a partnership, etc. The relationship is preserved for history "
+                "but excluded from active queries."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "description": "Source entity name",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Target entity name",
+                    },
+                    "relationship": {
+                        "type": "string",
+                        "description": "Relationship type to invalidate (works_with, manages, etc.)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why this relationship is being invalidated",
+                    },
+                },
+                "required": ["source", "target", "relationship"],
+            },
+        ),
+        Tool(
             name="memory.audit_history",
             description=(
                 "Get the full audit trail for an entity or memory. "
@@ -1281,6 +1340,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 strength=arguments.get("strength", 1.0),
                 valid_at=arguments.get("valid_at"),
                 supersedes=arguments.get("supersedes", False),
+                origin_type=arguments.get("origin_type", "extracted"),
+                direction=arguments.get("direction", "bidirectional"),
             )
             return CallToolResult(
                 content=[
@@ -1604,6 +1665,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             target=op["target"],
                             relationship=op["relationship"],
                             strength=op.get("strength", 1.0),
+                            supersedes=op.get("supersedes", False),
+                            valid_at=op.get("valid_at"),
+                            direction=op.get("direction", "bidirectional"),
+                            origin_type=op.get("origin_type", "extracted"),
                         )
                         op_result["success"] = True
                         op_result["relationship_id"] = relationship_id
@@ -1862,6 +1927,22 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
         elif name == "memory.invalidate":
             result = invalidate_memory(
                 memory_id=arguments["memory_id"],
+                reason=arguments.get("reason"),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
+                    )
+                ]
+            )
+
+        elif name == "memory.invalidate_relationship":
+            result = invalidate_relationship(
+                source=arguments["source"],
+                target=arguments["target"],
+                relationship=arguments["relationship"],
                 reason=arguments.get("reason"),
             )
             return CallToolResult(

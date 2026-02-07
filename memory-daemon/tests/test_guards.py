@@ -68,8 +68,9 @@ def test_validate_entity_empty_name():
 
 def test_validate_relationship_strength_clamped():
     """Strength outside [0, 1] gets clamped"""
-    result = validate_relationship(1.5)
+    # Use user_stated (ceiling=1.0) to isolate the clamping logic from origin ceilings
+    result = validate_relationship(1.5, origin_type="user_stated")
     assert result.adjustments["strength"] == 1.0
 
-    result2 = validate_relationship(-0.2)
+    result2 = validate_relationship(-0.2, origin_type="user_stated")
     assert result2.adjustments["strength"] == 0.0

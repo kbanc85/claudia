@@ -112,20 +112,51 @@ def validate_entity(
     return result
 
 
-def validate_relationship(strength: float = 1.0) -> ValidationResult:
+# Origin-aware strength ceilings: relationships can't exceed their evidence level
+ORIGIN_STRENGTH_CEILING = {
+    "user_stated": 1.0,    # User said it directly -- full trust
+    "extracted": 0.8,      # Evidence from a document -- high but not absolute
+    "inferred": 0.5,       # Co-occurrence guess -- must earn trust through repetition
+    "corrected": 1.0,      # User corrected it -- full trust
+}
+
+# Origin-scaled reinforcement increments (Hebbian: stronger signals potentiate more)
+REINFORCEMENT_BY_ORIGIN = {
+    "user_stated": 0.2,
+    "extracted": 0.1,
+    "inferred": 0.05,
+    "corrected": 0.2,
+}
+
+
+def validate_relationship(
+    strength: float = 1.0,
+    origin_type: str = "extracted",
+) -> ValidationResult:
     """
     Validate a relationship before storage.
 
     Checks:
     - Strength clamped to [0, 1]
+    - Strength capped by origin authority ceiling
     """
     result = ValidationResult()
 
+    # Clamp to [0, 1]
     if strength < 0:
         result.warnings.append(f"Relationship strength {strength} clamped to 0.0")
         result.adjustments["strength"] = 0.0
     elif strength > 1:
         result.warnings.append(f"Relationship strength {strength} clamped to 1.0")
         result.adjustments["strength"] = 1.0
+
+    # Cap by origin authority
+    ceiling = ORIGIN_STRENGTH_CEILING.get(origin_type, 0.5)
+    effective = result.adjustments.get("strength", strength)
+    if effective > ceiling:
+        result.warnings.append(
+            f"Strength {effective} exceeds ceiling {ceiling} for origin '{origin_type}', capped"
+        )
+        result.adjustments["strength"] = ceiling
 
     return result
