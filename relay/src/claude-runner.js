@@ -39,7 +39,7 @@ export async function runClaude(prompt, {
     minute: '2-digit',
     timeZoneName: 'short',
   });
-  const enrichedPrompt = `[${now} | responding via Telegram]\n\n${prompt}`;
+  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]\n\n${prompt}`;
 
   // Build args
   const args = [

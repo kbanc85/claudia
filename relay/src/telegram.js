@@ -8,6 +8,7 @@
 import { Bot } from 'grammy';
 import { chunkText } from './chunker.js';
 import { runClaude } from './claude-runner.js';
+import { markdownToTelegramHTML } from './formatter.js';
 
 export class TelegramBot {
   /**
@@ -88,10 +89,16 @@ export class TelegramBot {
 
           console.log(`[relay:telegram] Response for ${userId}: ${result.durationMs}ms, ${result.text.length} chars`);
 
-          // Chunk and send response
-          const chunks = chunkText(result.text);
+          // Convert markdown to Telegram HTML, chunk, and send
+          const html = markdownToTelegramHTML(result.text);
+          const chunks = chunkText(html);
           for (const chunk of chunks) {
-            await ctx.reply(chunk);
+            try {
+              await ctx.reply(chunk, { parse_mode: 'HTML' });
+            } catch {
+              // HTML parse failed (malformed tags), fall back to plain text
+              await ctx.reply(chunk.replace(/<[^>]+>/g, ''));
+            }
           }
         } catch (err) {
           console.error(`[relay:telegram] Error processing message: ${err.message}`);
