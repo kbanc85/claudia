@@ -26,6 +26,7 @@ export async function runClaude(prompt, {
   timeoutMs = 180000,
   claudiaDir = process.cwd(),
   permissionMode = 'plan',
+  files = [],
 } = {}) {
   const startTime = Date.now();
 
@@ -39,7 +40,7 @@ export async function runClaude(prompt, {
     minute: '2-digit',
     timeZoneName: 'short',
   });
-  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]\n\n${prompt}`;
+  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]\n\nIMPORTANT: When storing memories via memory.remember or memory.batch, always pass source_channel: "telegram" so memories are tagged with their origin channel.\n\n${prompt}`;
 
   // Build args
   const args = [
@@ -50,6 +51,11 @@ export async function runClaude(prompt, {
 
   if (sessionId) {
     args.push('--resume', sessionId);
+  }
+
+  // Add file arguments
+  for (const file of files) {
+    args.push('--file', `${file.name}:${file.path}`);
   }
 
   return new Promise((resolve, reject) => {

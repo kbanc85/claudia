@@ -102,6 +102,41 @@ def test_update():
         assert entity["description"] == "Updated description"
 
 
+def test_migration_16_source_channel():
+    """Migration 16 adds source_channel to memories with default 'claude_code'."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        db = Database(db_path)
+        db.initialize()
+
+        # Verify column exists
+        cols = db._get_table_columns(db._get_connection(), "memories")
+        assert "source_channel" in cols, "source_channel column should exist after migration 16"
+
+        # Insert a memory without specifying source_channel
+        memory_id = db.insert("memories", {
+            "content": "test memory",
+            "content_hash": "abc123",
+            "type": "fact",
+        })
+
+        # Default should be 'claude_code'
+        row = db.get_one("memories", where="id = ?", where_params=(memory_id,))
+        assert row["source_channel"] == "claude_code"
+
+        # Insert with explicit source_channel
+        memory_id2 = db.insert("memories", {
+            "content": "telegram memory",
+            "content_hash": "def456",
+            "type": "fact",
+            "source_channel": "telegram",
+        })
+        row2 = db.get_one("memories", where="id = ?", where_params=(memory_id2,))
+        assert row2["source_channel"] == "telegram"
+
+        db.close()
+
+
 def test_migration_integrity_detects_missing_verification_status():
     """Migration 5 added verification_status. Integrity check should catch if it is missing."""
     with tempfile.TemporaryDirectory() as tmpdir:
