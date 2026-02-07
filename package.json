@@ -33,7 +33,6 @@
     "template-v2",
     "memory-daemon",
     "gateway",
-    "visualizer",
     "visualizer-threejs",
     "assets"
   ],

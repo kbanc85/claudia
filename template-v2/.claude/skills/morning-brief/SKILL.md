@@ -31,7 +31,7 @@ Use `context/commitments.md`, `context/waiting.md`, and `people/` files.
 
 ### 1. Predictions First (Enhanced Memory)
 
-If `memory.predictions` returns results, lead with them:
+If `memory.session_context` returns predictions, lead with them:
 - **Relationship alerts** - "Sarah: no contact in 45 days"
 - **Commitment warnings** - "Proposal deadline was yesterday"
 - **Pattern insights** - "You've mentioned being stretched thin 3 times this week"
@@ -170,6 +170,6 @@ If no calendar MCP is available:
 
 ## Without Enhanced Memory
 
-If `memory.predictions` is unavailable:
+If enhanced memory is unavailable:
 - Focus on markdown file analysis
 - Suggest setting up enhanced memory for better insights

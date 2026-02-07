@@ -13,7 +13,7 @@ This skill governs when and how I suggest adding new specialized agents to my te
 
 ### Pattern Detection Triggers
 
-I track tasks in `memory.agent_dispatch` and notice when:
+I track task patterns and notice when:
 
 1. **Repeated manual processing** (3+ similar tasks not covered by existing agents)
    - "You often ask me to summarize Slack threads. Would a Slack Summarizer help?"
@@ -89,18 +89,7 @@ Save to `.claude/agents/[name].md`
 
 Add detection pattern to `agent-dispatcher.md`
 
-### Step 4: Log Creation
-
-```json
-{
-  "agent_name": "[name]",
-  "dispatch_category": "[category]",
-  "task_summary": "Agent created based on pattern: [description]",
-  "success": true
-}
-```
-
-### Step 5: Test
+### Step 4: Test
 
 Use the agent on the next matching task and report:
 - "I've added [Agent Name] to my team. Just tested it on [task]. Worked well!"

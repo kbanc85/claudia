@@ -68,7 +68,7 @@ Call memory.search_entities with types=["project"], limit=10
 ### 4. Active Patterns
 
 ```
-Call memory.predictions to get active predictions/patterns
+Call memory.session_context to get active patterns and insights
 ```
 
 ### 5. Provenance Sample

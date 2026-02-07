@@ -55,7 +55,6 @@ Claudia provides a briefing packet to Tier 2 agents so they have the context the
    - Tier 2: Native teammate with briefing packet
 4. **Results**: Agent returns structured JSON
 5. **Judgment**: Claudia applies relationship context and decides what to do
-6. **Logging**: Dispatch is logged via `memory.agent_dispatch` with `dispatch_tier`
 
 ## What Claudia Always Handles Directly
 

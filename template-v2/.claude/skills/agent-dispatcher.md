@@ -105,30 +105,14 @@ When delegating, I mention it naturally:
 - Spawn the agent as a native teammate
 - The agent works independently with its own tools
 
-### Step 3: Log the Dispatch
-After receiving results, log via `memory.agent_dispatch`:
-```json
-{
-  "agent_name": "research-scout",
-  "dispatch_category": "research",
-  "task_summary": "Researched Acme Corp funding history",
-  "success": true,
-  "duration_ms": 4500,
-  "required_claudia_judgment": false,
-  "dispatch_tier": "native_team"
-}
-```
-
-Always include `dispatch_tier` ("task" or "native_team") to track which mechanism was used.
-
-### Step 4: Apply My Judgment
+### Step 3: Apply My Judgment
 I review agent results through my lens:
 - Does this involve someone I know? Add relationship context.
 - Does this conflict with what I remember? Flag it.
 - Is there ambiguity? Use my knowledge to resolve it.
 - Does anything need user confirmation? Ask.
 
-### Step 5: Present to User
+### Step 4: Present to User
 Format the results appropriately:
 - For filing: Show suggested filename and ask for confirmation
 - For research: Present findings with confidence levels
@@ -205,7 +189,6 @@ When this happens, I:
    - I cross-reference with my memory: "Acme was last discussed as a potential client"
    - I add relationship context the Scout couldn't know
 7. **Present**: Synthesized findings with my editorial context
-8. **Log**: `memory.agent_dispatch` with dispatch_tier="native_team"
 
 ## Example Flow: Pasted Transcript
 
@@ -219,7 +202,6 @@ When this happens, I:
    - I recognize "Sarah Chen" from my memory
    - I add relationship context: "Sarah is the PM on Project Phoenix"
 6. **Present**: "I've processed the transcript. Suggested filename: `2026-02-05-sarah-chen-phoenix-sync.md`. Want me to file it under Sarah?"
-7. **Log**: `memory.agent_dispatch` with dispatch_tier="task"
 
 ## Performance Tracking
 

@@ -715,15 +715,8 @@ class Database:
                 if "duplicate column" not in str(e).lower():
                     logger.warning(f"Migration 14 statement failed: {e}")
 
-            # Add validation trigger for dispatch_tier
-            conn.execute("""
-                CREATE TRIGGER IF NOT EXISTS validate_dispatch_tier
-                BEFORE INSERT ON agent_dispatches
-                WHEN NEW.dispatch_tier NOT IN ('task', 'native_team')
-                BEGIN
-                    SELECT RAISE(ABORT, 'dispatch_tier must be task or native_team');
-                END
-            """)
+            # dispatch_tier trigger is created in the post-migration section below
+            # (handles both fresh installs and upgrades in one place)
 
             conn.execute(
                 "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (14, 'Add dispatch_tier to agent_dispatches for native agent team support')"

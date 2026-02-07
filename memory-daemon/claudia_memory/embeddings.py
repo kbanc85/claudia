@@ -209,7 +209,9 @@ class EmbeddingService:
         """Generate embeddings for multiple texts"""
         # Ollama doesn't have native batch support, so we parallelize
         tasks = [self.embed(text) for text in texts]
-        return await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Convert exceptions to None so callers get consistent Optional results
+        return [r if not isinstance(r, BaseException) else None for r in results]
 
     def embed_batch_sync(self, texts: List[str]) -> List[Optional[List[float]]]:
         """Synchronous batch embedding"""

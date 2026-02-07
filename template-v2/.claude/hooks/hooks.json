@@ -19,7 +19,7 @@
           "fallback": "If memory tools unavailable, proceed with markdown-only mode but WARN the user that memories won't persist."
         },
         "enhanced_memory": {
-          "context_load": "Call memory.session_context to get a formatted context block with recent memories, predictions, commitments, and unsummarized session alerts. This replaces individual calls to memory.recall and memory.predictions.",
+          "context_load": "Call memory.session_context to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
           "catch_up": "If unsummarized sessions are reported in the context block, review buffered turns and call memory.end_session with a retroactive narrative and structured extractions for each.",
           "recall_context": "Use the loaded context for greeting. For deeper search on specific topics, use memory.recall."
         }

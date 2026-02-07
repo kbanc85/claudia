@@ -109,10 +109,10 @@ flowchart LR
 - **Episodes**: Summaries of past conversation sessions
 
 **Background maintenance:**
-The daemon runs scheduled tasks to keep memory healthy:
-- Importance of old memories gradually decays (so recent things surface first)
-- Patterns are detected automatically from accumulated memories
-- Memory consolidation runs daily to keep the database efficient
+The daemon runs three scheduled jobs via APScheduler:
+- **Daily decay** (2 AM) - Importance of old memories gradually decays so recent things surface first
+- **Pattern detection** (every 6 hours) - Detects cooling relationships, overdue commitments, and cross-entity patterns
+- **Full consolidation** (3 AM) - Decay + near-duplicate merging + pattern detection in one pass
 
 ---
 

@@ -123,8 +123,7 @@ class MemoryConfig:
                     config.log_path = Path(data["log_path"])
 
             except (json.JSONDecodeError, IOError) as e:
-                # Use defaults on error
-                pass
+                logger.warning(f"Could not load config from {config_path}: {e}. Using defaults.")
 
         # DATABASE PATH OVERRIDE: Explicit database path takes highest priority
         # Set CLAUDIA_DB_OVERRIDE to a full .db path to force that database

@@ -71,7 +71,7 @@ class ConsolidateService:
         decay_rate = self.config.decay_rate_daily
 
         # Decay memories
-        memory_result = self.db.execute(
+        self.db.execute(
             """
             UPDATE memories
             SET importance = importance * ?,
@@ -80,9 +80,12 @@ class ConsolidateService:
             """,
             (decay_rate, datetime.utcnow().isoformat(), self.config.min_importance_threshold / 10),
         )
+        # Capture changes() immediately after the UPDATE -- it resets on next statement
+        memories_result = self.db.execute("SELECT changes()", fetch=True)
+        memories_decayed = memories_result[0][0] if memories_result else 0
 
         # Decay entities
-        entity_result = self.db.execute(
+        self.db.execute(
             """
             UPDATE entities
             SET importance = importance * ?,
@@ -93,7 +96,7 @@ class ConsolidateService:
         )
 
         # Decay relationship strengths
-        rel_result = self.db.execute(
+        self.db.execute(
             """
             UPDATE relationships
             SET strength = strength * ?,
@@ -127,9 +130,7 @@ class ConsolidateService:
         )
 
         return {
-            "memories_decayed": self.db.execute(
-                "SELECT changes()", fetch=True
-            )[0][0] if self.db.execute("SELECT changes()", fetch=True) else 0,
+            "memories_decayed": memories_decayed,
             "reflections_decayed": reflections_decayed,
         }
 

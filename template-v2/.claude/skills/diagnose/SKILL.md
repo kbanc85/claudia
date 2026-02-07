@@ -34,8 +34,8 @@ List your available tools that start with "memory."
 - `memory.end_session`
 - `memory.buffer_turn`
 - `memory.reflections`
-- `memory.predictions`
 - `memory.consolidate`
+- `memory.system_health`
 
 If NO memory tools appear, the daemon isn't connected via MCP.
 

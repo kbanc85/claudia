@@ -128,6 +128,15 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
         logger.info("Shutting down...")
         stop_scheduler()
         stop_health_server()
+        # Close embedding service HTTP clients to avoid resource leak
+        try:
+            from .embeddings import get_embedding_service
+            svc = get_embedding_service()
+            if svc._sync_client:
+                svc._sync_client.close()
+                svc._sync_client = None
+        except Exception:
+            pass
         db = get_db()
         db.close()
         logger.info("Claudia Memory Daemon stopped")
