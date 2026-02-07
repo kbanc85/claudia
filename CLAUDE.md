@@ -40,7 +40,7 @@ Installation flow:
 **Agents** (`.claude/agents/`) - Two-tier dispatch system:
 - Tier 1 (Task tool): Document Archivist, Document Processor, Schedule Analyst (Haiku, fast structured work)
 - Tier 2 (Native Agent Teams): Research Scout (Sonnet, independent context, multi-turn research)
-- Dispatch logic in `skills/agent-dispatcher.md`, tracked via `memory.agent_dispatch` MCP tool
+- Dispatch logic in `skills/agent-dispatcher.md`
 
 **Hooks** (`.claude/hooks/`) - Session lifecycle handlers:
 - `session-health-check.sh` - SessionStart: pings memory daemon, reports status
@@ -77,8 +77,6 @@ The memory system is a standalone Python application that gives Claudia persiste
 - `memory.relate` - Create/strengthen relationships between entities
 - `memory.entity` - Create/update entity information
 - `memory.search_entities` - Search entities by name or description
-- `memory.predictions` - Get proactive suggestions and insights
-- `memory.prediction_feedback` - Mark predictions as acted on (feeds engagement ratio)
 - `memory.consolidate` - Trigger manual consolidation
 - `memory.batch` - Batch multiple memory operations in one call
 - `memory.trace` - Trace provenance and source history
@@ -87,14 +85,13 @@ The memory system is a standalone Python application that gives Claudia persiste
 - `memory.merge_entities` - Merge duplicate entities, preserving all references
 - `memory.delete_entity` - Soft-delete with reason tracking
 - `memory.find_duplicates` - Fuzzy matching for potential duplicates
-- `memory.system_health` - Current system health metrics
+- `memory.system_health` - Current system health and diagnostics
 - `memory.audit_history` - Full provenance trail ("where did you learn that?")
-- `memory.agent_dispatch` - Track agent delegation performance (`dispatch_tier` field)
 - `memory.file` - Store documents
 - `memory.buffer_turn` / `memory.end_session` / `memory.session_context` - Session lifecycle
 
 **Background daemon** (`daemon/`)
-- Scheduled jobs via APScheduler (hourly decay, 6-hourly pattern detection, daily full consolidation, daily metrics at 5am)
+- 3 scheduled jobs via APScheduler: daily decay at 2 AM, pattern detection every 6 hours, full consolidation at 3 AM
 - Health check endpoint on port 3848 (includes `/flush` for WAL checkpoint)
 - Graceful shutdown with signal handling
 

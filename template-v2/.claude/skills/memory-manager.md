@@ -25,7 +25,7 @@ All available memory tools when the daemon is connected. Skills should only refe
 `memory.file`, `memory.documents`
 
 ### Analysis & Insights
-`memory.predictions`, `memory.prediction_feedback`, `memory.morning_context`, `memory.consolidate`, `memory.reflections`
+`memory.morning_context`, `memory.consolidate`, `memory.reflections`
 
 ### Trust & Provenance
 `memory.trace`, `memory.correct`, `memory.invalidate`, `memory.audit_history`, `memory.merge_entities`, `memory.delete_entity`
@@ -33,14 +33,11 @@ All available memory tools when the daemon is connected. Skills should only refe
 ### Network Graph
 `memory.project_network`, `memory.find_path`, `memory.network_hubs`, `memory.dormant_relationships`
 
-### Agent Dispatch
-`memory.agent_dispatch`
-
 ### Gateway
 `memory.telegram_inbox`
 
 ### Admin
-`memory.purge`
+`memory.purge`, `memory.system_health`
 
 ---
 
@@ -342,7 +339,7 @@ The briefing returns ~500 tokens of aggregate context. Use it to inform the gree
 
 Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
 
-**Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.predictions`.
+**Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.morning_context`.
 
 ### 1b. Check Telegram Inbox
 
