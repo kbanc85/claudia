@@ -2,6 +2,37 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.29.0 (2026-02-07)
+
+### The Robustness Release
+
+Claudia's memory system was overbuilt and underverified. Eight background jobs ran overnight, but three crashed, two never confirmed completing, and predictions had never generated a single result. This release strips the system down to what works, fixes what was broken, and adds the observability to prove it.
+
+### Fixed
+
+- **Hourly verification crash** - The `verification_status` column was missing on databases created before migration 5. The migration integrity check now detects and self-heals this on next daemon startup.
+
+### Added
+
+- **`memory.system_health` MCP tool** - Was documented but never implemented. Now returns schema version, component status (database/embeddings/scheduler), active job list with next run times, and data counts. Also powers the enhanced `/status` HTTP endpoint.
+- **Pipeline integration test** - 8 end-to-end tests proving the core data flow works: entity creation, memory storage, relationships, decay, pattern detection, session lifecycle, and deduplication.
+- **Shared test conftest.py** - Eliminates duplicated database fixture across 12+ test files.
+- **Scheduler test** - Verifies exactly 3 jobs are registered, none of the removed ones sneak back.
+
+### Changed
+
+- **Scheduler slimmed from 8 jobs to 3** - Kept: daily decay (2 AM), pattern detection (every 6h), full consolidation (3 AM). Removed: hourly verification (crashed), daily predictions (never worked), LLM consolidation (requires local model most users lack), metrics collection (no consumer), weekly document lifecycle (4 documents). Service code retained for future re-enablement.
+- **3 MCP tools deferred** - Removed `memory.predictions`, `memory.prediction_feedback`, `memory.agent_dispatch`. These exposed features that either never worked or had no data flowing through them.
+- **Full consolidation no longer generates predictions** - `run_full_consolidation()` now runs decay, merging, and pattern detection only.
+
+### Stats
+
+- 277 tests, 0 regressions
+- 16 new tests (pipeline, scheduler, health check, migration integrity)
+- Net code reduction: ~145 lines removed from MCP tools, ~50 from scheduler
+
+---
+
 ## 1.28.4 (2026-02-06)
 
 ### Windows 11 Compatibility
