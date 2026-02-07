@@ -2,6 +2,39 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.30.0 (2026-02-07)
+
+### The Trust Model
+
+Relationships now behave like synaptic connections: weak traces that strengthen through repeated activation, decay without reinforcement, and respect the authority of their source. A single batch inference can no longer create a 0.9-strength relationship. Instead, inferred relationships start capped at 0.5 and must earn trust through re-encounter.
+
+### Added
+
+- **`memory.invalidate_relationship` MCP tool** - Mark a relationship as incorrect or ended without creating a replacement. Use when someone leaves a company, ends a partnership, or when data was wrong. The relationship is preserved for history but excluded from active queries.
+- **Origin-aware strength ceilings** - Every relationship now tracks how it was learned (`origin_type`): `user_stated` (ceiling 1.0), `extracted` (0.8), `inferred` (0.5), `corrected` (1.0). Strength is automatically capped by origin authority.
+- **Scaled reinforcement** - Re-encountering a relationship strengthens it by an amount proportional to the new evidence: user statements add +0.2, extracted evidence +0.1, inferences +0.05. Repeated weak signals compound into strong connections.
+- **Origin upgrades** - When a relationship first seen as `inferred` is later confirmed by `user_stated`, the origin and ceiling both upgrade, lifting the strength cap.
+
+### Fixed
+
+- **Supersede targeted wrong relationship** - When an entity had multiple relationships of the same type (e.g., works_at Acme AND works_at Beta), supersede matched only source + type, picking one arbitrarily. Could invalidate the wrong relationship. Now matches the full source + target + type triple.
+- **Non-atomic supersede** - Three separate auto-committed operations (invalidate, rename, insert) meant a crash mid-sequence could leave corrupted state. Wrapped in a `Database.transaction()` context manager that commits on success, rolls back on error.
+- **Batch operations dropped relationship parameters** - `memory.batch` relate operations silently ignored `origin_type`, `supersedes`, `valid_at`, and `direction`. All parameters now forwarded correctly.
+
+### Changed
+
+- **`recall_about` includes origin_type** - Relationship results now include provenance so the visualizer and entity lookups show how each relationship was learned.
+- **map-connections skill uses origin_type** - Replaced manual strength mapping (0.9/0.6/0.3) with honest origin classification. Set `origin_type` based on evidence quality and let the system enforce the ceiling.
+- **New `Database.transaction()` context manager** - Explicit multi-step transactions for operations that must be atomic.
+
+### Stats
+
+- 295 tests, 0 regressions
+- 14 new tests, 1 updated (guards, bitemporal, batch parallel)
+- Migration 15: adds `origin_type` column to relationships
+
+---
+
 ## 1.29.2 (2026-02-07)
 
 ### Fixed
