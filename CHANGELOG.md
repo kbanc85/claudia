@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.29.2 (2026-02-07)
+
+### Fixed
+
+- **Brain visualizer missing from npm package** - v1.29.1 incorrectly removed `visualizer/` from the `files` array, assuming it was a legacy directory. It actually contains `server.js` (the Express API backend) and `scripts/install.sh` (called by the installer). New users got "Visualizer files not found. Skipping." and the brain visualizer never installed.
+
+---
+
 ## 1.29.1 (2026-02-07)
 
 ### Post-Release Fixes
@@ -13,7 +21,6 @@ Full code review across the entire repository caught bugs, dead references, and 
 - **`run_decay()` always reported 0 memories decayed** - `SELECT changes()` was called after subsequent UPDATE statements instead of immediately after the memories UPDATE, so the metric was always 0. Decay itself worked fine; only the reported count was wrong.
 - **7 dead MCP tool references in template** - Skills and hooks still referenced `memory.predictions` and `memory.agent_dispatch` (removed in v1.29.0). These would fail silently at runtime. Replaced with `memory.session_context` or removed dispatch logging steps.
 - **Embedding service HTTP clients leaked on shutdown** - The `EmbeddingService.close()` method existed but was never called during daemon shutdown. Added cleanup in the `finally` block.
-- **Legacy `visualizer/` shipped in npm package** - The `files` array in `package.json` included the deprecated Babylon.js visualizer alongside the current Three.js one, adding dead weight to every install.
 
 ### Changed
 

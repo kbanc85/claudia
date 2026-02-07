@@ -1,6 +1,6 @@
 {
   "name": "get-claudia",
-  "version": "1.29.1",
+  "version": "1.29.2",
   "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
@@ -33,6 +33,7 @@
     "template-v2",
     "memory-daemon",
     "gateway",
+    "visualizer",
     "visualizer-threejs",
     "assets"
   ],
