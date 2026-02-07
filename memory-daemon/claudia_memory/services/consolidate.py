@@ -1605,20 +1605,13 @@ class ConsolidateService:
             results["merged"] = 0
             results["reflections_aggregated"] = 0
 
-        # Phase 3: Detection + prediction (read-heavy, writes new rows)
+        # Phase 3: Detection (read-heavy, writes new pattern rows)
         try:
             patterns = self.detect_patterns()
             results["patterns_detected"] = len(patterns)
         except Exception as e:
             logger.warning(f"Pattern detection failed: {e}")
             results["patterns_detected"] = 0
-
-        try:
-            predictions = self.generate_predictions()
-            results["predictions_generated"] = len(predictions)
-        except Exception as e:
-            logger.warning(f"Prediction generation failed: {e}")
-            results["predictions_generated"] = 0
 
         logger.info(f"Consolidation complete: {results}")
         return results

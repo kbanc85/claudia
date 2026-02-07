@@ -15,12 +15,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from ..config import get_config
 from ..services.consolidate import (
     detect_patterns,
-    generate_predictions,
     run_decay,
     run_full_consolidation,
 )
-from ..services.documents import get_document_service
-from ..services.verify import run_verification
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +36,12 @@ class MemoryScheduler:
             logger.warning("Scheduler already started")
             return
 
-        # Hourly: Light decay
+        # Daily at 2am: Importance decay
         self.scheduler.add_job(
-            self._run_hourly_decay,
-            IntervalTrigger(hours=1),
-            id="hourly_decay",
-            name="Hourly importance decay",
+            self._run_daily_decay,
+            CronTrigger(hour=2, minute=0),
+            id="daily_decay",
+            name="Daily importance decay",
             replace_existing=True,
         )
 
@@ -63,51 +60,6 @@ class MemoryScheduler:
             CronTrigger(hour=3, minute=0),
             id="full_consolidation",
             name="Full overnight consolidation",
-            replace_existing=True,
-        )
-
-        # Daily at 5am: Collect system metrics
-        self.scheduler.add_job(
-            self._run_metrics_collection,
-            CronTrigger(hour=5, minute=0),
-            id="daily_metrics",
-            name="Daily metrics collection",
-            replace_existing=True,
-        )
-
-        # Daily at 6am: Generate predictions for the day
-        self.scheduler.add_job(
-            self._run_prediction_generation,
-            CronTrigger(hour=6, minute=0),
-            id="daily_predictions",
-            name="Daily prediction generation",
-            replace_existing=True,
-        )
-
-        # Periodic: Memory verification
-        self.scheduler.add_job(
-            self._run_memory_verification,
-            IntervalTrigger(minutes=self.config.verify_interval_minutes),
-            id="memory_verification",
-            name="Background memory verification",
-            replace_existing=True,
-        )
-
-        # Daily at 3:30am: LLM-powered consolidation (after regular consolidation)
-        self.scheduler.add_job(
-            self._run_llm_consolidation,
-            CronTrigger(hour=3, minute=30),
-            id="llm_consolidation",
-            name="Sleep-time LLM consolidation",
-            replace_existing=True,
-        )
-
-        # Weekly Sunday at 4am: Document lifecycle maintenance
-        self.scheduler.add_job(
-            self._run_document_lifecycle,
-            CronTrigger(day_of_week="sun", hour=4, minute=0),
-            id="document_lifecycle",
-            name="Weekly document lifecycle maintenance",
             replace_existing=True,
         )
 
@@ -138,14 +90,14 @@ class MemoryScheduler:
             return True
         return False
 
-    def _run_hourly_decay(self) -> None:
-        """Run light decay every hour"""
+    def _run_daily_decay(self) -> None:
+        """Run importance decay daily"""
         try:
-            logger.debug("Running hourly decay")
+            logger.debug("Running daily decay")
             result = run_decay()
-            logger.debug(f"Hourly decay complete: {result}")
+            logger.debug(f"Daily decay complete: {result}")
         except Exception as e:
-            logger.exception("Error in hourly decay")
+            logger.exception("Error in daily decay")
 
     def _run_pattern_detection(self) -> None:
         """Run pattern detection"""
@@ -164,58 +116,6 @@ class MemoryScheduler:
             logger.info(f"Full consolidation complete: {result}")
         except Exception as e:
             logger.exception("Error in full consolidation")
-
-    def _run_prediction_generation(self) -> None:
-        """Generate daily predictions"""
-        try:
-            logger.debug("Running prediction generation")
-            predictions = generate_predictions()
-            logger.info(f"Prediction generation complete: {len(predictions)} predictions")
-        except Exception as e:
-            logger.exception("Error in prediction generation")
-
-    def _run_document_lifecycle(self) -> None:
-        """Run weekly document lifecycle maintenance (active->dormant->archived)"""
-        try:
-            logger.debug("Running document lifecycle maintenance")
-            doc_svc = get_document_service()
-            result = doc_svc.run_lifecycle_maintenance()
-            logger.info(f"Document lifecycle maintenance complete: {result}")
-        except Exception as e:
-            logger.exception("Error in document lifecycle maintenance")
-
-    def _run_llm_consolidation(self) -> None:
-        """Run LLM-powered sleep-time consolidation"""
-        try:
-            logger.info("Running LLM consolidation")
-            from ..services.consolidate import get_consolidate_service
-            result = get_consolidate_service().run_llm_consolidation()
-            logger.info(f"LLM consolidation complete: {result}")
-        except Exception as e:
-            logger.exception("Error in LLM consolidation")
-
-    def _run_memory_verification(self) -> None:
-        """Run background memory verification"""
-        try:
-            logger.debug("Running memory verification")
-            result = run_verification()
-            logger.debug(f"Memory verification complete: {result}")
-        except Exception as e:
-            logger.exception("Error in memory verification")
-
-    def _run_metrics_collection(self) -> None:
-        """Run daily metrics collection"""
-        try:
-            logger.debug("Running metrics collection")
-            from ..services.metrics import get_metrics_service
-            result = get_metrics_service().collect_and_store()
-            logger.info(
-                f"Metrics collection complete: "
-                f"{result['entities']['total']} entities, "
-                f"{result['memories']['total']} memories"
-            )
-        except Exception as e:
-            logger.exception("Error in metrics collection")
 
 
 # Global scheduler instance
