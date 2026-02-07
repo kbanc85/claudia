@@ -100,3 +100,33 @@ def test_update():
 
         assert entity["importance"] == 0.5
         assert entity["description"] == "Updated description"
+
+
+def test_migration_integrity_detects_missing_verification_status():
+    """Migration 5 added verification_status. Integrity check should catch if it is missing."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        database = Database(db_path)
+        database.initialize()
+
+        conn = database._get_connection()
+
+        # Simulate a DB where migration 5 column is missing
+        conn.execute("ALTER TABLE memories RENAME TO memories_old")
+        cols = database._get_table_columns(conn, "memories_old")
+        cols.discard("verification_status")
+        cols.discard("verified_at")
+        col_list = ", ".join(sorted(cols))
+
+        conn.execute(f"""
+            CREATE TABLE memories AS
+            SELECT {col_list} FROM memories_old WHERE 0
+        """)
+        conn.execute("DROP TABLE memories_old")
+        conn.commit()
+
+        effective_version = database._check_migration_integrity(conn)
+        assert effective_version is not None, "Should detect missing verification_status"
+        assert effective_version <= 4, f"Should return version <= 4 to re-run migration 5, got {effective_version}"
+
+        database.close()

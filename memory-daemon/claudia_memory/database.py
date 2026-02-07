@@ -810,6 +810,12 @@ class Database:
         which may be lower than what schema_migrations claims.
         Returns None if all migrations completed properly.
         """
+        # Migration 5 added verification_status, verified_at to memories
+        memory_cols = self._get_table_columns(conn, "memories")
+        if "verification_status" not in memory_cols or "verified_at" not in memory_cols:
+            logger.warning("Migration 5 incomplete: memories missing verification columns")
+            return 4  # Force re-run from migration 5
+
         # Migration 8 added valid_at, invalid_at to relationships
         rel_cols = self._get_table_columns(conn, "relationships")
         if "invalid_at" not in rel_cols or "valid_at" not in rel_cols:
@@ -834,7 +840,6 @@ class Database:
             logger.warning("Migration 12 incomplete: entities missing deleted_at column")
             return 11
 
-        memory_cols = self._get_table_columns(conn, "memories")
         if "invalidated_at" not in memory_cols or "corrected_at" not in memory_cols:
             logger.warning("Migration 12 incomplete: memories missing correction/invalidation columns")
             return 11
