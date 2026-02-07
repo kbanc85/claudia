@@ -20,6 +20,87 @@ from .scheduler import get_scheduler
 logger = logging.getLogger(__name__)
 
 
+def build_status_report(*, db=None) -> dict:
+    """Build a comprehensive status report for the memory system.
+
+    Returns a dict with schema version, component health, job list, and counts.
+    Used by both the HTTP /status endpoint and the MCP system_health tool.
+
+    Args:
+        db: Optional database instance. If None, uses the global get_db() singleton.
+    """
+    report = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "status": "healthy",
+        "schema_version": 0,
+        "components": {},
+        "scheduled_jobs": [],
+        "counts": {},
+    }
+
+    # Database check + schema version
+    try:
+        _db = db or get_db()
+        _db.execute("SELECT 1", fetch=True)
+        report["components"]["database"] = "ok"
+
+        # Schema version
+        try:
+            rows = _db.execute(
+                "SELECT MAX(version) as v FROM schema_migrations", fetch=True
+            )
+            report["schema_version"] = rows[0]["v"] if rows and rows[0]["v"] else 0
+        except Exception:
+            report["schema_version"] = 0
+
+        # Counts
+        for table, query in [
+            ("memories", "SELECT COUNT(*) as c FROM memories"),
+            ("entities", "SELECT COUNT(*) as c FROM entities WHERE deleted_at IS NULL"),
+            ("relationships", "SELECT COUNT(*) as c FROM relationships"),
+            ("episodes", "SELECT COUNT(*) as c FROM episodes"),
+            ("patterns", "SELECT COUNT(*) as c FROM patterns WHERE is_active = 1"),
+            ("reflections", "SELECT COUNT(*) as c FROM reflections"),
+        ]:
+            try:
+                rows = _db.execute(query, fetch=True)
+                report["counts"][table] = rows[0]["c"] if rows else 0
+            except Exception:
+                report["counts"][table] = -1
+
+    except Exception:
+        report["components"]["database"] = "error"
+        report["status"] = "degraded"
+
+    # Embeddings check
+    try:
+        embeddings = get_embedding_service()
+        is_available = embeddings.is_available_sync()
+        report["components"]["embeddings"] = "ok" if is_available else "unavailable"
+        report["components"]["embedding_model"] = getattr(
+            embeddings, "model", "unknown"
+        )
+    except Exception:
+        report["components"]["embeddings"] = "error"
+
+    # Scheduler check
+    try:
+        scheduler = get_scheduler()
+        is_running = scheduler.is_running()
+        report["components"]["scheduler"] = "running" if is_running else "stopped"
+        if is_running:
+            report["scheduled_jobs"] = [
+                {"id": job.id, "name": job.name, "next_run": str(job.next_run_time)}
+                for job in scheduler.get_jobs()
+            ]
+        if not is_running:
+            report["status"] = "degraded"
+    except Exception:
+        report["components"]["scheduler"] = "error"
+
+    return report
+
+
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """HTTP request handler for health checks"""
 
@@ -56,38 +137,11 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def _send_status_response(self):
         """Send detailed status response"""
         try:
-            # Check database
-            db = get_db()
-            db_ok = False
-            try:
-                db.execute("SELECT 1", fetch=True)
-                db_ok = True
-            except Exception:
-                pass
-
-            # Check embeddings
-            embeddings = get_embedding_service()
-            embeddings_ok = embeddings.is_available_sync()
-
-            # Check scheduler
-            scheduler = get_scheduler()
-            scheduler_ok = scheduler.is_running()
-
-            status = {
-                "status": "healthy" if all([db_ok, scheduler_ok]) else "degraded",
-                "timestamp": datetime.utcnow().isoformat(),
-                "components": {
-                    "database": "ok" if db_ok else "error",
-                    "embeddings": "ok" if embeddings_ok else "unavailable",
-                    "scheduler": "running" if scheduler_ok else "stopped",
-                },
-            }
-
+            status = build_status_report()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(status).encode())
-
         except Exception as e:
             logger.exception("Error in status check")
             self.send_error(500, str(e))

@@ -1087,6 +1087,18 @@ async def list_tools() -> ListToolsResult:
                 },
             },
         ),
+        Tool(
+            name="memory.system_health",
+            description=(
+                "Get comprehensive system health: schema version, component status, "
+                "scheduled job list, and memory/entity counts. Use this to diagnose "
+                "issues or verify the memory system is working correctly."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -1895,6 +1907,18 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             "history": history,
                             "count": len(history),
                         }),
+                    )
+                ]
+            )
+
+        elif name == "memory.system_health":
+            from ..daemon.health import build_status_report
+            report = build_status_report()
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(report, indent=2),
                     )
                 ]
             )
