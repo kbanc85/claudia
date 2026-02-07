@@ -2,6 +2,32 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.29.1 (2026-02-07)
+
+### Post-Release Fixes
+
+Full code review across the entire repository caught bugs, dead references, and a resource leak that slipped through v1.29.0.
+
+### Fixed
+
+- **`run_decay()` always reported 0 memories decayed** - `SELECT changes()` was called after subsequent UPDATE statements instead of immediately after the memories UPDATE, so the metric was always 0. Decay itself worked fine; only the reported count was wrong.
+- **7 dead MCP tool references in template** - Skills and hooks still referenced `memory.predictions` and `memory.agent_dispatch` (removed in v1.29.0). These would fail silently at runtime. Replaced with `memory.session_context` or removed dispatch logging steps.
+- **Embedding service HTTP clients leaked on shutdown** - The `EmbeddingService.close()` method existed but was never called during daemon shutdown. Added cleanup in the `finally` block.
+- **Legacy `visualizer/` shipped in npm package** - The `files` array in `package.json` included the deprecated Babylon.js visualizer alongside the current Three.js one, adding dead weight to every install.
+
+### Changed
+
+- **Config parse errors now log a warning** - Previously, a malformed `~/.claudia/config.json` was silently ignored. Now logs the error and falls back to defaults.
+- **`embed_batch` handles individual failures gracefully** - One failed embedding no longer crashes the entire batch. Uses `return_exceptions=True` and converts exceptions to `None`.
+- **Duplicate dispatch_tier trigger removed** - The trigger was created in both migration 14 and the post-migration setup. Removed the redundant copy from migration 14.
+
+### Stats
+
+- 277 tests, 0 regressions
+- 14 files changed across memory-daemon, template, installer, and docs
+
+---
+
 ## 1.29.0 (2026-02-07)
 
 ### The Robustness Release
