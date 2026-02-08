@@ -27,6 +27,11 @@ const DEFAULT_CONFIG = {
     model: '', // Auto-detected from ~/.claudia/config.json language_model field
   },
 
+  // Tool use (LLM-driven memory tool calls)
+  toolUse: undefined,           // true/false/undefined (undefined = auto: true for Anthropic, false for Ollama)
+  toolUseMaxIterations: 5,      // Max tool loop rounds per message
+  preRecall: true,              // Keep programmatic pre-call recall alongside tool_use
+
   // Personality
   personalityDir: '',          // Path to Claudia template dir (contains CLAUDE.md + .claude/rules/)
   personalityMaxChars: 15000,  // Safety limit for prompt size
@@ -52,6 +57,7 @@ const DEFAULT_CONFIG = {
       token: '',
       allowedUsers: [],
       model: '',  // Per-channel model override (empty = use global)
+      toolUse: undefined,  // Per-channel tool_use override (undefined = use global)
     },
     slack: {
       enabled: false,
@@ -60,6 +66,7 @@ const DEFAULT_CONFIG = {
       signingSecret: '',
       allowedUsers: [],
       model: '',  // Per-channel model override (empty = use global)
+      toolUse: undefined,  // Per-channel tool_use override (undefined = use global)
     },
   },
 

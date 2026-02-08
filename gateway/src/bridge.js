@@ -18,6 +18,7 @@ import { existsSync } from 'fs';
 import { readFileSync } from 'fs';
 import { createLogger } from './utils/logger.js';
 import { loadPersonality } from './personality.js';
+import { ToolManager } from './tools.js';
 
 const log = createLogger('bridge');
 
@@ -45,6 +46,8 @@ export class Bridge {
     this.extractor = null; // Set by gateway after construction
     this._consecutiveFailures = 0;
     this._personality = null; // Loaded Claudia personality prompt
+    this._toolManager = null; // ToolManager instance (or null if tool_use disabled)
+    this._toolUseEnabled = false;
   }
 
   async start() {
@@ -97,6 +100,16 @@ export class Bridge {
 
     // Try to connect to memory daemon via MCP
     await this._connectMemory();
+
+    // Initialize tool_use if memory is available and tool_use is enabled
+    if (this.memoryAvailable && this._isToolUseEnabled()) {
+      this._toolManager = new ToolManager();
+      await this._toolManager.initialize(this.mcpClient);
+      this._toolUseEnabled = this._toolManager.isReady();
+      if (this._toolUseEnabled) {
+        log.info('Tool use enabled', { toolCount: this._toolManager.toolCount });
+      }
+    }
   }
 
   async stop() {
@@ -127,9 +140,12 @@ export class Bridge {
   async processMessage(message, conversationHistory = [], episodeId = null) {
     const { text, userId, userName, channel } = message;
 
-    // 1. Recall relevant memories (skip if memory is failing repeatedly)
+    const useTools = this._toolUseEnabled && this._isToolUseEnabled(channel);
+
+    // 1. Recall relevant memories (skip if tool_use is active and preRecall is off)
     let memoryContext = '';
-    if (this.memoryAvailable && this._consecutiveFailures < 3) {
+    const doPreRecall = this.config.preRecall !== false;
+    if (this.memoryAvailable && this._consecutiveFailures < 3 && (doPreRecall || !useTools)) {
       try {
         memoryContext = await this._recallContext(text, userName);
         this._consecutiveFailures = 0;
@@ -143,7 +159,7 @@ export class Bridge {
     }
 
     // 2. Build the prompt
-    const systemPrompt = this._buildSystemPrompt(memoryContext, userName, channel);
+    const systemPrompt = this._buildSystemPrompt(memoryContext, userName, channel, useTools);
 
     // 3. Build message history
     const messages = [];
@@ -155,21 +171,30 @@ export class Bridge {
     }
     messages.push({ role: 'user', content: text });
 
-    // 4. Call LLM (Anthropic or Ollama)
+    // 4. Call LLM (Anthropic or Ollama), with or without tool loop
     const resolvedModel = this._resolveModel(channel);
     log.info('Calling LLM', {
       provider: this.provider,
       model: resolvedModel,
       channel,
       messageCount: messages.length,
+      toolUse: useTools,
     });
 
     let result;
     try {
-      if (this.provider === 'anthropic') {
-        result = await this._callAnthropic(systemPrompt, messages, resolvedModel);
+      if (useTools) {
+        if (this.provider === 'anthropic') {
+          result = await this._callAnthropicWithTools(systemPrompt, messages, resolvedModel, channel);
+        } else {
+          result = await this._callOllamaWithTools(systemPrompt, messages, resolvedModel, channel);
+        }
       } else {
-        result = await this._callOllama(systemPrompt, messages, resolvedModel);
+        if (this.provider === 'anthropic') {
+          result = await this._callAnthropic(systemPrompt, messages, resolvedModel);
+        } else {
+          result = await this._callOllama(systemPrompt, messages, resolvedModel);
+        }
       }
     } catch (err) {
       log.error('LLM call failed', { provider: this.provider, error: err.message });
@@ -409,7 +434,7 @@ export class Bridge {
    * 2. Custom systemPromptPath file (backward compat)
    * 3. DEFAULT_SYSTEM_PROMPT fallback
    */
-  _buildSystemPrompt(memoryContext, userName, channel) {
+  _buildSystemPrompt(memoryContext, userName, channel, toolUse = false) {
     let prompt;
 
     if (this._personality) {
@@ -433,6 +458,16 @@ export class Bridge {
 
     if (memoryContext) {
       prompt += `\n\n# Memory Context\n${memoryContext}`;
+    }
+
+    if (toolUse) {
+      prompt += `\n\n# Memory Tools
+You have access to memory tools to search, store, and manage your persistent knowledge. Use them naturally during conversation:
+- Search for more context when a name, topic, or project comes up that you don't have enough info on
+- Store new facts when the user mentions something important worth remembering
+- Correct or invalidate memories when the user tells you something is wrong or outdated
+- Trace provenance when asked where you learned something
+Don't announce tool usage -- just use the tools and incorporate results naturally into your response.`;
     }
 
     return prompt;
@@ -516,6 +551,237 @@ export class Bridge {
   }
 
   /**
+   * Check if tool_use is enabled for a given channel.
+   * Resolution: per-channel override → global config → auto-detect by provider.
+   *
+   * @param {string} [channel] - Channel name
+   * @returns {boolean}
+   */
+  _isToolUseEnabled(channel) {
+    // Per-channel override (must be explicit boolean, not undefined)
+    if (channel) {
+      const channelToolUse = this.config.channels?.[channel]?.toolUse;
+      if (typeof channelToolUse === 'boolean') return channelToolUse;
+    }
+
+    // Global config override
+    if (typeof this.config.toolUse === 'boolean') return this.config.toolUse;
+
+    // Auto-detect: enabled for Anthropic, disabled for Ollama
+    return this.provider === 'anthropic';
+  }
+
+  /**
+   * Call Anthropic API with tool_use loop.
+   * Runs up to toolUseMaxIterations rounds, executing tool calls and feeding
+   * results back until the model produces a final text response.
+   *
+   * @param {string} systemPrompt
+   * @param {Object[]} messages - Conversation messages (will be mutated with tool results)
+   * @param {string} model
+   * @param {string} channel
+   * @returns {{ text: string, usage: Object }}
+   */
+  async _callAnthropicWithTools(systemPrompt, messages, model, channel) {
+    const tools = this._toolManager.getAnthropicTools();
+    const maxIterations = this.config.toolUseMaxIterations || 5;
+    let totalUsage = { input_tokens: 0, output_tokens: 0 };
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      const response = await this.anthropic.messages.create({
+        model,
+        max_tokens: this.config.maxTokens || 2048,
+        system: systemPrompt,
+        messages,
+        tools,
+      });
+
+      // Accumulate usage
+      if (response.usage) {
+        totalUsage.input_tokens += response.usage.input_tokens || 0;
+        totalUsage.output_tokens += response.usage.output_tokens || 0;
+      }
+
+      // If model didn't request tool use, extract text and return
+      if (response.stop_reason !== 'tool_use') {
+        const text = response.content
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text)
+          .join('\n');
+        return { text, usage: totalUsage };
+      }
+
+      // Process tool calls
+      const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use');
+      const toolResults = [];
+
+      for (const block of toolUseBlocks) {
+        log.debug('Tool call', {
+          iteration,
+          tool: block.name,
+          id: block.id,
+        });
+
+        const result = await this._executeToolCall(block.name, block.input, channel);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: result,
+        });
+      }
+
+      // Append assistant response + tool results for next iteration
+      messages.push({ role: 'assistant', content: response.content });
+      messages.push({ role: 'user', content: toolResults });
+    }
+
+    // Exhausted iterations -- make one final call without tools to force a text response
+    log.warn('Tool loop exhausted max iterations', { maxIterations });
+    const finalResponse = await this.anthropic.messages.create({
+      model,
+      max_tokens: this.config.maxTokens || 2048,
+      system: systemPrompt,
+      messages,
+    });
+
+    if (finalResponse.usage) {
+      totalUsage.input_tokens += finalResponse.usage.input_tokens || 0;
+      totalUsage.output_tokens += finalResponse.usage.output_tokens || 0;
+    }
+
+    const text = finalResponse.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
+
+    return { text, usage: totalUsage };
+  }
+
+  /**
+   * Call Ollama /api/chat with tool_use loop.
+   *
+   * @param {string} systemPrompt
+   * @param {Object[]} messages
+   * @param {string} model
+   * @param {string} channel
+   * @returns {{ text: string, usage: null }}
+   */
+  async _callOllamaWithTools(systemPrompt, messages, model, channel) {
+    const tools = this._toolManager.getOllamaTools();
+    const host = this.config.ollama?.host || 'http://localhost:11434';
+    const maxIterations = this.config.toolUseMaxIterations || 5;
+
+    const ollamaMessages = [{ role: 'system', content: systemPrompt }];
+    for (const msg of messages) {
+      ollamaMessages.push({ role: msg.role, content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) });
+    }
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      const res = await fetch(`${host}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: ollamaMessages,
+          stream: false,
+          tools,
+          options: { temperature: 0.7 },
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Ollama HTTP ${res.status}: ${body}`);
+      }
+
+      const data = await res.json();
+
+      // If no tool calls, return the text response
+      if (!data.message?.tool_calls?.length) {
+        return { text: data.message?.content || '', usage: null };
+      }
+
+      // Append assistant message with tool calls
+      ollamaMessages.push(data.message);
+
+      // Execute each tool call and add results
+      for (const tc of data.message.tool_calls) {
+        const toolName = tc.function?.name;
+        const toolInput = tc.function?.arguments || {};
+
+        log.debug('Ollama tool call', { iteration, tool: toolName });
+
+        const result = await this._executeToolCall(toolName, toolInput, channel);
+        ollamaMessages.push({
+          role: 'tool',
+          content: result,
+        });
+      }
+    }
+
+    // Exhausted iterations -- final call without tools
+    log.warn('Ollama tool loop exhausted max iterations', { maxIterations });
+    const finalRes = await fetch(`${host}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: ollamaMessages,
+        stream: false,
+        options: { temperature: 0.7 },
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!finalRes.ok) {
+      const body = await finalRes.text().catch(() => '');
+      throw new Error(`Ollama HTTP ${finalRes.status}: ${body}`);
+    }
+
+    const finalData = await finalRes.json();
+    return { text: finalData.message?.content || '', usage: null };
+  }
+
+  /**
+   * Execute a single tool call from the LLM against the MCP daemon.
+   *
+   * Safety: rejects calls to non-exposed tools.
+   * Auto-injects source_channel for write operations.
+   *
+   * @param {string} toolName
+   * @param {Object} toolInput
+   * @param {string} channel
+   * @returns {string} JSON string result (always valid, errors wrapped)
+   */
+  async _executeToolCall(toolName, toolInput, channel) {
+    // Safety gate: only execute exposed tools
+    if (!this._toolManager.isExposed(toolName)) {
+      log.warn('LLM attempted to call non-exposed tool', { tool: toolName });
+      return JSON.stringify({ error: `Tool "${toolName}" is not available` });
+    }
+
+    try {
+      // Auto-inject source_channel for write operations
+      const writeTools = new Set(['memory.remember', 'memory.batch', 'memory.correct']);
+      if (writeTools.has(toolName) && channel) {
+        toolInput = { ...toolInput, source_channel: channel };
+      }
+
+      const result = await this.mcpClient.callTool({
+        name: toolName,
+        arguments: toolInput,
+      });
+
+      const parsed = this._parseMcpResult(result);
+      return JSON.stringify(parsed ?? { ok: true });
+    } catch (err) {
+      log.warn('Tool execution failed', { tool: toolName, error: err.message });
+      return JSON.stringify({ error: err.message });
+    }
+  }
+
+  /**
    * Connect to the memory daemon via MCP stdio.
    */
   async _connectMemory() {
@@ -575,6 +841,8 @@ export class Bridge {
       personalityLoaded: !!this._personality,
       model:
         this.provider === 'ollama' ? this.config.ollama?.model : this.config.model,
+      toolUseEnabled: this._toolUseEnabled,
+      toolCount: this._toolManager?.toolCount || 0,
     };
   }
 }
