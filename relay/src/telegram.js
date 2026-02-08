@@ -6,8 +6,7 @@
  */
 
 import { Bot, InputFile } from 'grammy';
-import { writeFile, unlink, mkdtemp, rmdir } from 'fs/promises';
-import { tmpdir } from 'os';
+import { writeFile, unlink, mkdtemp, mkdir, rmdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { chunkText } from './chunker.js';
@@ -42,8 +41,10 @@ export class TelegramBot {
     const response = await fetch(url);
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    // Create temp directory and save file
-    const tempDir = await mkdtemp(join(tmpdir(), 'claudia-relay-'));
+    // Save inside claudiaDir so claude -p can read it (stays within cwd)
+    const baseDir = join(this.claudeConfig.claudiaDir, '.relay-tmp');
+    await mkdir(baseDir, { recursive: true });
+    const tempDir = await mkdtemp(join(baseDir, 'upload-'));
     const ext = file.file_path.split('.').pop() || 'bin';
     const filename = `file_${Date.now()}.${ext}`;
     const filePath = join(tempDir, filename);

@@ -40,7 +40,16 @@ export async function runClaude(prompt, {
     minute: '2-digit',
     timeZoneName: 'short',
   });
-  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]\n\nIMPORTANT: When storing memories via memory.remember or memory.batch, always pass source_channel: "telegram" so memories are tagged with their origin channel.\n\n${prompt}`;
+  // Include attached file paths in the prompt so Claude can Read them natively
+  let fileContext = '';
+  if (files.length > 0) {
+    fileContext = '\n\nThe user attached files via Telegram. Use your Read tool to view them:\n';
+    for (const file of files) {
+      fileContext += `- ${file.path}\n`;
+    }
+  }
+
+  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]\n\nIMPORTANT: When storing memories via memory.remember or memory.batch, always pass source_channel: "telegram" so memories are tagged with their origin channel.${fileContext}\n\n${prompt}`;
 
   // Build args
   const args = [
@@ -51,11 +60,6 @@ export async function runClaude(prompt, {
 
   if (sessionId) {
     args.push('--resume', sessionId);
-  }
-
-  // Add file arguments
-  for (const file of files) {
-    args.push('--file', `${file.name}:${file.path}`);
   }
 
   return new Promise((resolve, reject) => {
