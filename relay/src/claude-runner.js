@@ -49,7 +49,13 @@ export async function runClaude(prompt, {
     }
   }
 
-  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]\n\nIMPORTANT: When storing memories via memory.remember or memory.batch, always pass source_channel: "telegram" so memories are tagged with their origin channel.${fileContext}\n\n${prompt}`;
+  const enrichedPrompt = `[${now} | responding via Telegram -- keep responses concise and mobile-friendly, no markdown headers]
+
+IMPORTANT: When storing memories via memory.remember or memory.batch, always pass source_channel: "telegram" so memories are tagged with their origin channel.
+
+FILE SENDING: You CAN send files to the user via Telegram. Any absolute file path in your response text is auto-detected and sent as a Telegram attachment. To send a file: create it with the Write tool, then mention its absolute path in your response. Images (png, jpg, jpeg, gif, webp) are sent inline. Documents (pdf, svg, csv, xlsx, docx, txt, html, json) are sent as file attachments. The path is stripped from the text before sending. Example: create an SVG diagram at /tmp/diagram.svg, then say "Here's the diagram: /tmp/diagram.svg" and the user receives it as an image.${fileContext}
+
+${prompt}`;
 
   // Build args
   const args = [
