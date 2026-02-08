@@ -2,6 +2,35 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.33.0 (2026-02-08)
+
+### Claudia Thinks for Herself
+
+The gateway now exposes 14 memory tools to Claude via native Anthropic/Ollama tool_use. Instead of only getting pre-loaded context, Claudia can now decide mid-conversation to search for more memories, store new facts, correct outdated information, or trace where she learned something. She uses tools naturally without announcing them.
+
+### Added
+
+- **API-native tool_use** - New `ToolManager` (`tools.js`) dynamically loads MCP tool schemas from the memory daemon at startup, filters to a curated 14-tool subset, and converts to Anthropic/Ollama formats. No hardcoded schemas to maintain.
+- **Tool execution loop** - `_callAnthropicWithTools()` and `_callOllamaWithTools()` in `bridge.js` run an iterative tool loop (max 5 rounds, configurable) letting Claude chain tool calls before producing a final response.
+- **Safety chokepoint** - `_executeToolCall()` rejects non-exposed tools and auto-injects `source_channel` on write operations (`memory.remember`, `memory.batch`, `memory.correct`).
+- **`toolUse` config** - Global and per-channel setting. `undefined` (default) auto-detects by provider: enabled for Anthropic, disabled for Ollama.
+- **`toolUseMaxIterations` config** - Max tool loop rounds per message (default 5).
+- **`preRecall` config** - Keep programmatic pre-call recall alongside tool_use (default true, belt-and-suspenders).
+
+### Changed
+
+- **`processMessage()`** branches between tool_use and standard LLM paths based on resolved config.
+- **`_buildSystemPrompt()`** appends tool usage instructions when tool_use is active.
+- **`getStatus()`** includes `toolUseEnabled` and `toolCount` fields.
+
+### Stats
+
+- 75 gateway tests (was 49), 0 regressions
+- 26 new tests across 2 files (tools, bridge-tooluse)
+- Install: `npx get-claudia`
+
+---
+
 ## 1.32.0 (2026-02-08)
 
 ### The Real Claudia on Telegram
