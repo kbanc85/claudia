@@ -13,8 +13,9 @@ Both layers are core to how Claudia works. The template layer defines *who* Clau
 
 This repository also contains:
 - `gateway/` - Multi-channel messaging bridge (Telegram, Slack) with Anthropic/Ollama provider auto-detection
+- `relay/` - Telegram bot that spawns full `claude -p` agent sessions (Grammy + Claude Code subprocess)
 - `visualizer-threejs/` - 3D brain visualization (Three.js + D3-Force-3D) with live parameter controls
-- `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package)
+- `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package, no tests -- pure markdown)
 - `template/` - Legacy template (deprecated)
 
 For full architectural diagrams and pipeline explanations, see `ARCHITECTURE.md`.
@@ -57,7 +58,7 @@ The memory system is a standalone Python application that gives Claudia persiste
 - Per-project isolation via workspace folder hash (`~/.claudia/memory/{hash}.db`)
 - Bi-temporal tracking on relationships (`valid_at`/`invalid_at`)
 - Soft-delete on entities (`deleted_at`/`deleted_reason`), corrections on memories (`corrected_at`/`corrected_from`)
-- Schema defined in `schema.sql` with 14 migrations in `database.py`
+- Schema defined in `schema.sql` with 16 migrations in `database.py`
 
 **Service layers** (`services/`)
 - `RememberService` (`remember.py`) - Stores facts, entities, relationships; generates embeddings; deduplicates; merges entities; soft-deletes; corrections and invalidation; audit logging
@@ -71,14 +72,14 @@ The memory system is a standalone Python application that gives Claudia persiste
 - `guards.py` - Validation on writes (content length, importance clamping, deadline detection, near-duplicate warning)
 
 **MCP tools** exposed to Claude Code (`mcp/server.py`):
-- `memory.remember` - Store facts, preferences, observations, learnings (accepts `origin_type`)
-- `memory.recall` - Semantic search across all memories (max 50 results)
+- `memory.remember` - Store facts, preferences, observations, learnings (accepts `origin_type`, `source_channel`)
+- `memory.recall` - Semantic search across all memories (max 50 results); results include `source_channel`
 - `memory.about` - Retrieve all context about a specific entity
 - `memory.relate` - Create/strengthen relationships between entities
 - `memory.entity` - Create/update entity information
 - `memory.search_entities` - Search entities by name or description
 - `memory.consolidate` - Trigger manual consolidation
-- `memory.batch` - Batch multiple memory operations in one call
+- `memory.batch` - Batch multiple memory operations in one call (accepts `source_channel`)
 - `memory.trace` - Trace provenance and source history
 - `memory.correct` - Update memory content (preserves history in `corrected_from`)
 - `memory.invalidate` - Mark memories as no longer true
@@ -121,9 +122,11 @@ node bin/index.js ../test-install --demo  # With demo database
 
 ### Working on the Memory Daemon
 
+**Important:** Use `python3`, not `python`. Some systems don't alias `python` to Python 3.
+
 ```bash
 cd memory-daemon
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -e ".[dev]"
 
@@ -132,9 +135,9 @@ pytest tests/test_database.py -v       # Single test file
 pytest tests/test_recall.py::test_name # Single test function
 ./test.sh                              # Full suite: unit + integration + daemon startup
 
-python -m claudia_memory              # Run daemon (MCP mode, stdio)
-python -m claudia_memory --consolidate # Run just consolidation
-python -m claudia_memory --tui        # Brain Monitor TUI dashboard
+python3 -m claudia_memory              # Run daemon (MCP mode, stdio)
+python3 -m claudia_memory --consolidate # Run just consolidation
+python3 -m claudia_memory --tui        # Brain Monitor TUI dashboard
 claudia-brain                          # Same TUI via entry point
 curl http://localhost:3848/health      # Health check
 ```
@@ -170,6 +173,32 @@ npm start                              # Start server
 ```
 
 Key files: `src/config.js` (config + provider detection), `src/bridge.js` (Anthropic/Ollama routing), `src/server.js` (Express HTTP).
+
+**Gotcha:** Tests must account for the user having a real `~/.claudia/gateway.json` on their machine. Don't assume config files are absent.
+
+### Working on the Relay
+
+The relay bridges Telegram to full Claude Code agent sessions. Instead of calling LLM APIs directly, it spawns `claude -p` as a subprocess so Telegram users get all of Claudia's personality, memory, skills, and rules.
+
+```bash
+cd relay
+npm install
+npm test                               # Node --test runner
+TELEGRAM_BOT_TOKEN="..." npm start     # Start Telegram relay
+node src/index.js status               # Check if running
+node src/index.js stop                 # Stop running relay
+```
+
+Key files:
+- `src/relay.js` - Main orchestrator (wires config, runner, session, telegram, lock)
+- `src/claude-runner.js` - Spawns `claude -p` with enriched Claudia context; accepts `files` param for attachments
+- `src/telegram.js` - Grammy bot (handles text, photos, documents; auto-detects file paths in output for sending)
+- `src/session.js` - Session manager (30-min default TTL)
+- `src/config.js` - Config from `~/.claudia/relay.json`
+- `src/chunker.js` - Message chunking for Telegram's 4KB limit
+- `src/formatter.js` - Telegram-friendly message formatting
+
+The enriched prompt in `claude-runner.js` tells Claude to pass `source_channel: "telegram"` when storing memories, so memories created via Telegram are tracked separately from Claude Code sessions.
 
 ### Working on the Visualizer
 
@@ -261,7 +290,7 @@ claudia/
 ├── memory-daemon/            ← Python memory system
 │   ├── claudia_memory/
 │   │   ├── __main__.py      ← Entry point (MCP, consolidation, health check)
-│   │   ├── database.py      ← SQLite + sqlite-vec, migrations v1-v14
+│   │   ├── database.py      ← SQLite + sqlite-vec, migrations v1-v16
 │   │   ├── schema.sql       ← 14+ table definitions
 │   │   ├── config.py        ← Settings from ~/.claudia/config.json
 │   │   ├── embeddings.py    ← Ollama 384-dim embedding generation
@@ -277,6 +306,10 @@ claudia/
 │   └── test.sh              ← One-click full test suite
 ├── gateway/                  ← Messaging bridge (Telegram, Slack)
 │   ├── src/                 ← Express server, config, bridge (Anthropic/Ollama)
+│   ├── tests/               ← Node --test
+│   └── scripts/             ← Cross-platform installers
+├── relay/                    ← Telegram bot (Grammy + Claude Code subprocess)
+│   ├── src/                 ← Relay orchestrator, claude-runner, telegram, session
 │   ├── tests/               ← Node --test
 │   └── scripts/             ← Cross-platform installers
 ├── visualizer-threejs/       ← 3D brain visualization
