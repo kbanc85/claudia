@@ -76,6 +76,28 @@ describe('deepMerge', () => {
     assert.equal(result.a, 1);
     assert.equal(result.b, 2);
   });
+
+  it('preserves per-channel model overrides', () => {
+    const defaults = {
+      model: 'claude-sonnet-4-20250514',
+      channels: {
+        telegram: { enabled: false, token: '', allowedUsers: [], model: '' },
+        slack: { enabled: false, model: '' },
+      },
+    };
+    const overrides = {
+      channels: {
+        telegram: { enabled: true, model: 'claude-haiku-4-5-20251001' },
+      },
+    };
+    const result = deepMerge(defaults, overrides);
+
+    assert.equal(result.model, 'claude-sonnet-4-20250514');
+    assert.equal(result.channels.telegram.model, 'claude-haiku-4-5-20251001');
+    assert.equal(result.channels.telegram.enabled, true);
+    assert.equal(result.channels.telegram.allowedUsers.length, 0);
+    assert.equal(result.channels.slack.model, '');
+  });
 });
 
 describe('PID file operations', () => {

@@ -27,7 +27,11 @@ const DEFAULT_CONFIG = {
     model: '', // Auto-detected from ~/.claudia/config.json language_model field
   },
 
-  // System prompt context
+  // Personality
+  personalityDir: '',          // Path to Claudia template dir (contains CLAUDE.md + .claude/rules/)
+  personalityMaxChars: 15000,  // Safety limit for prompt size
+
+  // System prompt context (legacy, overridden by personalityDir)
   systemPromptPath: '', // Optional path to custom system prompt
 
   // Memory daemon connection
@@ -47,6 +51,7 @@ const DEFAULT_CONFIG = {
       enabled: false,
       token: '',
       allowedUsers: [],
+      model: '',  // Per-channel model override (empty = use global)
     },
     slack: {
       enabled: false,
@@ -54,6 +59,7 @@ const DEFAULT_CONFIG = {
       appToken: '',
       signingSecret: '',
       allowedUsers: [],
+      model: '',  // Per-channel model override (empty = use global)
     },
   },
 

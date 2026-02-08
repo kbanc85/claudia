@@ -17,6 +17,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { existsSync } from 'fs';
 import { readFileSync } from 'fs';
 import { createLogger } from './utils/logger.js';
+import { loadPersonality } from './personality.js';
 
 const log = createLogger('bridge');
 
@@ -43,6 +44,7 @@ export class Bridge {
     this.memoryAvailable = false;
     this.extractor = null; // Set by gateway after construction
     this._consecutiveFailures = 0;
+    this._personality = null; // Loaded Claudia personality prompt
   }
 
   async start() {
@@ -89,6 +91,9 @@ export class Bridge {
         );
       }
     }
+
+    // Load Claudia personality
+    this._personality = loadPersonality(this.config);
 
     // Try to connect to memory daemon via MCP
     await this._connectMemory();
@@ -151,18 +156,20 @@ export class Bridge {
     messages.push({ role: 'user', content: text });
 
     // 4. Call LLM (Anthropic or Ollama)
+    const resolvedModel = this._resolveModel(channel);
     log.info('Calling LLM', {
       provider: this.provider,
-      model: this.provider === 'anthropic' ? this.config.model : this.config.ollama.model,
+      model: resolvedModel,
+      channel,
       messageCount: messages.length,
     });
 
     let result;
     try {
       if (this.provider === 'anthropic') {
-        result = await this._callAnthropic(systemPrompt, messages);
+        result = await this._callAnthropic(systemPrompt, messages, resolvedModel);
       } else {
-        result = await this._callOllama(systemPrompt, messages);
+        result = await this._callOllama(systemPrompt, messages, resolvedModel);
       }
     } catch (err) {
       log.error('LLM call failed', { provider: this.provider, error: err.message });
@@ -376,18 +383,47 @@ export class Bridge {
   }
 
   /**
+   * Resolve which model to use for a given channel.
+   * Per-channel model overrides the global default.
+   *
+   * @param {string} channel - Channel name (e.g. 'telegram', 'slack')
+   * @returns {string} Resolved model identifier
+   */
+  _resolveModel(channel) {
+    // Check per-channel model override
+    const channelModel = this.config.channels?.[channel]?.model;
+    if (channelModel) return channelModel;
+
+    // Fall back to global model for the active provider
+    if (this.provider === 'anthropic') {
+      return this.config.model;
+    }
+    return this.config.ollama?.model || '';
+  }
+
+  /**
    * Build the system prompt with memory context.
+   *
+   * Resolution chain for personality:
+   * 1. Loaded personality from template dir (richest)
+   * 2. Custom systemPromptPath file (backward compat)
+   * 3. DEFAULT_SYSTEM_PROMPT fallback
    */
   _buildSystemPrompt(memoryContext, userName, channel) {
-    let prompt = DEFAULT_SYSTEM_PROMPT;
+    let prompt;
 
-    // Load custom system prompt if configured
-    if (this.config.systemPromptPath && existsSync(this.config.systemPromptPath)) {
+    if (this._personality) {
+      // Full Claudia personality loaded from template files
+      prompt = this._personality;
+    } else if (this.config.systemPromptPath && existsSync(this.config.systemPromptPath)) {
+      // Legacy: custom system prompt file
       try {
         prompt = readFileSync(this.config.systemPromptPath, 'utf8');
       } catch {
-        // Fall back to default
+        prompt = DEFAULT_SYSTEM_PROMPT;
       }
+    } else {
+      prompt = DEFAULT_SYSTEM_PROMPT;
     }
 
     prompt += `\n\nChannel: ${channel}`;
@@ -404,11 +440,14 @@ export class Bridge {
 
   /**
    * Call Anthropic API.
+   * @param {string} systemPrompt
+   * @param {Object[]} messages
+   * @param {string} model - Resolved model to use
    * @returns {{ text: string, usage: Object }}
    */
-  async _callAnthropic(systemPrompt, messages) {
+  async _callAnthropic(systemPrompt, messages, model) {
     const response = await this.anthropic.messages.create({
-      model: this.config.model,
+      model,
       max_tokens: this.config.maxTokens || 2048,
       system: systemPrompt,
       messages,
@@ -425,11 +464,13 @@ export class Bridge {
   /**
    * Call Ollama /api/chat endpoint.
    * Retries up to 2 times with 2s delay (matching memory daemon pattern).
+   * @param {string} systemPrompt
+   * @param {Object[]} messages
+   * @param {string} model - Resolved model to use
    * @returns {{ text: string, usage: null }}
    */
-  async _callOllama(systemPrompt, messages) {
+  async _callOllama(systemPrompt, messages, model) {
     const host = this.config.ollama?.host || 'http://localhost:11434';
-    const model = this.config.ollama?.model;
 
     // Build Ollama message array: system prompt + conversation turns
     const ollamaMessages = [{ role: 'system', content: systemPrompt }];
@@ -531,6 +572,7 @@ export class Bridge {
       provider: this.provider,
       providerReady: this.provider === 'anthropic' ? !!this.anthropic : this.provider === 'ollama',
       memoryAvailable: this.memoryAvailable,
+      personalityLoaded: !!this._personality,
       model:
         this.provider === 'ollama' ? this.config.ollama?.model : this.config.model,
     };
