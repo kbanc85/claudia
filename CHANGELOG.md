@@ -2,6 +2,33 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.32.0 (2026-02-08)
+
+### The Real Claudia on Telegram
+
+The gateway now loads Claudia's full personality from template files instead of a generic 8-line prompt. Telegram and Slack Claudia feels like the real Claudia: warm, witty, principled. Plus per-channel model config so you can run Haiku on Telegram (~$27/mo) and Sonnet on Slack (~$86/mo).
+
+### Added
+
+- **Per-channel model config** - Each channel (telegram, slack) can specify its own `model` in `gateway.json`, overriding the global default. Empty string means "use global." Resolved per-message in `_resolveModel()`.
+- **Claudia personality loading** - New `personality.js` module extracts gateway-relevant sections from `template-v2/CLAUDE.md` (identity, mission, style, behaviors, boundaries) and `claudia-principles.md` (principles 1-10). Prepends a chat-adapted preamble.
+- **Personality resolution chain** - `personalityDir` config > auto-detect `template-v2/` in dev mode > `systemPromptPath` legacy > `DEFAULT_SYSTEM_PROMPT` fallback. Cached after first load.
+- **`personalityMaxChars` config** - Safety limit (default 15,000) to prevent oversized system prompts. Truncates at last complete line.
+
+### Changed
+
+- **`_callAnthropic()` and `_callOllama()`** now receive the resolved model as a parameter instead of reading from config directly.
+- **`getStatus()`** includes `personalityLoaded` boolean.
+- **Gateway logs** now include `channel` and resolved `model` in LLM call logs.
+
+### Stats
+
+- 49 gateway tests (was 22), 0 regressions
+- 27 new tests across 3 files (personality, bridge-model, config)
+- Install: `npx get-claudia`
+
+---
+
 ## 1.31.0 (2026-02-07)
 
 ### The Telegram Relay
