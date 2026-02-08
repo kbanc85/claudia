@@ -18,7 +18,7 @@ const PID_PATH = join(CONFIG_DIR, 'gateway.pid');
 const DEFAULT_CONFIG = {
   // Anthropic API
   anthropicApiKey: '',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-haiku-4-5-20251001',
   maxTokens: 2048,
 
   // Ollama (local model, auto-detected from ~/.claudia/config.json)

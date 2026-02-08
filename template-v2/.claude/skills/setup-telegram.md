@@ -1,12 +1,14 @@
 ---
 name: setup-telegram
-description: Guided walkthrough for setting up the Claudia Telegram relay. Helps create a Telegram bot, configure relay.json, and start the service.
+description: Guided walkthrough for setting up the Claudia Telegram relay (full claude -p agent sessions). For the simpler API-based gateway path, use /setup-gateway instead.
 effort-level: medium
 ---
 
 # Telegram Relay Setup
 
-**Triggers:** "set up Telegram", "configure Telegram", "Telegram relay", "connect Telegram", "Telegram bot"
+> **Note:** This sets up the **relay** path, which spawns full `claude -p` agent sessions per message. This gives Telegram users access to all of Claudia's skills, memory, and MCP tools, but is heavier and slower. For a simpler, faster API-based chat path, use `/setup-gateway` instead.
+
+**Triggers:** "Telegram relay", "set up relay", "configure relay", "relay setup"
 
 ---
 

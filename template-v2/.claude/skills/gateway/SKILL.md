@@ -9,7 +9,7 @@ effort-level: medium
 
 Manage the Claudia Gateway service (Telegram, Slack) from within a session. Start, stop, or check status without needing a separate terminal.
 
-**Triggers:** `/gateway`, `/gateway start`, `/gateway stop`, `/gateway status`, or natural language like "start the gateway", "connect telegram", "stop the gateway", "is the gateway running?"
+**Triggers:** `/gateway`, `/gateway start`, `/gateway stop`, `/gateway status`, or natural language like "start the gateway", "stop the gateway", "is the gateway running?"
 
 ---
 
@@ -98,7 +98,7 @@ ls ~/.claudia/gateway/src/index.js 2>/dev/null
 
 If not found:
 ```
-"The gateway isn't installed yet. You can set it up by running the gateway installer:
+"The gateway isn't installed yet. Run `/setup-gateway` for a guided walkthrough, or install manually:
 `bash ~/.claudia/gateway/scripts/install.sh`"
 ```
 
@@ -147,9 +147,9 @@ If failed, show the error from the log:
 [relevant lines from log]
 
 Common issues:
-- `TELEGRAM_BOT_TOKEN` not set in your shell profile or `~/.claudia/config.json`
+- `TELEGRAM_BOT_TOKEN` not set in your shell profile. Run `/setup-gateway` to configure it.
 - Ollama not running (if using local models)
-- Port conflict on 3848"
+- Port conflict on 3849"
 ```
 
 ---

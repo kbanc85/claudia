@@ -323,6 +323,7 @@ These run only when explicitly invoked:
 | `/file-document` | Save any document with entity linking and provenance |
 | `/new-person [name]` | Create a relationship tracking file |
 | `/gateway [start\|stop\|status]` | Manage the Claudia Gateway service |
+| `/setup-gateway` | Guided walkthrough for gateway Telegram/Slack setup |
 | `/diagnose` | Check memory daemon health and troubleshoot issues |
 
 ---
