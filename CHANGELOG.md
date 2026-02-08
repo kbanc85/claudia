@@ -2,6 +2,27 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.34.2 (2026-02-08)
+
+### Hotfix: Python 3.14 sqlite-vec Loading
+
+Python 3.14 tightened SQLite extension security, requiring explicit `enable_load_extension(True)` before any extension can be loaded. This broke semantic search for every Python 3.14 user -- vector embeddings never loaded, and recall silently fell back to text-only matching.
+
+### Fixed
+
+- **sqlite-vec loading on Python 3.14+** - Added `enable_load_extension(True)` before `sqlite_vec.load()` and re-locked after. Guarded with `hasattr()` for Python builds that omit extension loading entirely (`SQLITE_OMIT_LOAD_EXTENSION`).
+
+### Added
+
+- **`--backfill-embeddings` CLI flag** - One-shot command (`python3 -m claudia_memory --backfill-embeddings`) to generate embeddings for all memories missing them. Useful after fixing the sqlite-vec loading issue on existing installations.
+
+### Stats
+
+- 299 tests (+1 new), 0 regressions
+- Install: `npx get-claudia`
+
+---
+
 ## 1.34.1 (2026-02-08)
 
 ### Hotfix: Tool Name Compatibility
