@@ -140,6 +140,10 @@ async def list_tools() -> ListToolsResult:
                         "type": "string",
                         "description": "Full raw text of the source (email body, transcript, etc.). Saved to disk, not stored in DB.",
                     },
+                    "source_channel": {
+                        "type": "string",
+                        "description": "Origin channel: claude_code, telegram, slack",
+                    },
                 },
                 "required": ["content"],
             },
@@ -637,6 +641,10 @@ async def list_tools() -> ListToolsResult:
                                 "source_material": {
                                     "type": "string",
                                     "description": "Full raw source text, saved to disk (for 'remember' op)",
+                                },
+                                "source_channel": {
+                                    "type": "string",
+                                    "description": "Origin channel: claude_code, telegram, slack (for 'remember' op)",
                                 },
                                 "target": {
                                     "type": "string",
@@ -1175,6 +1183,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 importance=arguments.get("importance", 1.0),
                 source=arguments.get("source"),
                 source_context=arguments.get("source_context"),
+                source_channel=arguments.get("source_channel"),
             )
             # Save source material to disk if provided
             if memory_id and arguments.get("source_material"):
@@ -1220,6 +1229,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                                             "source": r.source,
                                             "source_id": r.source_id,
                                             "source_context": r.source_context,
+                                            "source_channel": r.source_channel,
                                         }
                                         for r in results
                                     ]
@@ -1291,6 +1301,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                                         "source": r.source,
                                         "source_id": r.source_id,
                                         "source_context": r.source_context,
+                                        "source_channel": r.source_channel,
                                     }
                                     for r in results
                                 ]
@@ -1644,6 +1655,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                             importance=op.get("importance", 1.0),
                             source=op.get("source"),
                             source_context=op.get("source_context"),
+                            source_channel=op.get("source_channel"),
                             _precomputed_embedding=embeddings_map.get(i),
                         )
                         op_result["success"] = True

@@ -220,7 +220,7 @@ async function main() {
 
   // Helper: run visualizer install script and call back when done (auto-install, no prompt)
   function runVisualizerSetup(callback) {
-    console.log(`\n${colors.boldYellow}━━━ Phase 2/3: Brain Visualizer ━━━${colors.reset}\n`);
+    console.log(`\n${colors.boldYellow}━━━ Phase 2/4: Brain Visualizer ━━━${colors.reset}\n`);
 
     const visualizerScriptPath = isWindows
       ? join(__dirname, '..', 'visualizer', 'scripts', 'install.ps1')
@@ -263,7 +263,7 @@ async function main() {
 
   // Helper: run gateway install script and call back when done
   function runGatewaySetup(callback) {
-    console.log(`\n${colors.boldYellow}━━━ Phase 3/3: Messaging Gateway ━━━${colors.reset}\n`);
+    console.log(`\n${colors.boldYellow}━━━ Phase 3/4: Messaging Gateway ━━━${colors.reset}\n`);
 
     const gatewayScriptPath = isWindows
       ? join(__dirname, '..', 'gateway', 'scripts', 'install.ps1')
@@ -309,6 +309,54 @@ async function main() {
     }
   }
 
+  // Helper: run relay install script and call back when done
+  function runRelaySetup(callback) {
+    console.log(`\n${colors.boldYellow}━━━ Phase 4/4: Telegram Relay ━━━${colors.reset}\n`);
+
+    const relayScriptPath = isWindows
+      ? join(__dirname, '..', 'relay', 'scripts', 'install.ps1')
+      : join(__dirname, '..', 'relay', 'scripts', 'install.sh');
+
+    if (!existsSync(relayScriptPath)) {
+      console.log(`${colors.yellow}!${colors.reset} Relay files not found. Skipping.`);
+      callback(false);
+      return;
+    }
+
+    try {
+      const spawnCmd = isWindows ? powershellPath : 'bash';
+      const spawnArgs = isWindows
+        ? ['-ExecutionPolicy', 'Bypass', '-File', relayScriptPath]
+        : [relayScriptPath];
+      const relayResult = spawn(spawnCmd, spawnArgs, {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          CLAUDIA_RELAY_UPGRADE: isUpgrade ? '1' : '0',
+          CLAUDIA_RELAY_SKIP_SETUP: '1'
+        }
+      });
+
+      relayResult.on('close', (code) => {
+        if (code === 0) {
+          console.log(`${colors.green}✓${colors.reset} Relay installed`);
+          callback(true);
+        } else {
+          console.log(`${colors.yellow}!${colors.reset} Relay setup had issues. You can run it later with:`);
+          if (isWindows) {
+            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${relayScriptPath}"${colors.reset}`);
+          } else {
+            console.log(`  ${colors.cyan}bash ${relayScriptPath}${colors.reset}`);
+          }
+          callback(false);
+        }
+      });
+    } catch (error) {
+      console.log(`${colors.yellow}!${colors.reset} Could not set up relay: ${error.message}`);
+      callback(false);
+    }
+  }
+
   // Helper: run system health check after install
   function runSystemHealthCheck(callback) {
     const diagnoseScript = isWindows
@@ -343,20 +391,25 @@ async function main() {
   }
 
   // Helper: finish install after optional components
-  function finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled) {
+  function finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled) {
     if (memoryInstalled) {
       // Run health check when memory system was installed
       runSystemHealthCheck((healthy) => {
-        showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, healthy);
+        showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled, healthy);
       });
     } else {
-      showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, true);
+      showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled, true);
     }
   }
 
-  // Helper: run gateway setup (auto-install like visualizer), then finish
+  // Helper: run relay setup after gateway, then finish
+  function maybeRunRelay(memoryInstalled, visualizerInstalled, gatewayInstalled) {
+    runRelaySetup((relayOk) => finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled, relayOk));
+  }
+
+  // Helper: run gateway setup (auto-install like visualizer), then chain to relay
   function maybeRunGateway(memoryInstalled, visualizerInstalled) {
-    runGatewaySetup((gatewayOk) => finishInstall(memoryInstalled, visualizerInstalled, gatewayOk));
+    runGatewaySetup((gatewayOk) => maybeRunRelay(memoryInstalled, visualizerInstalled, gatewayOk));
   }
 
   // Helper: auto-install visualizer after memory (if memory was installed), then chain to gateway
@@ -371,7 +424,7 @@ async function main() {
   }
 
   // Memory system always installs (no prompt)
-  console.log(`\n${colors.boldYellow}━━━ Phase 1/3: Memory System ━━━${colors.reset}\n`);
+  console.log(`\n${colors.boldYellow}━━━ Phase 1/4: Memory System ━━━${colors.reset}\n`);
 
   const memoryDaemonPath = isWindows
     ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
@@ -453,7 +506,7 @@ async function main() {
   // Memory failed to spawn -- continue with visualizer/gateway
   maybeRunVisualizer(false);
 
-  function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, systemHealthy = true) {
+  function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled, systemHealthy = true) {
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
     // Installation summary
@@ -465,9 +518,14 @@ async function main() {
     console.log(`${memoryInstalled ? check : warn} Memory system    ${memoryInstalled ? 'Active' : 'Skipped'}`);
     console.log(`${visualizerInstalled ? check : warn} Brain visualizer ${visualizerInstalled ? 'Active' : 'Skipped'}`);
     console.log(`${gatewayInstalled ? check : warn} Gateway          ${gatewayInstalled ? 'Installed' : 'Skipped'}`);
+    console.log(`${relayInstalled ? check : warn} Telegram relay   ${relayInstalled ? 'Installed' : 'Skipped'}`);
 
     if (gatewayInstalled) {
       console.log(`${colors.yellow}->${colors.reset} Configure tokens: ~/.claudia/gateway.json`);
+    }
+
+    if (relayInstalled) {
+      console.log(`${colors.yellow}->${colors.reset} Configure relay: run /setup-telegram inside Claude`);
     }
 
     if (!systemHealthy) {

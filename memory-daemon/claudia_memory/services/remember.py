@@ -141,6 +141,7 @@ class RememberService:
         source_context: Optional[str] = None,
         metadata: Optional[Dict] = None,
         origin_type: Optional[str] = None,
+        source_channel: Optional[str] = None,
         _precomputed_embedding: Optional[List[float]] = None,
     ) -> Optional[int]:
         """
@@ -157,6 +158,7 @@ class RememberService:
             source_context: One-line breadcrumb describing the source material
             metadata: Additional metadata
             origin_type: 'user_stated', 'extracted', 'inferred', 'corrected' (Trust North Star)
+            source_channel: Origin channel: claude_code, telegram, slack
 
         Returns:
             Memory ID or None if duplicate
@@ -215,6 +217,8 @@ class RememberService:
         }
         if source_context:
             insert_data["source_context"] = source_context
+        if source_channel:
+            insert_data["source_channel"] = source_channel
 
         memory_id = self.db.insert("memories", insert_data)
 

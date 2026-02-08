@@ -763,6 +763,22 @@ class Database:
             conn.commit()
             logger.info("Applied migration 15: relationship origin_type for organic trust model")
 
+        if current_version < 16:
+            # Migration 16: Add source_channel to memories for channel-aware memory
+            try:
+                conn.execute(
+                    "ALTER TABLE memories ADD COLUMN source_channel TEXT DEFAULT 'claude_code'"
+                )
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    logger.warning(f"Migration 16 statement failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (16, 'Add source_channel to memories for channel-aware memory')"
+            )
+            conn.commit()
+            logger.info("Applied migration 16: source_channel on memories")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -895,6 +911,11 @@ class Database:
         if "origin_type" not in rel_cols:
             logger.warning("Migration 15 incomplete: relationships missing origin_type column")
             return 14
+
+        # Migration 16 added source_channel to memories
+        if "source_channel" not in memory_cols:
+            logger.warning("Migration 16 incomplete: memories missing source_channel column")
+            return 15
 
         return None  # All good
 

@@ -33,6 +33,7 @@
     "template-v2",
     "memory-daemon",
     "gateway",
+    "relay",
     "visualizer",
     "visualizer-threejs",
     "assets"

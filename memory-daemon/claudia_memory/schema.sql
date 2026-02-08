@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS memories (
     access_count INTEGER DEFAULT 0,
     verified_at TEXT,  -- When this memory was verified
     verification_status TEXT DEFAULT 'pending',  -- pending, verified, flagged, contradicts
-    metadata TEXT  -- JSON blob for flexible attributes
+    metadata TEXT,  -- JSON blob for flexible attributes
+    source_channel TEXT DEFAULT 'claude_code'  -- Origin channel: claude_code, telegram, slack
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
@@ -411,6 +412,9 @@ VALUES (14, 'Add dispatch_tier to agent_dispatches for native agent team support
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (15, 'Add origin_type to relationships for organic trust model');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (16, 'Add source_channel to memories for channel-aware memory');
 
 -- ============================================================================
 -- AGENT DISPATCHES: Track delegated tasks to sub-agents

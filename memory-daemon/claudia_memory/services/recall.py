@@ -41,6 +41,8 @@ class RecallResult:
     confidence: float = 1.0  # How confident we are in this memory
     verification_status: str = "pending"  # pending, verified, flagged, contradicts
     origin_type: str = "inferred"  # user_stated, extracted, inferred, corrected
+    # Channel tracking
+    source_channel: Optional[str] = None  # Origin channel: claude_code, telegram, slack
 
 
 @dataclass
@@ -339,6 +341,9 @@ class RecallService:
         verification_status_val = row["verification_status"] if "verification_status" in row_keys else "pending"
         origin_type_val = row["origin_type"] if "origin_type" in row_keys else "inferred"
 
+        # Channel tracking (may not exist in older DBs)
+        source_channel_val = row["source_channel"] if "source_channel" in row_keys else None
+
         return RecallResult(
             id=row["id"],
             content=row["content"],
@@ -354,6 +359,7 @@ class RecallService:
             confidence=confidence_val,
             verification_status=verification_status_val,
             origin_type=origin_type_val,
+            source_channel=source_channel_val,
         )
 
     def _rrf_score(
