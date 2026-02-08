@@ -197,7 +197,13 @@ export class Bridge {
         }
       }
     } catch (err) {
-      log.error('LLM call failed', { provider: this.provider, error: err.message });
+      log.error('LLM call failed', {
+        provider: this.provider,
+        error: err.message,
+        status: err.status,
+        body: err.error,
+        stack: err.stack,
+      });
       throw err;
     }
 
@@ -755,6 +761,10 @@ Don't announce tool usage -- just use the tools and incorporate results naturall
    * @returns {string} JSON string result (always valid, errors wrapped)
    */
   async _executeToolCall(toolName, toolInput, channel) {
+    // Convert Anthropic-format names (memory_recall) back to MCP format (memory.recall)
+    // Only replace the first underscore (namespace separator), preserving underscores in tool names
+    const mcpName = toolName.replace('_', '.');
+
     // Safety gate: only execute exposed tools
     if (!this._toolManager.isExposed(toolName)) {
       log.warn('LLM attempted to call non-exposed tool', { tool: toolName });
@@ -764,12 +774,12 @@ Don't announce tool usage -- just use the tools and incorporate results naturall
     try {
       // Auto-inject source_channel for write operations
       const writeTools = new Set(['memory.remember', 'memory.batch', 'memory.correct']);
-      if (writeTools.has(toolName) && channel) {
+      if (writeTools.has(mcpName) && channel) {
         toolInput = { ...toolInput, source_channel: channel };
       }
 
       const result = await this.mcpClient.callTool({
-        name: toolName,
+        name: mcpName,
         arguments: toolInput,
       });
 

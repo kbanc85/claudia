@@ -38,10 +38,15 @@ function createTestBridge(opts = {}) {
 
   // Mock ToolManager
   bridge._toolManager = {
-    isExposed: (name) => name.startsWith('memory.') && !['memory.purge', 'memory.buffer_turn', 'memory.merge_entities'].includes(name),
+    isExposed: (name) => {
+      const mcpName = name.replace(/_/g, '.');
+      const blocked = ['memory.purge', 'memory.buffer_turn', 'memory.merge_entities'];
+      return (name.startsWith('memory.') || name.startsWith('memory_')) &&
+        !blocked.includes(name) && !blocked.includes(mcpName);
+    },
     getAnthropicTools: () => [
-      { name: 'memory.recall', description: 'Search memories', input_schema: { type: 'object', properties: { query: { type: 'string' } } } },
-      { name: 'memory.remember', description: 'Store memory', input_schema: { type: 'object', properties: { content: { type: 'string' } } } },
+      { name: 'memory_recall', description: 'Search memories', input_schema: { type: 'object', properties: { query: { type: 'string' } } } },
+      { name: 'memory_remember', description: 'Store memory', input_schema: { type: 'object', properties: { content: { type: 'string' } } } },
     ],
     getOllamaTools: () => [
       { type: 'function', function: { name: 'memory.recall', description: 'Search memories', parameters: { type: 'object', properties: { query: { type: 'string' } } } } },
@@ -142,7 +147,7 @@ describe('Bridge._callAnthropicWithTools', () => {
           return {
             content: [
               { type: 'text', text: 'Let me check...' },
-              { type: 'tool_use', id: 'tu_1', name: 'memory.recall', input: { query: 'user preferences' } },
+              { type: 'tool_use', id: 'tu_1', name: 'memory_recall', input: { query: 'user preferences' } },
             ],
             stop_reason: 'tool_use',
             usage: { input_tokens: 50, output_tokens: 30 },
@@ -182,8 +187,8 @@ describe('Bridge._callAnthropicWithTools', () => {
         if (callCount === 1) {
           return {
             content: [
-              { type: 'tool_use', id: 'tu_1', name: 'memory.recall', input: { query: 'Alice' } },
-              { type: 'tool_use', id: 'tu_2', name: 'memory.recall', input: { query: 'Bob' } },
+              { type: 'tool_use', id: 'tu_1', name: 'memory_recall', input: { query: 'Alice' } },
+              { type: 'tool_use', id: 'tu_2', name: 'memory_recall', input: { query: 'Bob' } },
             ],
             stop_reason: 'tool_use',
             usage: { input_tokens: 50, output_tokens: 30 },
@@ -225,7 +230,7 @@ describe('Bridge._callAnthropicWithTools', () => {
         if (params.tools) {
           return {
             content: [
-              { type: 'tool_use', id: `tu_${callCount}`, name: 'memory.recall', input: { query: 'test' } },
+              { type: 'tool_use', id: `tu_${callCount}`, name: 'memory_recall', input: { query: 'test' } },
             ],
             stop_reason: 'tool_use',
             usage: { input_tokens: 10, output_tokens: 10 },
@@ -256,7 +261,7 @@ describe('Bridge._callAnthropicWithTools', () => {
 describe('Bridge._executeToolCall', () => {
   it('rejects non-exposed tools', async () => {
     const bridge = createTestBridge();
-    const result = await bridge._executeToolCall('memory.purge', {}, 'telegram');
+    const result = await bridge._executeToolCall('memory_purge', {}, 'telegram');
 
     const parsed = JSON.parse(result);
     assert.ok(parsed.error);
@@ -265,30 +270,37 @@ describe('Bridge._executeToolCall', () => {
 
   it('auto-injects source_channel for memory.remember', async () => {
     let capturedArgs;
+    let capturedName;
     const bridge = createTestBridge({
       mcpCallTool: async ({ name, arguments: args }) => {
+        capturedName = name;
         capturedArgs = args;
         return { content: [{ type: 'text', text: '{"ok": true}' }] };
       },
     });
 
-    await bridge._executeToolCall('memory.remember', { content: 'User likes tea' }, 'telegram');
+    // LLM sends underscore name; MCP should receive dot name
+    await bridge._executeToolCall('memory_remember', { content: 'User likes tea' }, 'telegram');
 
+    assert.equal(capturedName, 'memory.remember', 'MCP should receive dot-notation name');
     assert.equal(capturedArgs.source_channel, 'telegram');
     assert.equal(capturedArgs.content, 'User likes tea');
   });
 
   it('auto-injects source_channel for memory.batch', async () => {
     let capturedArgs;
+    let capturedName;
     const bridge = createTestBridge({
       mcpCallTool: async ({ name, arguments: args }) => {
+        capturedName = name;
         capturedArgs = args;
         return { content: [{ type: 'text', text: '{"ok": true}' }] };
       },
     });
 
-    await bridge._executeToolCall('memory.batch', { operations: [] }, 'slack');
+    await bridge._executeToolCall('memory_batch', { operations: [] }, 'slack');
 
+    assert.equal(capturedName, 'memory.batch', 'MCP should receive dot-notation name');
     assert.equal(capturedArgs.source_channel, 'slack');
   });
 
@@ -301,10 +313,26 @@ describe('Bridge._executeToolCall', () => {
       },
     });
 
-    await bridge._executeToolCall('memory.recall', { query: 'test' }, 'telegram');
+    await bridge._executeToolCall('memory_recall', { query: 'test' }, 'telegram');
 
     assert.equal(capturedArgs.source_channel, undefined);
     assert.equal(capturedArgs.query, 'test');
+  });
+
+  it('converts underscore names to dots for MCP calls', async () => {
+    let capturedName;
+    const bridge = createTestBridge({
+      mcpCallTool: async ({ name, arguments: args }) => {
+        capturedName = name;
+        return { content: [{ type: 'text', text: '{"results": []}' }] };
+      },
+    });
+
+    await bridge._executeToolCall('memory_recall', { query: 'test' }, 'telegram');
+    assert.equal(capturedName, 'memory.recall');
+
+    await bridge._executeToolCall('memory_search_entities', { query: 'Alice' }, 'telegram');
+    assert.equal(capturedName, 'memory.search_entities');
   });
 
   it('returns error JSON on MCP failure (never throws)', async () => {
@@ -314,7 +342,7 @@ describe('Bridge._executeToolCall', () => {
       },
     });
 
-    const result = await bridge._executeToolCall('memory.recall', { query: 'test' }, 'telegram');
+    const result = await bridge._executeToolCall('memory_recall', { query: 'test' }, 'telegram');
     const parsed = JSON.parse(result);
 
     assert.ok(parsed.error);

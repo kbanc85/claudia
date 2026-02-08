@@ -103,7 +103,10 @@ export class ToolManager {
    * @returns {boolean}
    */
   isExposed(toolName) {
-    return EXPOSED_TOOLS.has(toolName);
+    // Accept both MCP dot-names (memory.recall) and Anthropic underscore-names (memory_recall)
+    // Only replace the first underscore (namespace separator), preserving underscores in tool names
+    const mcpName = toolName.replace('_', '.');
+    return EXPOSED_TOOLS.has(toolName) || EXPOSED_TOOLS.has(mcpName);
   }
 
   /**
@@ -131,7 +134,7 @@ export class ToolManager {
   _toAnthropicSchema(mcpTool) {
     const inputSchema = this._normalizeSchema(mcpTool.inputSchema || { type: 'object', properties: {} });
     return {
-      name: mcpTool.name,
+      name: mcpTool.name.replace(/\./g, '_'),
       description: mcpTool.description || '',
       input_schema: inputSchema,
     };

@@ -88,19 +88,19 @@ describe('ToolManager', () => {
     const tools = tm.getAnthropicTools();
     const names = tools.map((t) => t.name);
 
-    assert.ok(names.includes('memory.recall'));
-    assert.ok(names.includes('memory.remember'));
-    assert.ok(names.includes('memory.about'));
-    assert.ok(!names.includes('memory.buffer_turn'), 'Should filter out gateway-internal tools');
-    assert.ok(!names.includes('memory.purge'), 'Should filter out destructive tools');
-    assert.ok(!names.includes('memory.merge_entities'), 'Should filter out admin tools');
+    assert.ok(names.includes('memory_recall'));
+    assert.ok(names.includes('memory_remember'));
+    assert.ok(names.includes('memory_about'));
+    assert.ok(!names.includes('memory_buffer_turn'), 'Should filter out gateway-internal tools');
+    assert.ok(!names.includes('memory_purge'), 'Should filter out destructive tools');
+    assert.ok(!names.includes('memory_merge_entities'), 'Should filter out admin tools');
   });
 
   it('converts MCP inputSchema to Anthropic input_schema', async () => {
     const tm = new ToolManager();
     await tm.initialize(new MockMcpClient());
 
-    const recallTool = tm.getAnthropicTools().find((t) => t.name === 'memory.recall');
+    const recallTool = tm.getAnthropicTools().find((t) => t.name === 'memory_recall');
     assert.ok(recallTool);
     assert.ok(recallTool.input_schema, 'Should have input_schema (snake_case)');
     assert.equal(recallTool.input_schema.type, 'object');
@@ -108,11 +108,22 @@ describe('ToolManager', () => {
     assert.deepEqual(recallTool.input_schema.required, ['query']);
   });
 
+  it('converts dot names to underscores for Anthropic format', async () => {
+    const tm = new ToolManager();
+    await tm.initialize(new MockMcpClient());
+
+    const tools = tm.getAnthropicTools();
+    for (const tool of tools) {
+      assert.ok(!tool.name.includes('.'), `Anthropic tool name should not contain dots: ${tool.name}`);
+      assert.ok(/^[a-zA-Z0-9_-]+$/.test(tool.name), `Anthropic tool name must match API regex: ${tool.name}`);
+    }
+  });
+
   it('normalizes union types like ["array", "string"]', async () => {
     const tm = new ToolManager();
     await tm.initialize(new MockMcpClient());
 
-    const rememberTool = tm.getAnthropicTools().find((t) => t.name === 'memory.remember');
+    const rememberTool = tm.getAnthropicTools().find((t) => t.name === 'memory_remember');
     const aboutProp = rememberTool.input_schema.properties.about;
 
     // Should normalize to the first non-null type
@@ -146,6 +157,23 @@ describe('ToolManager', () => {
     assert.equal(tm.isExposed('memory.purge'), false);
     assert.equal(tm.isExposed('memory.merge_entities'), false);
     assert.equal(tm.isExposed('nonexistent.tool'), false);
+  });
+
+  it('isExposed accepts both dot and underscore names', () => {
+    const tm = new ToolManager();
+
+    // Dot names (MCP format)
+    assert.equal(tm.isExposed('memory.recall'), true);
+    assert.equal(tm.isExposed('memory.remember'), true);
+
+    // Underscore names (Anthropic format)
+    assert.equal(tm.isExposed('memory_recall'), true);
+    assert.equal(tm.isExposed('memory_remember'), true);
+    assert.equal(tm.isExposed('memory_trace'), true);
+
+    // Non-exposed still rejected in both formats
+    assert.equal(tm.isExposed('memory_purge'), false);
+    assert.equal(tm.isExposed('memory_buffer_turn'), false);
   });
 
   it('handles empty tool list gracefully', async () => {
