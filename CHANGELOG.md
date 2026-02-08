@@ -2,6 +2,30 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.31.0 (2026-02-07)
+
+### The Telegram Relay
+
+Claudia can now talk to you over Telegram. The relay spawns `claude -p` for each message, so she has full access to skills, memory, MCP tools, and her complete personality. Not a simplified chatbot; the real Claudia, in your pocket.
+
+### Added
+
+- **Telegram relay** - New `relay/` module that bridges Telegram messages to Claude Code via `claude -p`. Handles text, photos, and document attachments with session persistence and concurrency guards.
+- **File sending over Telegram** - Claudia can create files (SVG diagrams, HTML pages, CSV exports) and send them back as Telegram attachments. Images go inline, documents as file attachments. Supported: png, jpg, jpeg, gif, webp, pdf, svg, csv, xlsx, docx, txt, html, json.
+- **Channel-aware memory** - Memories stored via Telegram are tagged with `source_channel: "telegram"`. New `source_channel` column (migration 16) on the memories table, exposed through `memory.remember`, `memory.batch`, and recall results.
+- **`/setup-telegram` skill** - Guided 7-step walkthrough: create bot via @BotFather, find user ID, install deps, create config, set token, start relay, test it. Checks existing state and skips completed steps.
+- **Relay in installer** - Phase 4/4 in `npx get-claudia`. Copies source to `~/.claudia/relay/`, runs npm install, creates `claudia-relay` CLI wrapper, sets up LaunchAgent (macOS) / systemd (Linux) / scheduled task (Windows).
+- **Telegram HTML formatter** - Converts markdown to Telegram-compatible HTML (bold, italic, code, pre blocks). Strips unsupported formatting gracefully.
+- **Message chunking** - Splits long responses at sentence boundaries to stay within Telegram's 4096-char limit.
+
+### Stats
+
+- 5 new relay test files (chunker, config, formatter, session, telegram)
+- 2 new memory daemon test files (source_channel, database migration)
+- Install: `npx get-claudia`
+
+---
+
 ## 1.30.0 (2026-02-07)
 
 ### The Trust Model
