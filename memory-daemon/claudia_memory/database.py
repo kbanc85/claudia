@@ -55,9 +55,15 @@ class Database:
             loaded = False
 
             # Method 1: Try sqlite_vec Python package (recommended, works everywhere)
+            # Python 3.14+ requires explicit enable_load_extension() before any
+            # extension loading, even via the sqlite_vec helper package.
             try:
                 import sqlite_vec
+                if hasattr(conn, "enable_load_extension"):
+                    conn.enable_load_extension(True)
                 sqlite_vec.load(conn)
+                if hasattr(conn, "enable_load_extension"):
+                    conn.enable_load_extension(False)
                 loaded = True
                 logger.debug("Loaded sqlite-vec via Python package")
             except ImportError:

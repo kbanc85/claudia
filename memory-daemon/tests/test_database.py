@@ -165,3 +165,39 @@ def test_migration_integrity_detects_missing_verification_status():
         assert effective_version <= 4, f"Should return version <= 4 to re-run migration 5, got {effective_version}"
 
         database.close()
+
+
+def test_sqlite_vec_loads_with_enable_extension():
+    """sqlite-vec loads correctly with enable_load_extension (Python 3.14+ compat).
+
+    Verifies that the Database class can load sqlite-vec and create vec0
+    virtual tables. Skips if sqlite_vec isn't installed or if the Python
+    build omits extension loading support (SQLITE_OMIT_LOAD_EXTENSION).
+    """
+    try:
+        import sqlite_vec  # noqa: F401
+    except ImportError:
+        pytest.skip("sqlite_vec package not installed")
+
+    # Check if this Python build supports extension loading at all
+    import sqlite3 as _sqlite3
+    _test_conn = _sqlite3.connect(":memory:")
+    if not hasattr(_test_conn, "enable_load_extension"):
+        _test_conn.close()
+        pytest.skip("Python built without SQLITE_LOAD_EXTENSION support")
+    _test_conn.close()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test_vec.db"
+        db = Database(db_path)
+        db.initialize()
+
+        # If sqlite-vec loaded, we should be able to query a vec0 table
+        # memory_embeddings is created in schema.sql as a vec0 virtual table
+        result = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='memory_embeddings'",
+            fetch=True,
+        )
+        assert len(result) > 0, "memory_embeddings vec0 table should exist when sqlite-vec is loaded"
+
+        db.close()

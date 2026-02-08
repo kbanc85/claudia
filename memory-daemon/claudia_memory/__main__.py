@@ -177,6 +177,11 @@ def main():
         action="store_true",
         help="Launch the Brain Monitor terminal dashboard (requires: pip install claudia-memory[tui])",
     )
+    parser.add_argument(
+        "--backfill-embeddings",
+        action="store_true",
+        help="Generate embeddings for all memories that don't have them yet, then exit",
+    )
 
     args = parser.parse_args()
 
@@ -218,6 +223,52 @@ def main():
         from .tui.app import run_brain_monitor
 
         run_brain_monitor(db_path=get_config().db_path)
+        return
+
+    if args.backfill_embeddings:
+        # One-shot: generate embeddings for memories missing them
+        setup_logging(debug=args.debug)
+        from .embeddings import get_embedding_service
+
+        db = get_db()
+        db.initialize()
+
+        # Find memories not in the memory_embeddings table
+        missing = db.execute(
+            "SELECT m.id, m.content FROM memories m "
+            "LEFT JOIN memory_embeddings me ON m.id = me.memory_id "
+            "WHERE me.memory_id IS NULL",
+            fetch=True,
+        )
+
+        if not missing:
+            print("All memories already have embeddings. Nothing to do.")
+            return
+
+        print(f"Found {len(missing)} memories without embeddings. Generating...")
+        svc = get_embedding_service()
+        if not svc.is_available_sync():
+            print("Error: Ollama is not available. Start Ollama and try again.")
+            sys.exit(1)
+
+        success = 0
+        failed = 0
+        for i, row in enumerate(missing, 1):
+            embedding = svc.embed_sync(row["content"])
+            if embedding:
+                import struct
+                blob = struct.pack(f"{len(embedding)}f", *embedding)
+                db.execute(
+                    "INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
+                    (row["id"], blob),
+                )
+                success += 1
+            else:
+                failed += 1
+            if i % 10 == 0 or i == len(missing):
+                print(f"  Progress: {i}/{len(missing)} (success={success}, failed={failed})")
+
+        print(f"Backfill complete: {success} embedded, {failed} failed, {len(missing)} total.")
         return
 
     # Run the daemon
