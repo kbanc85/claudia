@@ -12,7 +12,7 @@ Claudia is an agentic executive assistant framework that runs on Claude Code. It
 Both layers are core to how Claudia works. The template layer defines *who* Claudia is. The memory system defines *what she remembers*.
 
 This repository also contains:
-- `gateway/` - Multi-channel messaging bridge (Telegram, Slack) with Anthropic/Ollama provider auto-detection
+- `gateway/` - Multi-channel messaging bridge (Telegram, Slack) with Anthropic/Ollama provider auto-detection and native tool_use for LLM-driven memory access
 - `relay/` - Telegram bot that spawns full `claude -p` agent sessions (Grammy + Claude Code subprocess)
 - `visualizer-threejs/` - 3D brain visualization (Three.js + D3-Force-3D) with live parameter controls
 - `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package, no tests -- pure markdown)
@@ -172,7 +172,21 @@ npm test                               # Node --test runner
 npm start                              # Start server
 ```
 
-Key files: `src/config.js` (config + provider detection), `src/bridge.js` (Anthropic/Ollama routing), `src/server.js` (Express HTTP).
+Key files:
+- `src/config.js` - Config management, provider detection, `toolUse`/`toolUseMaxIterations`/`preRecall` defaults
+- `src/bridge.js` - Core bridge: Anthropic/Ollama routing, tool_use loop, MCP integration
+- `src/tools.js` - ToolManager: dynamic MCP schema loading, Anthropic/Ollama format conversion, exposed tool filtering
+- `src/personality.js` - Claudia personality loading from template files
+- `src/router.js` - Message routing, session management, auth enforcement
+- `src/server.js` - Express HTTP server
+
+**Tool use architecture:** The gateway exposes 14 of 32+ MCP memory tools to the LLM via native API tool_use. `ToolManager` fetches schemas from the daemon at startup via `listTools()`, filters to a curated safe subset, and converts to provider-specific formats. The tool loop in `bridge.js` (`_callAnthropicWithTools` / `_callOllamaWithTools`) runs up to `toolUseMaxIterations` (default 5) rounds, with `_executeToolCall()` as the single safety chokepoint that rejects non-exposed tools and auto-injects `source_channel` on write operations.
+
+**Exposed tools (14):** `memory.recall`, `memory.about`, `memory.remember`, `memory.relate`, `memory.entity`, `memory.search_entities`, `memory.batch`, `memory.correct`, `memory.invalidate`, `memory.trace`, `memory.reflections`, `memory.project_network`, `memory.find_path`, `memory.briefing`
+
+**Never exposed:** Destructive/admin tools (`memory.purge`, `memory.merge_entities`, `memory.delete_entity`), session lifecycle tools (`memory.buffer_turn`, `memory.end_session`), and internal tools (`memory.consolidate`, `memory.system_health`, etc.)
+
+**Config resolution for `toolUse`:** per-channel override (explicit boolean) > global `toolUse` config > auto-detect by provider (enabled for Anthropic, disabled for Ollama). Follows same pattern as `_resolveModel()`.
 
 **Gotcha:** Tests must account for the user having a real `~/.claudia/gateway.json` on their machine. Don't assume config files are absent.
 
@@ -304,9 +318,9 @@ claudia/
 │   ├── scripts/             ← Install, migrate, diagnose, seed scripts
 │   ├── tests/               ← 25+ test files, pytest (asyncio_mode = auto)
 │   └── test.sh              ← One-click full test suite
-├── gateway/                  ← Messaging bridge (Telegram, Slack)
-│   ├── src/                 ← Express server, config, bridge (Anthropic/Ollama)
-│   ├── tests/               ← Node --test
+├── gateway/                  ← Messaging bridge (Telegram, Slack) + tool_use
+│   ├── src/                 ← Express server, config, bridge, tools, personality
+│   ├── tests/               ← Node --test (75 tests)
 │   └── scripts/             ← Cross-platform installers
 ├── relay/                    ← Telegram bot (Grammy + Claude Code subprocess)
 │   ├── src/                 ← Relay orchestrator, claude-runner, telegram, session
