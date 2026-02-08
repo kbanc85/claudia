@@ -2,6 +2,30 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.34.0 (2026-02-08)
+
+### The Quick Setup
+
+Setting up Telegram used to mean 70 seconds of codebase exploration followed by a wall of text. Now there's a dedicated `/setup-gateway` skill that walks you through it one step at a time: create bot, get user ID, write secrets to shell profile, generate gateway.json, start and verify. The gateway also defaults to Haiku now (fast and cheap for chat), instead of Sonnet.
+
+### Added
+
+- **`/setup-gateway` skill** - Guided walkthrough for gateway Telegram/Slack setup with fast pre-flight checks (file existence + env vars, no codebase exploration), step-by-step flow with user confirmation at each stage, and automatic config generation.
+- **Setup-telegram clarification** - `setup-telegram.md` now clearly labels itself as the relay path (full `claude -p` sessions) and points users to `/setup-gateway` for the simpler API-based path.
+
+### Changed
+
+- **Default gateway model** - Changed from `claude-sonnet-4-20250514` to `claude-haiku-4-5-20251001`. Existing users with a model in their `gateway.json` are unaffected (deepMerge preserves their value).
+- **Gateway SKILL.md** - Fixed port typo (3848 to 3849), added `/setup-gateway` suggestions for missing install and missing token errors.
+- **Trigger deconfliction** - "connect Telegram" now routes to `/setup-gateway` (the common case). Relay-specific phrases ("Telegram relay", "set up relay") route to `/setup-telegram`.
+
+### Stats
+
+- 75 gateway tests, 0 regressions
+- Install: `npx get-claudia`
+
+---
+
 ## 1.33.0 (2026-02-08)
 
 ### Claudia Thinks for Herself
