@@ -2,6 +2,25 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.34.1 (2026-02-08)
+
+### Hotfix: Tool Name Compatibility
+
+The Anthropic Messages API requires tool names to match `^[a-zA-Z0-9_-]{1,128}$`, but the memory daemon's MCP tools use dot-notation (`memory.recall`, `memory.remember`, etc.). The gateway passed these names through verbatim, causing every API request with tool_use to fail with a 400 error. No user could send a message through Telegram with tool_use enabled.
+
+### Fixed
+
+- **Anthropic tool name conversion** - Dots are now converted to underscores when sending tool schemas to the Anthropic API (`memory.recall` becomes `memory_recall`), and converted back when calling the MCP daemon.
+- **Bidirectional name resolution** - `isExposed()` safety gate now accepts both MCP dot-names and Anthropic underscore-names. The conversion only replaces the first underscore (namespace separator), preserving underscores within tool names like `search_entities`.
+- **Verbose error logging** - LLM call errors now log `status`, `body`, and `stack` in addition to the error message, making API failures debuggable without guesswork.
+
+### Stats
+
+- 78 gateway tests (+3 new), 0 regressions
+- Install: `npx get-claudia`
+
+---
+
 ## 1.34.0 (2026-02-08)
 
 ### The Quick Setup
