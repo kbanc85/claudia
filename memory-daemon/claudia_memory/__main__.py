@@ -449,7 +449,7 @@ def main():
 
         # Count source data to re-embed
         mem_count_rows = db.execute(
-            "SELECT COUNT(*) as cnt FROM memories WHERE deleted_at IS NULL",
+            "SELECT COUNT(*) as cnt FROM memories WHERE invalidated_at IS NULL",
             fetch=True,
         )
         ent_count_rows = db.execute(
@@ -531,7 +531,7 @@ def main():
         # 3a. Memory embeddings (largest, most important)
         if mem_count > 0:
             memories = db.execute(
-                "SELECT id, content FROM memories WHERE deleted_at IS NULL",
+                "SELECT id, content FROM memories WHERE invalidated_at IS NULL",
                 fetch=True,
             )
             success = 0

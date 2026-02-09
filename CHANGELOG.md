@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.35.2 (2026-02-09)
+
+### Fix: Embedding Migration Column Name
+
+Fixed `--migrate-embeddings` crashing on the memories table. The migration code used `deleted_at` (which exists on entities) instead of `invalidated_at` (which is the correct soft-delete column on memories). Also fixed matching query in the migration test file.
+
+#### Fixed
+- Memory queries in migration now use `invalidated_at IS NULL` instead of `deleted_at IS NULL`
+- Test file `test_embedding_migration.py` updated to match
+
+---
+
 ## 1.35.1 (2026-02-09)
 
 ### UX: Friendlier Embedding Migration

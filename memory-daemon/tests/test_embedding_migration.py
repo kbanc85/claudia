@@ -220,7 +220,7 @@ class TestMigration:
 
             # Simulate re-embedding (what --migrate-embeddings does in step 3)
             memories = database.execute(
-                "SELECT id, content FROM memories WHERE deleted_at IS NULL",
+                "SELECT id, content FROM memories WHERE invalidated_at IS NULL",
                 fetch=True,
             )
             for row in memories:
