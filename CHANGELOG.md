@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.35.1 (2026-02-09)
+
+### UX: Friendlier Embedding Migration
+
+`--migrate-embeddings` no longer requires manual config editing. It now shows an interactive model picker, auto-updates config.json, and offers to download missing models from Ollama automatically. Three simple prompts: pick a number, press Enter to download, press Y to migrate.
+
+#### Improved
+- Interactive model selection menu with size/accuracy info and current model marked
+- Auto-pull: if the selected model isn't installed in Ollama, offers to download it with one keypress
+- Better error messages: distinguishes "Ollama not running" from "model not pulled"
+- Config.json updated automatically when user picks a new model (no manual JSON editing)
+
+---
+
 ## 1.35.0 (2026-02-09)
 
 ### The Memory Upgrade

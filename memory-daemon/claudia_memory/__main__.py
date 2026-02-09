@@ -331,14 +331,104 @@ def main():
         old_dim = int(old_dims_row[0]["value"]) if old_dims_row else 384
 
         if old_model == new_model and old_dim == new_dim:
-            print(f"Already using {new_model} ({new_dim}D). Nothing to migrate.")
-            return
+            # No mismatch -- offer interactive model selection
+            print(f"\nCurrent embedding model: {old_model} ({old_dim}D)")
+            print()
+            print("Available models:")
+            models_info = [
+                ("1", "all-minilm:l6-v2", 384, "  23MB", "Fast, good baseline"),
+                ("2", "nomic-embed-text", 768, " 274MB", "Better retrieval (+6%)"),
+                ("3", "mxbai-embed-large", 1024, " 669MB", "Best accuracy, larger"),
+            ]
+            for num, name, dim, size, desc in models_info:
+                current = " (current)" if name == old_model else ""
+                print(f"  {num}) {name:<20s} {dim}D  {size}   {desc}{current}")
+            print("  4) Cancel")
+            print()
+            choice = input("Switch to [1-4, default=4]: ").strip()
+
+            model_map = {
+                "1": ("all-minilm:l6-v2", 384),
+                "2": ("nomic-embed-text", 768),
+                "3": ("mxbai-embed-large", 1024),
+            }
+
+            if choice not in model_map:
+                print("No changes made.")
+                return
+
+            new_model, new_dim = model_map[choice]
+
+            if new_model == old_model and new_dim == old_dim:
+                print(f"Already using {new_model}. No changes needed.")
+                return
+
+            # Update config.json with the user's choice
+            config_path = Path.home() / ".claudia" / "config.json"
+            try:
+                if config_path.exists():
+                    with open(config_path) as f:
+                        cfg_data = _json.load(f)
+                else:
+                    cfg_data = {}
+                cfg_data["embedding_model"] = new_model
+                cfg_data["embedding_dimensions"] = new_dim
+                with open(config_path, "w") as f:
+                    _json.dump(cfg_data, f, indent=2)
+                print(f"\nConfig updated: {new_model} ({new_dim}D)")
+            except Exception as e:
+                print(f"Warning: Could not update config.json: {e}")
+
+            # Reinitialize embedding service with new model
+            svc.model = new_model
+            svc.dimensions = new_dim
+            svc._available = None  # Force re-check
 
         # Pre-flight: verify Ollama is running and model is available
         if not svc.is_available_sync():
-            print(f"Error: Ollama is not available or model '{new_model}' not found.")
-            print(f"Start Ollama and pull the model: ollama pull {new_model}")
-            sys.exit(1)
+            # Distinguish: Ollama not running vs model not pulled
+            import subprocess
+            import httpx
+
+            ollama_running = False
+            try:
+                resp = httpx.get(f"{svc.host}/api/tags", timeout=5)
+                ollama_running = resp.status_code == 200
+            except Exception:
+                pass
+
+            if not ollama_running:
+                print(f"Error: Ollama is not running.")
+                print(f"Please start Ollama and try again.")
+                sys.exit(1)
+
+            # Ollama is running but model is missing -- offer to pull it
+            print(f"\nThe model '{new_model}' is not installed in Ollama.")
+            pull_choice = input(f"Download it now? (Y/n): ").strip().lower()
+            if pull_choice in ("", "y", "yes"):
+                print(f"Downloading {new_model}... (this may take a minute)")
+                try:
+                    result = subprocess.run(
+                        ["ollama", "pull", new_model],
+                        capture_output=False,
+                        text=True,
+                    )
+                    if result.returncode != 0:
+                        print(f"Error: Failed to pull {new_model}.")
+                        sys.exit(1)
+                except FileNotFoundError:
+                    print("Error: 'ollama' command not found. Please install Ollama.")
+                    sys.exit(1)
+
+                # Re-check availability after pull
+                svc._available = None
+                if not svc.is_available_sync():
+                    print(f"Error: Model still not available after pull.")
+                    sys.exit(1)
+                print(f"Model '{new_model}' ready.")
+            else:
+                print("Migration cancelled.")
+                return
 
         # Count embeddings across all tables
         embedding_counts = {}
