@@ -71,6 +71,56 @@ argument-hint: [arg]             # Optional: show in /skill [arg] help
 [Skill content: triggers, behavior, output format, etc.]
 ```
 
+### Skill YAML Schema Reference
+
+Complete schema for skill frontmatter fields:
+
+```yaml
+---
+# Required fields
+name: skill-name
+description: Brief description for contextual matching
+effort-level: low | medium | high | max
+
+# Optional fields (v1.35+)
+triggers:                    # Natural language activation patterns
+  - "pattern one"
+  - "pattern two"
+inputs:                      # Expected input data
+  - name: input_name
+    type: string | entity | date | file
+    description: What this input is
+outputs:                     # What the skill produces
+  - name: output_name
+    type: text | file | memory_ops
+    description: What this output is
+invocation: explicit | contextual | proactive
+  # explicit: only via /command (disable-model-invocation: true)
+  # contextual: natural language + /command (default)
+  # proactive: Claude auto-invokes (user-invocable: false)
+
+# Legacy fields (still supported)
+disable-model-invocation: true  # Use invocation: explicit instead
+user-invocable: false           # Use invocation: proactive instead
+argument-hint: [arg]
+---
+```
+
+**Field details:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Skill identifier, used for `/name` invocation |
+| `description` | Yes | Used for contextual matching and skill index |
+| `effort-level` | Yes | Thinking budget: `low`, `medium`, `high`, `max` |
+| `triggers` | No | 3-5 natural language phrases that activate the skill |
+| `inputs` | No | Structured input expectations (name, type, description) |
+| `outputs` | No | What the skill produces (name, type, description) |
+| `invocation` | No | `explicit`, `contextual` (default), or `proactive` |
+| `argument-hint` | No | Shown in `/skill [hint]` help text |
+
+**Invocation priority:** The `invocation` field is preferred over the legacy `disable-model-invocation` and `user-invocable` fields. If both are present, `invocation` takes precedence. Legacy fields remain fully supported for backward compatibility.
+
 ## Core Skills
 
 ### Proactive (Auto-Activate)

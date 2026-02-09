@@ -3,6 +3,7 @@ name: ingest-sources
 description: Process multiple source documents with Extract-Then-Aggregate discipline. Use when user shares multiple transcripts, emails, or documents for batch processing.
 argument-hint: [folder-path]
 effort-level: max
+disable-model-invocation: true
 ---
 
 # Ingest Sources

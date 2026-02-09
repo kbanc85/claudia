@@ -2,7 +2,25 @@
 name: commitment-detector
 description: Automatically detect promises and commitments in conversation and offer to track them.
 user-invocable: false
+invocation: proactive
 effort-level: high
+triggers:
+  - "I'll send you"
+  - "I promised to"
+  - "I need to by"
+  - "I committed to"
+  - "I told them I would"
+inputs:
+  - name: conversation_text
+    type: string
+    description: The conversation content containing potential commitment language
+outputs:
+  - name: commitment
+    type: memory_ops
+    description: Tracked commitment stored via memory.remember with type 'commitment'
+  - name: context_update
+    type: file
+    description: Update to context/commitments.md or context/waiting.md
 ---
 
 # Commitment Detector Skill

@@ -2,7 +2,25 @@
 name: pattern-recognizer
 description: Notice trends, recurring themes, and patterns across conversations and surface them when relevant.
 user-invocable: false
+invocation: proactive
 effort-level: high
+triggers:
+  - "recurring theme detected"
+  - "same issue three times"
+  - "repeated behavior pattern"
+  - "you tend to"
+  - "I've noticed a trend"
+inputs:
+  - name: conversation_history
+    type: string
+    description: Accumulated conversation and memory context showing recurring themes
+outputs:
+  - name: pattern_observation
+    type: text
+    description: Gentle observation about a detected pattern with context
+  - name: context_update
+    type: file
+    description: Update to context/patterns.md with new pattern entry
 ---
 
 # Pattern Recognizer Skill

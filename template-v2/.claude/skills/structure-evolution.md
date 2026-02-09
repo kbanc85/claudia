@@ -2,7 +2,25 @@
 name: structure-evolution
 description: Periodically analyze the user's workflow and proactively suggest structural improvements to their Claudia setup.
 user-invocable: false
+invocation: proactive
 effort-level: high
+triggers:
+  - "files created outside existing structure"
+  - "tracking something with no home"
+  - "business complexity has grown"
+  - "workflow friction observed"
+  - "every 2 weeks or 10+ sessions"
+inputs:
+  - name: usage_patterns
+    type: string
+    description: Observed file creation patterns, workflow friction, and structural gaps
+outputs:
+  - name: suggestion
+    type: text
+    description: Proposed structural improvement with rationale
+  - name: structure_change
+    type: file
+    description: New folders, files, or templates if user accepts the suggestion
 ---
 
 # Structure Evolution Skill

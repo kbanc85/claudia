@@ -14,6 +14,43 @@ from urllib.request import urlopen
 from urllib.error import URLError
 
 
+def _get_status_summary():
+    """Call /status endpoint for richer system data. Returns summary string or None."""
+    try:
+        resp = urlopen("http://localhost:3848/status", timeout=5)
+        data = json.loads(resp.read().decode())
+
+        parts = []
+
+        # Counts summary
+        counts = data.get("counts", {})
+        memories = counts.get("memories", 0)
+        entities = counts.get("entities", 0)
+        patterns = counts.get("patterns", 0)
+        parts.append(f"{memories} memories, {entities} entities, {patterns} active patterns.")
+
+        # Warnings
+        warnings = []
+        components = data.get("components", {})
+        embed_status = components.get("embeddings", "ok")
+        if embed_status in ("unavailable", "error"):
+            warnings.append(f"WARNING: Embeddings component is '{embed_status}'. Semantic search may not work.")
+
+        if data.get("embedding_model_mismatch", False):
+            warnings.append(
+                "WARNING: Embedding model mismatch detected. "
+                "Memories may have been created with a different model. "
+                "Consider running /diagnose for details."
+            )
+
+        if warnings:
+            parts.extend(warnings)
+
+        return " ".join(parts)
+    except (URLError, OSError, TimeoutError, json.JSONDecodeError, KeyError):
+        return None
+
+
 def check_health():
     context_parts = []
 
@@ -22,7 +59,12 @@ def check_health():
         resp = urlopen("http://localhost:3848/health", timeout=5)
         body = resp.read().decode()
         if "healthy" in body:
-            print(json.dumps({"additionalContext": "Memory system healthy."}))
+            # Health OK - try to get richer status data
+            status_msg = _get_status_summary()
+            if status_msg:
+                print(json.dumps({"additionalContext": f"Memory system healthy. {status_msg}"}))
+            else:
+                print(json.dumps({"additionalContext": "Memory system healthy."}))
             return
     except (URLError, OSError, TimeoutError):
         pass

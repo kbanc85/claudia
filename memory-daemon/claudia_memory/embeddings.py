@@ -8,8 +8,11 @@ Includes retry logic to wait for Ollama to start (e.g., after system boot).
 """
 
 import asyncio
+import hashlib
 import logging
+import threading
 import time
+from collections import OrderedDict
 from typing import List, Optional
 
 import httpx
@@ -17,6 +20,55 @@ import httpx
 from .config import get_config
 
 logger = logging.getLogger(__name__)
+
+
+class EmbeddingCache:
+    """Thread-safe LRU cache for embeddings, keyed by SHA256 of input text."""
+
+    def __init__(self, maxsize: int = 256):
+        self._cache: OrderedDict = OrderedDict()
+        self._lock = threading.Lock()
+        self._maxsize = maxsize
+        self._hits = 0
+        self._misses = 0
+
+    def _key(self, text: str) -> str:
+        return hashlib.sha256(text.encode()).hexdigest()
+
+    def get(self, text: str) -> Optional[List[float]]:
+        key = self._key(text)
+        with self._lock:
+            if key in self._cache:
+                self._hits += 1
+                self._cache.move_to_end(key)
+                return self._cache[key]
+            self._misses += 1
+            return None
+
+    def put(self, text: str, embedding: List[float]) -> None:
+        key = self._key(text)
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+                self._cache[key] = embedding
+            else:
+                if len(self._cache) >= self._maxsize:
+                    self._cache.popitem(last=False)
+                self._cache[key] = embedding
+
+    def clear(self) -> None:
+        """Clear all cached embeddings."""
+        with self._lock:
+            self._cache.clear()
+
+    def stats(self) -> dict:
+        with self._lock:
+            return {
+                "hits": self._hits,
+                "misses": self._misses,
+                "size": len(self._cache),
+                "maxsize": self._maxsize,
+            }
 
 # Retry configuration for waiting on Ollama
 OLLAMA_RETRY_ATTEMPTS = 5
@@ -34,6 +86,8 @@ class EmbeddingService:
         self._client: Optional[httpx.AsyncClient] = None
         self._sync_client: Optional[httpx.Client] = None
         self._available: Optional[bool] = None
+        self._cache = EmbeddingCache()
+        self._model_mismatch = False
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client"""
@@ -46,6 +100,51 @@ class EmbeddingService:
         if self._sync_client is None:
             self._sync_client = httpx.Client(timeout=30.0)
         return self._sync_client
+
+    def _check_model_consistency(self) -> None:
+        """Check if the configured embedding model and dimensions match what was used previously."""
+        try:
+            from .database import get_db
+            db = get_db()
+
+            # Check model
+            rows = db.execute(
+                "SELECT value FROM _meta WHERE key = 'embedding_model'",
+                fetch=True,
+            )
+
+            if rows and rows[0]["value"]:
+                stored_model = rows[0]["value"]
+                if stored_model != self.model:
+                    logger.warning(
+                        f"Embedding model changed from '{stored_model}' to '{self.model}'. "
+                        f"Run --migrate-embeddings to regenerate all embeddings."
+                    )
+                    self._model_mismatch = True
+                else:
+                    self._model_mismatch = False
+            else:
+                db.execute(
+                    "INSERT OR REPLACE INTO _meta (key, value) VALUES ('embedding_model', ?)",
+                    (self.model,),
+                )
+
+            # Check dimensions
+            dim_rows = db.execute(
+                "SELECT value FROM _meta WHERE key = 'embedding_dimensions'",
+                fetch=True,
+            )
+            if dim_rows and dim_rows[0]["value"]:
+                stored_dims = int(dim_rows[0]["value"])
+                if stored_dims != self.dimensions:
+                    logger.warning(
+                        f"Embedding dimensions mismatch: config={self.dimensions}, "
+                        f"database={stored_dims}. "
+                        f"Run --migrate-embeddings to regenerate."
+                    )
+                    self._model_mismatch = True
+        except Exception as e:
+            logger.debug(f"Model consistency check skipped: {e}")
 
     async def _wait_for_ollama(self, max_retries: int = OLLAMA_RETRY_ATTEMPTS, delay: float = OLLAMA_RETRY_DELAY) -> bool:
         """Wait for Ollama to be available with retries (async)"""
@@ -104,7 +203,9 @@ class EmbeddingService:
                     self.model in m or self.model.split(":")[0] in m
                     for m in models
                 )
-                if not self._available:
+                if self._available:
+                    self._check_model_consistency()
+                elif not self._available:
                     logger.warning(
                         f"Embedding model '{self.model}' not found. "
                         f"Available models: {models}. "
@@ -142,6 +243,8 @@ class EmbeddingService:
                     self.model in m or self.model.split(":")[0] in m
                     for m in models
                 )
+                if self._available:
+                    self._check_model_consistency()
             else:
                 self._available = False
         except Exception as e:
@@ -155,6 +258,10 @@ class EmbeddingService:
         if not await self.is_available():
             return None
 
+        cached = self._cache.get(text)
+        if cached is not None:
+            return cached
+
         try:
             client = await self._get_client()
             response = await client.post(
@@ -166,6 +273,7 @@ class EmbeddingService:
                 data = response.json()
                 embedding = data.get("embedding", [])
                 if len(embedding) == self.dimensions:
+                    self._cache.put(text, embedding)
                     return embedding
                 else:
                     logger.warning(
@@ -185,6 +293,10 @@ class EmbeddingService:
         if not self.is_available_sync():
             return None
 
+        cached = self._cache.get(text)
+        if cached is not None:
+            return cached
+
         try:
             client = self._get_sync_client()
             response = client.post(
@@ -196,6 +308,7 @@ class EmbeddingService:
                 data = response.json()
                 embedding = data.get("embedding", [])
                 if len(embedding) == self.dimensions:
+                    self._cache.put(text, embedding)
                     return embedding
             else:
                 logger.error(f"Embedding request failed: {response.status_code}")

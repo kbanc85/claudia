@@ -1,0 +1,350 @@
+{
+  "$schema": "Claudia Skill Index v1",
+  "description": "Progressive loading index - lightweight metadata for all skills",
+  "skills": [
+    {
+      "name": "onboarding",
+      "path": "onboarding.md",
+      "description": "Guide new users through a conversational discovery flow to create a personalized Claudia setup",
+      "invocation": "proactive",
+      "effort_level": "medium",
+      "triggers": ["first run", "new user setup", "no me.md exists", "getting started"]
+    },
+    {
+      "name": "structure-generator",
+      "path": "structure-generator.md",
+      "description": "Create personalized folder structures and files based on user archetype and workflow needs",
+      "invocation": "proactive",
+      "effort_level": "medium",
+      "triggers": ["after onboarding", "create folder structure", "set up workspace", "archetype setup"]
+    },
+    {
+      "name": "memory-manager",
+      "path": "memory-manager.md",
+      "description": "Handle cross-session persistence using the enhanced memory system with fallback to markdown files",
+      "invocation": "proactive",
+      "effort_level": "medium",
+      "triggers": ["session start", "session end", "save context", "load memory"]
+    },
+    {
+      "name": "agent-dispatcher",
+      "path": "agent-dispatcher.md",
+      "description": "Detects when to delegate tasks to specialized agents with two-tier dispatch",
+      "invocation": "proactive",
+      "effort_level": "medium",
+      "triggers": ["delegate task", "use agent team", "process document", "research task"]
+    },
+    {
+      "name": "commitment-detector",
+      "path": "commitment-detector.md",
+      "description": "Automatically detect promises and commitments in conversation and offer to track them",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["I'll send", "I promised", "by Friday", "I need to", "I committed to"]
+    },
+    {
+      "name": "pattern-recognizer",
+      "path": "pattern-recognizer.md",
+      "description": "Notice trends, recurring themes, and patterns across conversations and surface them when relevant",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["recurring theme detected", "repeated behavior", "trend noticed", "pattern emerging"]
+    },
+    {
+      "name": "relationship-tracker",
+      "path": "relationship-tracker.md",
+      "description": "Surface relevant context when people are mentioned in conversation and track relationship health",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["person name mentioned", "who is", "relationship context", "people file lookup"]
+    },
+    {
+      "name": "risk-surfacer",
+      "path": "risk-surfacer.md",
+      "description": "Proactively identify and surface potential problems before they become crises",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["overdue commitment", "cooling relationship", "capacity risk", "deadline approaching"]
+    },
+    {
+      "name": "capability-suggester",
+      "path": "capability-suggester.md",
+      "description": "Notice repeated user behaviors and suggest new commands, workflows, or structure to streamline work",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["repeated task pattern", "workflow gap", "frequent request", "could be automated"]
+    },
+    {
+      "name": "structure-evolution",
+      "path": "structure-evolution.md",
+      "description": "Periodically analyze workflow and proactively suggest structural improvements to the Claudia setup",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["files created outside structure", "workflow friction", "business growth", "missing capability"]
+    },
+    {
+      "name": "hire-agent",
+      "path": "hire-agent.md",
+      "description": "Suggests new agents based on repeated task patterns",
+      "invocation": "proactive",
+      "effort_level": "high",
+      "triggers": ["repeated delegation pattern", "new agent needed", "automation opportunity", "task pattern detected"]
+    },
+    {
+      "name": "morning-brief",
+      "path": "morning-brief/SKILL.md",
+      "description": "Daily digest with commitments, follow-ups, and priorities",
+      "invocation": "explicit",
+      "effort_level": "low",
+      "triggers": ["morning", "daily brief", "start my day", "what's on today", "what's on my plate"]
+    },
+    {
+      "name": "accountability-check",
+      "path": "accountability-check/SKILL.md",
+      "description": "Surface all commitments, overdue items, and things you're waiting on by relationship",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["what do I owe", "am I overdue", "check my commitments", "what's outstanding"]
+    },
+    {
+      "name": "client-health",
+      "path": "client-health/SKILL.md",
+      "description": "Health check across active client engagements showing status, deliverables, and concerns",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["how are my clients", "client status", "client health check", "engagement review"]
+    },
+    {
+      "name": "financial-snapshot",
+      "path": "financial-snapshot/SKILL.md",
+      "description": "Quick view of revenue, expenses, invoicing, and cash flow with key metrics",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["cash position", "revenue check", "financial overview", "money status"]
+    },
+    {
+      "name": "growth-check",
+      "path": "growth-check/SKILL.md",
+      "description": "Periodic reflection on development, skills, learning, and progress toward goals",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["am I growing", "development check", "personal growth review", "progress on goals"]
+    },
+    {
+      "name": "databases",
+      "path": "databases/SKILL.md",
+      "description": "View all Claudia memory databases, switch between them, manage isolation",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["which database", "switch workspace", "show databases", "list databases"]
+    },
+    {
+      "name": "brain-monitor",
+      "path": "brain-monitor/SKILL.md",
+      "description": "Terminal dashboard for real-time memory stats and activity",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["brain monitor", "show dashboard", "memory dashboard", "terminal brain"]
+    },
+    {
+      "name": "diagnose",
+      "path": "diagnose/SKILL.md",
+      "description": "Check memory daemon health and troubleshoot connectivity issues",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["is my memory working", "diagnose memory", "daemon health", "troubleshoot memory"]
+    },
+    {
+      "name": "meeting-prep",
+      "path": "meeting-prep/SKILL.md",
+      "description": "One-page briefing before a call or meeting with person context and open items",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["prep me for my call", "meeting prep", "brief me before", "get ready for meeting"]
+    },
+    {
+      "name": "capture-meeting",
+      "path": "capture-meeting/SKILL.md",
+      "description": "Process meeting notes or transcript to extract decisions, commitments, and insights",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["capture this meeting", "here are my notes", "process meeting notes", "meeting transcript"]
+    },
+    {
+      "name": "summarize-doc",
+      "path": "summarize-doc/SKILL.md",
+      "description": "Create an executive summary of any document at the appropriate level of detail",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["summarize this", "main points", "give me the gist", "executive summary"]
+    },
+    {
+      "name": "memory-audit",
+      "path": "memory-audit/SKILL.md",
+      "description": "Show everything Claudia knows with provenance tracing and entity counts",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["what do you know", "show memories", "memory audit", "what do you remember about"]
+    },
+    {
+      "name": "brain",
+      "path": "brain/SKILL.md",
+      "description": "Launch the 3D Brain Visualizer showing entities, relationships, and memories as an interactive graph",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["show your brain", "visualize memory", "open the brain", "memory graph"]
+    },
+    {
+      "name": "fix-duplicates",
+      "path": "fix-duplicates/SKILL.md",
+      "description": "Find and merge duplicate entities in the memory system",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["clean up duplicates", "merge these people", "fix duplicate entities", "dedupe"]
+    },
+    {
+      "name": "memory-health",
+      "path": "memory-health/SKILL.md",
+      "description": "Check memory system health and data quality with stats and recommendations",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["how's my memory", "system health", "memory stats", "data quality"]
+    },
+    {
+      "name": "file-document",
+      "path": "file-document/SKILL.md",
+      "description": "Store a document, email, or text for future reference with entity linking and provenance",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["save this email", "file this", "store this document", "save for later"]
+    },
+    {
+      "name": "new-person",
+      "path": "new-person/SKILL.md",
+      "description": "Create a relationship tracking file for a person with contact info and history",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["new person", "create contact", "add person", "track this person"]
+    },
+    {
+      "name": "gateway",
+      "path": "gateway/SKILL.md",
+      "description": "Start, stop, or check status of the Claudia Gateway service for messaging integrations",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["start gateway", "stop gateway", "gateway status", "is the gateway running"]
+    },
+    {
+      "name": "setup-telegram",
+      "path": "setup-telegram.md",
+      "description": "Guided walkthrough for setting up the Claudia Telegram relay with full agent sessions",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["telegram relay", "set up relay", "configure relay", "relay setup"]
+    },
+    {
+      "name": "setup-gateway",
+      "path": "setup-gateway.md",
+      "description": "Guided walkthrough for setting up Claudia Gateway with Telegram or Slack",
+      "invocation": "contextual",
+      "effort_level": "medium",
+      "triggers": ["set up gateway", "connect telegram", "setup messaging", "gateway setup"]
+    },
+    {
+      "name": "concierge",
+      "path": "concierge.md",
+      "description": "Context-aware web research that connects findings to memory, relationships, and accumulated knowledge",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["look up", "what's new", "check current", "any updates on", "latest info"]
+    },
+    {
+      "name": "connector-discovery",
+      "path": "connector-discovery.md",
+      "description": "Help users connect external tools in a gentle, non-technical way with plain language guidance",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["can you see my email", "connect to Notion", "integrate with", "set up connection"]
+    },
+    {
+      "name": "research",
+      "path": "research/SKILL.md",
+      "description": "Deep research on a topic with web sources, memory integration, and stored findings",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["research this", "look into", "find out about", "dig into"]
+    },
+    {
+      "name": "what-am-i-missing",
+      "path": "what-am-i-missing/SKILL.md",
+      "description": "Surface risks, blind spots, and overlooked items across commitments and relationships",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["what am I overlooking", "blind spots", "what's falling through the cracks", "any risks"]
+    },
+    {
+      "name": "map-connections",
+      "path": "map-connections/SKILL.md",
+      "description": "Scan context files to extract entities and relationships into the memory system",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["who knows who", "network graph", "map my connections", "extract relationships"]
+    },
+    {
+      "name": "weekly-review",
+      "path": "weekly-review/SKILL.md",
+      "description": "Guided weekly reflection across all relationships, commitments, and projects",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["weekly review", "end of week", "reflect on this week", "weekly check-in"]
+    },
+    {
+      "name": "meditate",
+      "path": "meditate/SKILL.md",
+      "description": "End-of-session reflection generating persistent learnings and cross-session insights",
+      "invocation": "contextual",
+      "effort_level": "high",
+      "triggers": ["let's wrap up", "end the session", "session reflection", "time to meditate"]
+    },
+    {
+      "name": "draft-reply",
+      "path": "draft-reply/SKILL.md",
+      "description": "Draft an email response with tone matching the relationship context",
+      "invocation": "explicit",
+      "effort_level": "medium",
+      "triggers": ["draft a reply", "respond to this email", "write a response", "reply to this"]
+    },
+    {
+      "name": "follow-up-draft",
+      "path": "follow-up-draft/SKILL.md",
+      "description": "Create a post-meeting thank-you or follow-up email with key points and next steps",
+      "invocation": "explicit",
+      "effort_level": "medium",
+      "triggers": ["follow-up email", "thank you note", "post-meeting email", "send a follow-up"]
+    },
+    {
+      "name": "ingest-sources",
+      "path": "ingest-sources/SKILL.md",
+      "description": "Process multiple source documents with Extract-Then-Aggregate discipline",
+      "invocation": "explicit",
+      "effort_level": "max",
+      "triggers": ["process these transcripts", "batch process", "ingest these documents", "multiple sources"]
+    },
+    {
+      "name": "pipeline-review",
+      "path": "pipeline-review/SKILL.md",
+      "description": "Review active pipeline, opportunities, capacity, and stalled items needing attention",
+      "invocation": "contextual",
+      "effort_level": "max",
+      "triggers": ["pipeline status", "capacity check", "what's in the pipeline", "deal flow"]
+    },
+    {
+      "name": "deep-context",
+      "path": "deep-context/SKILL.md",
+      "description": "Full-context deep analysis pulling up to 180 memories for comprehensive synthesis",
+      "invocation": "contextual",
+      "effort_level": "max",
+      "triggers": ["deep dive", "full context", "everything about", "strategic analysis"]
+    }
+  ]
+}

@@ -68,6 +68,16 @@ class MemoryConfig:
     # Health check
     health_port: int = 3848
 
+    # Backup settings
+    backup_retention_count: int = 3  # Number of rolling backups to keep
+    enable_pre_consolidation_backup: bool = True  # Auto-backup before consolidation
+
+    # Retention settings (data cleanup during consolidation)
+    audit_log_retention_days: int = 90
+    prediction_retention_days: int = 30
+    turn_buffer_retention_days: int = 60
+    metrics_retention_days: int = 90
+
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
 
@@ -119,6 +129,18 @@ class MemoryConfig:
                     config.fts_weight = data["fts_weight"]
                 if "health_port" in data:
                     config.health_port = data["health_port"]
+                if "backup_retention_count" in data:
+                    config.backup_retention_count = data["backup_retention_count"]
+                if "enable_pre_consolidation_backup" in data:
+                    config.enable_pre_consolidation_backup = data["enable_pre_consolidation_backup"]
+                if "audit_log_retention_days" in data:
+                    config.audit_log_retention_days = data["audit_log_retention_days"]
+                if "prediction_retention_days" in data:
+                    config.prediction_retention_days = data["prediction_retention_days"]
+                if "turn_buffer_retention_days" in data:
+                    config.turn_buffer_retention_days = data["turn_buffer_retention_days"]
+                if "metrics_retention_days" in data:
+                    config.metrics_retention_days = data["metrics_retention_days"]
                 if "log_path" in data:
                     config.log_path = Path(data["log_path"])
 
@@ -171,6 +193,20 @@ class MemoryConfig:
         weights = self.vector_weight + self.importance_weight + self.recency_weight + self.fts_weight
         if abs(weights - 1.0) > 0.01:
             logger.warning(f"Ranking weights sum to {weights:.3f}, not 1.0. Results may be skewed.")
+        if self.backup_retention_count < 1:
+            logger.warning(f"backup_retention_count={self.backup_retention_count} below minimum, using 1")
+            self.backup_retention_count = 1
+        for attr in ("audit_log_retention_days", "prediction_retention_days", "turn_buffer_retention_days", "metrics_retention_days"):
+            val = getattr(self, attr)
+            if val < 1:
+                logger.warning(f"{attr}={val} below minimum, using 1")
+                setattr(self, attr, 1)
+        common_dims = {384, 512, 768, 1024, 1536}
+        if self.embedding_dimensions not in common_dims:
+            logger.warning(
+                f"embedding_dimensions={self.embedding_dimensions} is not a common value "
+                f"({sorted(common_dims)}). Verify this matches your embedding model's output."
+            )
 
     def save(self) -> None:
         """Save current configuration to ~/.claudia/config.json"""
@@ -193,6 +229,12 @@ class MemoryConfig:
             "recency_weight": self.recency_weight,
             "fts_weight": self.fts_weight,
             "health_port": self.health_port,
+            "backup_retention_count": self.backup_retention_count,
+            "enable_pre_consolidation_backup": self.enable_pre_consolidation_backup,
+            "audit_log_retention_days": self.audit_log_retention_days,
+            "prediction_retention_days": self.prediction_retention_days,
+            "turn_buffer_retention_days": self.turn_buffer_retention_days,
+            "metrics_retention_days": self.metrics_retention_days,
             "log_path": str(self.log_path),
         }
 

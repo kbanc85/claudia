@@ -224,6 +224,9 @@ class Database:
             else:
                 logger.warning(f"Schema file not found at {schema_path}")
 
+            # Create vec0 virtual tables with configurable dimensions
+            self._create_vec0_tables(conn)
+
             # Run migrations for existing databases
             self._run_migrations(conn)
 
@@ -231,6 +234,64 @@ class Database:
             self._store_workspace_path(conn)
 
             self._initialized = True
+
+    # All vec0 virtual tables and their primary key columns
+    VEC0_TABLES = [
+        ("entity_embeddings", "entity_id"),
+        ("memory_embeddings", "memory_id"),
+        ("message_embeddings", "message_id"),
+        ("episode_embeddings", "episode_id"),
+        ("reflection_embeddings", "reflection_id"),
+    ]
+
+    def _create_vec0_tables(self, conn: sqlite3.Connection) -> None:
+        """Create vec0 virtual tables with configurable embedding dimensions.
+
+        Reads dimensions from config.embedding_dimensions. Also stores the
+        dimensions in _meta for migration detection.
+        """
+        config = get_config()
+        dim = config.embedding_dimensions
+
+        for table, pk in self.VEC0_TABLES:
+            try:
+                conn.execute(f"""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS {table} USING vec0(
+                        {pk} INTEGER PRIMARY KEY,
+                        embedding FLOAT[{dim}]
+                    )
+                """)
+            except sqlite3.OperationalError as e:
+                if "no such module: vec0" in str(e):
+                    logger.warning(f"sqlite-vec not available, skipping {table}")
+                else:
+                    logger.warning(f"Could not create {table}: {e}")
+
+        # Store dimensions in _meta for migration detection
+        try:
+            check = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='_meta'"
+            ).fetchone()
+            if check:
+                # Only write dimensions if not already set (preserve existing value
+                # so --migrate-embeddings can detect changes)
+                existing = conn.execute(
+                    "SELECT value FROM _meta WHERE key = 'embedding_dimensions'"
+                ).fetchone()
+                if not existing:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO _meta (key, value) VALUES ('embedding_dimensions', ?)",
+                        (str(dim),),
+                    )
+                    conn.commit()
+                elif int(existing["value"]) != dim:
+                    logger.warning(
+                        f"Embedding dimensions mismatch: config={dim}, "
+                        f"database={existing['value']}. "
+                        f"Run --migrate-embeddings to fix."
+                    )
+        except sqlite3.OperationalError:
+            pass  # _meta table may not exist yet on very first run
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
         """Run database migrations for schema changes."""
@@ -274,19 +335,7 @@ class Database:
                     if "duplicate column" not in str(e).lower() and "already exists" not in str(e).lower():
                         logger.warning(f"Migration 2 statement failed: {e}")
 
-            # Try to create episode_embeddings virtual table
-            try:
-                conn.execute(
-                    """CREATE VIRTUAL TABLE IF NOT EXISTS episode_embeddings USING vec0(
-                        episode_id INTEGER PRIMARY KEY,
-                        embedding FLOAT[384]
-                    )"""
-                )
-            except sqlite3.OperationalError as e:
-                if "no such module: vec0" in str(e):
-                    logger.warning("Skipping episode_embeddings virtual table: sqlite-vec not available")
-                else:
-                    logger.warning(f"Could not create episode_embeddings: {e}")
+            # episode_embeddings is now created by _create_vec0_tables() with configurable dimensions
 
             # Mark existing episodes as summarized if they have a summary
             try:
@@ -575,19 +624,7 @@ class Database:
                     if "already exists" not in str(e).lower():
                         logger.warning(f"Migration 10 statement failed: {e}")
 
-            # Try to create reflection_embeddings virtual table
-            try:
-                conn.execute(
-                    """CREATE VIRTUAL TABLE IF NOT EXISTS reflection_embeddings USING vec0(
-                        reflection_id INTEGER PRIMARY KEY,
-                        embedding FLOAT[384]
-                    )"""
-                )
-            except sqlite3.OperationalError as e:
-                if "no such module: vec0" in str(e):
-                    logger.warning("Skipping reflection_embeddings virtual table: sqlite-vec not available")
-                else:
-                    logger.warning(f"Could not create reflection_embeddings: {e}")
+            # reflection_embeddings is now created by _create_vec0_tables() with configurable dimensions
 
             conn.execute(
                 "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (10, 'Add reflections table and reflection_embeddings for /meditate skill')"
@@ -1045,6 +1082,40 @@ class Database:
         """Get a single row from a table"""
         rows = self.query(table, columns, where, where_params, limit=1)
         return rows[0] if rows else None
+
+    def backup(self) -> Path:
+        """Create a backup of the database using SQLite's online backup API.
+
+        Returns:
+            Path to the created backup file
+        """
+        import glob
+
+        config = get_config()
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        backup_path = Path(f"{self.db_path}.backup-{timestamp}.db")
+
+        # Create backup using SQLite's built-in backup API
+        backup_conn = sqlite3.connect(str(backup_path))
+        try:
+            self._get_connection().backup(backup_conn)
+        finally:
+            backup_conn.close()
+
+        logger.info(f"Database backed up to {backup_path}")
+
+        # Rolling retention: delete oldest backups beyond retention count
+        pattern = f"{self.db_path}.backup-*.db"
+        backups = sorted(glob.glob(pattern))
+        while len(backups) > config.backup_retention_count:
+            oldest = backups.pop(0)
+            try:
+                Path(oldest).unlink()
+                logger.info(f"Deleted old backup: {oldest}")
+            except OSError as e:
+                logger.warning(f"Failed to delete old backup {oldest}: {e}")
+
+        return backup_path
 
     def close(self) -> None:
         """Close the thread-local connection"""

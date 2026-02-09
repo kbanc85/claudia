@@ -1155,6 +1155,30 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.summary",
+            description=(
+                "Get a lightweight summary for one or more entities. Returns name, type, "
+                "importance, memory count, relationship count, last mentioned date, and "
+                "top facts. Cheaper than memory.about for quick overviews."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entities": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of entity names to summarize",
+                    },
+                    "top_facts_limit": {
+                        "type": "integer",
+                        "description": "Maximum top facts per entity (default 5)",
+                        "default": 5,
+                    },
+                },
+                "required": ["entities"],
+            },
+        ),
+        Tool(
             name="memory.system_health",
             description=(
                 "Get comprehensive system health: schema version, component status, "
@@ -2004,9 +2028,107 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 ]
             )
 
+        elif name == "memory.summary":
+            entity_names = arguments.get("entities", [])
+            top_facts_limit = arguments.get("top_facts_limit", 5)
+            db = get_db()
+            summaries = []
+
+            for entity_name in entity_names:
+                from ..extraction.entity_extractor import get_extractor
+                canonical = get_extractor().canonical_name(entity_name)
+
+                entity = db.get_one(
+                    "entities",
+                    where="canonical_name = ? AND deleted_at IS NULL",
+                    where_params=(canonical,),
+                )
+                if not entity:
+                    summaries.append({"name": entity_name, "found": False})
+                    continue
+
+                eid = entity["id"]
+
+                # Memory count (excluding invalidated)
+                mem_count_rows = db.execute(
+                    """
+                    SELECT COUNT(*) as cnt FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                    """,
+                    (eid,),
+                    fetch=True,
+                ) or []
+                memory_count = mem_count_rows[0]["cnt"] if mem_count_rows else 0
+
+                # Relationship count
+                rel_count_rows = db.execute(
+                    """
+                    SELECT COUNT(*) as cnt FROM relationships
+                    WHERE (source_entity_id = ? OR target_entity_id = ?)
+                    AND invalid_at IS NULL
+                    """,
+                    (eid, eid),
+                    fetch=True,
+                ) or []
+                relationship_count = rel_count_rows[0]["cnt"] if rel_count_rows else 0
+
+                # Last mentioned
+                last_rows = db.execute(
+                    """
+                    SELECT MAX(m.created_at) as last_mentioned FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                    """,
+                    (eid,),
+                    fetch=True,
+                ) or []
+                last_mentioned = last_rows[0]["last_mentioned"] if last_rows else None
+
+                # Top facts
+                fact_rows = db.execute(
+                    """
+                    SELECT m.content, m.type, m.importance FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                    ORDER BY m.importance DESC, m.created_at DESC
+                    LIMIT ?
+                    """,
+                    (eid, top_facts_limit),
+                    fetch=True,
+                ) or []
+
+                summaries.append({
+                    "name": entity["name"],
+                    "type": entity["type"],
+                    "importance": entity["importance"],
+                    "found": True,
+                    "memory_count": memory_count,
+                    "relationship_count": relationship_count,
+                    "last_mentioned": last_mentioned,
+                    "top_facts": [
+                        {"content": r["content"], "type": r["type"], "importance": r["importance"]}
+                        for r in fact_rows
+                    ],
+                })
+
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"summaries": summaries}, indent=2),
+                    )
+                ]
+            )
+
         elif name == "memory.system_health":
             from ..daemon.health import build_status_report
             report = build_status_report()
+            embedding_svc = get_embedding_service()
+            if hasattr(embedding_svc, '_model_mismatch') and embedding_svc._model_mismatch:
+                if "components" not in report:
+                    report["components"] = {}
+                report["components"]["embedding_model_mismatch"] = True
             return CallToolResult(
                 content=[
                     TextContent(

@@ -2,7 +2,25 @@
 name: relationship-tracker
 description: Surface relevant context when people are mentioned in conversation, and track relationship health over time.
 user-invocable: false
+invocation: proactive
 effort-level: high
+triggers:
+  - "person name mentioned in conversation"
+  - "meeting with someone"
+  - "commitment to or from a person"
+  - "haven't talked to in a while"
+  - "who is this person"
+inputs:
+  - name: person_name
+    type: entity
+    description: Name of the person mentioned in conversation
+outputs:
+  - name: person_context
+    type: text
+    description: Brief relevant context about the person (last contact, open items, health)
+  - name: person_file
+    type: file
+    description: New or updated people/[name].md file if person is important
 ---
 
 # Relationship Tracker Skill

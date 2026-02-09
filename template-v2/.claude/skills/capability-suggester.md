@@ -2,7 +2,25 @@
 name: capability-suggester
 description: Notice repeated user behaviors and suggest new commands, workflows, or structure to streamline their work.
 user-invocable: false
+invocation: proactive
 effort-level: high
+triggers:
+  - "same request three or more times"
+  - "repeated manual workflow"
+  - "frequent status check query"
+  - "mentions checking external tool"
+  - "workflow gap between steps"
+inputs:
+  - name: behavior_pattern
+    type: string
+    description: Observed repeated behavior or workflow pattern
+outputs:
+  - name: suggestion
+    type: text
+    description: Proposed enhancement (new command, workflow change, or structure addition)
+  - name: capability
+    type: file
+    description: New skill file or structural change if user accepts the suggestion
 ---
 
 # Capability Suggester Skill

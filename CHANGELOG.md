@@ -2,6 +2,45 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.35.0 (2026-02-09)
+
+### The Memory Upgrade
+
+Claudia's memory system got meaningfully better in three ways: she no longer accidentally surfaces outdated facts, she can now switch to better embedding models with a single command, and the install/upgrade flow maintains her semantic search automatically.
+
+### Added
+
+- **Embedding model migration** - New `--migrate-embeddings` CLI command safely transitions between embedding models (e.g., `all-minilm:l6-v2` at 384D to `nomic-embed-text` at 768D). Pre-flight checks, automatic backup, progress reporting, and clear rollback instructions. Vec0 dimensions are now configurable via `config.json`.
+- **Embedding backfill on upgrade** - The installer now auto-backfills missing embeddings across all databases during upgrades, and detects model mismatches with clear guidance.
+- **Config-aware model pulling** - Installer reads `embedding_model` from `config.json` instead of hardcoding `all-minilm:l6-v2`, so users with custom models get the right model pulled during install.
+- **`memory.system_health` MCP tool** - Surfaces daemon health, memory counts, and embedding status directly inside Claude sessions.
+- **`memory.summary` MCP tool** - Lightweight entity summaries with proper soft-delete filtering.
+- **Database backup** - `Database.backup()` with SQLite online backup API and rolling retention (configurable, default 3).
+- **Embedding cache** - Thread-safe LRU cache (256 entries, SHA256 keys) for embedding deduplication. Includes `clear()` for post-migration invalidation.
+- **Retention cleanup** - Consolidation Phase 4 trims old audit logs (90d), predictions (30d), turn buffer (60d), and metrics (90d). All thresholds configurable.
+- **Dimension mismatch detection** - `_check_model_consistency()` now checks both model name and dimensions, warns on startup if database doesn't match config.
+- **Skill index** - `skill-index.json` (43 skills, ~3K tokens) for fast skill lookup without loading all skill files.
+- **Enhanced session hooks** - Health check hook now calls `/status` for memory counts and embedding warnings.
+
+### Fixed
+
+- **Invalidated memories no longer surface** - Added `invalidated_at IS NULL` filter to all 6 recall paths. Previously, memories marked as no longer true could still appear in search results.
+- **Backfill format bug** - `--backfill-embeddings` was using `struct.pack()` (binary blobs) instead of `json.dumps()` (JSON strings), silently corrupting the vec0 index. Fixed to match all other code paths.
+- **Adaptive decay** - High-importance memories (>0.7) now decay at half rate with a configurable floor at `min_importance_threshold`.
+
+### Changed
+
+- **Vec0 tables moved to database.py** - All 5 vec0 `CREATE VIRTUAL TABLE` statements moved from `schema.sql` to `database.py` for runtime dimension configuration. `VEC0_TABLES` class attribute provides canonical table list.
+- **Scheduler trimmed** - Reduced from 8 scheduled jobs to 3 (daily decay, pattern detection, full consolidation). Removed: verification, predictions, LLM consolidation, metrics, document lifecycle.
+- **Config validation** - Warns on uncommon `embedding_dimensions` values, enforces minimums on `backup_retention_count` and all retention day settings.
+
+### Stats
+
+- 341 tests (+42 new across 5 test files), 0 regressions
+- Install: `npx get-claudia`
+
+---
+
 ## 1.34.2 (2026-02-08)
 
 ### Hotfix: Python 3.14 sqlite-vec Loading

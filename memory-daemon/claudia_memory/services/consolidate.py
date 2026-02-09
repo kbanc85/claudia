@@ -61,59 +61,98 @@ class ConsolidateService:
         self.config = get_config()
 
     def run_decay(self) -> Dict[str, int]:
-        """
-        Apply importance decay to memories and entities.
-        Never deletes, just reduces importance over time.
+        """Apply tiered importance decay to memories and entities.
 
-        Returns:
-            Dict with counts of affected records
+        Tier 1 (high-value): importance > 0.7 -> decay at half standard rate
+        Tier 2 (standard): everything else -> decay at config rate (0.995)
+
+        All decays have a floor at min_importance_threshold to prevent memories
+        from becoming permanently invisible.
         """
         decay_rate = self.config.decay_rate_daily
+        slow_decay_rate = (1.0 + decay_rate) / 2  # Midpoint between 1.0 and standard rate
+        floor = self.config.min_importance_threshold
 
-        # Decay memories
+        # Tier 1: High-value memories decay slower
         self.db.execute(
             """
             UPDATE memories
-            SET importance = importance * ?,
+            SET importance = MAX(?, importance * ?),
                 updated_at = ?
-            WHERE importance > ?
+            WHERE importance > 0.7
+              AND importance > ?
             """,
-            (decay_rate, datetime.utcnow().isoformat(), self.config.min_importance_threshold / 10),
+            (floor, slow_decay_rate, datetime.utcnow().isoformat(), floor),
         )
-        # Capture changes() immediately after the UPDATE -- it resets on next statement
-        memories_result = self.db.execute("SELECT changes()", fetch=True)
-        memories_decayed = memories_result[0][0] if memories_result else 0
+        tier1_result = self.db.execute("SELECT changes()", fetch=True)
+        tier1_count = tier1_result[0][0] if tier1_result else 0
 
-        # Decay entities
+        # Tier 2: Standard memories decay normally
+        self.db.execute(
+            """
+            UPDATE memories
+            SET importance = MAX(?, importance * ?),
+                updated_at = ?
+            WHERE importance <= 0.7
+              AND importance > ?
+            """,
+            (floor, decay_rate, datetime.utcnow().isoformat(), floor),
+        )
+        tier2_result = self.db.execute("SELECT changes()", fetch=True)
+        tier2_count = tier2_result[0][0] if tier2_result else 0
+
+        memories_decayed = tier1_count + tier2_count
+
+        # Entities: same tiered approach
         self.db.execute(
             """
             UPDATE entities
-            SET importance = importance * ?,
+            SET importance = MAX(?, importance * ?),
                 updated_at = ?
-            WHERE importance > ?
+            WHERE importance > 0.7
+              AND importance > ?
             """,
-            (decay_rate, datetime.utcnow().isoformat(), self.config.min_importance_threshold / 10),
+            (floor, slow_decay_rate, datetime.utcnow().isoformat(), floor),
+        )
+        self.db.execute(
+            """
+            UPDATE entities
+            SET importance = MAX(?, importance * ?),
+                updated_at = ?
+            WHERE importance <= 0.7
+              AND importance > ?
+            """,
+            (floor, decay_rate, datetime.utcnow().isoformat(), floor),
         )
 
-        # Decay relationship strengths
+        # Relationships: tiered by strength
         self.db.execute(
             """
             UPDATE relationships
-            SET strength = strength * ?,
+            SET strength = MAX(0.01, strength * ?),
                 updated_at = ?
-            WHERE strength > 0.01
+            WHERE strength > 0.7
+              AND strength > 0.01
+            """,
+            (slow_decay_rate, datetime.utcnow().isoformat()),
+        )
+        self.db.execute(
+            """
+            UPDATE relationships
+            SET strength = MAX(0.01, strength * ?),
+                updated_at = ?
+            WHERE strength <= 0.7
+              AND strength > 0.01
             """,
             (decay_rate, datetime.utcnow().isoformat()),
         )
 
-        # Decay reflections using per-row decay_rate
-        # Reflections decay very slowly by default (0.999)
-        # Aggregated reflections (3+) decay even slower (0.9995)
+        # Reflections: keep using per-row decay_rate (unchanged)
         try:
             self.db.execute(
                 """
                 UPDATE reflections
-                SET importance = importance * decay_rate,
+                SET importance = MAX(0.01, importance * decay_rate),
                     updated_at = ?
                 WHERE importance > 0.01
                 """,
@@ -126,7 +165,7 @@ class ConsolidateService:
             reflections_decayed = 0
 
         logger.info(
-            f"Decay applied: decay_rate={decay_rate}"
+            f"Decay applied: standard_rate={decay_rate}, slow_rate={slow_decay_rate:.4f}, floor={floor}"
         )
 
         return {
@@ -1578,6 +1617,73 @@ class ConsolidateService:
 
         logger.debug(f"Merged reflection {duplicate['id']} into {primary['id']}")
 
+    def run_retention_cleanup(self) -> Dict[str, int]:
+        """Clean up old data per retention policies.
+
+        Removes:
+        - Old audit_log entries
+        - Expired predictions past retention window
+        - Archived turn_buffer from old episodes
+        - Old metrics rows
+        """
+        results = {}
+        now = datetime.utcnow()
+
+        # Audit log cleanup
+        try:
+            cutoff = (now - timedelta(days=self.config.audit_log_retention_days)).isoformat()
+            self.db.execute(
+                "DELETE FROM audit_log WHERE timestamp < ?",
+                (cutoff,),
+            )
+            rows = self.db.execute("SELECT changes()", fetch=True)
+            results["audit_log_deleted"] = rows[0][0] if rows else 0
+        except Exception as e:
+            logger.warning(f"Audit log cleanup failed: {e}")
+            results["audit_log_deleted"] = 0
+
+        # Predictions cleanup (expired + past retention window)
+        try:
+            cutoff = (now - timedelta(days=self.config.prediction_retention_days)).isoformat()
+            self.db.execute(
+                "DELETE FROM predictions WHERE expires_at IS NOT NULL AND expires_at < ?",
+                (cutoff,),
+            )
+            rows = self.db.execute("SELECT changes()", fetch=True)
+            results["predictions_deleted"] = rows[0][0] if rows else 0
+        except Exception as e:
+            logger.warning(f"Predictions cleanup failed: {e}")
+            results["predictions_deleted"] = 0
+
+        # Turn buffer cleanup (old archived turns)
+        try:
+            cutoff = (now - timedelta(days=self.config.turn_buffer_retention_days)).isoformat()
+            self.db.execute(
+                "DELETE FROM turn_buffer WHERE created_at < ?",
+                (cutoff,),
+            )
+            rows = self.db.execute("SELECT changes()", fetch=True)
+            results["turn_buffer_deleted"] = rows[0][0] if rows else 0
+        except Exception as e:
+            logger.warning(f"Turn buffer cleanup failed: {e}")
+            results["turn_buffer_deleted"] = 0
+
+        # Metrics cleanup
+        try:
+            cutoff = (now - timedelta(days=self.config.metrics_retention_days)).isoformat()
+            self.db.execute(
+                "DELETE FROM metrics WHERE timestamp < ?",
+                (cutoff,),
+            )
+            rows = self.db.execute("SELECT changes()", fetch=True)
+            results["metrics_deleted"] = rows[0][0] if rows else 0
+        except Exception as e:
+            logger.warning(f"Metrics cleanup failed: {e}")
+            results["metrics_deleted"] = 0
+
+        logger.info(f"Retention cleanup: {results}")
+        return results
+
     def run_full_consolidation(self) -> Dict[str, Any]:
         """
         Run complete consolidation: decay, patterns, predictions.
@@ -1587,6 +1693,15 @@ class ConsolidateService:
         logger.info("Starting full consolidation")
 
         results = {}
+
+        # Phase 0: Pre-consolidation backup
+        if self.config.enable_pre_consolidation_backup:
+            try:
+                backup_path = self.db.backup()
+                results["backup_path"] = str(backup_path)
+            except Exception as e:
+                logger.warning(f"Pre-consolidation backup failed: {e}")
+                results["backup_error"] = str(e)
 
         # Phase 1: Decay + boost (modifies importance scores)
         try:
@@ -1613,6 +1728,13 @@ class ConsolidateService:
         except Exception as e:
             logger.warning(f"Pattern detection failed: {e}")
             results["patterns_detected"] = 0
+
+        # Phase 4: Retention cleanup (removes old data)
+        try:
+            results["retention"] = self.run_retention_cleanup()
+        except Exception as e:
+            logger.warning(f"Retention cleanup failed: {e}")
+            results["retention"] = {"error": str(e)}
 
         logger.info(f"Consolidation complete: {results}")
         return results

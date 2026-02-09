@@ -286,6 +286,7 @@ class RecallService:
         about_entity: Optional[str] = None,
     ) -> None:
         """Apply common filters to SQL query parts."""
+        sql_parts.append("AND m.invalidated_at IS NULL")
         if memory_types:
             placeholders = ", ".join(["?" for _ in memory_types])
             sql_parts.append(f"AND m.type IN ({placeholders})")
@@ -534,6 +535,7 @@ class RecallService:
                 FROM memories_fts fts
                 JOIN memories m ON m.id = fts.rowid
                 WHERE memories_fts MATCH ?
+                AND m.invalidated_at IS NULL
             """
             params: list = [query]
 
@@ -653,6 +655,7 @@ class RecallService:
             SELECT m.* FROM memories m
             JOIN memory_entities me ON m.id = me.memory_id
             WHERE me.entity_id = ?
+            AND m.invalidated_at IS NULL
         """
         params = [entity["id"]]
 
@@ -939,6 +942,7 @@ class RecallService:
             LEFT JOIN memory_entities me ON m.id = me.memory_id
             LEFT JOIN entities e ON me.entity_id = e.id
             WHERE m.created_at >= ?
+            AND m.invalidated_at IS NULL
         """
         params = [cutoff.isoformat()]
 
@@ -1933,6 +1937,7 @@ class RecallService:
                 LEFT JOIN memory_entities me ON m.id = me.memory_id
                 LEFT JOIN entities e ON me.entity_id = e.id
                 WHERE memories_fts MATCH ?
+                AND m.invalidated_at IS NULL
             """
             params: list = [query]
 
@@ -1961,6 +1966,7 @@ class RecallService:
             LEFT JOIN memory_entities me ON m.id = me.memory_id
             LEFT JOIN entities e ON me.entity_id = e.id
             WHERE m.content LIKE ?
+            AND m.invalidated_at IS NULL
         """
         params = [f"%{query}%"]
 

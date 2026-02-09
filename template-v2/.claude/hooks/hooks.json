@@ -22,6 +22,26 @@
           "context_load": "Call memory.session_context to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
           "catch_up": "If unsummarized sessions are reported in the context block, review buffered turns and call memory.end_session with a retroactive narrative and structured extractions for each.",
           "recall_context": "Use the loaded context for greeting. For deeper search on specific topics, use memory.recall."
+        },
+        "proactive_surfacing": {
+          "description": "Surface urgent items naturally in the greeting. Keep it to a brief mention, not a full report.",
+          "max_items": 3,
+          "checks": [
+            {
+              "type": "overdue_commitments",
+              "description": "Commitments older than 7 days without resolution",
+              "query_hint": "Use memory.recall with type='commitment' filter and check dates"
+            },
+            {
+              "type": "cooling_relationships",
+              "description": "Important people not mentioned in >30 days",
+              "query_hint": "Use memory.search_entities to find entities with old last_mentioned dates"
+            }
+          ],
+          "examples": [
+            "By the way, you mentioned sending that proposal to Sarah 10 days ago. Want me to help draft a follow-up?",
+            "It's been a while since we talked about Alex. Shall I pull up your latest context?"
+          ]
         }
       }
     },

@@ -203,24 +203,9 @@ CREATE TABLE IF NOT EXISTS config (
 -- ============================================================================
 -- VECTOR TABLES: sqlite-vec virtual tables for semantic search
 -- ============================================================================
-
--- Entity embeddings (384 dimensions for all-minilm)
-CREATE VIRTUAL TABLE IF NOT EXISTS entity_embeddings USING vec0(
-    entity_id INTEGER PRIMARY KEY,
-    embedding FLOAT[384]
-);
-
--- Memory embeddings
-CREATE VIRTUAL TABLE IF NOT EXISTS memory_embeddings USING vec0(
-    memory_id INTEGER PRIMARY KEY,
-    embedding FLOAT[384]
-);
-
--- Message embeddings (optional, for searching conversations)
-CREATE VIRTUAL TABLE IF NOT EXISTS message_embeddings USING vec0(
-    message_id INTEGER PRIMARY KEY,
-    embedding FLOAT[384]
-);
+-- NOTE: vec0 virtual tables are created by database.py initialize() with
+-- configurable dimensions from config.embedding_dimensions.
+-- This allows changing embedding models without schema changes.
 
 -- ============================================================================
 -- TURN BUFFER: Raw conversation turns awaiting session summary
@@ -239,11 +224,7 @@ CREATE TABLE IF NOT EXISTS turn_buffer (
 
 CREATE INDEX IF NOT EXISTS idx_turn_buffer_episode ON turn_buffer(episode_id);
 
--- Episode narrative embeddings (for semantic search across session summaries)
-CREATE VIRTUAL TABLE IF NOT EXISTS episode_embeddings USING vec0(
-    episode_id INTEGER PRIMARY KEY,
-    embedding FLOAT[384]
-);
+-- Episode narrative embeddings are created by database.py with configurable dimensions.
 
 -- ============================================================================
 -- DOCUMENTS: File registry for provenance tracking
@@ -392,11 +373,7 @@ CREATE INDEX IF NOT EXISTS idx_reflections_importance ON reflections(importance 
 CREATE INDEX IF NOT EXISTS idx_reflections_entity ON reflections(about_entity_id);
 CREATE INDEX IF NOT EXISTS idx_reflections_episode ON reflections(episode_id);
 
--- Reflection embeddings for semantic search
-CREATE VIRTUAL TABLE IF NOT EXISTS reflection_embeddings USING vec0(
-    reflection_id INTEGER PRIMARY KEY,
-    embedding FLOAT[384]
-);
+-- Reflection embeddings are created by database.py with configurable dimensions.
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (10, 'Add reflections table and reflection_embeddings for /meditate skill');

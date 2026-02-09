@@ -239,6 +239,25 @@ echo
 # Pull embedding model
 echo -e "${BOLD}Step 2/8: AI Models${NC}"
 echo
+
+# Determine embedding model from config (default: all-minilm:l6-v2)
+EMBEDDING_MODEL="all-minilm:l6-v2"
+EMBEDDING_MODEL_SHORT="all-minilm"
+if [ -f "$HOME/.claudia/config.json" ]; then
+    CONFIG_EMB=$("$PYTHON" -c "
+import json
+try:
+    with open('$HOME/.claudia/config.json') as f:
+        print(json.load(f).get('embedding_model', ''))
+except:
+    pass
+" 2>/dev/null)
+    if [ -n "$CONFIG_EMB" ]; then
+        EMBEDDING_MODEL="$CONFIG_EMB"
+        EMBEDDING_MODEL_SHORT="${CONFIG_EMB%%:*}"
+    fi
+fi
+
 if [ "$OLLAMA_AVAILABLE" = true ]; then
     # Ensure Ollama is running before pulling model
     if ! curl -s http://localhost:11434/api/tags &>/dev/null; then
@@ -264,13 +283,13 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
     fi
 
     # Pull embedding model
-    if ollama list 2>/dev/null | grep -q "all-minilm"; then
-        echo -e "  ${GREEN}✓${NC} Embedding model ready"
+    if ollama list 2>/dev/null | grep -q "$EMBEDDING_MODEL_SHORT"; then
+        echo -e "  ${GREEN}✓${NC} Embedding model ready (${EMBEDDING_MODEL})"
     else
-        echo -e "  ${CYAN}◐${NC} Downloading embedding model (45MB)..."
+        echo -e "  ${CYAN}◐${NC} Downloading embedding model (${EMBEDDING_MODEL})..."
         echo -e "    ${DIM}This gives Claudia semantic understanding${NC}"
         echo
-        if ollama pull all-minilm:l6-v2 2>/dev/null; then
+        if ollama pull "$EMBEDDING_MODEL" 2>/dev/null; then
             echo -e "  ${GREEN}✓${NC} Model downloaded"
         else
             echo -e "  ${YELLOW}!${NC} Model pull failed (will retry when Ollama runs)"
@@ -538,6 +557,52 @@ else
     echo -e "  ${DIM}Fresh install - no migration needed${NC}"
 fi
 
+# Embedding maintenance (backfill missing embeddings on upgrade)
+if [ "$OLLAMA_AVAILABLE" = true ]; then
+    # Find all databases in ~/.claudia/memory/
+    EMBED_DBS=()
+    for db_file in "$HOME/.claudia/memory/"*.db; do
+        [ -f "$db_file" ] && EMBED_DBS+=("$db_file")
+    done
+
+    if [ ${#EMBED_DBS[@]} -gt 0 ]; then
+        echo
+        echo -e "  ${CYAN}◐${NC} Checking embeddings..."
+
+        BACKFILLED_TOTAL=0
+        MISMATCH_FOUND=false
+
+        for db_file in "${EMBED_DBS[@]}"; do
+            DB_NAME=$(basename "$db_file")
+            RESULT=$(CLAUDIA_DB_OVERRIDE="$db_file" "$VENV_DIR/bin/python" -m claudia_memory --backfill-embeddings 2>&1)
+            EXITCODE=$?
+
+            if [ $EXITCODE -ne 0 ]; then
+                if echo "$RESULT" | grep -q "Dimension mismatch"; then
+                    MISMATCH_FOUND=true
+                    echo -e "  ${YELLOW}!${NC} ${DB_NAME}: Embedding model change detected"
+                fi
+                continue
+            fi
+
+            # Count backfilled embeddings from output
+            if echo "$RESULT" | grep -q "Backfill complete"; then
+                COUNT=$(echo "$RESULT" | grep -o '[0-9]* embedded' | cut -d' ' -f1)
+                BACKFILLED_TOTAL=$((BACKFILLED_TOTAL + ${COUNT:-0}))
+            fi
+        done
+
+        if [ "$MISMATCH_FOUND" = true ]; then
+            echo -e "    ${DIM}Your config has a different embedding model than the database.${NC}"
+            echo -e "    ${DIM}Run to migrate: ~/.claudia/daemon/venv/bin/python -m claudia_memory --migrate-embeddings${NC}"
+        elif [ $BACKFILLED_TOTAL -gt 0 ]; then
+            echo -e "  ${GREEN}✓${NC} Backfilled ${BACKFILLED_TOTAL} embeddings"
+        else
+            echo -e "  ${GREEN}✓${NC} Embeddings up to date"
+        fi
+    fi
+fi
+
 echo
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo
@@ -565,10 +630,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 # Check 3: Embedding model
-if [ "$OLLAMA_AVAILABLE" = true ] && ollama list 2>/dev/null | grep -q "minilm"; then
-    echo -e "  ${GREEN}✓${NC} Embedding model ready"
+if [ "$OLLAMA_AVAILABLE" = true ] && ollama list 2>/dev/null | grep -q "$EMBEDDING_MODEL_SHORT"; then
+    echo -e "  ${GREEN}✓${NC} Embedding model ready (${EMBEDDING_MODEL})"
 else
-    echo -e "  ${YELLOW}○${NC} Embedding model pending"
+    echo -e "  ${YELLOW}○${NC} Embedding model pending (${EMBEDDING_MODEL})"
 fi
 
 # Check 3b: Language model (cognitive tools)
@@ -637,7 +702,7 @@ echo -e "  ${CYAN}◆${NC} Memory daemon      ${DIM}~/.claudia/daemon/${NC}"
 echo -e "  ${CYAN}◆${NC} SQLite database    ${DIM}~/.claudia/memory/claudia.db${NC}"
 echo -e "  ${CYAN}◆${NC} Health endpoint    ${DIM}http://localhost:3848${NC}"
 if [ "$OLLAMA_AVAILABLE" = true ]; then
-echo -e "  ${CYAN}◆${NC} Vector search      ${DIM}Enabled (Ollama)${NC}"
+echo -e "  ${CYAN}◆${NC} Vector search      ${DIM}Enabled (${EMBEDDING_MODEL})${NC}"
 else
 echo -e "  ${YELLOW}○${NC} Vector search      ${DIM}Disabled (install Ollama to enable)${NC}"
 fi

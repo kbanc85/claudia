@@ -10,6 +10,7 @@ import logging
 import threading
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from ..config import get_config
@@ -67,6 +68,24 @@ def build_status_report(*, db=None) -> dict:
                 report["counts"][table] = rows[0]["c"] if rows else 0
             except Exception:
                 report["counts"][table] = -1
+
+        # Backup status
+        try:
+            import glob
+            db_path = str(get_config().db_path)
+            pattern = f"{db_path}.backup-*.db"
+            backups = sorted(glob.glob(pattern))
+            if backups:
+                latest = Path(backups[-1])
+                report["backup"] = {
+                    "count": len(backups),
+                    "latest_path": str(latest),
+                    "latest_size_bytes": latest.stat().st_size if latest.exists() else 0,
+                }
+            else:
+                report["backup"] = {"count": 0}
+        except Exception:
+            report["backup"] = {"count": -1, "error": "unable to check"}
 
     except Exception:
         report["components"]["database"] = "error"

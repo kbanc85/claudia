@@ -2,7 +2,25 @@
 name: risk-surfacer
 description: Proactively identify and surface potential problems before they become crises.
 user-invocable: false
+invocation: proactive
 effort-level: high
+triggers:
+  - "overdue commitment detected"
+  - "relationship cooling past threshold"
+  - "capacity overload next week"
+  - "cascading delay risk"
+  - "sentiment shift in relationship"
+inputs:
+  - name: commitments
+    type: string
+    description: Current commitments and deadlines from memory and context files
+  - name: relationships
+    type: string
+    description: Relationship health data from entity last_mentioned dates
+outputs:
+  - name: risk_alert
+    type: text
+    description: Formatted risk alert with category, context, impact, and suggested action
 ---
 
 # Risk Surfacer Skill

@@ -4,12 +4,49 @@
 # Provides actionable guidance when daemon is down
 
 # Try curl first, fall back to PowerShell for Windows environments without curl
+HEALTH_OK=false
 if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
-  echo '{"additionalContext": "Memory system healthy."}'
-  exit 0
+  HEALTH_OK=true
 elif command -v powershell.exe &>/dev/null && \
      powershell.exe -Command "(Invoke-WebRequest -Uri 'http://localhost:3848/health' -UseBasicParsing -TimeoutSec 5).Content" 2>/dev/null | grep -q "healthy"; then
-  echo '{"additionalContext": "Memory system healthy."}'
+  HEALTH_OK=true
+fi
+
+if [ "$HEALTH_OK" = true ]; then
+  # Health OK - try to get richer status data from /status endpoint
+  STATUS_JSON=""
+  if command -v curl &>/dev/null; then
+    STATUS_JSON=$(curl -s "http://localhost:3848/status" 2>/dev/null)
+  elif command -v powershell.exe &>/dev/null; then
+    STATUS_JSON=$(powershell.exe -Command "(Invoke-WebRequest -Uri 'http://localhost:3848/status' -UseBasicParsing -TimeoutSec 5).Content" 2>/dev/null)
+  fi
+
+  if [ -n "$STATUS_JSON" ] && command -v python3 &>/dev/null; then
+    STATUS_SUMMARY=$(python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    c = d.get('counts', {})
+    parts = [f\"{c.get('memories',0)} memories, {c.get('entities',0)} entities, {c.get('patterns',0)} active patterns.\"]
+    comp = d.get('components', {})
+    es = comp.get('embeddings', 'ok')
+    if es in ('unavailable', 'error'):
+        parts.append(f\"WARNING: Embeddings component is '{es}'. Semantic search may not work.\")
+    if d.get('embedding_model_mismatch', False):
+        parts.append('WARNING: Embedding model mismatch detected. Consider running /diagnose.')
+    print(' '.join(parts))
+except Exception:
+    pass
+" <<< "$STATUS_JSON" 2>/dev/null)
+  fi
+
+  if [ -n "$STATUS_SUMMARY" ]; then
+    # Escape for JSON
+    STATUS_SUMMARY_ESC=$(echo "$STATUS_SUMMARY" | sed 's/"/\\"/g')
+    echo "{\"additionalContext\": \"Memory system healthy. $STATUS_SUMMARY_ESC\"}"
+  else
+    echo '{"additionalContext": "Memory system healthy."}'
+  fi
   exit 0
 fi
 

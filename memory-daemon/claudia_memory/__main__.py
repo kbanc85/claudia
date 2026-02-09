@@ -13,6 +13,7 @@ import hashlib
 import logging
 import os
 import signal
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -182,6 +183,16 @@ def main():
         action="store_true",
         help="Generate embeddings for all memories that don't have them yet, then exit",
     )
+    parser.add_argument(
+        "--migrate-embeddings",
+        action="store_true",
+        help="Migrate embeddings to a new model/dimensions (drop and recreate vec0 tables, re-embed all data)",
+    )
+    parser.add_argument(
+        "--backup",
+        action="store_true",
+        help="Create a database backup and exit",
+    )
 
     args = parser.parse_args()
 
@@ -232,6 +243,21 @@ def main():
 
         db = get_db()
         db.initialize()
+        config = get_config()
+
+        # Fail fast if dimensions mismatch (user needs --migrate-embeddings instead)
+        stored_dims = db.execute(
+            "SELECT value FROM _meta WHERE key = 'embedding_dimensions'",
+            fetch=True,
+        )
+        if stored_dims and int(stored_dims[0]["value"]) != config.embedding_dimensions:
+            print(
+                f"Error: Dimension mismatch detected. "
+                f"Database has {stored_dims[0]['value']}D embeddings, "
+                f"config specifies {config.embedding_dimensions}D. "
+                f"Run --migrate-embeddings first."
+            )
+            sys.exit(1)
 
         # Find memories not in the memory_embeddings table
         missing = db.execute(
@@ -256,11 +282,10 @@ def main():
         for i, row in enumerate(missing, 1):
             embedding = svc.embed_sync(row["content"])
             if embedding:
-                import struct
-                blob = struct.pack(f"{len(embedding)}f", *embedding)
+                import json as _json
                 db.execute(
                     "INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
-                    (row["id"], blob),
+                    (row["id"], _json.dumps(embedding)),
                 )
                 success += 1
             else:
@@ -268,7 +293,290 @@ def main():
             if i % 10 == 0 or i == len(missing):
                 print(f"  Progress: {i}/{len(missing)} (success={success}, failed={failed})")
 
+        # Update stored embedding model to match current config (clears mismatch warning)
+        db.execute(
+            "INSERT OR REPLACE INTO _meta (key, value) VALUES ('embedding_model', ?)",
+            (svc.model,),
+        )
+
         print(f"Backfill complete: {success} embedded, {failed} failed, {len(missing)} total.")
+        return
+
+    if args.migrate_embeddings:
+        # Full embedding migration: change model and/or dimensions
+        setup_logging(debug=args.debug)
+        import json as _json
+
+        from .database import Database
+        from .embeddings import get_embedding_service
+
+        db = get_db()
+        db.initialize()
+        config = get_config()
+        svc = get_embedding_service()
+
+        new_model = config.embedding_model
+        new_dim = config.embedding_dimensions
+
+        # Read current state from _meta
+        old_model_row = db.execute(
+            "SELECT value FROM _meta WHERE key = 'embedding_model'",
+            fetch=True,
+        )
+        old_dims_row = db.execute(
+            "SELECT value FROM _meta WHERE key = 'embedding_dimensions'",
+            fetch=True,
+        )
+        old_model = old_model_row[0]["value"] if old_model_row else "unknown"
+        old_dim = int(old_dims_row[0]["value"]) if old_dims_row else 384
+
+        if old_model == new_model and old_dim == new_dim:
+            print(f"Already using {new_model} ({new_dim}D). Nothing to migrate.")
+            return
+
+        # Pre-flight: verify Ollama is running and model is available
+        if not svc.is_available_sync():
+            print(f"Error: Ollama is not available or model '{new_model}' not found.")
+            print(f"Start Ollama and pull the model: ollama pull {new_model}")
+            sys.exit(1)
+
+        # Count embeddings across all tables
+        embedding_counts = {}
+        for table, pk in Database.VEC0_TABLES:
+            try:
+                rows = db.execute(f"SELECT COUNT(*) as cnt FROM {table}", fetch=True)
+                embedding_counts[table] = rows[0]["cnt"] if rows else 0
+            except Exception:
+                embedding_counts[table] = 0
+        total_embeddings = sum(embedding_counts.values())
+
+        # Show migration summary
+        print(f"\nEmbedding Migration")
+        print(f"  Current: {old_model} ({old_dim}D)")
+        print(f"  Target:  {new_model} ({new_dim}D)")
+        print(f"  Embeddings to regenerate: {total_embeddings}")
+        print()
+
+        # Count source data to re-embed
+        mem_count_rows = db.execute(
+            "SELECT COUNT(*) as cnt FROM memories WHERE deleted_at IS NULL",
+            fetch=True,
+        )
+        ent_count_rows = db.execute(
+            "SELECT COUNT(*) as cnt FROM entities WHERE deleted_at IS NULL",
+            fetch=True,
+        )
+        ep_count_rows = db.execute(
+            "SELECT COUNT(*) as cnt FROM episodes WHERE summary IS NOT NULL AND summary != ''",
+            fetch=True,
+        )
+        msg_count_rows = db.execute(
+            "SELECT COUNT(*) as cnt FROM messages",
+            fetch=True,
+        )
+        ref_count_rows = db.execute(
+            "SELECT COUNT(*) as cnt FROM reflections",
+            fetch=True,
+        )
+        mem_count = mem_count_rows[0]["cnt"] if mem_count_rows else 0
+        ent_count = ent_count_rows[0]["cnt"] if ent_count_rows else 0
+        ep_count = ep_count_rows[0]["cnt"] if ep_count_rows else 0
+        msg_count = msg_count_rows[0]["cnt"] if msg_count_rows else 0
+        ref_count = ref_count_rows[0]["cnt"] if ref_count_rows else 0
+        total_to_embed = mem_count + ent_count + ep_count + msg_count + ref_count
+
+        print(f"  Source data to re-embed:")
+        print(f"    Memories:    {mem_count}")
+        print(f"    Entities:    {ent_count}")
+        print(f"    Episodes:    {ep_count}")
+        print(f"    Messages:    {msg_count}")
+        print(f"    Reflections: {ref_count}")
+        print(f"    Total:       {total_to_embed}")
+        print()
+
+        # Pre-flight: verify sqlite-vec is available
+        try:
+            db.execute("SELECT vec_version()", fetch=True)
+        except Exception:
+            print("Error: sqlite-vec extension not available. Cannot migrate embeddings.")
+            print("Install with: pip install sqlite-vec")
+            sys.exit(1)
+
+        # Confirmation
+        confirm = input("Proceed with migration? (y/N): ").strip().lower()
+        if confirm != "y":
+            print("Migration cancelled.")
+            return
+
+        # Step 1: Backup
+        print("\nStep 1/4: Creating backup...")
+        backup_path = db.backup()
+        print(f"  Backup at: {backup_path}")
+
+        # Step 2: Drop and recreate vec0 tables with new dimensions
+        print("\nStep 2/4: Recreating vector tables...")
+        with db.transaction() as conn:
+            for table, pk in Database.VEC0_TABLES:
+                try:
+                    conn.execute(f"DROP TABLE IF EXISTS {table}")
+                    conn.execute(f"""
+                        CREATE VIRTUAL TABLE {table} USING vec0(
+                            {pk} INTEGER PRIMARY KEY,
+                            embedding FLOAT[{new_dim}]
+                        )
+                    """)
+                    print(f"  Recreated {table} ({new_dim}D)")
+                except sqlite3.OperationalError as e:
+                    if "no such module: vec0" in str(e):
+                        print(f"  Warning: sqlite-vec not available, skipping {table}")
+                    else:
+                        print(f"  Error recreating {table}: {e}")
+                        print("Aborting. Restore from backup to recover.")
+                        sys.exit(1)
+
+        # Step 3: Re-embed everything
+        print("\nStep 3/4: Re-embedding all data...")
+        results = {}
+
+        # 3a. Memory embeddings (largest, most important)
+        if mem_count > 0:
+            memories = db.execute(
+                "SELECT id, content FROM memories WHERE deleted_at IS NULL",
+                fetch=True,
+            )
+            success = 0
+            for i, row in enumerate(memories or [], 1):
+                embedding = svc.embed_sync(row["content"])
+                if embedding:
+                    db.execute(
+                        "INSERT INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
+                        (row["id"], _json.dumps(embedding)),
+                    )
+                    success += 1
+                if i % 25 == 0 or i == mem_count:
+                    print(f"  Memories:    {i}/{mem_count}")
+            results["memories"] = success
+        else:
+            results["memories"] = 0
+
+        # 3b. Entity embeddings
+        if ent_count > 0:
+            entities = db.execute(
+                "SELECT id, name, description FROM entities WHERE deleted_at IS NULL",
+                fetch=True,
+            )
+            success = 0
+            for i, row in enumerate(entities or [], 1):
+                text = f"{row['name']}: {row['description'] or ''}"
+                embedding = svc.embed_sync(text)
+                if embedding:
+                    db.execute(
+                        "INSERT INTO entity_embeddings (entity_id, embedding) VALUES (?, ?)",
+                        (row["id"], _json.dumps(embedding)),
+                    )
+                    success += 1
+                if i % 25 == 0 or i == ent_count:
+                    print(f"  Entities:    {i}/{ent_count}")
+            results["entities"] = success
+        else:
+            results["entities"] = 0
+
+        # 3c. Episode embeddings (from summaries)
+        if ep_count > 0:
+            episodes = db.execute(
+                "SELECT id, summary FROM episodes WHERE summary IS NOT NULL AND summary != ''",
+                fetch=True,
+            )
+            success = 0
+            for i, row in enumerate(episodes or [], 1):
+                embedding = svc.embed_sync(row["summary"])
+                if embedding:
+                    db.execute(
+                        "INSERT INTO episode_embeddings (episode_id, embedding) VALUES (?, ?)",
+                        (row["id"], _json.dumps(embedding)),
+                    )
+                    success += 1
+                if i % 25 == 0 or i == ep_count:
+                    print(f"  Episodes:    {i}/{ep_count}")
+            results["episodes"] = success
+        else:
+            results["episodes"] = 0
+
+        # 3d. Message embeddings
+        if msg_count > 0:
+            messages = db.execute(
+                "SELECT id, content FROM messages",
+                fetch=True,
+            )
+            success = 0
+            for i, row in enumerate(messages or [], 1):
+                embedding = svc.embed_sync(row["content"])
+                if embedding:
+                    db.execute(
+                        "INSERT INTO message_embeddings (message_id, embedding) VALUES (?, ?)",
+                        (row["id"], _json.dumps(embedding)),
+                    )
+                    success += 1
+                if i % 25 == 0 or i == msg_count:
+                    print(f"  Messages:    {i}/{msg_count}")
+            results["messages"] = success
+        else:
+            results["messages"] = 0
+
+        # 3e. Reflection embeddings
+        if ref_count > 0:
+            reflections = db.execute(
+                "SELECT id, content FROM reflections",
+                fetch=True,
+            )
+            success = 0
+            for i, row in enumerate(reflections or [], 1):
+                embedding = svc.embed_sync(row["content"])
+                if embedding:
+                    db.execute(
+                        "INSERT INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)",
+                        (row["id"], _json.dumps(embedding)),
+                    )
+                    success += 1
+                if i % 25 == 0 or i == ref_count:
+                    print(f"  Reflections: {i}/{ref_count}")
+            results["reflections"] = success
+        else:
+            results["reflections"] = 0
+
+        # Step 4: Update _meta
+        print("\nStep 4/4: Updating metadata...")
+        db.execute(
+            "INSERT OR REPLACE INTO _meta (key, value) VALUES ('embedding_model', ?)",
+            (new_model,),
+        )
+        db.execute(
+            "INSERT OR REPLACE INTO _meta (key, value) VALUES ('embedding_dimensions', ?)",
+            (str(new_dim),),
+        )
+
+        # Clear embedding cache (old-dimension entries)
+        svc._cache.clear()
+        svc._model_mismatch = False
+
+        # Summary
+        print(f"\nMigration complete:")
+        print(f"  Model: {new_model} ({new_dim}D)")
+        print(f"  Memories re-embedded:    {results['memories']}/{mem_count}")
+        print(f"  Entities re-embedded:    {results['entities']}/{ent_count}")
+        print(f"  Episodes re-embedded:    {results['episodes']}/{ep_count}")
+        print(f"  Messages re-embedded:    {results['messages']}/{msg_count}")
+        print(f"  Reflections re-embedded: {results['reflections']}/{ref_count}")
+        print(f"  Backup at: {backup_path}")
+        print(f"\n  To rollback: restore the backup file.")
+        return
+
+    if args.backup:
+        setup_logging(debug=args.debug)
+        db = get_db()
+        db.initialize()
+        backup_path = db.backup()
+        print(f"Backup created: {backup_path}")
         return
 
     # Run the daemon
