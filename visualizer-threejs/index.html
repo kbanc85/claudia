@@ -10,69 +10,99 @@
   <!-- Three.js container -->
   <div id="graph-container"></div>
 
+  <!-- Hover tooltip (follows cursor) -->
+  <div id="tooltip" class="hidden">
+    <div id="tooltip-name"></div>
+    <div id="tooltip-type"></div>
+    <div id="tooltip-meta"></div>
+  </div>
+
   <!-- Top HUD bar -->
   <div id="hud-bar">
-    <div id="hud-title">
+    <div id="hud-left">
       <img src="/assets/claudia-logo.png" alt="Claudia" class="hud-logo" />
-      <span>Claudia Brain</span>
+      <span class="hud-brand">Claudia Brain</span>
       <span id="activity-pulse" class="pulse"></span>
     </div>
     <div id="hud-stats">
-      <div class="stat"><span id="stat-entities">0</span> entities</div>
-      <div class="stat"><span id="stat-memories">0</span> memories</div>
-      <div class="stat"><span id="stat-patterns">0</span> patterns</div>
-      <div class="stat"><span id="stat-relationships">0</span> relationships</div>
+      <div class="stat"><span id="stat-entities">0</span><label>entities</label></div>
+      <div class="stat"><span id="stat-memories">0</span><label>memories</label></div>
+      <div class="stat"><span id="stat-patterns">0</span><label>patterns</label></div>
+      <div class="stat"><span id="stat-relationships">0</span><label>relationships</label></div>
     </div>
     <div id="hud-controls">
-      <a href="https://github.com/kbanc85/claudia" target="_blank" rel="noopener"
-         class="hud-github" title="View on GitHub">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-        </svg>
-      </a>
       <div id="db-selector-container">
         <select id="db-selector" title="Select Database">
           <option value="">Loading...</option>
         </select>
       </div>
-      <span id="fps-counter">-- FPS</span>
-      <span id="engine-info">Three.js</span>
       <div id="settings-container">
         <button id="settings-btn" title="Quality Settings">&#x2699;</button>
         <div id="settings-panel" class="hidden">
           <div class="settings-title">Quality</div>
-          <label class="settings-option"><input type="radio" name="quality" value="low"><span>Low</span><span class="settings-desc">No bloom, no particles</span></label>
-          <label class="settings-option"><input type="radio" name="quality" value="medium"><span>Medium</span><span class="settings-desc">Bloom, particles</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="low"><span>Low</span><span class="settings-desc">No bloom</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="medium"><span>Medium</span><span class="settings-desc">Bloom + particles</span></label>
           <label class="settings-option"><input type="radio" name="quality" value="high" checked><span>High</span><span class="settings-desc">Full effects</span></label>
-          <label class="settings-option"><input type="radio" name="quality" value="ultra"><span>Ultra</span><span class="settings-desc">Full-res, max glow</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="ultra"><span>Ultra</span><span class="settings-desc">Max glow</span></label>
+          <div class="settings-divider"></div>
+          <div class="settings-title">Resolution</div>
+          <label class="settings-option"><input type="radio" name="resolution" value="0"><span>Auto</span><span class="settings-desc">Device default</span></label>
+          <label class="settings-option"><input type="radio" name="resolution" value="0.5"><span>0.5x</span><span class="settings-desc">Performance</span></label>
+          <label class="settings-option"><input type="radio" name="resolution" value="1"><span>1x</span><span class="settings-desc">Balanced</span></label>
+          <label class="settings-option"><input type="radio" name="resolution" value="1.5"><span>1.5x</span><span class="settings-desc">Crisp</span></label>
+          <label class="settings-option"><input type="radio" name="resolution" value="2" ><span>2x</span><span class="settings-desc">Retina</span></label>
+          <div class="settings-divider"></div>
+          <div class="settings-meta">
+            <span id="fps-counter">-- FPS</span>
+            <span id="engine-info">Three.js</span>
+            <a href="https://github.com/kbanc85/claudia" target="_blank" rel="noopener" class="hud-github" title="View on GitHub">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Left sidebar -->
-  <div id="sidebar">
+  <!-- Sidebar (collapsible overlay) -->
+  <div id="sidebar" class="collapsed">
+    <div id="sidebar-header">
+      <span class="sidebar-title">Filters</span>
+      <button id="sidebar-close" title="Close (S)">&times;</button>
+    </div>
     <div id="search-container">
-      <input type="text" id="search-input" placeholder="Search entities & memories..." autocomplete="off">
+      <input type="text" id="search-input" placeholder="Search... ( / )" autocomplete="off">
       <div id="search-results"></div>
     </div>
     <div id="filters">
-      <h3>Node Types</h3>
+      <h3>Entity Types</h3>
       <div id="type-filters"></div>
       <h3>Memory Types</h3>
       <div id="memory-filters"></div>
     </div>
-    <div id="legend"></div>
+    <div id="legend">
+      <h3>Shapes</h3>
+    </div>
   </div>
+
+  <!-- Sidebar toggle button (always visible) -->
+  <button id="sidebar-toggle" title="Filters (S)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>
+    </svg>
+  </button>
 
   <!-- Right detail panel (slides in on node click) -->
   <div id="detail-panel" class="hidden">
-    <button id="detail-close">&times;</button>
+    <button id="detail-close" title="Close (Esc)">&times;</button>
     <div id="detail-content"></div>
   </div>
 
   <!-- Bottom timeline -->
   <div id="timeline-container">
+    <div id="timeline-density"></div>
     <div id="timeline-bar">
       <input type="range" id="timeline-slider" min="0" max="100" value="100">
       <div id="timeline-labels">
@@ -85,7 +115,14 @@
       <button id="timeline-play" title="Play/Pause">&#9654;</button>
       <button id="timeline-speed" title="Speed">1x</button>
     </div>
-    <div id="timeline-density"></div>
+  </div>
+
+  <!-- Keyboard hints (shown briefly on first load) -->
+  <div id="keyboard-hints" class="hidden">
+    <div class="hint"><kbd>S</kbd> Filters</div>
+    <div class="hint"><kbd>/</kbd> Search</div>
+    <div class="hint"><kbd>H</kbd> Design</div>
+    <div class="hint"><kbd>Esc</kbd> Clear</div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

@@ -1,7 +1,7 @@
 /**
  * Claudia Brain Visualizer — Theme Definitions
  *
- * Five distinct visual themes with complete color palettes.
+ * Ten distinct visual themes with complete color palettes.
  * Use applyTheme(themeName) to apply a theme to the config.
  */
 
@@ -292,6 +292,347 @@ export const themes = {
       strength: 1.3,
       radius: 0.7,
       threshold: 0.35
+    }
+  },
+
+  noirSignal: {
+    name: 'Noir Signal',
+    description: 'High-contrast black with a single hot accent',
+    background: '#0a0a0a',
+    entityColors: {
+      person: '#f5f0e8',
+      organization: '#b8b0a4',
+      project: '#d44030',
+      concept: '#8c8478',
+      location: '#c8c0b4'
+    },
+    memoryColors: {
+      fact: '#d8d0c4',
+      commitment: '#d44030',
+      learning: '#b8b0a4',
+      observation: '#a8a098',
+      preference: '#f5f0e8',
+      pattern: '#8c8478'
+    },
+    linkColors: {
+      relationship: '#3a3632',
+      memoryEntity: '#2a2622',
+      memoryEntityAlpha: 0.05,
+      highlighted: '#d44030',
+      particle: '#5a5248',
+      particleHighlight: '#d44030',
+      historical: '#1a1816'
+    },
+    lighting: {
+      ambient: { color: '#1a1816', intensity: 0.9 },
+      key: { color: '#f5f0e8', intensity: 0.7, position: [150, 250, 150] },
+      fill: { color: '#8c8478', intensity: 0.25, position: [-200, -150, 200] },
+      accent: { color: '#d44030', intensity: 0.35, position: [0, 100, -200] }
+    },
+    fog: {
+      color: '#0a0a0a',
+      density: 0.0005
+    },
+    ambientParticles: {
+      color: '#2a2622'
+    },
+    nodes: {
+      emissiveIntensity: 0.6,
+      glowSize: 4,
+      glowIntensity: 0.2,
+      patternColor: '#8c8478',
+      patternEmissive: '#5a5248'
+    },
+    nebula: {
+      enabled: false,
+      colors: {
+        core: 'rgba(20, 18, 16, 0.15)',
+        mid1: 'rgba(15, 13, 12, 0.08)',
+        mid2: 'rgba(10, 10, 10, 0.04)',
+        edge: 'rgba(10, 10, 10, 0)'
+      },
+      spots: []
+    },
+    bloom: {
+      strength: 0.6,
+      radius: 0.4,
+      threshold: 0.3
+    },
+    starfield: {
+      opacity: 0.15,
+      brightnessMax: 0.3
+    }
+  },
+
+  arcticCommand: {
+    name: 'Arctic Command',
+    description: 'Cool blue-white military ops center',
+    background: '#060d14',
+    entityColors: {
+      person: '#e0f0ff',
+      organization: '#5ba4d4',
+      project: '#00d4ff',
+      concept: '#7890a8',
+      location: '#90c8e0'
+    },
+    memoryColors: {
+      fact: '#b0c8d8',
+      commitment: '#ff6070',
+      learning: '#60d0a0',
+      observation: '#7ab8d8',
+      preference: '#e0f0ff',
+      pattern: '#5890a8'
+    },
+    linkColors: {
+      relationship: '#1a3848',
+      memoryEntity: '#0e2838',
+      memoryEntityAlpha: 0.06,
+      highlighted: '#00d4ff',
+      particle: '#2a5868',
+      particleHighlight: '#00d4ff',
+      historical: '#0a1820'
+    },
+    lighting: {
+      ambient: { color: '#0c1a28', intensity: 0.85 },
+      key: { color: '#b0d8f0', intensity: 0.9, position: [150, 250, 150] },
+      fill: { color: '#5ba4d4', intensity: 0.35, position: [-200, -150, 200] },
+      accent: { color: '#00d4ff', intensity: 0.3, position: [0, 100, -200] }
+    },
+    fog: {
+      color: '#060d14',
+      density: 0.0009
+    },
+    ambientParticles: {
+      color: '#1a3848'
+    },
+    nodes: {
+      patternColor: '#5890a8',
+      patternEmissive: '#2a4858'
+    },
+    nebula: {
+      enabled: true,
+      colors: {
+        core: 'rgba(10, 30, 50, 0.35)',
+        mid1: 'rgba(8, 20, 35, 0.2)',
+        mid2: 'rgba(6, 14, 24, 0.1)',
+        edge: 'rgba(6, 13, 20, 0)'
+      },
+      spots: [
+        { x: 170, y: 200, r: 80, color: '30, 70, 100', alpha: 0.1 },
+        { x: 340, y: 280, r: 65, color: '0, 100, 140', alpha: 0.08 },
+        { x: 230, y: 150, r: 50, color: '50, 90, 120', alpha: 0.06 }
+      ]
+    },
+    bloom: {
+      strength: 1.0,
+      radius: 0.6,
+      threshold: 0.2
+    }
+  },
+
+  synthWave: {
+    name: 'Synth Wave',
+    description: 'Retro-futuristic neon pink and cyan',
+    background: '#0d0015',
+    entityColors: {
+      person: '#ff2a8a',
+      organization: '#00e5ff',
+      project: '#b040ff',
+      concept: '#ffe040',
+      location: '#ff7050'
+    },
+    memoryColors: {
+      fact: '#e0c0ff',
+      commitment: '#ff2a8a',
+      learning: '#00e5ff',
+      observation: '#b080ff',
+      preference: '#ffe040',
+      pattern: '#8040c0'
+    },
+    linkColors: {
+      relationship: '#3a1050',
+      memoryEntity: '#280840',
+      memoryEntityAlpha: 0.07,
+      highlighted: '#ff2a8a',
+      particle: '#6030a0',
+      particleHighlight: '#00e5ff',
+      historical: '#1a0828'
+    },
+    lighting: {
+      ambient: { color: '#18002a', intensity: 0.8 },
+      key: { color: '#ff2a8a', intensity: 1.0, position: [150, 250, 150] },
+      fill: { color: '#00e5ff', intensity: 0.5, position: [-200, -150, 200] },
+      accent: { color: '#b040ff', intensity: 0.4, position: [0, 100, -200] }
+    },
+    fog: {
+      color: '#0d0015',
+      density: 0.0007
+    },
+    ambientParticles: {
+      color: '#4020a0'
+    },
+    nodes: {
+      patternColor: '#8040c0',
+      patternEmissive: '#5020a0'
+    },
+    nebula: {
+      enabled: true,
+      colors: {
+        core: 'rgba(40, 10, 60, 0.4)',
+        mid1: 'rgba(25, 5, 40, 0.25)',
+        mid2: 'rgba(15, 3, 25, 0.12)',
+        edge: 'rgba(13, 0, 21, 0)'
+      },
+      spots: [
+        { x: 160, y: 220, r: 85, color: '180, 40, 120', alpha: 0.15 },
+        { x: 330, y: 270, r: 70, color: '0, 120, 180', alpha: 0.12 },
+        { x: 240, y: 140, r: 55, color: '140, 50, 200', alpha: 0.1 }
+      ]
+    },
+    bloom: {
+      strength: 1.6,
+      radius: 0.85,
+      threshold: 0.15
+    },
+    starfield: {
+      opacity: 0.5,
+      brightnessMax: 0.8
+    }
+  },
+
+  copperPatina: {
+    name: 'Copper Patina',
+    description: 'Warm industrial copper and oxidized teal',
+    background: '#0c0a08',
+    entityColors: {
+      person: '#e8a050',
+      organization: '#c08030',
+      project: '#40a098',
+      concept: '#f0dcc0',
+      location: '#d0a868'
+    },
+    memoryColors: {
+      fact: '#d8c8a8',
+      commitment: '#d05838',
+      learning: '#50b0a0',
+      observation: '#c8a870',
+      preference: '#e8a050',
+      pattern: '#70988c'
+    },
+    linkColors: {
+      relationship: '#3a2e20',
+      memoryEntity: '#2a2018',
+      memoryEntityAlpha: 0.06,
+      highlighted: '#e8a050',
+      particle: '#5a4830',
+      particleHighlight: '#40a098',
+      historical: '#1a1410'
+    },
+    lighting: {
+      ambient: { color: '#201810', intensity: 0.8 },
+      key: { color: '#e8a050', intensity: 0.9, position: [150, 250, 150] },
+      fill: { color: '#40a098', intensity: 0.35, position: [-200, -150, 200] },
+      accent: { color: '#c08030', intensity: 0.3, position: [0, 100, -200] }
+    },
+    fog: {
+      color: '#0c0a08',
+      density: 0.0008
+    },
+    ambientParticles: {
+      color: '#3a2e20'
+    },
+    nodes: {
+      patternColor: '#70988c',
+      patternEmissive: '#406058'
+    },
+    nebula: {
+      enabled: true,
+      colors: {
+        core: 'rgba(40, 28, 15, 0.35)',
+        mid1: 'rgba(28, 20, 10, 0.2)',
+        mid2: 'rgba(18, 14, 8, 0.1)',
+        edge: 'rgba(12, 10, 8, 0)'
+      },
+      spots: [
+        { x: 180, y: 210, r: 80, color: '160, 100, 40', alpha: 0.12 },
+        { x: 320, y: 290, r: 65, color: '50, 120, 110', alpha: 0.1 },
+        { x: 240, y: 150, r: 50, color: '180, 120, 50', alpha: 0.08 }
+      ]
+    },
+    bloom: {
+      strength: 0.9,
+      radius: 0.6,
+      threshold: 0.25
+    }
+  },
+
+  phosphorTerminal: {
+    name: 'Phosphor Terminal',
+    description: 'Green-on-black CRT monitor glow',
+    background: '#020804',
+    entityColors: {
+      person: '#30ff60',
+      organization: '#20c848',
+      project: '#d0a020',
+      concept: '#18a040',
+      location: '#60e870'
+    },
+    memoryColors: {
+      fact: '#40d060',
+      commitment: '#d0a020',
+      learning: '#28e850',
+      observation: '#38c058',
+      preference: '#30ff60',
+      pattern: '#188830'
+    },
+    linkColors: {
+      relationship: '#0a3010',
+      memoryEntity: '#082008',
+      memoryEntityAlpha: 0.06,
+      highlighted: '#30ff60',
+      particle: '#104018',
+      particleHighlight: '#30ff60',
+      historical: '#041808'
+    },
+    lighting: {
+      ambient: { color: '#041808', intensity: 0.7 },
+      key: { color: '#30ff60', intensity: 0.8, position: [150, 250, 150] },
+      fill: { color: '#20c848', intensity: 0.3, position: [-200, -150, 200] },
+      accent: { color: '#d0a020', intensity: 0.25, position: [0, 100, -200] }
+    },
+    fog: {
+      color: '#020804',
+      density: 0.0012
+    },
+    ambientParticles: {
+      color: '#0a3010'
+    },
+    nodes: {
+      patternColor: '#188830',
+      patternEmissive: '#105020'
+    },
+    nebula: {
+      enabled: true,
+      colors: {
+        core: 'rgba(8, 30, 12, 0.3)',
+        mid1: 'rgba(5, 20, 8, 0.18)',
+        mid2: 'rgba(3, 12, 5, 0.08)',
+        edge: 'rgba(2, 8, 4, 0)'
+      },
+      spots: [
+        { x: 170, y: 200, r: 75, color: '20, 120, 40', alpha: 0.1 },
+        { x: 330, y: 280, r: 60, color: '30, 160, 50', alpha: 0.08 },
+        { x: 230, y: 160, r: 50, color: '160, 120, 20', alpha: 0.06 }
+      ]
+    },
+    bloom: {
+      strength: 1.5,
+      radius: 0.8,
+      threshold: 0.18
+    },
+    starfield: {
+      opacity: 0.2,
+      brightnessMax: 0.4
     }
   },
 

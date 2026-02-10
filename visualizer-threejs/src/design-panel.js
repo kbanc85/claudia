@@ -233,6 +233,16 @@ export function initDesignPanel(onUpdate) {
   linksFolder.add(config.links, 'highlightRadius', 1, 3, 0.1).name('Highlight Multiplier').onChange(() => update('links.highlightRadius'));
   linksFolder.add(config.links, 'opacity', 0, 0.5, 0.01).name('Opacity').onChange(() => update('links.opacity'));
   linksFolder.add(config.links, 'highlightOpacity', 0.3, 1, 0.05).name('Highlight Opacity').onChange(() => update('links.highlightOpacity'));
+
+  // Edge bundling subfolder
+  const bundlingFolder = linksFolder.addFolder('Edge Bundling');
+  bundlingFolder.add(config.links.bundling, 'enabled').name('Enabled').onChange(() => update('links.bundling.enabled'));
+  bundlingFolder.add(config.links.bundling, 'strength', 0, 1, 0.05).name('Strength').onChange(() => update('links.bundling.strength'));
+  bundlingFolder.add(config.links.bundling, 'radius', 10, 150, 5).name('Radius').onChange(() => update('links.bundling.radius'));
+  bundlingFolder.add(config.links.bundling, 'iterations', 1, 8, 1).name('Iterations').onChange(() => update('links.bundling.iterations'));
+  bundlingFolder.add(config.links.bundling, 'endpointStiffness', 0, 1, 0.05).name('Endpoint Stiffness').onChange(() => update('links.bundling.endpointStiffness'));
+  bundlingFolder.close();
+
   linksFolder.close();
 
   // ── Particles ──────────────────────────────────────────────
@@ -333,6 +343,17 @@ export function initDesignPanel(onUpdate) {
   qualityFolder.add(config.quality, 'current', ['low', 'medium', 'high', 'ultra'])
     .name('Preset')
     .onChange(() => update('quality.current'));
+
+  // Resolution scale
+  const resOptions = { 'Auto': 0, '0.5x': 0.5, '1x': 1, '1.5x': 1.5, '2x': 2 };
+  const resState = { current: Object.keys(resOptions).find(k => resOptions[k] === config.resolution.scale) || 'Auto' };
+  qualityFolder.add(resState, 'current', Object.keys(resOptions))
+    .name('Resolution')
+    .onChange((label) => {
+      config.resolution.scale = resOptions[label];
+      update('resolution.scale');
+    });
+
   qualityFolder.close();
 
   // ── Actions ────────────────────────────────────────────────

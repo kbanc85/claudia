@@ -9,53 +9,53 @@
 
 export const config = {
   // ── Theme ──────────────────────────────────────────────────
-  theme: 'midnight',
+  theme: 'monochromePro',
 
   // ── Colors ─────────────────────────────────────────────────
-  background: '#050510',
+  background: '#09090b',
 
   entityColors: {
-    person: '#fbbf24',
-    organization: '#60a5fa',
-    project: '#34d399',
-    concept: '#c084fc',
-    location: '#fb923c'
+    person: '#ffce7a',
+    organization: '#94c8ff',
+    project: '#6bffe1',
+    concept: '#ffffff',
+    location: '#d494ff'
   },
 
   memoryColors: {
-    fact: '#e2e8f0',
-    commitment: '#f87171',
-    learning: '#4ade80',
-    observation: '#93c5fd',
-    preference: '#fbbf24',
-    pattern: '#a78bfa'
+    fact: '#e4e4e7',
+    commitment: '#ef4444',
+    learning: '#a1a1aa',
+    observation: '#d4d4d8',
+    preference: '#fafafa',
+    pattern: '#71717a'
   },
 
   linkColors: {
-    relationship: '#8ca0ff',
-    memoryEntity: '#7890ff',
-    memoryEntityAlpha: 0.06,
-    highlighted: '#7dd3fc',
-    particle: '#b4b4ff',
-    particleHighlight: '#7dd3fc',
-    historical: '#ffffff',
+    relationship: '#3f3f46',
+    memoryEntity: '#27272a',
+    memoryEntityAlpha: 0.05,
+    highlighted: '#3b82f6',
+    particle: '#52525b',
+    particleHighlight: '#3b82f6',
+    historical: '#27272a',
     // Per-memory-type link colors (memory-entity links)
     memoryEntityByType: {
-      fact: '#94a3b8',        // Slate (subtle)
-      commitment: '#f87171',  // Red (urgent)
-      learning: '#4ade80',    // Green (growth)
-      observation: '#93c5fd', // Blue (neutral)
-      preference: '#fbbf24',  // Amber (personal)
-      pattern: '#a78bfa'      // Violet (insight)
+      fact: '#94a3b8',
+      commitment: '#f87171',
+      learning: '#4ade80',
+      observation: '#93c5fd',
+      preference: '#fbbf24',
+      pattern: '#a78bfa'
     }
   },
 
   // ── Lighting ───────────────────────────────────────────────
   lighting: {
-    ambient: { color: '#1a1a3e', intensity: 0.8 },
-    key: { color: '#6366f1', intensity: 1.0, position: [150, 250, 150] },
-    fill: { color: '#0ea5e9', intensity: 0.5, position: [-200, -150, 200] },
-    accent: { color: '#f59e0b', intensity: 0.3, position: [0, 100, -200] }
+    ambient: { color: '#18181b', intensity: 1 },
+    key: { color: '#f4f4f5', intensity: 0.8, position: [150, 250, 150] },
+    fill: { color: '#a1a1aa', intensity: 0.3, position: [-200, -150, 200] },
+    accent: { color: '#3b82f6', intensity: 0.2, position: [0, 100, -200] }
   },
 
   // ── Nodes ──────────────────────────────────────────────────
@@ -82,8 +82,8 @@ export const config = {
     memoryMaxOpacity: 0.65,
 
     // Pattern nodes
-    patternColor: '#a78bfa',
-    patternEmissive: '#7c3aed',
+    patternColor: '#71717a',
+    patternEmissive: '#3f3f46',
     patternEmissiveIntensity: 0.5,
     patternOpacity: 0.5
   },
@@ -91,20 +91,35 @@ export const config = {
   // ── Links ──────────────────────────────────────────────────
   links: {
     // Curved tubes (relationships)
-    curvature: 0.15,              // base curvature
+    curvature: 0.09,              // base curvature
     curvatureStrength: 0.1,       // additional curvature per strength
     tubeRadius: 0.15,             // base radius for normal links
-    highlightRadius: 1.5,         // multiplier for highlighted links
+    highlightRadius: 1.3,         // multiplier for highlighted links
     tubularSegments: 20,
     radialSegments: 6,
 
     // Opacity
-    opacity: 0.15,
-    highlightOpacity: 0.7,
+    opacity: 0.27,
+    highlightOpacity: 0.65,
     historicalOpacity: 0.04,
 
     // Memory-entity lines
-    memoryLineAlpha: 0.06
+    memoryLineAlpha: 0.06,
+
+    // Edge bundling
+    bundling: {
+      enabled: true,
+      strength: 0.6,       // how aggressively edges attract (0=off, 1=max)
+      radius: 60,           // max distance for edge attraction
+      iterations: 4,        // bundling passes
+      segments: 5,           // control points per edge
+      endpointStiffness: 0.85  // how much endpoints resist bundling (0=free, 1=pinned)
+    }
+  },
+
+  // ── Resolution ───────────────────────────────────────────────
+  resolution: {
+    scale: 0       // 0 = auto (devicePixelRatio capped at 2), 0.5/1/1.5/2 = manual
   },
 
   // ── Particles ──────────────────────────────────────────────
@@ -172,15 +187,15 @@ export const config = {
 
   // ── Bloom ──────────────────────────────────────────────────
   bloom: {
-    strength: 1.5,
-    radius: 0.8,
-    threshold: 0.3
+    strength: 0.4,
+    radius: 2,
+    threshold: 0.15
   },
 
   // ── Fog ────────────────────────────────────────────────────
   fog: {
-    color: '#050510',
-    density: 0.0008
+    color: '#09090b',
+    density: 0.0006
   },
 
   // ── Ambient Effects ────────────────────────────────────────
@@ -192,7 +207,7 @@ export const config = {
     baseOpacity: 0.12,
     opacityPulse: 0.04,
     opacityPulseSpeed: 0.5,
-    color: '#6366f1',
+    color: '#27272a',
     velocityX: 0.05,
     velocityY: 0.03,
     velocityZ: 0.05,
@@ -209,27 +224,23 @@ export const config = {
     minRadius: 600,
     maxRadius: 1000,
     size: 0.6,
-    opacity: 0.5,
+    opacity: 0.3,
     brightnessMin: 0.3,
-    brightnessMax: 0.8
+    brightnessMax: 0.5
   },
 
   nebula: {
-    enabled: true,
+    enabled: false,
     size: 1500,
     positionZ: -400,
     rotationSpeed: 0.01,
     colors: {
-      core: 'rgba(30, 20, 60, 0.4)',
-      mid1: 'rgba(15, 12, 40, 0.2)',
-      mid2: 'rgba(8, 8, 25, 0.1)',
-      edge: 'rgba(5, 5, 16, 0)'
+      core: 'rgba(20, 20, 22, 0.2)',
+      mid1: 'rgba(15, 15, 17, 0.1)',
+      mid2: 'rgba(10, 10, 12, 0.05)',
+      edge: 'rgba(9, 9, 11, 0)'
     },
-    spots: [
-      { x: 150, y: 200, r: 80, color: '60, 50, 140', alpha: 0.15 },
-      { x: 350, y: 300, r: 60, color: '20, 80, 120', alpha: 0.15 },
-      { x: 250, y: 150, r: 50, color: '100, 40, 80', alpha: 0.15 }
-    ]
+    spots: []
   },
 
   // ── Camera ─────────────────────────────────────────────────
@@ -260,8 +271,7 @@ export const config = {
     linkStrengthMemory: 0.4,
     alphaDecay: 0.008,
     velocityDecay: 0.4,
-    warmupTicks: 80,
-    umapScale: 50
+    warmupTicks: 80
   },
 
   // ── Quality Presets ────────────────────────────────────────

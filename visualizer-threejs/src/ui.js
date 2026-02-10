@@ -1,11 +1,12 @@
 /**
  * Claudia Brain — UI overlays
  * Search, type filters, detail panel, timeline scrubber, stats HUD.
+ * Collapsible sidebar, keyboard shortcuts, hover tooltip.
  * Pure DOM code, engine-agnostic. Only import is effects.js for quality settings.
  */
 
 import { setQuality, getQuality } from './effects.js';
-import { config, onConfigUpdate } from './config.js';
+import { config, onConfigUpdate, notifyConfigUpdate } from './config.js';
 
 let graphData = null;
 let activeFilters = { entities: new Set(), memories: new Set() };
@@ -19,6 +20,7 @@ let onFocusNode = null;
 let onFilterNodes = null;
 let onResetFilter = null;
 let onDatabaseSwitch = null;
+let onClearSelection = null;
 
 /**
  * Get current legend colors from config (dynamic, theme-aware)
@@ -36,6 +38,7 @@ export function initUI(data, callbacks) {
   onFilterNodes = callbacks.filterNodes;
   onResetFilter = callbacks.resetFilter;
   onDatabaseSwitch = callbacks.databaseSwitch;
+  onClearSelection = callbacks.clearSelection;
 
   initSearch();
   initFilters();
@@ -43,6 +46,9 @@ export function initUI(data, callbacks) {
   initTimeline();
   initSettings();
   initDatabaseSelector();
+  initSidebar();
+  initKeyboardShortcuts();
+  showKeyboardHints();
 
   // Subscribe to theme changes to update legend colors
   onConfigUpdate((path) => {
@@ -54,6 +60,143 @@ export function initUI(data, callbacks) {
 
 export function setGraphData(data) {
   graphData = data;
+}
+
+// ── Sidebar toggle ─────────────────────────────────────────
+
+function initSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const closeBtn = document.getElementById('sidebar-close');
+
+  if (!sidebar || !toggleBtn) return;
+
+  toggleBtn.addEventListener('click', () => toggleSidebar());
+  if (closeBtn) closeBtn.addEventListener('click', () => closeSidebar());
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  if (!sidebar) return;
+
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  if (isCollapsed) {
+    sidebar.classList.remove('collapsed');
+    toggleBtn?.classList.add('sidebar-open');
+  } else {
+    closeSidebar();
+  }
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  if (!sidebar) return;
+  sidebar.classList.add('collapsed');
+  toggleBtn?.classList.remove('sidebar-open');
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────
+
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Don't intercept when typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+      if (e.key === 'Escape') {
+        e.target.blur();
+      }
+      return;
+    }
+
+    switch (e.key.toLowerCase()) {
+      case 's':
+        e.preventDefault();
+        toggleSidebar();
+        break;
+      case '/':
+        e.preventDefault();
+        openSidebarAndFocusSearch();
+        break;
+      case 'escape':
+        closeDetailPanel();
+        closeSidebar();
+        if (onClearSelection) onClearSelection();
+        break;
+    }
+  });
+}
+
+function openSidebarAndFocusSearch() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const searchInput = document.getElementById('search-input');
+
+  if (sidebar?.classList.contains('collapsed')) {
+    sidebar.classList.remove('collapsed');
+    toggleBtn?.classList.add('sidebar-open');
+  }
+
+  setTimeout(() => searchInput?.focus(), 100);
+}
+
+function showKeyboardHints() {
+  const hints = document.getElementById('keyboard-hints');
+  if (!hints) return;
+
+  // Only show on first visit
+  if (localStorage.getItem('claudia-brain-hints-seen')) return;
+
+  hints.classList.remove('hidden');
+  localStorage.setItem('claudia-brain-hints-seen', '1');
+
+  // Auto-hide after animation completes (4s delay + 0.5s fade)
+  setTimeout(() => hints.classList.add('hidden'), 5000);
+}
+
+// ── Tooltip ────────────────────────────────────────────────
+
+export function showTooltip(node, x, y) {
+  const tooltip = document.getElementById('tooltip');
+  const nameEl = document.getElementById('tooltip-name');
+  const typeEl = document.getElementById('tooltip-type');
+  const metaEl = document.getElementById('tooltip-meta');
+
+  if (!tooltip || !node) return;
+
+  nameEl.textContent = node.name || '';
+  nameEl.style.color = node.color || '';
+
+  typeEl.textContent = node.entityType || node.memoryType || node.nodeType || '';
+
+  // Meta line: importance + access count
+  const parts = [];
+  if (node.importance !== undefined) parts.push('imp ' + node.importance.toFixed(2));
+  if (node.accessCount) parts.push(node.accessCount + ' recalls');
+  if (node.confidence !== undefined) parts.push('conf ' + node.confidence.toFixed(2));
+  metaEl.textContent = parts.join(' \u00B7 ');
+  metaEl.style.display = parts.length > 0 ? '' : 'none';
+
+  // Position tooltip near cursor with offset
+  const offsetX = 14;
+  const offsetY = 14;
+  let left = x + offsetX;
+  let top = y + offsetY;
+
+  // Keep within viewport
+  const tw = 260;
+  const th = 80;
+  if (left + tw > window.innerWidth) left = x - tw - offsetX;
+  if (top + th > window.innerHeight) top = y - th - offsetY;
+
+  tooltip.style.left = left + 'px';
+  tooltip.style.top = top + 'px';
+  tooltip.classList.remove('hidden');
+}
+
+export function hideTooltip() {
+  const tooltip = document.getElementById('tooltip');
+  if (tooltip) tooltip.classList.add('hidden');
 }
 
 // ── Search ──────────────────────────────────────────────────
@@ -80,6 +223,7 @@ function initSearch() {
     if (e.key === 'Escape') {
       input.value = '';
       results.classList.remove('active');
+      input.blur();
     }
   });
 
@@ -101,7 +245,14 @@ function performSearch(query) {
       const desc = (n.description || '').toLowerCase();
       return name.includes(query) || content.includes(query) || desc.includes(query);
     })
-    .sort((a, b) => (b.importance || 0) - (a.importance || 0))
+    .sort((a, b) => {
+      // People always first
+      const aIsPerson = a.entityType === 'person' ? 1 : 0;
+      const bIsPerson = b.entityType === 'person' ? 1 : 0;
+      if (aIsPerson !== bIsPerson) return bIsPerson - aIsPerson;
+      // Within same tier, sort by importance
+      return (b.importance || 0) - (a.importance || 0);
+    })
     .slice(0, 20);
 
   if (matches.length === 0) {
@@ -135,7 +286,7 @@ function performSearch(query) {
       document.getElementById('search-input').value = node.name;
 
       if (node.nodeType === 'entity') {
-        fetch(`/api/entity/${node.dbId}`)
+        fetch('/api/entity/' + node.dbId)
           .then(r => r.json())
           .then(detail => showDetail(node, detail));
       } else {
@@ -161,11 +312,9 @@ function buildFiltersUI() {
   const memoryFilters = document.getElementById('memory-filters');
   const colors = getLegendColors();
 
-  // Clear existing
   entityFilters.replaceChildren();
   memoryFilters.replaceChildren();
 
-  // Initialize active filters if empty
   if (activeFilters.entities.size === 0) {
     for (const type of allEntityTypes) activeFilters.entities.add(type);
   }
@@ -232,8 +381,12 @@ function buildLegend() {
   const legend = document.getElementById('legend');
   const colors = getLegendColors();
 
-  // Clear existing legend items
   legend.replaceChildren();
+
+  // Re-add h3 title
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Shapes';
+  legend.appendChild(h3);
 
   const shapes = [
     { label: 'Person', shape: 'circle', color: colors.person },
@@ -259,7 +412,7 @@ function buildLegend() {
 
     const text = document.createElement('span');
     text.textContent = item.label;
-    text.style.fontSize = '12px';
+    text.style.fontSize = '11px';
     text.style.color = 'var(--text-dim)';
 
     row.appendChild(dot);
@@ -272,9 +425,11 @@ function buildLegend() {
 
 function initDetailPanel() {
   const closeBtn = document.getElementById('detail-close');
-  closeBtn.addEventListener('click', () => {
-    document.getElementById('detail-panel').classList.add('hidden');
-  });
+  closeBtn.addEventListener('click', () => closeDetailPanel());
+}
+
+function closeDetailPanel() {
+  document.getElementById('detail-panel')?.classList.add('hidden');
 }
 
 export function showDetail(node, apiDetail) {
@@ -283,89 +438,161 @@ export function showDetail(node, apiDetail) {
   content.replaceChildren();
   panel.classList.remove('hidden');
 
-  // Header
-  const header = document.createElement('div');
-  header.className = 'detail-header';
+  // Hero header with colored accent bar
+  const hero = document.createElement('div');
+  hero.className = 'detail-hero';
+
+  const accent = document.createElement('div');
+  accent.className = 'detail-hero-accent';
+  accent.style.background = node.color || 'var(--accent)';
 
   const h2 = document.createElement('h2');
   h2.textContent = node.name;
   h2.style.color = node.color;
 
   const typeLabel = document.createElement('div');
-  typeLabel.className = 'detail-type';
+  typeLabel.className = 'detail-hero-type';
   typeLabel.textContent = node.entityType || node.memoryType || node.nodeType;
 
-  header.appendChild(h2);
-  header.appendChild(typeLabel);
-  content.appendChild(header);
+  hero.appendChild(accent);
+  hero.appendChild(h2);
+  hero.appendChild(typeLabel);
+  content.appendChild(hero);
+
+  // Importance arc + stats row
+  if (node.importance !== undefined) {
+    const row = document.createElement('div');
+    row.className = 'detail-importance-row';
+
+    // SVG arc (built with safe DOM methods)
+    const arcDiv = document.createElement('div');
+    arcDiv.className = 'importance-arc';
+
+    const radius = 14;
+    const circumference = 2 * Math.PI * radius;
+    const offset = (1 - node.importance) * circumference;
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 36 36');
+
+    const bgCircle = document.createElementNS(svgNS, 'circle');
+    bgCircle.setAttribute('class', 'importance-arc-bg');
+    bgCircle.setAttribute('cx', '18');
+    bgCircle.setAttribute('cy', '18');
+    bgCircle.setAttribute('r', String(radius));
+
+    const fgCircle = document.createElementNS(svgNS, 'circle');
+    fgCircle.setAttribute('class', 'importance-arc-fg');
+    fgCircle.setAttribute('cx', '18');
+    fgCircle.setAttribute('cy', '18');
+    fgCircle.setAttribute('r', String(radius));
+    fgCircle.setAttribute('stroke-dasharray', String(circumference));
+    fgCircle.setAttribute('stroke-dashoffset', String(offset));
+    fgCircle.style.stroke = node.color || 'var(--accent)';
+
+    svg.appendChild(bgCircle);
+    svg.appendChild(fgCircle);
+    arcDiv.appendChild(svg);
+
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'importance-value';
+    valueSpan.textContent = String(Math.round(node.importance * 100));
+    arcDiv.appendChild(valueSpan);
+
+    const details = document.createElement('div');
+    details.className = 'importance-details';
+
+    const impLabel = document.createElement('span');
+    impLabel.className = 'detail-stat-label';
+    impLabel.textContent = 'Importance';
+    details.appendChild(impLabel);
+
+    if (node.confidence !== undefined) {
+      const confVal = document.createElement('span');
+      confVal.className = 'detail-stat-value';
+      confVal.textContent = 'Conf: ' + node.confidence.toFixed(2);
+      details.appendChild(confVal);
+    }
+
+    if (node.accessCount) {
+      const accessVal = document.createElement('span');
+      accessVal.className = 'detail-stat-value';
+      accessVal.textContent = node.accessCount + ' recalls';
+      details.appendChild(accessVal);
+    }
+
+    row.appendChild(arcDiv);
+    row.appendChild(details);
+    content.appendChild(row);
+  }
 
   // Description
   if (node.description || node.content) {
     const descSection = createSection('Description');
     const descText = document.createElement('div');
     descText.className = 'detail-item';
+    descText.style.cursor = 'default';
     descText.textContent = node.description || node.content;
     descSection.appendChild(descText);
     content.appendChild(descSection);
   }
 
-  // Stats
-  const statsSection = createSection('Properties');
-  if (node.importance !== undefined) {
-    statsSection.appendChild(createStatItem('Importance', node.importance.toFixed(2), node.importance));
-  }
-  if (node.confidence !== undefined) {
-    statsSection.appendChild(createStatItem('Confidence', node.confidence.toFixed(2), node.confidence));
-  }
-  if (node.accessCount !== undefined) {
-    statsSection.appendChild(createStatItem('Recalls', String(node.accessCount)));
-  }
-  if (node.verificationStatus) {
-    statsSection.appendChild(createStatItem('Status', node.verificationStatus));
-  }
-  if (node.createdAt) {
-    statsSection.appendChild(createStatItem('Created', formatDate(node.createdAt)));
-  }
-  if (node.llmImproved) {
-    statsSection.appendChild(createStatItem('Refined', 'LLM-improved'));
-  }
-  content.appendChild(statsSection);
+  // Properties
+  const hasProps = node.verificationStatus || node.createdAt || node.llmImproved;
+  if (hasProps) {
+    const propsSection = createSection('Properties');
 
-  // API detail
+    if (node.verificationStatus) {
+      propsSection.appendChild(createStatRow('Status', node.verificationStatus));
+    }
+    if (node.createdAt) {
+      propsSection.appendChild(createStatRow('Created', formatDate(node.createdAt)));
+    }
+    if (node.llmImproved) {
+      propsSection.appendChild(createStatRow('Refined', 'LLM-improved'));
+    }
+
+    content.appendChild(propsSection);
+  }
+
+  // API detail: relationships as chips
   if (apiDetail) {
     if (apiDetail.relationships?.length > 0) {
-      const relSection = createSection(`Relationships (${apiDetail.relationships.length})`);
+      const relSection = createSection('Relationships (' + apiDetail.relationships.length + ')');
+      const chips = document.createElement('div');
+      chips.className = 'detail-chips';
+
       for (const rel of apiDetail.relationships) {
-        const item = document.createElement('div');
-        item.className = 'detail-item';
+        const chip = document.createElement('div');
+        chip.className = 'detail-chip';
 
-        const name = document.createElement('strong');
-        name.textContent = rel.other_name;
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = rel.other_name;
 
-        const type = document.createElement('span');
-        type.textContent = ` ${rel.relationship_type}`;
-        type.style.color = 'var(--text-dim)';
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'detail-chip-type';
+        typeSpan.textContent = rel.relationship_type;
 
-        const meta = document.createElement('div');
-        meta.className = 'detail-meta';
-        meta.textContent = `strength: ${rel.strength?.toFixed(2)} | ${rel.direction}`;
+        chip.appendChild(nameSpan);
+        chip.appendChild(typeSpan);
 
-        item.appendChild(name);
-        item.appendChild(type);
-        item.appendChild(meta);
+        chip.title = rel.relationship_type + ' \u00B7 strength ' + (rel.strength?.toFixed(2) || '?') + ' \u00B7 ' + rel.direction;
 
-        item.addEventListener('click', () => {
-          const targetNode = graphData?.nodes.find(n => n.id === `entity-${rel.other_id}`);
+        chip.addEventListener('click', () => {
+          const targetNode = graphData?.nodes.find(n => n.id === 'entity-' + rel.other_id);
           if (targetNode && onFocusNode) onFocusNode(targetNode);
         });
 
-        relSection.appendChild(item);
+        chips.appendChild(chip);
       }
+
+      relSection.appendChild(chips);
       content.appendChild(relSection);
     }
 
     if (apiDetail.memories?.length > 0) {
-      const memSection = createSection(`Memories (${apiDetail.memories.length})`);
+      const memSection = createSection('Memories (' + apiDetail.memories.length + ')');
       for (const mem of apiDetail.memories.slice(0, 15)) {
         const item = document.createElement('div');
         item.className = 'detail-item';
@@ -376,15 +603,15 @@ export function showDetail(node, apiDetail) {
         const meta = document.createElement('div');
         meta.className = 'detail-meta';
         const parts = [mem.type];
-        if (mem.importance) parts.push(`imp: ${mem.importance.toFixed(2)}`);
+        if (mem.importance) parts.push('imp: ' + mem.importance.toFixed(2));
         if (mem.relationship) parts.push(mem.relationship);
-        meta.textContent = parts.join(' | ');
+        meta.textContent = parts.join(' \u00B7 ');
 
         item.appendChild(text);
         item.appendChild(meta);
 
         item.addEventListener('click', () => {
-          const memNode = graphData?.nodes.find(n => n.id === `memory-${mem.id}`);
+          const memNode = graphData?.nodes.find(n => n.id === 'memory-' + mem.id);
           if (memNode && onFocusNode) onFocusNode(memNode);
         });
 
@@ -394,10 +621,11 @@ export function showDetail(node, apiDetail) {
     }
 
     if (apiDetail.documents?.length > 0) {
-      const docSection = createSection(`Documents (${apiDetail.documents.length})`);
+      const docSection = createSection('Documents (' + apiDetail.documents.length + ')');
       for (const doc of apiDetail.documents) {
         const item = document.createElement('div');
         item.className = 'detail-item';
+        item.style.cursor = 'default';
 
         const name = document.createElement('div');
         name.textContent = doc.filename;
@@ -406,7 +634,7 @@ export function showDetail(node, apiDetail) {
         meta.className = 'detail-meta';
         const parts = [doc.source_type || 'file', doc.relationship];
         if (doc.storage_path) parts.push(doc.storage_path);
-        meta.textContent = parts.join(' | ');
+        meta.textContent = parts.join(' \u00B7 ');
 
         item.appendChild(name);
         item.appendChild(meta);
@@ -417,10 +645,16 @@ export function showDetail(node, apiDetail) {
 
     if (apiDetail.aliases?.length > 0) {
       const aliasSection = createSection('Also known as');
-      const text = document.createElement('div');
-      text.className = 'detail-item';
-      text.textContent = apiDetail.aliases.map(a => a.alias).join(', ');
-      aliasSection.appendChild(text);
+      const chips = document.createElement('div');
+      chips.className = 'detail-chips';
+      for (const a of apiDetail.aliases) {
+        const chip = document.createElement('div');
+        chip.className = 'detail-chip';
+        chip.style.cursor = 'default';
+        chip.textContent = a.alias;
+        chips.appendChild(chip);
+      }
+      aliasSection.appendChild(chips);
       content.appendChild(aliasSection);
     }
   }
@@ -435,21 +669,21 @@ function createSection(title) {
   return section;
 }
 
-function createStatItem(label, value, barValue) {
-  const item = document.createElement('div');
-  item.className = 'detail-item';
-  const text = document.createElement('span');
-  text.textContent = `${label}: ${value}`;
-  item.appendChild(text);
+function createStatRow(label, value) {
+  const row = document.createElement('div');
+  row.className = 'detail-stat-row';
 
-  if (barValue !== undefined && typeof barValue === 'number') {
-    const bar = document.createElement('span');
-    bar.className = 'importance-bar';
-    bar.style.width = `${Math.round(barValue * 60)}px`;
-    item.appendChild(bar);
-  }
+  const labelEl = document.createElement('span');
+  labelEl.className = 'label';
+  labelEl.textContent = label;
 
-  return item;
+  const valueEl = document.createElement('span');
+  valueEl.className = 'value';
+  valueEl.textContent = value;
+
+  row.appendChild(labelEl);
+  row.appendChild(valueEl);
+  return row;
 }
 
 function formatDate(dateStr) {
@@ -484,8 +718,24 @@ function initSettings() {
   }
 
   const current = getQuality();
-  const currentRadio = panel.querySelector(`input[value="${current}"]`);
+  const currentRadio = panel.querySelector('input[value="' + current + '"]');
   if (currentRadio) currentRadio.checked = true;
+
+  // Resolution radios
+  const resRadios = panel.querySelectorAll('input[name="resolution"]');
+  for (const radio of resRadios) {
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        config.resolution.scale = parseFloat(radio.value);
+        notifyConfigUpdate('resolution.scale');
+      }
+    });
+  }
+
+  // Set current resolution
+  const currentScale = String(config.resolution.scale || 0);
+  const currentResRadio = panel.querySelector('input[name="resolution"][value="' + currentScale + '"]');
+  if (currentResRadio) currentResRadio.checked = true;
 }
 
 // ── Database selector ────────────────────────────────────────
@@ -511,11 +761,11 @@ async function initDatabaseSelector() {
     for (const db of data.databases) {
       const opt = document.createElement('option');
       opt.value = db.path;
-      opt.textContent = db.label + (db.isCurrent ? ' ●' : '');
+      opt.textContent = db.label + (db.isCurrent ? ' \u25CF' : '');
       if (db.isCurrent) {
         opt.selected = true;
         if (db.entityCount !== null) {
-          opt.textContent = `${db.label} (${db.entityCount})`;
+          opt.textContent = db.label + ' (' + db.entityCount + ')';
         }
       }
       selector.appendChild(opt);
@@ -536,17 +786,13 @@ async function initDatabaseSelector() {
         const result = await switchResponse.json();
 
         if (result.success) {
-          // Refresh the selector to show new current
           await initDatabaseSelector();
-          // Notify main.js to reload graph
           if (onDatabaseSwitch) onDatabaseSwitch();
         } else {
           console.error('Failed to switch database:', result.error);
-          alert('Failed to switch database: ' + result.error);
         }
       } catch (err) {
         console.error('Database switch error:', err);
-        alert('Error switching database');
       } finally {
         selector.disabled = false;
       }
@@ -624,14 +870,14 @@ function drawDensityHistogram(events) {
 
   for (let i = 0; i < bucketCount; i++) {
     const bar = document.createElement('div');
-    bar.style.cssText = `
-      display: inline-block;
-      width: ${100 / bucketCount}%;
-      height: ${(buckets[i] / maxCount) * 16}px;
-      background: var(--accent);
-      opacity: ${0.2 + (buckets[i] / maxCount) * 0.6};
-      vertical-align: bottom;
-    `;
+    const heightPx = (buckets[i] / maxCount) * 14;
+    const opacity = 0.15 + (buckets[i] / maxCount) * 0.5;
+    bar.style.display = 'inline-block';
+    bar.style.width = (100 / bucketCount) + '%';
+    bar.style.height = heightPx + 'px';
+    bar.style.background = 'var(--accent)';
+    bar.style.opacity = String(opacity);
+    bar.style.verticalAlign = 'bottom';
     container.appendChild(bar);
   }
 }
@@ -697,6 +943,6 @@ function initTimeline() {
     const speeds = [1, 2, 5, 10];
     const idx = (speeds.indexOf(speed) + 1) % speeds.length;
     speed = speeds[idx];
-    speedBtn.textContent = `${speed}x`;
+    speedBtn.textContent = speed + 'x';
   });
 }

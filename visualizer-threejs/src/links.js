@@ -79,16 +79,29 @@ export function updateLinks(links, nodePositions, highlightSet, scene) {
       // Add particles for this link
       const particleCount = getParticleCount(link, isHighlighted);
       for (let i = 0; i < particleCount; i++) {
+        // For bidirectional links, alternate forward/reverse particles
+        const isReverse = link.bidirectional && (i % 2 === 1);
+        const baseColor = isHighlighted
+          ? new THREE.Color(config.linkColors.particleHighlight)
+          : new THREE.Color(config.linkColors.particle);
+
+        // Reverse particles are slightly dimmer
+        if (isReverse) baseColor.multiplyScalar(0.6);
+
         particleData.push({
           linkId: link.id,
-          t: Math.random(), // position along curve (0-1)
+          t: Math.random(),
           speed: config.particles.speed + Math.random() * config.particles.speedVariance,
-          color: isHighlighted
-            ? new THREE.Color(config.linkColors.particleHighlight)
-            : new THREE.Color(config.linkColors.particle)
+          reverse: isReverse,
+          color: baseColor
         });
       }
     }
+  }
+
+  // Edge bundling pass (runs once after all curves are created)
+  if (config.links.bundling?.enabled && relationshipMeshes.length > 1) {
+    bundleEdges(relationshipMeshes, scene);
   }
 
   // Create memory lines mesh
@@ -192,10 +205,14 @@ function createCurvedLink(link, start, end, isHighlighted) {
 
 function getParticleCount(link, isHighlighted) {
   const { particles: pCfg } = config;
-  if (isHighlighted) return pCfg.highlightCount;
-  if (link.direction === 'forward') return pCfg.forwardCount;
-  if ((link.strength || 0) > pCfg.strongThreshold) return pCfg.strongCount;
-  return 0;
+  let count = 0;
+  if (isHighlighted) count = pCfg.highlightCount;
+  else if (link.direction === 'forward') count = pCfg.forwardCount;
+  else if ((link.strength || 0) > pCfg.strongThreshold) count = pCfg.strongCount;
+
+  // Bidirectional links need particles in both directions
+  if (link.bidirectional && count > 0) count *= 2;
+  return count;
 }
 
 // ── Particle system creation ────────────────────────────────
@@ -250,9 +267,14 @@ export function updateParticles(elapsed) {
 
     if (!curve) continue;
 
-    // Move along curve
-    p.t += p.speed;
-    if (p.t > 1) p.t -= 1;
+    // Move along curve (reverse particles flow backwards)
+    if (p.reverse) {
+      p.t -= p.speed;
+      if (p.t < 0) p.t += 1;
+    } else {
+      p.t += p.speed;
+      if (p.t > 1) p.t -= 1;
+    }
 
     // Get position on curve
     const point = curve.getPointAt(p.t);
@@ -272,6 +294,111 @@ export function updateLinkPositions(links, nodePositions, highlightSet, scene, a
     updateLinks(links, nodePositions, highlightSet, scene);
   }
   lastAlpha = alpha;
+}
+
+// ── Edge bundling (FDEB-inspired) ───────────────────────────
+
+function bundleEdges(meshes, scene) {
+  const bundleCfg = config.links.bundling;
+  const numSegments = bundleCfg.segments;
+  const strength = bundleCfg.strength;
+  const radius = bundleCfg.radius;
+  const iterations = bundleCfg.iterations;
+  const stiffness = bundleCfg.endpointStiffness;
+
+  // 1. Sample control points from each edge's existing curve
+  const edgePoints = [];
+  for (const mesh of meshes) {
+    const curve = mesh.userData.curve;
+    if (!curve) continue;
+
+    const points = [];
+    // Include start and end plus interior control points
+    for (let i = 0; i <= numSegments + 1; i++) {
+      const t = i / (numSegments + 1);
+      points.push(curve.getPointAt(t));
+    }
+    edgePoints.push({ mesh, points, link: mesh.userData.link });
+  }
+
+  // 2. Iteratively attract nearby control points
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let ei = 0; ei < edgePoints.length; ei++) {
+      const edgeA = edgePoints[ei];
+
+      for (let pi = 1; pi <= numSegments; pi++) {
+        const pointA = edgeA.points[pi];
+
+        // Endpoint stiffness: points near start/end resist more
+        const tNorm = pi / (numSegments + 1);
+        const endpointFactor = 1 - stiffness * (1 - 4 * Math.pow(tNorm - 0.5, 2));
+
+        // Attract toward nearby control points from other edges
+        let forceX = 0, forceY = 0, forceZ = 0;
+        let neighbors = 0;
+
+        for (let ej = 0; ej < edgePoints.length; ej++) {
+          if (ei === ej) continue;
+          const edgeB = edgePoints[ej];
+
+          // Check corresponding control point (same relative position)
+          const pointB = edgeB.points[pi];
+          const dx = pointB.x - pointA.x;
+          const dy = pointB.y - pointA.y;
+          const dz = pointB.z - pointA.z;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+          if (dist < radius && dist > 0.01) {
+            // Attraction force: inverse distance, capped
+            const force = strength * Math.min(1, radius / (dist + 1));
+            forceX += dx * force / dist;
+            forceY += dy * force / dist;
+            forceZ += dz * force / dist;
+            neighbors++;
+          }
+        }
+
+        if (neighbors > 0) {
+          const scale = endpointFactor / neighbors;
+          pointA.x += forceX * scale;
+          pointA.y += forceY * scale;
+          pointA.z += forceZ * scale;
+        }
+      }
+    }
+  }
+
+  // 3. Replace tube geometry with CatmullRom curves through bundled points
+  for (const edge of edgePoints) {
+    const { mesh, points, link } = edge;
+    const { links: linkCfg } = config;
+
+    // Create smooth CatmullRom curve through bundled control points
+    const catmull = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.5);
+
+    // Determine radius (same logic as createCurvedLink)
+    const isHighlighted = mesh.material.opacity > linkCfg.opacity;
+    const tubeRadius = isHighlighted
+      ? (link.width || 0.5) * linkCfg.highlightRadius
+      : Math.max(linkCfg.tubeRadius, (link.width || 0.4) * 0.5);
+
+    // Replace geometry
+    const oldGeometry = mesh.geometry;
+    mesh.geometry = new THREE.TubeGeometry(
+      catmull,
+      linkCfg.tubularSegments + numSegments, // more segments for smoother bundled curve
+      tubeRadius,
+      linkCfg.radialSegments,
+      false
+    );
+    oldGeometry.dispose();
+
+    // Update curve reference for particles
+    mesh.userData.curve = catmull;
+    if (link.id) {
+      linkCurves.set(link.id, catmull);
+    }
+  }
 }
 
 // ── Helper to parse color strings ───────────────────────────

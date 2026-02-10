@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.36.0 (2026-02-10)
+
+### Brain Visualizer V1
+
+The 3D brain visualizer gets four upgrades that make dense graphs readable, search smarter, and the visual experience more customizable.
+
+#### Added
+- **Edge bundling** - Tightly interconnected clusters (e.g., YPO Forum V+) now render bundled "highway" edges instead of spaghetti. Uses force-directed edge bundling (FDEB) as a post-processing pass after simulation settles. Configurable strength, radius, and endpoint stiffness via design panel.
+- **5 new dark themes** - Noir Signal (high-contrast black + crimson), Arctic Command (cool blue-white ops center), Synth Wave (retro neon pink/cyan), Copper Patina (warm industrial copper/teal), Phosphor Terminal (green-on-black CRT). Now 10 themes total.
+- **Resolution picker** - Control render resolution via settings gear or design panel. Options: Auto (device default), 0.5x (performance), 1x, 1.5x, 2x (retina). Useful for HiDPI tradeoffs or screen recording at specific resolutions.
+- **Search prioritizes people** - People entities now always appear before other types in search results, sorted by importance within each tier.
+
+---
+
 ## 1.35.2 (2026-02-09)
 
 ### Fix: Embedding Migration Column Name

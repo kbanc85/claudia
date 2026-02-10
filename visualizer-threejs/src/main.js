@@ -61,7 +61,9 @@ import {
   updateStats,
   showDetail,
   updateTimeline,
-  setGraphData
+  setGraphData,
+  showTooltip,
+  hideTooltip
 } from './ui.js';
 
 let renderer = null;
@@ -150,7 +152,8 @@ async function init() {
       focusNode: handleFocusNode,
       filterNodes: filterNodes,
       resetFilter: resetFilter,
-      databaseSwitch: handleDatabaseSwitch
+      databaseSwitch: handleDatabaseSwitch,
+      clearSelection: clearSelection
     });
 
     // Node picking
@@ -161,6 +164,9 @@ async function init() {
 
     // Start render loop (owned, not library-controlled)
     animate();
+
+    // Apply resolution scale
+    applyResolutionScale();
 
     // Handle resize
     window.addEventListener('resize', handleResize);
@@ -346,6 +352,8 @@ function onPointerClick(event) {
   }
 }
 
+let hoveredNode = null;
+
 function onPointerMove(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -361,7 +369,31 @@ function onPointerMove(event) {
   }
 
   const intersects = raycaster.intersectObjects(meshes, false);
-  renderer.domElement.style.cursor = intersects.length > 0 ? 'pointer' : 'default';
+
+  if (intersects.length > 0) {
+    renderer.domElement.style.cursor = 'pointer';
+
+    // Find the node from the hit mesh
+    let parent = intersects[0].object.parent;
+    while (parent && !parent.userData?.node) {
+      parent = parent.parent;
+    }
+
+    const node = parent?.userData?.node;
+    if (node && node !== hoveredNode) {
+      hoveredNode = node;
+      showTooltip(node, event.clientX, event.clientY);
+    } else if (node === hoveredNode) {
+      // Update position while hovering same node
+      showTooltip(node, event.clientX, event.clientY);
+    }
+  } else {
+    renderer.domElement.style.cursor = 'default';
+    if (hoveredNode) {
+      hoveredNode = null;
+      hideTooltip();
+    }
+  }
 }
 
 function handleNodeClick(node) {
@@ -564,6 +596,16 @@ function handleConfigUpdate(changedPath) {
     // Particle changes need link rebuild to re-create particle system
     syncPositions();
   }
+
+  // Edge bundling
+  if (changedPath.startsWith('links.bundling')) {
+    syncPositions();
+  }
+
+  // Resolution
+  if (changedPath.startsWith('resolution') || changedPath === '*') {
+    applyResolutionScale();
+  }
 }
 
 // ── Resize handler ──────────────────────────────────────────
@@ -572,9 +614,18 @@ function handleResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  applyResolutionScale();
   if (bloomComposer) {
     bloomComposer.setSize(window.innerWidth, window.innerHeight);
   }
+}
+
+// ── Resolution scale ─────────────────────────────────────────
+
+function applyResolutionScale() {
+  if (!renderer) return;
+  const scale = config.resolution.scale || Math.min(window.devicePixelRatio, 2);
+  renderer.setPixelRatio(scale);
 }
 
 // ── Stats refresh ───────────────────────────────────────────
