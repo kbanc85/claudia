@@ -323,19 +323,22 @@ function bundleEdges(meshes, scene) {
 
   // 2. Iteratively attract nearby control points
   for (let iter = 0; iter < iterations; iter++) {
+    // Decreasing step size per iteration for convergence
+    const iterScale = 1 / (iter + 1);
+
     for (let ei = 0; ei < edgePoints.length; ei++) {
       const edgeA = edgePoints[ei];
 
       for (let pi = 1; pi <= numSegments; pi++) {
         const pointA = edgeA.points[pi];
 
-        // Endpoint stiffness: points near start/end resist more
+        // Endpoint stiffness: middle points move freely, endpoints resist
+        // At t=0.5 (middle): factor=1.0, at t=0 or t=1 (endpoints): factor=1-stiffness
         const tNorm = pi / (numSegments + 1);
-        const endpointFactor = 1 - stiffness * (1 - 4 * Math.pow(tNorm - 0.5, 2));
+        const endpointFactor = 1 - stiffness * 4 * Math.pow(tNorm - 0.5, 2);
 
         // Attract toward nearby control points from other edges
         let forceX = 0, forceY = 0, forceZ = 0;
-        let neighbors = 0;
 
         for (let ej = 0; ej < edgePoints.length; ej++) {
           if (ei === ej) continue;
@@ -349,21 +352,20 @@ function bundleEdges(meshes, scene) {
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
           if (dist < radius && dist > 0.01) {
-            // Attraction force: inverse distance, capped
-            const force = strength * Math.min(1, radius / (dist + 1));
+            // Attraction force: stronger for closer edges (inverse square falloff)
+            const t = dist / radius;
+            const force = strength * (1 - t * t);
             forceX += dx * force / dist;
             forceY += dy * force / dist;
             forceZ += dz * force / dist;
-            neighbors++;
           }
         }
 
-        if (neighbors > 0) {
-          const scale = endpointFactor / neighbors;
-          pointA.x += forceX * scale;
-          pointA.y += forceY * scale;
-          pointA.z += forceZ * scale;
-        }
+        // Apply accumulated force (not averaged -- more neighbors = stronger bundling)
+        const scale = endpointFactor * iterScale * 0.3;
+        pointA.x += forceX * scale;
+        pointA.y += forceY * scale;
+        pointA.z += forceZ * scale;
       }
     }
   }

@@ -412,13 +412,15 @@ async function main() {
     runGatewaySetup((gatewayOk) => maybeRunRelay(memoryInstalled, visualizerInstalled, gatewayOk));
   }
 
-  // Helper: auto-install visualizer after memory (if memory was installed), then chain to gateway
+  // Helper: auto-install visualizer after memory, then chain to gateway
+  // On upgrades, always attempt visualizer install even if memory step had issues,
+  // since the database likely already exists from a prior install.
   function maybeRunVisualizer(memoryInstalled) {
-    if (memoryInstalled) {
-      // Visualizer auto-installs when memory is installed (needs the database)
+    const memoryDbExists = existsSync(join(homedir(), '.claudia', 'memory'));
+    if (memoryInstalled || isUpgrade || memoryDbExists) {
       runVisualizerSetup((vizOk) => maybeRunGateway(memoryInstalled, vizOk));
     } else {
-      // Skip visualizer if no memory system
+      // Fresh install with no memory system -- skip visualizer
       maybeRunGateway(memoryInstalled, false);
     }
   }

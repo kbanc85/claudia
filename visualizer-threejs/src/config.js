@@ -94,13 +94,13 @@ export const config = {
     curvature: 0.09,              // base curvature
     curvatureStrength: 0.1,       // additional curvature per strength
     tubeRadius: 0.15,             // base radius for normal links
-    highlightRadius: 1.3,         // multiplier for highlighted links
+    highlightRadius: 0.8,         // multiplier for highlighted links
     tubularSegments: 20,
     radialSegments: 6,
 
     // Opacity
     opacity: 0.27,
-    highlightOpacity: 0.65,
+    highlightOpacity: 0.45,
     historicalOpacity: 0.04,
 
     // Memory-entity lines
@@ -128,7 +128,7 @@ export const config = {
     speedVariance: 0.001,
     size: 2.5,
     opacity: 0.8,
-    highlightCount: 6,
+    highlightCount: 3,
     forwardCount: 2,
     strongCount: 1,
     strongThreshold: 0.6
