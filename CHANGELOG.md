@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.36.1 (2026-02-10)
+
+### Fix: Edge Bundling & Highlight Intensity
+
+#### Fixed
+- Edge bundling algorithm: inverted endpoint stiffness (middle points now move most), force averaging that killed dense clusters (accumulated instead), flat force falloff (now inverse-square)
+- Highlight intensity toned down: radius 1.3 to 0.8, opacity 0.65 to 0.45, particle count 6 to 3
+- Installer now attempts visualizer install on upgrades even if memory step had issues
+
+---
+
 ## 1.36.0 (2026-02-10)
 
 ### Brain Visualizer V1
