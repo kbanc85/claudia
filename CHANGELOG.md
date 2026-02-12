@@ -2,6 +2,39 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.37.0 (2026-02-12)
+
+### The Proactive Intelligence Upgrade
+
+Claudia now thinks ahead. She tracks deadlines, notices when relationships are cooling, syncs her memory to an Obsidian vault, and generates visual dashboards you can browse in Obsidian's graph view.
+
+#### Added
+- **Temporal intelligence** - Memories now carry deadline and temporal marker metadata. New `memory.upcoming`, `memory.since`, and `memory.timeline` MCP tools let Claudia surface what's due, what happened recently, and full chronological views.
+- **Contact velocity tracking** - Entities track `last_contact_at`, `contact_frequency_days`, and `contact_trend` (accelerating/stable/decelerating/stale). New `memory.reconnections` tool surfaces relationships that need attention.
+- **Attention tiers** - Entities are automatically classified into inner_circle, active, peripheral, or dormant based on contact patterns. Consolidation updates tiers nightly.
+- **Obsidian vault sync** - Every entity becomes a markdown note with `[[wikilinks]]` in `~/.claudia/vault/`. Obsidian's graph view acts as a relationship visualizer. Sync runs nightly and on-demand.
+- **Canvas generation** - Relationship maps, morning brief dashboards, and project boards generated as `.canvas` files for Obsidian. Canvas preservation ensures manual edits survive re-generation.
+- **Vault edit import** - New `memory.import_vault_edits` tool detects when you've edited vault markdown files and syncs changes back into the memory database.
+- **Project health tool** - New `memory.project_health` surfaces stale projects and at-risk deliverables.
+- **Temporal extraction** - `extraction/temporal.py` parses natural language deadlines ("by Friday", "end of Q1") into ISO dates with confidence scores.
+
+#### Changed
+- **Installer streamlined** - Replaced visualizer setup with Obsidian vault detection. Install is now 2 phases (memory daemon + Obsidian vault) instead of 4.
+- **Skills updated** - Commitment detector, relationship tracker, risk surfacer, morning brief, and vault awareness skills all leverage the new temporal and contact velocity data.
+- **Consolidation enhanced** - Three new sub-steps: surge approaching deadlines, update contact velocity, update attention tiers. Each wrapped in independent try-except for resilience.
+
+#### Database
+- Migration 17: `deadline_at` and `temporal_markers` columns on memories table
+- Migration 18: `last_contact_at`, `contact_frequency_days`, `contact_trend`, `attention_tier` columns on entities table
+- Both migrations are purely additive with duplicate-column guards. Existing databases upgrade safely.
+
+#### Stats
+- 436 tests pass, 5 skipped, 0 regressions
+- 6 new test files covering temporal extraction, temporal recall, vault sync, canvas preservation, and consolidation v2
+- Install: `npx get-claudia`
+
+---
+
 ## 1.36.1 (2026-02-10)
 
 ### Fix: Edge Bundling & Highlight Intensity
