@@ -18,6 +18,7 @@ from ..services.consolidate import (
     run_decay,
     run_full_consolidation,
 )
+from ..services.vault_sync import run_vault_sync
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,16 @@ class MemoryScheduler:
             name="Full overnight consolidation",
             replace_existing=True,
         )
+
+        # Daily at 3:15am: Vault sync (after consolidation)
+        if self.config.vault_sync_enabled:
+            self.scheduler.add_job(
+                self._run_vault_sync,
+                CronTrigger(hour=3, minute=15),
+                id="vault_sync",
+                name="Obsidian vault sync",
+                replace_existing=True,
+            )
 
         self.scheduler.start()
         self._started = True
@@ -116,6 +127,25 @@ class MemoryScheduler:
             logger.info(f"Full consolidation complete: {result}")
         except Exception as e:
             logger.exception("Error in full consolidation")
+
+    def _run_vault_sync(self) -> None:
+        """Run Obsidian vault sync + canvas regeneration"""
+        try:
+            logger.info("Running vault sync")
+            from ..config import _project_id
+            from ..services.vault_sync import get_vault_path
+            from ..services.canvas_generator import CanvasGenerator
+
+            result = run_vault_sync(project_id=_project_id)
+            logger.info(f"Vault sync complete: {result}")
+
+            # Regenerate canvases after sync
+            vault_path = get_vault_path(_project_id)
+            gen = CanvasGenerator(vault_path)
+            canvas_result = gen.generate_all()
+            logger.info(f"Canvas regeneration complete: {canvas_result}")
+        except Exception as e:
+            logger.exception("Error in vault sync")
 
 
 # Global scheduler instance

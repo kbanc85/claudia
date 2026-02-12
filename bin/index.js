@@ -566,8 +566,8 @@ ${line}
   ${bc}Zero-Prompt Install${r}  ${d}Everything installs automatically.${r}
                        ${d}No questions, smart defaults, graceful fallbacks.${r}
 
-  ${bc}Gateway Auto-Setup${r}   ${d}Messaging gateway installs with everything.${r}
-                       ${d}Configure tokens at your own pace.${r}
+  ${bc}Obsidian Vault${r}       ${d}Memory syncs to ~/.claudia/vault/ as markdown.${r}
+                       ${d}Open in Obsidian for graph view and search.${r}
 
   ${bc}Document Storage${r}     ${d}Files, transcripts, and emails are stored${r}
                        ${d}and linked to people and memories.${r}

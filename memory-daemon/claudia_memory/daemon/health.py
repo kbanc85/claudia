@@ -102,6 +102,24 @@ def build_status_report(*, db=None) -> dict:
     except Exception:
         report["components"]["embeddings"] = "error"
 
+    # Vault sync status
+    try:
+        from ..services.vault_sync import get_vault_path, get_vault_sync_service
+        from ..config import _project_id
+        vault_path = get_vault_path(_project_id)
+        if vault_path.exists():
+            svc = get_vault_sync_service(_project_id, db=_db if '_db' in dir() else None)
+            vault_status = svc.get_status()
+            report["vault"] = {
+                "path": str(vault_path),
+                "synced": vault_status.get("synced", False),
+                "last_sync": vault_status.get("last_sync"),
+            }
+        else:
+            report["vault"] = {"path": str(vault_path), "synced": False}
+    except Exception:
+        report["vault"] = {"synced": False, "error": "unable to check"}
+
     # Scheduler check
     try:
         scheduler = get_scheduler()

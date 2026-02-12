@@ -78,6 +78,10 @@ class MemoryConfig:
     turn_buffer_retention_days: int = 60
     metrics_retention_days: int = 90
 
+    # Vault sync settings (Obsidian integration)
+    vault_base_dir: Path = field(default_factory=lambda: Path.home() / ".claudia" / "vault")
+    vault_sync_enabled: bool = True
+
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
 
@@ -143,6 +147,10 @@ class MemoryConfig:
                     config.metrics_retention_days = data["metrics_retention_days"]
                 if "log_path" in data:
                     config.log_path = Path(data["log_path"])
+                if "vault_base_dir" in data:
+                    config.vault_base_dir = Path(data["vault_base_dir"])
+                if "vault_sync_enabled" in data:
+                    config.vault_sync_enabled = data["vault_sync_enabled"]
 
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Could not load config from {config_path}: {e}. Using defaults.")
@@ -236,6 +244,8 @@ class MemoryConfig:
             "turn_buffer_retention_days": self.turn_buffer_retention_days,
             "metrics_retention_days": self.metrics_retention_days,
             "log_path": str(self.log_path),
+            "vault_base_dir": str(self.vault_base_dir),
+            "vault_sync_enabled": self.vault_sync_enabled,
         }
 
         with open(config_path, "w") as f:

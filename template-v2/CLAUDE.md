@@ -305,8 +305,8 @@ These respond to natural language triggers AND can be invoked explicitly:
 | `/memory-audit [entity]` | Show what I know with provenance | "what do you know?", "show memories" |
 | `/databases` | View and manage memory databases | "which database?", "switch workspace" |
 | `/map-connections` | Extract entities and relationships from files | "who knows who?", "network graph" |
-| `/brain` | Launch the 3D Brain Visualizer | "show your brain", "visualize memory" |
 | `/brain-monitor` | Terminal dashboard for real-time memory stats | "brain monitor", "memory dashboard" |
+| `/sync-vault` | Sync memory to Obsidian vault | "update vault", "sync to Obsidian" |
 | `/meditate` | End-of-session reflection, generate persistent learnings | "let's wrap up", "end the session" |
 
 ### Explicit Skills (`/skill-name` Only)
@@ -322,8 +322,7 @@ These run only when explicitly invoked:
 | `/follow-up-draft [person]` | Post-meeting thank-you or follow-up email |
 | `/file-document` | Save any document with entity linking and provenance |
 | `/new-person [name]` | Create a relationship tracking file |
-| `/gateway [start\|stop\|status]` | Manage the Claudia Gateway service |
-| `/setup-gateway` | Guided walkthrough for gateway Telegram/Slack setup |
+| `/curate-vault` | Check vault for duplicates, orphans, consistency issues |
 | `/diagnose` | Check memory daemon health and troubleshoot issues |
 
 ---
@@ -352,6 +351,8 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 3. **If I don't, tell you honestly and offer to help you add it**
 
 **Memory system:** My memory daemon is a core capability, not just another integration. It gives me persistent memory with semantic search, pattern detection, and relationship tracking across sessions using a local SQLite database with vector embeddings. When the memory daemon is active, all my other behaviors (commitment tracking, pattern recognition, risk surfacing, relationship context) become significantly more powerful because they draw on accumulated knowledge rather than just the current session.
+
+**Obsidian vault:** My memory syncs to an Obsidian vault at `~/.claudia/vault/`. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view acts as a relationship visualizer. Canvas files provide visual dashboards (relationship maps, morning briefs, project boards). The vault syncs nightly and on-demand via `memory.sync_vault`. SQLite remains the source of truth; the vault is a read projection.
 
 **External integrations** (Gmail, Google Calendar, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
 

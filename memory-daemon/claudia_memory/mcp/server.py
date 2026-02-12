@@ -1190,6 +1190,59 @@ async def list_tools() -> ListToolsResult:
                 "properties": {},
             },
         ),
+        Tool(
+            name="memory.sync_vault",
+            description=(
+                "Sync memory data to the Obsidian vault. Exports entities, relationships, "
+                "patterns, reflections, and sessions as markdown notes with [[wikilinks]]. "
+                "Use 'full' mode for a complete rebuild or default incremental mode for "
+                "changes since last sync."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "full": {
+                        "type": "boolean",
+                        "description": "If true, do a full rebuild. Otherwise incremental (default).",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.vault_status",
+            description=(
+                "Get the status of the Obsidian vault sync: last sync time, file counts, "
+                "and vault path. Use this to check if the vault is up to date."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="memory.generate_canvas",
+            description=(
+                "Generate an Obsidian canvas file. Types: 'relationship_map' (entity graph), "
+                "'morning_brief' (daily dashboard), 'project_board' (project-specific view, "
+                "requires project_name), 'all' (generate all standard canvases)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "canvas_type": {
+                        "type": "string",
+                        "enum": ["relationship_map", "morning_brief", "project_board", "all"],
+                        "description": "Type of canvas to generate",
+                    },
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name (required for project_board type)",
+                    },
+                },
+                "required": ["canvas_type"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -2136,6 +2189,76 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                         text=json.dumps(report, indent=2),
                     )
                 ]
+            )
+
+        elif name == "memory.sync_vault":
+            from ..config import _project_id
+            from ..services.vault_sync import run_vault_sync
+            full = arguments.get("full", False)
+            result = run_vault_sync(project_id=_project_id, full=full)
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"success": True, **result}),
+                    )
+                ]
+            )
+
+        elif name == "memory.vault_status":
+            from ..config import _project_id
+            from ..services.vault_sync import get_vault_sync_service
+            svc = get_vault_sync_service(_project_id)
+            status = svc.get_status()
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(status, indent=2),
+                    )
+                ]
+            )
+
+        elif name == "memory.generate_canvas":
+            from ..config import _project_id
+            from ..services.vault_sync import get_vault_path
+            from ..services.canvas_generator import CanvasGenerator
+            vault_path = get_vault_path(_project_id)
+            gen = CanvasGenerator(vault_path)
+            canvas_type = arguments["canvas_type"]
+
+            if canvas_type == "all":
+                result = gen.generate_all()
+            elif canvas_type == "relationship_map":
+                path = gen.generate_relationship_map()
+                result = {"relationship_map": {"path": str(path), "status": "ok"}}
+            elif canvas_type == "morning_brief":
+                path = gen.generate_morning_brief()
+                result = {"morning_brief": {"path": str(path), "status": "ok"}}
+            elif canvas_type == "project_board":
+                project_name = arguments.get("project_name")
+                if not project_name:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(
+                            {"error": "project_name is required for project_board"}
+                        ))],
+                        isError=True,
+                    )
+                path = gen.generate_project_board(project_name)
+                if path:
+                    result = {"project_board": {"path": str(path), "status": "ok"}}
+                else:
+                    result = {"project_board": {"status": "not_found", "error": f"Project '{project_name}' not found"}}
+            else:
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(
+                        {"error": f"Unknown canvas type: {canvas_type}"}
+                    ))],
+                    isError=True,
+                )
+
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
             )
 
         else:

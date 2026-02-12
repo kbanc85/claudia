@@ -12,11 +12,11 @@ Claudia is an agentic executive assistant framework that runs on Claude Code. It
 Both layers are core to how Claudia works. The template layer defines *who* Claudia is. The memory system defines *what she remembers*.
 
 This repository also contains:
-- `gateway/` - Multi-channel messaging bridge (Telegram, Slack) with Anthropic/Ollama provider auto-detection and native tool_use for LLM-driven memory access
-- `relay/` - Telegram bot that spawns full `claude -p` agent sessions (Grammy + Claude Code subprocess)
-- `visualizer-threejs/` - 3D brain visualization (Three.js + D3-Force-3D) with live parameter controls
+- `docs/` - Design plans and internal docs
 - `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package, no tests -- pure markdown)
 - `template/` - Legacy template (deprecated)
+
+Previously included gateway, relay, and visualizer directories were archived to the `archive/pre-obsidian` branch and replaced by the Obsidian vault integration.
 
 For full architectural diagrams and pipeline explanations, see `ARCHITECTURE.md`.
 
@@ -163,68 +163,6 @@ if current_version < N:
 
 Also add integrity checks in `_check_migration_integrity()` if the migration adds columns that could fail silently (e.g., ALTER TABLE on a table that might not exist).
 
-### Working on the Gateway
-
-```bash
-cd gateway
-npm install
-npm test                               # Node --test runner
-npm start                              # Start server
-```
-
-Key files:
-- `src/config.js` - Config management, provider detection, `toolUse`/`toolUseMaxIterations`/`preRecall` defaults
-- `src/bridge.js` - Core bridge: Anthropic/Ollama routing, tool_use loop, MCP integration
-- `src/tools.js` - ToolManager: dynamic MCP schema loading, Anthropic/Ollama format conversion, exposed tool filtering
-- `src/personality.js` - Claudia personality loading from template files
-- `src/router.js` - Message routing, session management, auth enforcement
-- `src/server.js` - Express HTTP server
-
-**Tool use architecture:** The gateway exposes 14 of 32+ MCP memory tools to the LLM via native API tool_use. `ToolManager` fetches schemas from the daemon at startup via `listTools()`, filters to a curated safe subset, and converts to provider-specific formats. The tool loop in `bridge.js` (`_callAnthropicWithTools` / `_callOllamaWithTools`) runs up to `toolUseMaxIterations` (default 5) rounds, with `_executeToolCall()` as the single safety chokepoint that rejects non-exposed tools and auto-injects `source_channel` on write operations.
-
-**Exposed tools (14):** `memory.recall`, `memory.about`, `memory.remember`, `memory.relate`, `memory.entity`, `memory.search_entities`, `memory.batch`, `memory.correct`, `memory.invalidate`, `memory.trace`, `memory.reflections`, `memory.project_network`, `memory.find_path`, `memory.briefing`
-
-**Never exposed:** Destructive/admin tools (`memory.purge`, `memory.merge_entities`, `memory.delete_entity`), session lifecycle tools (`memory.buffer_turn`, `memory.end_session`), and internal tools (`memory.consolidate`, `memory.system_health`, etc.)
-
-**Config resolution for `toolUse`:** per-channel override (explicit boolean) > global `toolUse` config > auto-detect by provider (enabled for Anthropic, disabled for Ollama). Follows same pattern as `_resolveModel()`.
-
-**Gotcha:** Tests must account for the user having a real `~/.claudia/gateway.json` on their machine. Don't assume config files are absent.
-
-### Working on the Relay
-
-The relay bridges Telegram to full Claude Code agent sessions. Instead of calling LLM APIs directly, it spawns `claude -p` as a subprocess so Telegram users get all of Claudia's personality, memory, skills, and rules.
-
-```bash
-cd relay
-npm install
-npm test                               # Node --test runner
-TELEGRAM_BOT_TOKEN="..." npm start     # Start Telegram relay
-node src/index.js status               # Check if running
-node src/index.js stop                 # Stop running relay
-```
-
-Key files:
-- `src/relay.js` - Main orchestrator (wires config, runner, session, telegram, lock)
-- `src/claude-runner.js` - Spawns `claude -p` with enriched Claudia context; accepts `files` param for attachments
-- `src/telegram.js` - Grammy bot (handles text, photos, documents; auto-detects file paths in output for sending)
-- `src/session.js` - Session manager (30-min default TTL)
-- `src/config.js` - Config from `~/.claudia/relay.json`
-- `src/chunker.js` - Message chunking for Telegram's 4KB limit
-- `src/formatter.js` - Telegram-friendly message formatting
-
-The enriched prompt in `claude-runner.js` tells Claude to pass `source_channel: "telegram"` when storing memories, so memories created via Telegram are tracked separately from Claude Code sessions.
-
-### Working on the Visualizer
-
-```bash
-cd visualizer-threejs
-npm install
-npm run dev                            # Vite dev server with HMR
-npm run build                          # Production build to dist/
-```
-
-Key files: `src/main.js` (entry + config observer), `src/graph.js` (D3-Force-3D simulation), `src/nodes.js` (Three.js node rendering), `src/design-panel.js` (lil-gui settings panel).
-
 ### Modifying Templates
 
 - Edit files in `template-v2/`
@@ -318,17 +256,8 @@ claudia/
 │   ├── scripts/             ← Install, migrate, diagnose, seed scripts
 │   ├── tests/               ← 25+ test files, pytest (asyncio_mode = auto)
 │   └── test.sh              ← One-click full test suite
-├── gateway/                  ← Messaging bridge (Telegram, Slack) + tool_use
-│   ├── src/                 ← Express server, config, bridge, tools, personality
-│   ├── tests/               ← Node --test (75 tests)
-│   └── scripts/             ← Cross-platform installers
-├── relay/                    ← Telegram bot (Grammy + Claude Code subprocess)
-│   ├── src/                 ← Relay orchestrator, claude-runner, telegram, session
-│   ├── tests/               ← Node --test
-│   └── scripts/             ← Cross-platform installers
-├── visualizer-threejs/       ← 3D brain visualization
-│   ├── src/                 ← Three.js + D3-Force-3D + lil-gui
-│   └── vite.config.js
+├── docs/                    ← Design plans and internal docs
+│   └── plans/
 ├── openclaw-skills/          ← Standalone OpenClaw skills (not in npm package)
 └── template/                 ← Legacy template (deprecated)
 ```

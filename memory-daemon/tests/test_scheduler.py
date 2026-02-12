@@ -5,8 +5,8 @@ from unittest.mock import patch
 from claudia_memory.daemon.scheduler import MemoryScheduler
 
 
-def test_scheduler_registers_exactly_three_jobs():
-    """Scheduler should only register decay, pattern detection, and full consolidation."""
+def test_scheduler_registers_expected_jobs():
+    """Scheduler should register decay, pattern detection, consolidation, and vault sync."""
     scheduler = MemoryScheduler()
 
     with patch.object(scheduler.scheduler, "start"):
@@ -15,8 +15,9 @@ def test_scheduler_registers_exactly_three_jobs():
     jobs = scheduler.scheduler.get_jobs()
     job_ids = {job.id for job in jobs}
 
-    assert job_ids == {"daily_decay", "pattern_detection", "full_consolidation"}, (
-        f"Expected exactly 3 jobs, got: {job_ids}"
+    expected = {"daily_decay", "pattern_detection", "full_consolidation", "vault_sync"}
+    assert job_ids == expected, (
+        f"Expected jobs {expected}, got: {job_ids}"
     )
 
 

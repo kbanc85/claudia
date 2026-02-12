@@ -227,30 +227,6 @@
       "triggers": ["new person", "create contact", "add person", "track this person"]
     },
     {
-      "name": "gateway",
-      "path": "gateway/SKILL.md",
-      "description": "Start, stop, or check status of the Claudia Gateway service for messaging integrations",
-      "invocation": "contextual",
-      "effort_level": "medium",
-      "triggers": ["start gateway", "stop gateway", "gateway status", "is the gateway running"]
-    },
-    {
-      "name": "setup-telegram",
-      "path": "setup-telegram.md",
-      "description": "Guided walkthrough for setting up the Claudia Telegram relay with full agent sessions",
-      "invocation": "contextual",
-      "effort_level": "medium",
-      "triggers": ["telegram relay", "set up relay", "configure relay", "relay setup"]
-    },
-    {
-      "name": "setup-gateway",
-      "path": "setup-gateway.md",
-      "description": "Guided walkthrough for setting up Claudia Gateway with Telegram or Slack",
-      "invocation": "contextual",
-      "effort_level": "medium",
-      "triggers": ["set up gateway", "connect telegram", "setup messaging", "gateway setup"]
-    },
-    {
       "name": "concierge",
       "path": "concierge.md",
       "description": "Context-aware web research that connects findings to memory, relationships, and accumulated knowledge",

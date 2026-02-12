@@ -193,6 +193,11 @@ def main():
         action="store_true",
         help="Create a database backup and exit",
     )
+    parser.add_argument(
+        "--vault-sync",
+        action="store_true",
+        help="Export memory to Obsidian vault and exit (full rebuild)",
+    )
 
     args = parser.parse_args()
 
@@ -667,6 +672,23 @@ def main():
         db.initialize()
         backup_path = db.backup()
         print(f"Backup created: {backup_path}")
+        return
+
+    if args.vault_sync:
+        setup_logging(debug=args.debug)
+        from .services.vault_sync import get_vault_path, get_vault_sync_service
+
+        db = get_db()
+        db.initialize()
+        vault_path = get_vault_path(project_id)
+        print(f"Exporting memory to vault: {vault_path}")
+        svc = get_vault_sync_service(project_id)
+        stats = svc.export_all()
+        print(f"Vault sync complete:")
+        for key, value in stats.items():
+            print(f"  {key}: {value}")
+        print(f"\nVault at: {vault_path}")
+        print("Open this folder in Obsidian to browse your memory graph.")
         return
 
     # Run the daemon

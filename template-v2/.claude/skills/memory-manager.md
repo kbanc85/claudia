@@ -33,8 +33,8 @@ All available memory tools when the daemon is connected. Skills should only refe
 ### Network Graph
 `memory.project_network`, `memory.find_path`, `memory.network_hubs`, `memory.dormant_relationships`
 
-### Gateway
-`memory.telegram_inbox`
+### Obsidian Vault
+`memory.sync_vault`, `memory.vault_status`, `memory.generate_canvas`
 
 ### Admin
 `memory.purge`, `memory.system_health`
@@ -340,24 +340,6 @@ The briefing returns ~500 tokens of aggregate context. Use it to inform the gree
 Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
 
 **Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.morning_context`.
-
-### 1b. Check Telegram Inbox
-
-After loading session context, check for new Telegram messages:
-
-```
-Session context already includes the inbox (via memory.session_context).
-If unread Telegram/Slack messages are returned:
-├── Summarize them to the user:
-│   "You have N new messages from Telegram since we last talked: [summary]"
-├── Messages are marked as read automatically, so they won't appear again
-└── Mid-session: user can say "check telegram" or "any new messages?"
-    to trigger another inbox check via memory.telegram_inbox
-```
-
-The `memory.session_context` call automatically includes a Telegram Inbox section when unread gateway messages exist. If the user asks "any new messages?" or "check telegram" mid-session, call `memory.telegram_inbox` directly to fetch and display any messages that arrived since session start.
-
-If the user asks about Telegram messages but the gateway isn't running (no messages returned and no gateway process detected), suggest: "The gateway doesn't seem to be running. You can start it with `/gateway start`."
 
 ### 2. Greeting
 

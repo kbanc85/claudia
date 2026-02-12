@@ -156,8 +156,6 @@ argument-hint: [arg]
 | `brain/` | 3D memory visualizer | "show your brain" |
 | `brain-monitor/` | Terminal memory dashboard | "brain monitor", "memory dashboard" |
 | `meditate/` | End-of-session reflection | "let's wrap up", "end the session" |
-| `setup-telegram.md` | Guided Telegram relay setup | "Telegram relay", "set up relay" |
-| `setup-gateway.md` | Guided gateway setup (Telegram/Slack) | "set up gateway", "connect Telegram", "setup messaging" |
 
 ### Explicit Only (`/skill-name`)
 
@@ -170,7 +168,6 @@ argument-hint: [arg]
 | `follow-up-draft/` | Post-meeting thank-you |
 | `file-document/` | Save documents with provenance |
 | `new-person/` | Create relationship file |
-| `gateway/` | Manage Gateway service |
 | `diagnose/` | Check memory daemon health |
 
 ## Effort Levels
@@ -197,7 +194,7 @@ effort-level: medium
 | Effort | Skills |
 |--------|--------|
 | **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor |
-| **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, gateway, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher, setup-telegram, setup-gateway |
+| **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher |
 | **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
 | **max** | ingest-sources, pipeline-review, deep-context |
 
