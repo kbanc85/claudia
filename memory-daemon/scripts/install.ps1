@@ -62,8 +62,10 @@ Write-Host "${BOLD}Step 1/8: Environment Check${NC}"
 Write-Host ""
 
 $PYTHON = $null
+$PYTHON_FALLBACK = $null
 
 # Try common Python locations on Windows
+# Prefer 3.10-3.13 over 3.14+ (spaCy's Pydantic V1 dependency doesn't support 3.14 yet)
 $pythonCandidates = @(
     "python",
     "python3",
@@ -77,14 +79,27 @@ foreach ($candidate in $pythonCandidates) {
             $major = [int]$Matches[1]
             $minor = [int]$Matches[2]
             if ($major -ge 3 -and $minor -ge 10) {
-                $PYTHON = $candidate
-                Write-Host "  ${GREEN}✓${NC} $version ($candidate)"
-                break
+                if ($minor -lt 14) {
+                    # Preferred: 3.10-3.13
+                    $PYTHON = $candidate
+                    Write-Host "  ${GREEN}✓${NC} $version ($candidate)"
+                    break
+                } elseif (-not $PYTHON_FALLBACK) {
+                    # 3.14+: usable but spaCy won't work
+                    $PYTHON_FALLBACK = $candidate
+                }
             }
         }
     } catch {
         # Not found, try next
     }
+}
+
+# Fall back to 3.14+ if no 3.10-3.13 found
+if (-not $PYTHON -and $PYTHON_FALLBACK) {
+    $PYTHON = $PYTHON_FALLBACK
+    $version = & $PYTHON --version 2>&1
+    Write-Host "  ${YELLOW}○${NC} $version ($PYTHON) -- spaCy may not work, entity extraction will use regex"
 }
 
 if (-not $PYTHON) {

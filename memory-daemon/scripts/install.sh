@@ -99,16 +99,55 @@ random_message() {
 }
 
 # Check Python - prefer Homebrew Python on macOS (supports SQLite extensions)
+# Avoid Python 3.14+ where spaCy/Pydantic V1 are incompatible
 echo -e "${BOLD}Step 1/8: Environment Check${NC}"
 echo
 PYTHON=""
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # Homebrew Python supports SQLite extension loading (needed for vector search)
-    if [ -x "/opt/homebrew/bin/python3" ]; then
-        PYTHON="/opt/homebrew/bin/python3"
-        echo -e "  ${GREEN}✓${NC} Using Homebrew Python (vector search supported)"
-    elif [ -x "/usr/local/bin/python3" ]; then
-        PYTHON="/usr/local/bin/python3"
+    # Prefer 3.13 over 3.14+ (spaCy's Pydantic V1 dependency doesn't support 3.14 yet)
+    _pick_homebrew_python() {
+        local candidate="$1"
+        if [ -x "$candidate" ]; then
+            local minor
+            minor=$("$candidate" -c "import sys; print(sys.version_info.minor)" 2>/dev/null)
+            # Verify SQLite extension support (only Homebrew Python has this on macOS)
+            if ! "$candidate" -c "import sqlite3; sqlite3.connect(':memory:').enable_load_extension(True)" 2>/dev/null; then
+                return 1
+            fi
+            if [ -n "$minor" ] && [ "$minor" -lt 14 ]; then
+                PYTHON="$candidate"
+                return 0
+            fi
+        fi
+        return 1
+    }
+
+    # Try versioned 3.13 first (Homebrew keeps it alongside 3.14)
+    # Check both symlinks and Cellar paths (symlinks may not exist for non-default versions)
+    _pick_homebrew_python "/opt/homebrew/bin/python3.13" ||
+    _pick_homebrew_python "/usr/local/bin/python3.13" ||
+    {
+        # Search Homebrew Cellar for python@3.13 (ARM and Intel paths)
+        for cellar_path in /opt/homebrew/Cellar/python@3.13/*/bin/python3.13 \
+                           /usr/local/Cellar/python@3.13/*/bin/python3.13; do
+            _pick_homebrew_python "$cellar_path" && break
+        done
+    } ||
+    # Fall back to unversioned python3 even if 3.14+
+    _pick_homebrew_python "/opt/homebrew/bin/python3" ||
+    _pick_homebrew_python "/usr/local/bin/python3" || true
+
+    # If all Homebrew candidates are 3.14+, still use Homebrew for SQLite support
+    if [ -z "$PYTHON" ]; then
+        if [ -x "/opt/homebrew/bin/python3" ]; then
+            PYTHON="/opt/homebrew/bin/python3"
+        elif [ -x "/usr/local/bin/python3" ]; then
+            PYTHON="/usr/local/bin/python3"
+        fi
+    fi
+
+    if [ -n "$PYTHON" ]; then
         echo -e "  ${GREEN}✓${NC} Using Homebrew Python (vector search supported)"
     fi
 fi

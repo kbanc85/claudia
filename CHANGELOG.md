@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.37.2 (2026-02-12)
+
+### Python 3.14 Compatibility
+
+#### Fixed
+- **macOS installer** now prefers Python 3.13 over 3.14 for spaCy compatibility. Searches Homebrew symlinks, then Cellar paths, with SQLite extension validation. Falls back to 3.14 gracefully when 3.13 is unavailable.
+- **Windows installer** now prefers Python 3.10-3.13, falling back to 3.14+ with a visible warning about reduced NLP capabilities.
+
+#### Stats
+- Install: `npx get-claudia`
+
+---
+
 ## 1.37.1 (2026-02-12)
 
 ### Directory Policy Compliance
