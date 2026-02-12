@@ -18,6 +18,7 @@ from mcp.types import (
     ListToolsResult,
     TextContent,
     Tool,
+    ToolAnnotations,
 )
 
 from ..database import get_db
@@ -109,7 +110,9 @@ async def list_tools() -> ListToolsResult:
     tools = [
         Tool(
             name="memory.remember",
+            title="Store a Memory",
             description="Store information in Claudia's memory. Use for facts, preferences, observations, or learnings about people, projects, or the user.",
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -155,11 +158,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.recall",
+            title="Search Memory",
             description=(
                 "Search Claudia's memory for relevant information. Uses hybrid vector + full-text "
                 "similarity. Use compact=true for lightweight browsing (snippets), then fetch full "
                 "content with ids=[...] for the interesting results."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -196,7 +201,9 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.about",
+            title="Get Entity Context",
             description="Get all context about a specific person, project, or entity. Returns memories, relationships, and metadata.",
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -220,7 +227,9 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.relate",
+            title="Create Relationship",
             description="Create or strengthen a relationship between two entities (people, projects, etc.)",
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -266,7 +275,9 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.consolidate",
+            title="Run Consolidation",
             description="Manually trigger memory consolidation (decay, merging, pattern detection). Usually runs automatically at 3 AM.",
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -274,7 +285,9 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.entity",
+            title="Create or Update Entity",
             description="Create or update information about an entity (person, organization, project, etc.)",
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -303,7 +316,9 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.search_entities",
+            title="Search Entities",
             description="Search for entities (people, projects, organizations) by name or description.",
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -327,7 +342,9 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.buffer_turn",
+            title="Buffer Conversation Turn",
             description="Buffer a conversation turn for end-of-session summarization. Call this after each meaningful exchange. Lightweight -- no embedding generation or extraction, just raw storage. Returns an episode_id to reuse on subsequent calls within the same session.",
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -353,6 +370,7 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.end_session",
+            title="End Session",
             description=(
                 "Finalize a session with a narrative summary and structured extractions. "
                 "Call at session end. The narrative should ENHANCE stored information -- capture "
@@ -361,6 +379,7 @@ async def list_tools() -> ListToolsResult:
                 "(facts, commitments, entities, relationships) are stored alongside the narrative, "
                 "not replaced by it. Both are searchable in future sessions."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -522,12 +541,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.unsummarized",
+            title="List Unsummarized Sessions",
             description=(
                 "Check for previous sessions that ended without a summary. "
                 "Call at session start. If results are returned, Claude should "
                 "review the buffered turns and generate a retroactive summary "
                 "by calling memory.end_session for each orphaned episode."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -535,12 +556,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.reflections",
+            title="Manage Reflections",
             description=(
                 "Get or search persistent reflections (observations, patterns, learnings, questions) "
                 "from past /meditate sessions. Reflections are user-approved insights that decay "
                 "very slowly and inform future interactions. Use this to retrieve cross-session "
                 "patterns about user preferences and communication styles."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -584,6 +607,7 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.batch",
+            title="Batch Memory Operations",
             description=(
                 "Execute multiple memory operations in a single call. Use this for mid-session "
                 "entity creation when processing a new person, meeting transcript, or topic that "
@@ -591,6 +615,7 @@ async def list_tools() -> ListToolsResult:
                 "than calling memory.entity, memory.remember, and memory.relate separately. "
                 "For end-of-session summaries, use memory.end_session instead."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -690,12 +715,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.trace",
+            title="Trace Memory Provenance",
             description=(
                 "Reconstruct full provenance for a memory. Returns the memory with all fields, "
                 "the source episode narrative and archived conversation turns (if applicable), "
                 "related entities, and a preview of any source material file saved on disk. "
                 "Zero cost until invoked -- use when asked 'where did that come from?'"
             ),
+            annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -709,6 +736,7 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.session_context",
+            title="Load Session Context",
             description=(
                 "Load relevant context at session start. Call this FIRST at the beginning of every session "
                 "(after confirming context/me.md exists). Returns a pre-formatted context block with: "
@@ -717,6 +745,7 @@ async def list_tools() -> ListToolsResult:
                 "active commitments, and recent episode narratives. If unsummarized sessions are "
                 "reported, generate retroactive summaries using memory.end_session."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -731,11 +760,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.morning_context",
+            title="Morning Digest",
             description=(
                 "Curated morning digest: stale commitments, cooling relationships, "
                 "cross-entity connections, active predictions, and recent activity (72h). "
                 "Use this when generating the morning brief to get all relevant data in one call."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -743,12 +774,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.telegram_inbox",
+            title="Fetch Telegram Messages",
             description=(
                 "Fetch unread Telegram/Slack conversations and extracted notes. Marks them as read. "
                 "Call at session start to catch up on gateway messages, or mid-session when the user "
                 "asks 'check telegram' or 'any new messages?'. Returns conversation summaries and "
                 "extracted facts/commitments from gateway channels."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -762,12 +795,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.briefing",
+            title="Compact Briefing",
             description=(
                 "Compact session briefing (~500 tokens). Returns aggregate counts and highlights: "
                 "active commitments, cooling relationships, unread messages, top prediction, "
                 "recent activity. Call at session start instead of loading full context. "
                 "Use memory.recall or memory.about to drill into specifics during conversation."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -775,12 +810,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.file",
+            title="Store Document",
             description=(
                 "Store a document (transcript, email, file) with entity and memory links. "
                 "The file is saved to managed storage on disk and registered in the database "
                 "with provenance links. Deduplicates by file hash. Use this when the user "
                 "shares a document, transcript, or email that should be preserved."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -822,10 +859,12 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.documents",
+            title="Search Documents",
             description=(
                 "Search and list documents by entity, source type, or text query. "
                 "Use to find transcripts, emails, or files linked to a person or topic."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -852,10 +891,12 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.purge",
+            title="Delete File Permanently",
             description=(
                 "Delete a document's file from disk while keeping its metadata as a tombstone. "
                 "Use when a user requests file deletion but you want to preserve the provenance record."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -869,11 +910,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.project_network",
+            title="Project Relationships",
             description=(
                 "Get all people and organizations connected to a project. "
                 "Returns direct participants, organizations involved, and 1-hop extended network. "
                 "Use when asked 'who's involved in [project]?' or to understand project stakeholders."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -887,11 +930,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.find_path",
+            title="Find Relationship Path",
             description=(
                 "Find connection path between two entities. "
                 "Returns the shortest chain of relationships connecting them, or null if unconnected. "
                 "Use when asked 'how is [A] connected to [B]?' or 'do [A] and [B] know each other?'"
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -914,11 +959,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.network_hubs",
+            title="Find Network Hubs",
             description=(
                 "Find most connected entities in the network. "
                 "Identifies 'hub' people or organizations with many relationships. "
                 "Use when asked 'who knows the most people?' or 'who are the key connectors?'"
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -942,11 +989,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.dormant_relationships",
+            title="Find Dormant Relationships",
             description=(
                 "Find relationships with no recent activity. "
                 "Identifies connections that may need attention because there hasn't been "
                 "any recent memory or interaction. Use for relationship health monitoring."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -970,6 +1019,7 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="cognitive.ingest",
+            title="Extract Entities from Text",
             description=(
                 "Extract structured data from raw text using a local language model. "
                 "Use this when the user pastes a meeting transcript, email, document, or "
@@ -978,6 +1028,7 @@ async def list_tools() -> ListToolsResult:
                 "commitments, action items, and relationships. If no local language model "
                 "is available, returns the raw text so Claude can process it directly."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1004,12 +1055,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.merge_entities",
+            title="Merge Duplicate Entities",
             description=(
                 "Merge two duplicate entities into one. All memories, relationships, "
                 "and reflections referencing the source entity will be moved to the target. "
                 "The source entity's name becomes an alias of the target. Use when "
                 "duplicates are found via find_duplicate_entities or user reports."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1031,11 +1084,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.delete_entity",
+            title="Delete Entity",
             description=(
                 "Soft-delete an entity. Sets deleted_at timestamp but preserves "
                 "all historical data (memories, relationships). Use when an entity "
                 "is no longer relevant or was created in error."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1053,12 +1108,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.correct",
+            title="Correct a Memory",
             description=(
                 "Correct a memory's content while preserving history. "
                 "Use when the user says 'that's not right', 'actually...', "
                 "or identifies incorrect information. The original content is "
                 "saved in corrected_from for audit trail."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1080,12 +1137,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.invalidate",
+            title="Invalidate Memory",
             description=(
                 "Mark a memory as no longer true (soft delete). "
                 "Use when facts become outdated, the user says to forget something, "
                 "or information was wrong. The memory is preserved for history "
                 "but excluded from future queries."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1103,12 +1162,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.invalidate_relationship",
+            title="Invalidate Relationship",
             description=(
                 "Mark a relationship as incorrect or ended without creating a replacement. "
                 "Use when the user says a relationship is wrong, or when someone leaves a "
                 "company, ends a partnership, etc. The relationship is preserved for history "
                 "but excluded from active queries."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1134,12 +1195,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.audit_history",
+            title="Audit Provenance Trail",
             description=(
                 "Get the full audit trail for an entity or memory. "
                 "Use when the user asks 'where did you learn that?' or wants to trace "
                 "the provenance of information. Shows all operations (creates, merges, "
                 "corrections, deletions) with timestamps."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1161,11 +1224,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.summary",
+            title="Entity Summaries",
             description=(
                 "Get a lightweight summary for one or more entities. Returns name, type, "
                 "importance, memory count, relationship count, last mentioned date, and "
                 "top facts. Cheaper than memory.about for quick overviews."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1185,11 +1250,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.system_health",
+            title="System Health Check",
             description=(
                 "Get comprehensive system health: schema version, component status, "
                 "scheduled job list, and memory/entity counts. Use this to diagnose "
                 "issues or verify the memory system is working correctly."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -1197,12 +1264,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.sync_vault",
+            title="Sync to Obsidian Vault",
             description=(
                 "Sync memory data to the Obsidian vault. Exports entities, relationships, "
                 "patterns, reflections, and sessions as markdown notes with [[wikilinks]]. "
                 "Use 'full' mode for a complete rebuild or default incremental mode for "
                 "changes since last sync."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1216,10 +1285,12 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.vault_status",
+            title="Vault Sync Status",
             description=(
                 "Get the status of the Obsidian vault sync: last sync time, file counts, "
                 "and vault path. Use this to check if the vault is up to date."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -1227,11 +1298,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.generate_canvas",
+            title="Generate Canvas Dashboard",
             description=(
                 "Generate an Obsidian canvas file. Types: 'relationship_map' (entity graph), "
                 "'morning_brief' (daily dashboard), 'project_board' (project-specific view, "
                 "requires project_name), 'all' (generate all standard canvases)."
             ),
+            annotations=ToolAnnotations(destructiveHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1250,12 +1323,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.import_vault_edits",
+            title="Import Vault Edits",
             description=(
                 "Scan the Obsidian vault for notes that the user has edited and import "
                 "changes back into Claudia's memory. Human edits always win (applied with "
                 "origin_type='user_stated', confidence=1.0). Detects: description changes, "
                 "new facts, commitment completions (checkbox changes)."
             ),
+            annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -1263,12 +1338,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.reconnections",
+            title="Reconnection Suggestions",
             description=(
                 "Get reconnection suggestions for contacts trending toward dormancy. "
                 "Each suggestion includes: person name, days since contact, trend, "
                 "last topic, open commitments, and a suggested action. "
                 "Use in morning briefs and relationship health checks."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1282,11 +1359,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.upcoming",
+            title="Upcoming Deadlines",
             description=(
                 "Get upcoming deadlines from committed tasks. Returns memories with deadlines "
                 "grouped by urgency: overdue, today, tomorrow, this_week, later. "
                 "Essential for morning briefs and accountability checks."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1305,10 +1384,12 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.since",
+            title="Recent Changes",
             description=(
                 "Get memories created or updated since a specific time. "
                 "Use for 'what's new since last session' or tracking changes over a period."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1331,11 +1412,13 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.timeline",
+            title="Entity Timeline",
             description=(
                 "Temporal view of an entity: all memories sorted chronologically "
                 "with deadlines highlighted. Shows the full history of interactions "
                 "and commitments related to a person, project, or organization."
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1354,12 +1437,14 @@ async def list_tools() -> ListToolsResult:
         ),
         Tool(
             name="memory.project_health",
+            title="Project Health Check",
             description=(
                 "Project when a relationship will go dormant based on contact velocity. "
                 "Returns projected dormant date, recommended contact date, risk level, "
                 "and open commitments. Ask 'if I don't contact [person], when will they go dormant?' "
                 "or 'which relationships need attention in the next 2 weeks?'"
             ),
+            annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
                 "type": "object",
                 "properties": {

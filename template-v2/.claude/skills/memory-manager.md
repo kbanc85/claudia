@@ -16,7 +16,7 @@ effort-level: medium
 All available memory tools when the daemon is connected. Skills should only reference tools from this list.
 
 ### Core
-`memory.remember`, `memory.recall`, `memory.about`, `memory.entity`, `memory.relate`, `memory.search_entities`, `memory.batch`
+`memory.remember`, `memory.recall`, `memory.about`, `memory.entity`, `memory.relate`, `memory.search_entities`, `memory.batch`, `memory.summary`
 
 ### Session Lifecycle
 `memory.session_context`, `memory.buffer_turn`, `memory.end_session`, `memory.unsummarized`, `memory.briefing`
@@ -25,7 +25,7 @@ All available memory tools when the daemon is connected. Skills should only refe
 `memory.file`, `memory.documents`
 
 ### Analysis & Insights
-`memory.morning_context`, `memory.consolidate`, `memory.reflections`
+`memory.morning_context`, `memory.consolidate`, `memory.reflections`, `memory.upcoming`, `memory.since`, `memory.timeline`, `memory.reconnections`, `memory.project_health`
 
 ### Trust & Provenance
 `memory.trace`, `memory.correct`, `memory.invalidate`, `memory.audit_history`, `memory.merge_entities`, `memory.delete_entity`
@@ -34,7 +34,7 @@ All available memory tools when the daemon is connected. Skills should only refe
 `memory.project_network`, `memory.find_path`, `memory.network_hubs`, `memory.dormant_relationships`
 
 ### Obsidian Vault
-`memory.sync_vault`, `memory.vault_status`, `memory.generate_canvas`
+`memory.sync_vault`, `memory.vault_status`, `memory.generate_canvas`, `memory.import_vault_edits`
 
 ### Admin
 `memory.purge`, `memory.system_health`

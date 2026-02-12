@@ -53,7 +53,7 @@
     {
       "name": "relationship-tracker",
       "path": "relationship-tracker.md",
-      "description": "Surface relevant context when people are mentioned in conversation and track relationship health",
+      "description": "Surface relevant context when people are mentioned and track relationship health with velocity-based reconnection suggestions",
       "invocation": "proactive",
       "effort_level": "high",
       "triggers": ["person name mentioned", "who is", "relationship context", "people file lookup"]
@@ -61,7 +61,7 @@
     {
       "name": "risk-surfacer",
       "path": "risk-surfacer.md",
-      "description": "Proactively identify and surface potential problems before they become crises",
+      "description": "Proactively identify and surface potential problems using velocity-based relationship trends and commitment risk detection",
       "invocation": "proactive",
       "effort_level": "high",
       "triggers": ["overdue commitment", "cooling relationship", "capacity risk", "deadline approaching"]
@@ -93,7 +93,7 @@
     {
       "name": "morning-brief",
       "path": "morning-brief/SKILL.md",
-      "description": "Daily digest with commitments, follow-ups, and priorities",
+      "description": "Daily digest organized by urgency: overdue commitments, upcoming deadlines, reconnection suggestions, and recent changes",
       "invocation": "explicit",
       "effort_level": "low",
       "triggers": ["morning", "daily brief", "start my day", "what's on today", "what's on my plate"]
@@ -145,6 +145,14 @@
       "invocation": "contextual",
       "effort_level": "low",
       "triggers": ["brain monitor", "show dashboard", "memory dashboard", "terminal brain"]
+    },
+    {
+      "name": "vault-awareness",
+      "path": "vault-awareness.md",
+      "description": "Manage Obsidian vault projection with syncing, bidirectional edits, canvas generation, and vault-to-memory import",
+      "invocation": "proactive",
+      "effort_level": "low",
+      "triggers": ["mention Obsidian", "ask about vault", "sync to vault", "generate canvas", "browse memories"]
     },
     {
       "name": "diagnose",
