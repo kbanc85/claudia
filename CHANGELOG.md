@@ -2,6 +2,24 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.37.1 (2026-02-12)
+
+### Directory Policy Compliance
+
+#### Added
+- **MCP tool annotations** - All 42 tools now include `title` and `ToolAnnotations` (readOnlyHint, destructiveHint, openWorldHint) for Anthropic Software Directory compliance. 23 read-only, 12 write-safe, 7 destructive, 2 open-world.
+- **Vault awareness skill** indexed in skill-index.json (was missing)
+
+#### Fixed
+- **memory-manager.md** tool reference now includes all 7 tools added in v1.37.0: `memory.upcoming`, `memory.since`, `memory.timeline`, `memory.reconnections`, `memory.project_health`, `memory.summary`, `memory.import_vault_edits`
+- **skill-index.json** descriptions updated for relationship-tracker, risk-surfacer, and morning-brief to reflect temporal/velocity capabilities
+
+#### Stats
+- 436 tests pass, 5 skipped, 0 regressions
+- Install: `npx get-claudia`
+
+---
+
 ## 1.37.0 (2026-02-12)
 
 ### The Proactive Intelligence Upgrade
