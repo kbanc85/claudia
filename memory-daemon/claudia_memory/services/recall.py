@@ -1984,6 +1984,344 @@ class RecallService:
 
         return self.db.execute(sql, tuple(params), fetch=True) or []
 
+    # ── Temporal recall methods ────────────────────────────────────
+
+    def recall_upcoming_deadlines(
+        self,
+        days_ahead: int = 14,
+        include_overdue: bool = True,
+    ) -> List[RecallResult]:
+        """Retrieve memories with upcoming deadlines, sorted by urgency.
+
+        Returns overdue items first, then items due soonest.
+        """
+        now = datetime.utcnow()
+        future = now + timedelta(days=days_ahead)
+
+        conditions = ["m.deadline_at IS NOT NULL", "m.invalidated_at IS NULL"]
+        params: list = []
+
+        if include_overdue:
+            conditions.append("m.deadline_at <= ?")
+            params.append(future.strftime("%Y-%m-%d %H:%M:%S"))
+        else:
+            conditions.append("m.deadline_at BETWEEN ? AND ?")
+            params.extend([
+                now.strftime("%Y-%m-%d %H:%M:%S"),
+                future.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+
+        where = " AND ".join(conditions)
+
+        rows = self.db.execute(
+            f"""
+            SELECT m.*, GROUP_CONCAT(e.name) as entity_names
+            FROM memories m
+            LEFT JOIN memory_entities me ON m.id = me.memory_id
+            LEFT JOIN entities e ON me.entity_id = e.id
+            WHERE {where}
+            GROUP BY m.id
+            ORDER BY m.deadline_at ASC
+            """,
+            tuple(params),
+            fetch=True,
+        ) or []
+
+        results = []
+        for row in rows:
+            deadline_str = row["deadline_at"] if "deadline_at" in row.keys() else None
+            urgency = "later"
+            if deadline_str:
+                try:
+                    deadline_dt = datetime.fromisoformat(deadline_str)
+                    if deadline_dt < now:
+                        urgency = "overdue"
+                    elif deadline_dt < now + timedelta(days=1):
+                        urgency = "today"
+                    elif deadline_dt < now + timedelta(days=2):
+                        urgency = "tomorrow"
+                    elif deadline_dt < now + timedelta(days=7):
+                        urgency = "this_week"
+                except (ValueError, TypeError):
+                    pass
+
+            entity_str = row["entity_names"] if "entity_names" in row.keys() and row["entity_names"] else ""
+            results.append(RecallResult(
+                id=row["id"],
+                content=row["content"],
+                type=row["type"],
+                score=row["importance"],
+                importance=row["importance"],
+                created_at=row["created_at"],
+                entities=entity_str.split(",") if entity_str else [],
+                metadata={"urgency": urgency, "deadline_at": deadline_str},
+            ))
+
+        return results
+
+    def recall_since(
+        self,
+        since: str,
+        entity_name: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[RecallResult]:
+        """Retrieve memories created or updated since a timestamp.
+
+        Args:
+            since: ISO datetime string (e.g. "2026-02-10T00:00:00")
+            entity_name: Optional entity filter
+            limit: Maximum results
+        """
+        conditions = [
+            "(m.created_at >= ? OR m.updated_at >= ?)",
+            "m.invalidated_at IS NULL",
+        ]
+        params: list = [since, since]
+
+        if entity_name:
+            conditions.append("""
+                m.id IN (
+                    SELECT me.memory_id FROM memory_entities me
+                    JOIN entities e ON me.entity_id = e.id
+                    WHERE e.canonical_name = ? OR e.name = ?
+                )
+            """)
+            params.extend([entity_name.lower(), entity_name])
+
+        where = " AND ".join(conditions)
+
+        rows = self.db.execute(
+            f"""
+            SELECT m.*, GROUP_CONCAT(e.name) as entity_names
+            FROM memories m
+            LEFT JOIN memory_entities me ON m.id = me.memory_id
+            LEFT JOIN entities e ON me.entity_id = e.id
+            WHERE {where}
+            GROUP BY m.id
+            ORDER BY m.created_at DESC
+            LIMIT ?
+            """,
+            tuple(params + [limit]),
+            fetch=True,
+        ) or []
+
+        return [self._row_to_simple_result(row) for row in rows]
+
+    def recall_temporal(
+        self,
+        query: str,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[RecallResult]:
+        """Semantic search within a time window.
+
+        Combines vector similarity with date range filtering.
+        """
+        # First get semantic results
+        results = self.recall(query, limit=limit * 2)
+
+        # Filter by date range
+        filtered = []
+        for r in results:
+            created = r.created_at
+            if not created:
+                continue
+            if date_from and created < date_from:
+                continue
+            if date_to and created > date_to:
+                continue
+            filtered.append(r)
+            if len(filtered) >= limit:
+                break
+
+        return filtered
+
+    def recall_timeline(
+        self,
+        entity_name: str,
+        limit: int = 50,
+    ) -> List[RecallResult]:
+        """Temporal view of an entity: all memories sorted by time.
+
+        Deadlines are highlighted in metadata.
+        """
+        rows = self.db.execute(
+            """
+            SELECT m.*, GROUP_CONCAT(e2.name) as entity_names
+            FROM memories m
+            JOIN memory_entities me ON m.id = me.memory_id
+            JOIN entities e ON me.entity_id = e.id
+            LEFT JOIN memory_entities me2 ON m.id = me2.memory_id
+            LEFT JOIN entities e2 ON me2.entity_id = e2.id
+            WHERE (e.canonical_name = ? OR e.name = ?)
+              AND m.invalidated_at IS NULL
+            GROUP BY m.id
+            ORDER BY COALESCE(m.deadline_at, m.created_at) ASC
+            LIMIT ?
+            """,
+            (entity_name.lower(), entity_name, limit),
+            fetch=True,
+        ) or []
+
+        results = []
+        for row in rows:
+            r = self._row_to_simple_result(row)
+            # Enrich metadata with deadline info
+            row_keys = row.keys()
+            if "deadline_at" in row_keys and row["deadline_at"]:
+                r.metadata = r.metadata or {}
+                r.metadata["deadline_at"] = row["deadline_at"]
+                r.metadata["has_deadline"] = True
+            results.append(r)
+
+        return results
+
+    def project_relationship_health(
+        self,
+        entity_name: str,
+        days_ahead: int = 30,
+    ) -> Dict[str, Any]:
+        """Project when a relationship will go dormant based on current velocity.
+
+        Uses contact_frequency_days and contact_trend to estimate
+        future relationship state.
+
+        Args:
+            entity_name: Person entity to analyze
+            days_ahead: How far ahead to project (default 30)
+
+        Returns:
+            Dict with projected_dormant_date, recommended_contact_date,
+            risk_level, and current stats.
+        """
+        canonical = self.extractor.canonical_name(entity_name)
+        entity = self.db.get_one(
+            "entities",
+            where="canonical_name = ? AND deleted_at IS NULL",
+            where_params=(canonical,),
+        )
+        if not entity:
+            return {"error": f"Entity '{entity_name}' not found"}
+
+        entity_keys = entity.keys()
+        last_contact = entity["last_contact_at"] if "last_contact_at" in entity_keys else None
+        frequency = entity["contact_frequency_days"] if "contact_frequency_days" in entity_keys else None
+        trend = (entity["contact_trend"] if "contact_trend" in entity_keys else None) or "unknown"
+
+        # If no velocity data, return basic info
+        if not last_contact or not frequency:
+            return {
+                "entity": entity["name"],
+                "status": "insufficient_data",
+                "trend": trend,
+                "message": "Not enough contact history to project. Need at least 2 recorded interactions.",
+            }
+
+        try:
+            last_dt = datetime.strptime(last_contact, "%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            try:
+                last_dt = datetime.fromisoformat(last_contact.replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                return {"entity": entity["name"], "status": "parse_error"}
+
+        now = datetime.utcnow()
+        days_since = (now - last_dt).days
+
+        # Dormancy threshold: 2x average frequency (matches consolidate.py logic)
+        dormancy_threshold = frequency * 2.0
+
+        # Apply trend modifiers for projection
+        trend_multiplier = {
+            "accelerating": 0.7,   # Contact happening faster, dormancy further away
+            "stable": 1.0,
+            "decelerating": 1.3,   # Contact slowing, dormancy approaching faster
+            "dormant": 1.5,
+        }.get(trend, 1.0)
+
+        # Projected days until dormancy from last contact
+        projected_days_to_dormancy = dormancy_threshold * trend_multiplier
+        projected_dormant_date = last_dt + timedelta(days=projected_days_to_dormancy)
+
+        # Recommended contact: at 1x frequency from last contact (or now if overdue)
+        recommended_contact_date = last_dt + timedelta(days=frequency)
+        if recommended_contact_date < now:
+            recommended_contact_date = now  # Already overdue for contact
+
+        # Risk level
+        days_until_dormant = (projected_dormant_date - now).days
+        if days_until_dormant <= 0:
+            risk_level = "dormant"
+        elif days_until_dormant <= 7:
+            risk_level = "critical"
+        elif days_until_dormant <= 14:
+            risk_level = "high"
+        elif days_until_dormant <= 30:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+
+        # Check for open commitments
+        open_commitments = self.db.execute(
+            """
+            SELECT m.content FROM memories m
+            JOIN memory_entities me ON m.id = me.memory_id
+            WHERE me.entity_id = ?
+              AND m.type = 'commitment'
+              AND m.invalidated_at IS NULL
+            ORDER BY m.importance DESC
+            LIMIT 5
+            """,
+            (entity["id"],),
+            fetch=True,
+        ) or []
+
+        result = {
+            "entity": entity["name"],
+            "days_since_contact": days_since,
+            "contact_frequency_days": round(frequency, 1),
+            "trend": trend,
+            "attention_tier": entity["attention_tier"] if "attention_tier" in entity_keys else "standard",
+            "projected_dormant_date": projected_dormant_date.strftime("%Y-%m-%d"),
+            "days_until_dormant": max(0, days_until_dormant),
+            "recommended_contact_date": recommended_contact_date.strftime("%Y-%m-%d"),
+            "risk_level": risk_level,
+            "open_commitments": [c["content"] for c in open_commitments],
+        }
+
+        return result
+
+    def _row_to_simple_result(self, row) -> RecallResult:
+        """Convert a database row to a RecallResult without scoring.
+
+        Used by temporal recall methods that don't need vector/FTS scoring.
+        """
+        row_keys = row.keys()
+        entity_str = row["entity_names"] if "entity_names" in row_keys and row["entity_names"] else ""
+        metadata = None
+        if "metadata" in row_keys and row["metadata"]:
+            try:
+                metadata = json.loads(row["metadata"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return RecallResult(
+            id=row["id"],
+            content=row["content"],
+            type=row["type"],
+            score=row["importance"],
+            importance=row["importance"],
+            created_at=row["created_at"],
+            entities=entity_str.split(",") if entity_str else [],
+            metadata=metadata,
+            source=row["source"] if "source" in row_keys else None,
+            source_context=row["source_context"] if "source_context" in row_keys else None,
+            origin_type=row["origin_type"] if "origin_type" in row_keys else "inferred",
+            confidence=row["confidence"] if "confidence" in row_keys else 1.0,
+            source_channel=row["source_channel"] if "source_channel" in row_keys else None,
+        )
+
 
 # Global service instance
 _service: Optional[RecallService] = None
@@ -2071,3 +2409,28 @@ def get_active_reflections(limit: int = 5, min_importance: float = 0.6) -> List[
 def find_duplicate_entities(threshold: float = 0.85, entity_type: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
     """Find potential duplicate entities using fuzzy matching"""
     return get_recall_service().find_duplicate_entities(threshold, entity_type, limit)
+
+
+def recall_upcoming_deadlines(days_ahead: int = 14, **kwargs) -> List[RecallResult]:
+    """Get memories with upcoming deadlines"""
+    return get_recall_service().recall_upcoming_deadlines(days_ahead, **kwargs)
+
+
+def recall_since(since: str, **kwargs) -> List[RecallResult]:
+    """Get memories since a timestamp"""
+    return get_recall_service().recall_since(since, **kwargs)
+
+
+def recall_temporal(query: str, **kwargs) -> List[RecallResult]:
+    """Semantic search within a time window"""
+    return get_recall_service().recall_temporal(query, **kwargs)
+
+
+def recall_timeline(entity_name: str, **kwargs) -> List[RecallResult]:
+    """Temporal view of an entity"""
+    return get_recall_service().recall_timeline(entity_name, **kwargs)
+
+
+def project_relationship_health(entity_name: str, days_ahead: int = 30) -> Dict[str, Any]:
+    """Project when a relationship will go dormant"""
+    return get_recall_service().project_relationship_health(entity_name, days_ahead)

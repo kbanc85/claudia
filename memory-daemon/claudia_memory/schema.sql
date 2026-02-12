@@ -21,12 +21,19 @@ CREATE TABLE IF NOT EXISTS entities (
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     metadata TEXT,  -- JSON blob for flexible attributes
+    last_contact_at TEXT,  -- Last time user interacted with this entity
+    contact_frequency_days REAL,  -- Average days between contacts (rolling)
+    contact_trend TEXT,  -- accelerating, stable, decelerating, dormant
+    attention_tier TEXT DEFAULT 'standard',  -- active, watchlist, standard, archive
     UNIQUE(canonical_name, type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
 CREATE INDEX IF NOT EXISTS idx_entities_canonical ON entities(canonical_name);
 CREATE INDEX IF NOT EXISTS idx_entities_importance ON entities(importance DESC);
+CREATE INDEX IF NOT EXISTS idx_entities_last_contact ON entities(last_contact_at);
+CREATE INDEX IF NOT EXISTS idx_entities_trend ON entities(contact_trend);
+CREATE INDEX IF NOT EXISTS idx_entities_attention_tier ON entities(attention_tier);
 
 -- Entity aliases for matching variations (e.g., "Sarah", "Sarah Chen", "S. Chen")
 CREATE TABLE IF NOT EXISTS entity_aliases (
@@ -61,13 +68,16 @@ CREATE TABLE IF NOT EXISTS memories (
     verified_at TEXT,  -- When this memory was verified
     verification_status TEXT DEFAULT 'pending',  -- pending, verified, flagged, contradicts
     metadata TEXT,  -- JSON blob for flexible attributes
-    source_channel TEXT DEFAULT 'claude_code'  -- Origin channel: claude_code, telegram, slack
+    source_channel TEXT DEFAULT 'claude_code',  -- Origin channel: claude_code, telegram, slack
+    deadline_at TEXT,  -- ISO datetime for commitment deadlines (Phase 2: temporal intelligence)
+    temporal_markers TEXT  -- JSON: extracted temporal references from content
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
 CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(content_hash);
+CREATE INDEX IF NOT EXISTS idx_memories_deadline ON memories(deadline_at);
 CREATE INDEX IF NOT EXISTS idx_memories_verification ON memories(verification_status);
 
 -- Junction table linking memories to entities
@@ -392,6 +402,12 @@ VALUES (15, 'Add origin_type to relationships for organic trust model');
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (16, 'Add source_channel to memories for channel-aware memory');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (17, 'Add deadline_at and temporal_markers to memories for temporal intelligence');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (18, 'Add contact velocity and attention tier to entities for proactive relationship intelligence');
 
 -- ============================================================================
 -- AGENT DISPATCHES: Track delegated tasks to sub-agents

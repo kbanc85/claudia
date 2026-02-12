@@ -60,6 +60,66 @@ class ConsolidateService:
         self.db = get_db()
         self.config = get_config()
 
+    def _surge_approaching_deadlines(self) -> Dict[str, int]:
+        """Boost importance of memories with approaching deadlines.
+
+        Runs BEFORE decay so that deadline-driven items resist decay.
+        Tiered surge:
+        - Overdue: surge to 1.0
+        - Due within 48 hours: surge to 0.95
+        - Due within 7 days: surge to 0.85
+        """
+        now = datetime.utcnow()
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        two_days = (now + timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
+        one_week = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Overdue: surge to 1.0
+        self.db.execute(
+            """
+            UPDATE memories SET importance = 1.0, updated_at = datetime('now')
+            WHERE deadline_at IS NOT NULL
+              AND deadline_at < ?
+              AND invalidated_at IS NULL
+              AND importance < 1.0
+            """,
+            (now_str,),
+        )
+        overdue_result = self.db.execute("SELECT changes()", fetch=True)
+        overdue = overdue_result[0][0] if overdue_result else 0
+
+        # Due within 48 hours: surge to 0.95
+        self.db.execute(
+            """
+            UPDATE memories SET importance = MAX(importance, 0.95), updated_at = datetime('now')
+            WHERE deadline_at IS NOT NULL
+              AND deadline_at BETWEEN ? AND ?
+              AND invalidated_at IS NULL
+            """,
+            (now_str, two_days),
+        )
+        near_result = self.db.execute("SELECT changes()", fetch=True)
+        near = near_result[0][0] if near_result else 0
+
+        # Due within 7 days: surge to 0.85
+        self.db.execute(
+            """
+            UPDATE memories SET importance = MAX(importance, 0.85), updated_at = datetime('now')
+            WHERE deadline_at IS NOT NULL
+              AND deadline_at BETWEEN ? AND ?
+              AND invalidated_at IS NULL
+            """,
+            (two_days, one_week),
+        )
+        week_result = self.db.execute("SELECT changes()", fetch=True)
+        week = week_result[0][0] if week_result else 0
+
+        total = overdue + near + week
+        if total > 0:
+            logger.info(f"Deadline surge: {overdue} overdue, {near} within 48h, {week} within 7d")
+
+        return {"overdue_surged": overdue, "near_surged": near, "week_surged": week}
+
     def run_decay(self) -> Dict[str, int]:
         """Apply tiered importance decay to memories and entities.
 
@@ -69,6 +129,13 @@ class ConsolidateService:
         All decays have a floor at min_importance_threshold to prevent memories
         from becoming permanently invisible.
         """
+        # Surge approaching deadlines BEFORE decay (so they resist decay)
+        try:
+            surge_results = self._surge_approaching_deadlines()
+        except Exception as e:
+            logger.debug(f"Deadline surge skipped (column may not exist): {e}")
+            surge_results = {}
+
         decay_rate = self.config.decay_rate_daily
         slow_decay_rate = (1.0 + decay_rate) / 2  # Midpoint between 1.0 and standard rate
         floor = self.config.min_importance_threshold
@@ -171,6 +238,7 @@ class ConsolidateService:
         return {
             "memories_decayed": memories_decayed,
             "reflections_decayed": reflections_decayed,
+            **surge_results,
         }
 
     def boost_accessed_memories(self) -> int:
@@ -237,12 +305,337 @@ class ConsolidateService:
         opportunity_patterns = self.detect_opportunities()
         patterns.extend(opportunity_patterns)
 
+        # Update contact velocity and attention tiers
+        try:
+            self._update_contact_velocity()
+            self._update_attention_tiers()
+            self._generate_reconnection_suggestions()
+        except Exception as e:
+            logger.debug(f"Velocity/tier update skipped (columns may not exist): {e}")
+
         # Store detected patterns
         for pattern in patterns:
             self._store_pattern(pattern)
 
         logger.info(f"Detected {len(patterns)} patterns")
         return patterns
+
+    # ── Contact velocity and attention tiers ────────────────────
+
+    def _update_contact_velocity(self) -> None:
+        """Calculate contact frequency and trend for person entities.
+
+        For each person entity:
+        1. Find all memory timestamps linked to the entity
+        2. Calculate intervals between mentions
+        3. Compute rolling average (last 5 intervals)
+        4. Determine trend: accelerating, stable, decelerating, dormant
+        """
+        entities = self.db.execute(
+            "SELECT id, name FROM entities WHERE type = 'person' AND deleted_at IS NULL",
+            fetch=True,
+        ) or []
+
+        now = datetime.utcnow()
+
+        for entity in entities:
+            # Get all memory timestamps for this entity
+            rows = self.db.execute(
+                """
+                SELECT m.created_at
+                FROM memories m
+                JOIN memory_entities me ON m.id = me.memory_id
+                WHERE me.entity_id = ?
+                  AND m.invalidated_at IS NULL
+                ORDER BY m.created_at ASC
+                """,
+                (entity["id"],),
+                fetch=True,
+            ) or []
+
+            if not rows:
+                continue
+
+            timestamps = []
+            for r in rows:
+                try:
+                    timestamps.append(datetime.fromisoformat(r["created_at"]))
+                except (ValueError, TypeError):
+                    continue
+
+            if not timestamps:
+                continue
+
+            last_contact = timestamps[-1]
+
+            # Calculate intervals between consecutive mentions (in days)
+            intervals = []
+            for i in range(1, len(timestamps)):
+                delta = (timestamps[i] - timestamps[i - 1]).total_seconds() / 86400
+                if delta > 0:
+                    intervals.append(delta)
+
+            # Need at least 2 intervals for trend detection
+            if len(intervals) < 2:
+                avg_freq = intervals[0] if intervals else None
+                trend = "stable"
+            else:
+                # Rolling average: last 5 intervals vs historical
+                recent = intervals[-5:] if len(intervals) >= 5 else intervals
+                avg_freq = sum(recent) / len(recent)
+
+                if len(intervals) >= 4:
+                    historical = intervals[:-len(recent)] if len(intervals) > len(recent) else intervals[:len(intervals) // 2]
+                    hist_avg = sum(historical) / len(historical) if historical else avg_freq
+
+                    ratio = avg_freq / hist_avg if hist_avg > 0 else 1.0
+
+                    if ratio < 0.7:
+                        trend = "accelerating"  # Recent intervals shorter
+                    elif ratio > 1.5:
+                        trend = "decelerating"  # Recent intervals longer
+                    else:
+                        trend = "stable"
+                else:
+                    trend = "stable"
+
+            # Check for dormancy: last contact > 2x average frequency
+            days_since_contact = (now - last_contact).total_seconds() / 86400
+            if avg_freq and days_since_contact > avg_freq * 2 and days_since_contact > 30:
+                trend = "dormant"
+
+            # Update entity
+            self.db.execute(
+                """
+                UPDATE entities
+                SET last_contact_at = ?,
+                    contact_frequency_days = ?,
+                    contact_trend = ?,
+                    updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (
+                    last_contact.isoformat(),
+                    round(avg_freq, 1) if avg_freq else None,
+                    trend,
+                    entity["id"],
+                ),
+            )
+
+        logger.info(f"Updated contact velocity for {len(entities)} entities")
+
+    def _update_attention_tiers(self) -> None:
+        """Assign attention tiers based on recency and deadlines.
+
+        - Active: mentioned in last 7 days OR has deadline within 14 days
+        - Watchlist: decelerating trend OR has deadline within 30 days
+        - Standard: default
+        - Archive: not mentioned in 90+ days AND importance < 0.3
+        """
+        now = datetime.utcnow()
+        seven_days = (now - timedelta(days=7)).isoformat()
+        ninety_days = (now - timedelta(days=90)).isoformat()
+        fourteen_days_ahead = (now + timedelta(days=14)).strftime("%Y-%m-%d %H:%M:%S")
+        thirty_days_ahead = (now + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Reset all to standard first
+        self.db.execute(
+            "UPDATE entities SET attention_tier = 'standard' WHERE deleted_at IS NULL"
+        )
+
+        # Archive: no contact in 90+ days AND low importance
+        self.db.execute(
+            """
+            UPDATE entities SET attention_tier = 'archive'
+            WHERE deleted_at IS NULL
+              AND type = 'person'
+              AND (last_contact_at IS NULL OR last_contact_at < ?)
+              AND importance < 0.3
+            """,
+            (ninety_days,),
+        )
+
+        # Watchlist: decelerating trend OR deadline within 30 days
+        self.db.execute(
+            """
+            UPDATE entities SET attention_tier = 'watchlist'
+            WHERE deleted_at IS NULL
+              AND type = 'person'
+              AND (
+                contact_trend = 'decelerating'
+                OR id IN (
+                    SELECT DISTINCT me.entity_id
+                    FROM memory_entities me
+                    JOIN memories m ON me.memory_id = m.id
+                    WHERE m.deadline_at IS NOT NULL
+                      AND m.deadline_at BETWEEN ? AND ?
+                      AND m.invalidated_at IS NULL
+                )
+              )
+            """,
+            (now_str, thirty_days_ahead),
+        )
+
+        # Active: mentioned in last 7 days OR deadline within 14 days
+        self.db.execute(
+            """
+            UPDATE entities SET attention_tier = 'active'
+            WHERE deleted_at IS NULL
+              AND type = 'person'
+              AND (
+                last_contact_at >= ?
+                OR id IN (
+                    SELECT DISTINCT me.entity_id
+                    FROM memory_entities me
+                    JOIN memories m ON me.memory_id = m.id
+                    WHERE m.deadline_at IS NOT NULL
+                      AND m.deadline_at BETWEEN ? AND ?
+                      AND m.invalidated_at IS NULL
+                )
+              )
+            """,
+            (seven_days, now_str, fourteen_days_ahead),
+        )
+
+        logger.info("Updated attention tiers")
+
+    def _generate_reconnection_suggestions(self) -> None:
+        """Generate actionable reconnection predictions for dormant/decelerating contacts.
+
+        Creates prediction records with context: last topic, open commitments,
+        suggested action.
+        """
+        entities = self.db.execute(
+            """
+            SELECT id, name, contact_trend, last_contact_at, contact_frequency_days
+            FROM entities
+            WHERE type = 'person'
+              AND deleted_at IS NULL
+              AND contact_trend IN ('decelerating', 'dormant')
+              AND importance > 0.3
+            ORDER BY importance DESC
+            LIMIT 20
+            """,
+            fetch=True,
+        ) or []
+
+        now = datetime.utcnow()
+
+        for entity in entities:
+            entity_id = entity["id"]
+            entity_name = entity["name"]
+            trend = entity["contact_trend"]
+
+            # Calculate days since last contact
+            days_since = 0
+            if entity["last_contact_at"]:
+                try:
+                    last_dt = datetime.fromisoformat(entity["last_contact_at"])
+                    days_since = int((now - last_dt).total_seconds() / 86400)
+                except (ValueError, TypeError):
+                    pass
+
+            # Get last topic (most recent memory about this entity)
+            last_memory = self.db.execute(
+                """
+                SELECT m.content FROM memories m
+                JOIN memory_entities me ON m.id = me.memory_id
+                WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                ORDER BY m.created_at DESC LIMIT 1
+                """,
+                (entity_id,),
+                fetch=True,
+            )
+            last_topic = last_memory[0]["content"][:100] if last_memory else "No recent topic"
+
+            # Get open commitments
+            open_commitments = self.db.execute(
+                """
+                SELECT m.content FROM memories m
+                JOIN memory_entities me ON m.id = me.memory_id
+                WHERE me.entity_id = ?
+                  AND m.type = 'commitment'
+                  AND m.invalidated_at IS NULL
+                ORDER BY m.importance DESC LIMIT 3
+                """,
+                (entity_id,),
+                fetch=True,
+            ) or []
+            commitment_list = [c["content"][:80] for c in open_commitments]
+
+            # Build suggestion
+            suggested_action = "Reach out to reconnect"
+            if commitment_list:
+                suggested_action = f"Address open commitment: {commitment_list[0]}"
+
+            priority = 0.7
+            if trend == "dormant":
+                priority = 0.85
+            if commitment_list:
+                priority = min(1.0, priority + 0.1)
+
+            content = (
+                f"Reconnect with {entity_name} ({days_since} days, {trend}). "
+                f"Last topic: {last_topic}. "
+            )
+            if commitment_list:
+                content += f"Open commitments: {'; '.join(commitment_list)}. "
+            content += f"Suggested: {suggested_action}"
+
+            # Store as prediction
+            metadata = json.dumps({
+                "entity_id": entity_id,
+                "entity_name": entity_name,
+                "days_since_contact": days_since,
+                "trend": trend,
+                "open_commitments": commitment_list,
+                "last_topic": last_topic,
+            })
+
+            expires = (now + timedelta(days=14)).isoformat()
+
+            # Check for existing reconnection prediction for this entity
+            existing = self.db.execute(
+                """
+                SELECT id FROM predictions
+                WHERE prediction_type = 'reconnection'
+                  AND metadata LIKE ?
+                  AND expires_at > ?
+                LIMIT 1
+                """,
+                (f'%"entity_id": {entity_id}%', now.isoformat()),
+                fetch=True,
+            )
+
+            if existing:
+                # Update existing
+                self.db.execute(
+                    """
+                    UPDATE predictions
+                    SET content = ?, priority = ?, metadata = ?,
+                        expires_at = ?, updated_at = datetime('now')
+                    WHERE id = ?
+                    """,
+                    (content, priority, metadata, expires, existing[0]["id"]),
+                )
+            else:
+                # Create new
+                self.db.insert(
+                    "predictions",
+                    {
+                        "content": content,
+                        "prediction_type": "reconnection",
+                        "priority": priority,
+                        "expires_at": expires,
+                        "created_at": now.isoformat(),
+                        "updated_at": now.isoformat(),
+                        "metadata": metadata,
+                    },
+                )
+
+        if entities:
+            logger.info(f"Generated {len(entities)} reconnection suggestions")
 
     def _detect_cooling_relationships(self) -> List[DetectedPattern]:
         """Detect relationships that haven't been mentioned recently"""

@@ -367,6 +367,56 @@ class VaultSyncService:
             logger.error(f"Failed to write entity note {filepath}: {e}")
             return None
 
+    def export_entity_by_name(self, name: str) -> Optional[Path]:
+        """Export a single entity by canonical name lookup.
+
+        Convenience method for real-time write-through: looks up the entity
+        by name and exports it. Returns the path of the written file, or None.
+        """
+        from ..extraction.entity_extractor import get_extractor
+        extractor = get_extractor()
+        canonical = extractor.canonical_name(name)
+
+        entity = self.db.get_one(
+            "entities",
+            where="canonical_name = ? AND deleted_at IS NULL",
+            where_params=(canonical,),
+        )
+        if not entity:
+            # Try alias lookup
+            alias_row = self.db.get_one(
+                "entity_aliases",
+                where="canonical_alias = ?",
+                where_params=(canonical,),
+            )
+            if alias_row:
+                entity = self.db.get_one(
+                    "entities",
+                    where="id = ? AND deleted_at IS NULL",
+                    where_params=(alias_row["entity_id"],),
+                )
+
+        if entity:
+            self._ensure_directories()
+            return self.export_entity(entity)
+        return None
+
+    def export_entity_by_id(self, entity_id: int) -> Optional[Path]:
+        """Export a single entity by ID.
+
+        Direct ID-based export for cases where the entity ID is already known.
+        Returns the path of the written file, or None.
+        """
+        entity = self.db.get_one(
+            "entities",
+            where="id = ? AND deleted_at IS NULL",
+            where_params=(entity_id,),
+        )
+        if entity:
+            self._ensure_directories()
+            return self.export_entity(entity)
+        return None
+
     # ── Pattern export ──────────────────────────────────────────
 
     def _export_patterns(self) -> int:
@@ -554,6 +604,113 @@ class VaultSyncService:
 
         return count
 
+    # ── Dataview templates ──────────────────────────────────────
+
+    def _export_dataview_templates(self) -> int:
+        """Generate starter Dataview query notes in _queries/.
+
+        These are created once and never overwritten (user may customize).
+        Returns count of templates created.
+        """
+        queries_dir = self.vault_path / "_queries"
+        queries_dir.mkdir(parents=True, exist_ok=True)
+        created = 0
+
+        templates = {
+            "Upcoming Deadlines.md": (
+                "# Upcoming Deadlines\n\n"
+                "Commitments sorted by deadline date.\n\n"
+                "```dataview\n"
+                "TABLE type, importance, deadline_at\n"
+                "FROM \"people\" OR \"projects\" OR \"organizations\"\n"
+                "WHERE contains(file.content, \"commitment\")\n"
+                "SORT deadline_at ASC\n"
+                "```\n\n"
+                "---\n"
+                "*This query requires the [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugin.*\n"
+            ),
+            "Cooling Relationships.md": (
+                "# Cooling Relationships\n\n"
+                "People sorted by days since last contact.\n\n"
+                "```dataview\n"
+                "TABLE type, importance, last_contact_at, contact_trend\n"
+                "FROM \"people\"\n"
+                "WHERE type = \"person\"\n"
+                "SORT last_contact_at ASC\n"
+                "```\n\n"
+                "---\n"
+                "*This query requires the [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugin.*\n"
+            ),
+            "Recent Memories.md": (
+                "# Recent Memories\n\n"
+                "What Claudia learned this week.\n\n"
+                "```dataview\n"
+                "TABLE type, importance, created_at\n"
+                "FROM \"people\" OR \"projects\" OR \"organizations\" OR \"concepts\"\n"
+                "WHERE date(created_at) >= date(today) - dur(7 days)\n"
+                "SORT created_at DESC\n"
+                "LIMIT 50\n"
+                "```\n\n"
+                "---\n"
+                "*This query requires the [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugin.*\n"
+            ),
+            "Open Commitments.md": (
+                "# Open Commitments\n\n"
+                "All tracked commitments across entities.\n\n"
+                "```dataview\n"
+                "LIST\n"
+                "FROM \"people\" OR \"projects\"\n"
+                "WHERE contains(file.content, \"- [ ]\")\n"
+                "SORT file.name ASC\n"
+                "```\n\n"
+                "---\n"
+                "*This query requires the [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugin.*\n"
+            ),
+            "Network Map.md": (
+                "# Network Map\n\n"
+                "Entities by number of connections.\n\n"
+                "```dataview\n"
+                "TABLE type, importance, length(file.outlinks) as connections\n"
+                "FROM \"people\" OR \"projects\" OR \"organizations\"\n"
+                "SORT length(file.outlinks) DESC\n"
+                "LIMIT 30\n"
+                "```\n\n"
+                "---\n"
+                "*This query requires the [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugin.*\n"
+            ),
+        }
+
+        for filename, content in templates.items():
+            filepath = queries_dir / filename
+            if not filepath.exists():
+                try:
+                    filepath.write_text(content, encoding="utf-8")
+                    created += 1
+                except IOError as e:
+                    logger.error(f"Failed to write Dataview template {filepath}: {e}")
+
+        if created:
+            logger.info(f"Created {created} Dataview query templates in _queries/")
+        return created
+
+    def _check_obsidian_rest_api(self) -> bool:
+        """Check if Obsidian Local REST API plugin is running.
+
+        Pings localhost on the configured port to detect the plugin.
+        Returns True if available, False otherwise.
+        """
+        config = get_config()
+        if not getattr(config, "obsidian_rest_api_enabled", False):
+            return False
+
+        port = getattr(config, "obsidian_rest_api_port", 27124)
+        try:
+            import httpx
+            resp = httpx.get(f"https://localhost:{port}/", timeout=2, verify=False)
+            return resp.status_code in (200, 401)  # 401 means plugin is there but needs auth
+        except Exception:
+            return False
+
     # ── Public sync methods ─────────────────────────────────────
 
     def export_all(self) -> Dict[str, int]:
@@ -587,6 +744,9 @@ class VaultSyncService:
 
         # Export sessions
         stats["sessions"] = self._export_sessions()
+
+        # Export Dataview query templates (only if they don't exist yet)
+        self._export_dataview_templates()
 
         # Save metadata
         self._save_sync_metadata(stats)
@@ -684,6 +844,230 @@ class VaultSyncService:
                 "stats": None,
                 "error": "Could not read sync metadata",
             }
+
+    # ── Bidirectional sync (Phase 4) ────────────────────────────
+
+    def detect_user_edits(self) -> List[Dict[str, Any]]:
+        """Detect notes that users have edited in the vault.
+
+        Walks all .md files, compares content hash to sync_hash in frontmatter.
+        Returns list of edits with file path, entity ID, and change info.
+        """
+        edits = []
+        for subdir in ["people", "projects", "organizations", "concepts", "locations"]:
+            d = self.vault_path / subdir
+            if not d.exists():
+                continue
+            for filepath in d.glob("*.md"):
+                try:
+                    raw = filepath.read_text(encoding="utf-8")
+                    fm, body = self._parse_frontmatter(raw)
+                    if not fm or "sync_hash" not in fm:
+                        continue
+
+                    current_hash = _compute_sync_hash(body)
+                    if current_hash != fm["sync_hash"]:
+                        edits.append({
+                            "file_path": str(filepath),
+                            "entity_id": fm.get("claudia_id"),
+                            "entity_type": fm.get("type"),
+                            "old_hash": fm["sync_hash"],
+                            "new_hash": current_hash,
+                        })
+                except (IOError, UnicodeDecodeError) as e:
+                    logger.debug(f"Could not read vault note {filepath}: {e}")
+
+        return edits
+
+    def import_vault_edit(self, file_path: Path) -> Dict[str, Any]:
+        """Import user edits from a vault note back into SQLite.
+
+        Human edits always win: all changes use origin_type='user_stated'
+        and confidence=1.0.
+
+        Returns summary of changes applied.
+        """
+        from .remember import get_remember_service
+
+        filepath = Path(file_path)
+        raw = filepath.read_text(encoding="utf-8")
+        fm, body = self._parse_frontmatter(raw)
+
+        if not fm or "claudia_id" not in fm:
+            return {"error": "No claudia_id in frontmatter", "file": str(filepath)}
+
+        entity_id = fm["claudia_id"]
+        entity_type = fm.get("type", "concept")
+        svc = get_remember_service()
+        changes = {"entity_id": entity_id, "facts_added": 0, "facts_updated": 0,
+                    "commitments_completed": 0, "description_updated": False}
+
+        # Get current entity from DB
+        entity = self.db.get_one("entities", where="id = ?", where_params=(entity_id,))
+        if not entity:
+            return {"error": f"Entity {entity_id} not found", "file": str(filepath)}
+
+        entity_name = entity["name"]
+
+        # Parse body sections
+        lines = body.strip().split("\n")
+
+        # Extract description (text after title, before first ## heading)
+        desc_lines = []
+        in_desc = False
+        for line in lines:
+            if line.startswith("# "):
+                in_desc = True
+                continue
+            if line.startswith("## "):
+                break
+            if in_desc and line.strip():
+                desc_lines.append(line.strip())
+
+        new_desc = " ".join(desc_lines).strip() if desc_lines else None
+        if new_desc and new_desc != (entity.get("description") or ""):
+            self.db.update(
+                "entities",
+                {"description": new_desc, "updated_at": datetime.utcnow().isoformat()},
+                "id = ?",
+                (entity_id,),
+            )
+            changes["description_updated"] = True
+
+        # Parse commitment checkboxes
+        current_section = None
+        for line in lines:
+            if line.startswith("## "):
+                current_section = line[3:].strip().lower()
+                continue
+
+            if current_section == "commitments":
+                # Check for completed checkboxes: - [x]
+                completed_match = re.match(r"^-\s*\[x\]\s*(.+?)(?:\s*\(.*\))?\s*$", line, re.IGNORECASE)
+                if completed_match:
+                    content = completed_match.group(1).strip()
+                    # Find matching commitment in DB
+                    mem = self.db.execute(
+                        """
+                        SELECT m.id FROM memories m
+                        JOIN memory_entities me ON m.id = me.memory_id
+                        WHERE me.entity_id = ? AND m.type = 'commitment'
+                          AND m.content LIKE ? AND m.invalidated_at IS NULL
+                        LIMIT 1
+                        """,
+                        (entity_id, f"%{content[:40]}%"),
+                        fetch=True,
+                    )
+                    if mem:
+                        from .remember import invalidate_memory
+                        invalidate_memory(mem[0]["id"], reason="completed (marked in vault)")
+                        changes["commitments_completed"] += 1
+
+            elif current_section in ("key facts", "preferences", "observations", "learnings"):
+                # Check for new bullets
+                bullet_match = re.match(r"^-\s+(.+?)(?:\s*\(.*\))?\s*$", line)
+                if bullet_match:
+                    fact_content = bullet_match.group(1).strip()
+                    if not fact_content:
+                        continue
+
+                    # Check if this fact already exists
+                    from ..database import content_hash
+                    fact_hash = content_hash(fact_content)
+                    existing = self.db.get_one(
+                        "memories",
+                        where="content_hash = ?",
+                        where_params=(fact_hash,),
+                    )
+                    if not existing:
+                        # Map section to type
+                        type_map = {
+                            "key facts": "fact",
+                            "preferences": "preference",
+                            "observations": "observation",
+                            "learnings": "learning",
+                        }
+                        mem_type = type_map.get(current_section, "fact")
+                        svc.remember_fact(
+                            content=fact_content,
+                            memory_type=mem_type,
+                            about_entities=[entity_name],
+                            importance=0.8,
+                            origin_type="user_stated",
+                            confidence=1.0,
+                            source="vault_import",
+                        )
+                        changes["facts_added"] += 1
+
+        # Update sync_hash in frontmatter
+        new_hash = _compute_sync_hash(body)
+        updated_raw = raw.replace(
+            f"sync_hash: {fm.get('sync_hash', '')}",
+            f"sync_hash: {new_hash}",
+        )
+        filepath.write_text(updated_raw, encoding="utf-8")
+
+        self._append_sync_log(
+            f"Imported edits from {filepath.name}: "
+            f"{changes['facts_added']} facts, "
+            f"{changes['commitments_completed']} commitments completed"
+        )
+
+        return changes
+
+    def import_all_edits(self) -> Dict[str, Any]:
+        """Scan vault for user edits and import them all.
+
+        Returns summary of all changes applied.
+        """
+        edits = self.detect_user_edits()
+        if not edits:
+            return {"edits_found": 0, "changes": []}
+
+        results = []
+        for edit in edits:
+            try:
+                change = self.import_vault_edit(Path(edit["file_path"]))
+                results.append(change)
+            except Exception as e:
+                logger.warning(f"Failed to import edit from {edit['file_path']}: {e}")
+                results.append({"error": str(e), "file": edit["file_path"]})
+
+        return {"edits_found": len(edits), "changes": results}
+
+    @staticmethod
+    def _parse_frontmatter(raw: str) -> tuple:
+        """Parse YAML frontmatter from a markdown file.
+
+        Returns (frontmatter_dict, body_text) tuple.
+        Returns (None, raw) if no frontmatter found.
+        """
+        if not raw.startswith("---"):
+            return None, raw
+
+        parts = raw.split("---", 2)
+        if len(parts) < 3:
+            return None, raw
+
+        fm_text = parts[1].strip()
+        body = parts[2].strip()
+
+        try:
+            import yaml
+            fm = yaml.safe_load(fm_text)
+            if not isinstance(fm, dict):
+                return None, raw
+            return fm, body
+        except ImportError:
+            # Fallback: simple key-value parsing
+            fm = {}
+            for line in fm_text.split("\n"):
+                if ":" in line:
+                    key, _, value = line.partition(":")
+                    fm[key.strip()] = value.strip()
+            return fm, body
+        except Exception:
+            return None, raw
 
 
 # ── Module-level convenience functions ──────────────────────────

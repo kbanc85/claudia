@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import sys
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from mcp.server import Server
@@ -39,6 +40,10 @@ from ..services.recall import (
     recall,
     recall_about,
     recall_episodes,
+    recall_since,
+    recall_temporal,
+    recall_timeline,
+    recall_upcoming_deadlines,
     search_entities,
     search_reflections,
     trace_memory,
@@ -1243,6 +1248,134 @@ async def list_tools() -> ListToolsResult:
                 "required": ["canvas_type"],
             },
         ),
+        Tool(
+            name="memory.import_vault_edits",
+            description=(
+                "Scan the Obsidian vault for notes that the user has edited and import "
+                "changes back into Claudia's memory. Human edits always win (applied with "
+                "origin_type='user_stated', confidence=1.0). Detects: description changes, "
+                "new facts, commitment completions (checkbox changes)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="memory.reconnections",
+            description=(
+                "Get reconnection suggestions for contacts trending toward dormancy. "
+                "Each suggestion includes: person name, days since contact, trend, "
+                "last topic, open commitments, and a suggested action. "
+                "Use in morning briefs and relationship health checks."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum suggestions to return",
+                        "default": 10,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.upcoming",
+            description=(
+                "Get upcoming deadlines from committed tasks. Returns memories with deadlines "
+                "grouped by urgency: overdue, today, tomorrow, this_week, later. "
+                "Essential for morning briefs and accountability checks."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Look ahead window in days",
+                        "default": 14,
+                    },
+                    "include_overdue": {
+                        "type": "boolean",
+                        "description": "Include overdue items (past deadline)",
+                        "default": True,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="memory.since",
+            description=(
+                "Get memories created or updated since a specific time. "
+                "Use for 'what's new since last session' or tracking changes over a period."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "since": {
+                        "type": "string",
+                        "description": "ISO datetime string (e.g., '2026-02-10T00:00:00')",
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Optional: filter to memories about a specific entity",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum results",
+                        "default": 50,
+                    },
+                },
+                "required": ["since"],
+            },
+        ),
+        Tool(
+            name="memory.timeline",
+            description=(
+                "Temporal view of an entity: all memories sorted chronologically "
+                "with deadlines highlighted. Shows the full history of interactions "
+                "and commitments related to a person, project, or organization."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {
+                        "type": "string",
+                        "description": "Name of the entity to view timeline for",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum results",
+                        "default": 50,
+                    },
+                },
+                "required": ["entity"],
+            },
+        ),
+        Tool(
+            name="memory.project_health",
+            description=(
+                "Project when a relationship will go dormant based on contact velocity. "
+                "Returns projected dormant date, recommended contact date, risk level, "
+                "and open commitments. Ask 'if I don't contact [person], when will they go dormant?' "
+                "or 'which relationships need attention in the next 2 weeks?'"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {
+                        "type": "string",
+                        "description": "Name of the person to project health for",
+                    },
+                    "days_ahead": {
+                        "type": "integer",
+                        "description": "How far ahead to project (default 30)",
+                        "default": 30,
+                    },
+                },
+                "required": ["entity"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -2257,6 +2390,124 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     isError=True,
                 )
 
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+            )
+
+        elif name == "memory.import_vault_edits":
+            from ..config import _project_id
+            from ..services.vault_sync import get_vault_sync_service
+            vault_svc = get_vault_sync_service(_project_id)
+            result = vault_svc.import_all_edits()
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+            )
+
+        elif name == "memory.reconnections":
+            limit = arguments.get("limit", 10)
+            now_str = datetime.utcnow().isoformat()
+            rows = get_db().execute(
+                """
+                SELECT content, priority, metadata
+                FROM predictions
+                WHERE prediction_type = 'reconnection'
+                  AND expires_at > ?
+                ORDER BY priority DESC
+                LIMIT ?
+                """,
+                (now_str, limit),
+                fetch=True,
+            ) or []
+
+            suggestions = []
+            for row in rows:
+                meta = {}
+                try:
+                    meta = json.loads(row["metadata"]) if row["metadata"] else {}
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                suggestions.append({
+                    "person": meta.get("entity_name", "Unknown"),
+                    "days_since_contact": meta.get("days_since_contact", 0),
+                    "trend": meta.get("trend", "unknown"),
+                    "last_topic": meta.get("last_topic", ""),
+                    "open_commitments": meta.get("open_commitments", []),
+                    "suggestion": row["content"],
+                    "priority": row["priority"],
+                })
+
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(suggestions, indent=2))]
+            )
+
+        elif name == "memory.upcoming":
+            from ..services.recall import recall_upcoming_deadlines
+            days = arguments.get("days", 14)
+            include_overdue = arguments.get("include_overdue", True)
+            results = recall_upcoming_deadlines(days, include_overdue=include_overdue)
+
+            # Group by urgency
+            grouped = {"overdue": [], "today": [], "tomorrow": [], "this_week": [], "later": []}
+            for r in results:
+                urgency = (r.metadata or {}).get("urgency", "later")
+                deadline = (r.metadata or {}).get("deadline_at", "")
+                grouped.setdefault(urgency, []).append({
+                    "id": r.id,
+                    "content": r.content,
+                    "deadline_at": deadline,
+                    "importance": r.importance,
+                    "entities": r.entities[:3],
+                })
+
+            # Remove empty groups
+            grouped = {k: v for k, v in grouped.items() if v}
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(grouped, indent=2))]
+            )
+
+        elif name == "memory.since":
+            from ..services.recall import recall_since
+            since = arguments["since"]
+            entity = arguments.get("entity")
+            limit = arguments.get("limit", 50)
+            results = recall_since(since, entity_name=entity, limit=limit)
+
+            formatted = [{
+                "id": r.id,
+                "content": r.content,
+                "type": r.memory_type,
+                "created_at": r.created_at,
+                "importance": r.importance,
+                "entities": r.entities[:3],
+            } for r in results]
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
+            )
+
+        elif name == "memory.timeline":
+            from ..services.recall import recall_timeline
+            entity = arguments["entity"]
+            limit = arguments.get("limit", 50)
+            results = recall_timeline(entity, limit=limit)
+
+            formatted = [{
+                "id": r.id,
+                "content": r.content,
+                "type": r.memory_type,
+                "created_at": r.created_at,
+                "importance": r.importance,
+                "deadline_at": (r.metadata or {}).get("deadline_at"),
+                "has_deadline": (r.metadata or {}).get("has_deadline", False),
+            } for r in results]
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
+            )
+
+        elif name == "memory.project_health":
+            from ..services.recall import project_relationship_health
+            entity = arguments["entity"]
+            days_ahead = arguments.get("days_ahead", 30)
+            result = project_relationship_health(entity, days_ahead)
             return CallToolResult(
                 content=[TextContent(type="text", text=json.dumps(result, indent=2))]
             )

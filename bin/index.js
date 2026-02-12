@@ -218,143 +218,80 @@ async function main() {
     });
   }
 
-  // Helper: run visualizer install script and call back when done (auto-install, no prompt)
-  function runVisualizerSetup(callback) {
-    console.log(`\n${colors.boldYellow}━━━ Phase 2/4: Brain Visualizer ━━━${colors.reset}\n`);
+  // Helper: set up Obsidian vault and detect Obsidian installation
+  function runObsidianSetup(callback) {
+    console.log(`\n${colors.boldYellow}━━━ Phase 2/2: Obsidian Vault ━━━${colors.reset}\n`);
 
-    const visualizerScriptPath = isWindows
-      ? join(__dirname, '..', 'visualizer', 'scripts', 'install.ps1')
-      : join(__dirname, '..', 'visualizer', 'scripts', 'install.sh');
+    let obsidianDetected = false;
 
-    if (!existsSync(visualizerScriptPath)) {
-      console.log(`${colors.yellow}!${colors.reset} Visualizer files not found. Skipping.`);
-      callback(false);
-      return;
+    // Platform-specific Obsidian detection
+    if (process.platform === 'darwin') {
+      obsidianDetected = existsSync('/Applications/Obsidian.app');
+    } else if (isWindows) {
+      const localAppData = process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local');
+      obsidianDetected = existsSync(join(localAppData, 'Obsidian', 'Obsidian.exe'));
+    } else {
+      // Linux: check if obsidian is on PATH
+      try {
+        const which = spawn('which', ['obsidian'], { stdio: 'pipe' });
+        which.on('close', (code) => {
+          obsidianDetected = code === 0;
+          finishObsidianSetup(obsidianDetected, callback);
+        });
+        which.on('error', () => {
+          finishObsidianSetup(false, callback);
+        });
+        return; // Wait for async which to complete on Linux
+      } catch {
+        obsidianDetected = false;
+      }
     }
 
-    try {
-      const spawnCmd = isWindows ? powershellPath : 'bash';
-      const spawnArgs = isWindows
-        ? ['-ExecutionPolicy', 'Bypass', '-File', visualizerScriptPath]
-        : [visualizerScriptPath];
-      const vizResult = spawn(spawnCmd, spawnArgs, {
-        stdio: 'inherit'
-      });
-
-      vizResult.on('close', (code) => {
-        if (code === 0) {
-          console.log(`${colors.green}✓${colors.reset} Brain visualizer installed`);
-          callback(true);
-        } else {
-          console.log(`${colors.yellow}!${colors.reset} Visualizer setup had issues. You can run it later with:`);
-          if (isWindows) {
-            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${visualizerScriptPath}"${colors.reset}`);
-          } else {
-            console.log(`  ${colors.cyan}bash ${visualizerScriptPath}${colors.reset}`);
-          }
-          callback(false);
-        }
-      });
-    } catch (error) {
-      console.log(`${colors.yellow}!${colors.reset} Could not set up visualizer: ${error.message}`);
-      callback(false);
-    }
+    finishObsidianSetup(obsidianDetected, callback);
   }
 
-  // Helper: run gateway install script and call back when done
-  function runGatewaySetup(callback) {
-    console.log(`\n${colors.boldYellow}━━━ Phase 3/4: Messaging Gateway ━━━${colors.reset}\n`);
-
-    const gatewayScriptPath = isWindows
-      ? join(__dirname, '..', 'gateway', 'scripts', 'install.ps1')
-      : join(__dirname, '..', 'gateway', 'scripts', 'install.sh');
-
-    if (!existsSync(gatewayScriptPath)) {
-      console.log(`${colors.yellow}!${colors.reset} Gateway files not found. Skipping.`);
-      callback(false);
-      return;
+  function finishObsidianSetup(obsidianDetected, callback) {
+    if (obsidianDetected) {
+      console.log(`${colors.green}✓${colors.reset} Obsidian detected`);
+    } else {
+      console.log(`${colors.yellow}○${colors.reset} Obsidian not found (optional, recommended)`);
+      if (process.platform === 'darwin') {
+        console.log(`  Install: ${colors.cyan}brew install --cask obsidian${colors.reset} or download from ${colors.cyan}https://obsidian.md${colors.reset}`);
+      } else if (isWindows) {
+        console.log(`  Install: ${colors.cyan}winget install Obsidian.Obsidian${colors.reset} or download from ${colors.cyan}https://obsidian.md${colors.reset}`);
+      } else {
+        console.log(`  Install: ${colors.cyan}snap install obsidian --classic${colors.reset} or download AppImage from ${colors.cyan}https://obsidian.md${colors.reset}`);
+      }
     }
 
-    try {
-      const spawnCmd = isWindows ? powershellPath : 'bash';
-      const spawnArgs = isWindows
-        ? ['-ExecutionPolicy', 'Bypass', '-File', gatewayScriptPath]
-        : [gatewayScriptPath];
-      const gwResult = spawn(spawnCmd, spawnArgs, {
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          CLAUDIA_GATEWAY_UPGRADE: isUpgrade ? '1' : '0',
-          CLAUDIA_GATEWAY_SKIP_SETUP: '1'
-        }
-      });
+    // Create vault directory
+    const vaultPath = join(homedir(), '.claudia', 'vault');
+    mkdirSync(vaultPath, { recursive: true });
+    console.log(`${colors.green}✓${colors.reset} Vault directory ready at ~/.claudia/vault/`);
 
-      gwResult.on('close', (code) => {
-        if (code === 0) {
-          console.log(`${colors.green}✓${colors.reset} Gateway installed`);
-          callback(true);
-        } else {
-          console.log(`${colors.yellow}!${colors.reset} Gateway setup had issues. You can run it later with:`);
-          if (isWindows) {
-            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${gatewayScriptPath}"${colors.reset}`);
-          } else {
-            console.log(`  ${colors.cyan}bash ${gatewayScriptPath}${colors.reset}`);
-          }
-          callback(false);
-        }
-      });
-    } catch (error) {
-      console.log(`${colors.yellow}!${colors.reset} Could not set up gateway: ${error.message}`);
-      callback(false);
-    }
-  }
+    // Create minimal .obsidian config inside vault
+    const obsidianDir = join(vaultPath, '.obsidian');
+    mkdirSync(obsidianDir, { recursive: true });
 
-  // Helper: run relay install script and call back when done
-  function runRelaySetup(callback) {
-    console.log(`\n${colors.boldYellow}━━━ Phase 4/4: Telegram Relay ━━━${colors.reset}\n`);
+    writeFileSync(join(obsidianDir, 'app.json'), JSON.stringify({
+      vimMode: false,
+      strictLineBreaks: true
+    }, null, 2));
 
-    const relayScriptPath = isWindows
-      ? join(__dirname, '..', 'relay', 'scripts', 'install.ps1')
-      : join(__dirname, '..', 'relay', 'scripts', 'install.sh');
+    writeFileSync(join(obsidianDir, 'graph.json'), JSON.stringify({
+      colorGroups: [
+        { query: 'tag:#person', color: { a: 1, rgb: 3329330 } },
+        { query: 'tag:#project', color: { a: 1, rgb: 14355762 } },
+        { query: 'tag:#organization', color: { a: 1, rgb: 10159730 } }
+      ]
+    }, null, 2));
 
-    if (!existsSync(relayScriptPath)) {
-      console.log(`${colors.yellow}!${colors.reset} Relay files not found. Skipping.`);
-      callback(false);
-      return;
-    }
+    writeFileSync(join(obsidianDir, 'community-plugins.json'), JSON.stringify([], null, 2));
 
-    try {
-      const spawnCmd = isWindows ? powershellPath : 'bash';
-      const spawnArgs = isWindows
-        ? ['-ExecutionPolicy', 'Bypass', '-File', relayScriptPath]
-        : [relayScriptPath];
-      const relayResult = spawn(spawnCmd, spawnArgs, {
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          CLAUDIA_RELAY_UPGRADE: isUpgrade ? '1' : '0',
-          CLAUDIA_RELAY_SKIP_SETUP: '1'
-        }
-      });
+    console.log(`${colors.green}✓${colors.reset} Obsidian config created`);
+    console.log(`${colors.dim}  Recommended plugin: Dataview (for dynamic queries)${colors.reset}`);
 
-      relayResult.on('close', (code) => {
-        if (code === 0) {
-          console.log(`${colors.green}✓${colors.reset} Relay installed`);
-          callback(true);
-        } else {
-          console.log(`${colors.yellow}!${colors.reset} Relay setup had issues. You can run it later with:`);
-          if (isWindows) {
-            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${relayScriptPath}"${colors.reset}`);
-          } else {
-            console.log(`  ${colors.cyan}bash ${relayScriptPath}${colors.reset}`);
-          }
-          callback(false);
-        }
-      });
-    } catch (error) {
-      console.log(`${colors.yellow}!${colors.reset} Could not set up relay: ${error.message}`);
-      callback(false);
-    }
+    callback(obsidianDetected);
   }
 
   // Helper: run system health check after install
@@ -391,42 +328,19 @@ async function main() {
   }
 
   // Helper: finish install after optional components
-  function finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled) {
+  function finishInstall(memoryInstalled, obsidianDetected) {
     if (memoryInstalled) {
       // Run health check when memory system was installed
       runSystemHealthCheck((healthy) => {
-        showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled, healthy);
+        showNextSteps(memoryInstalled, obsidianDetected, healthy);
       });
     } else {
-      showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled, true);
-    }
-  }
-
-  // Helper: run relay setup after gateway, then finish
-  function maybeRunRelay(memoryInstalled, visualizerInstalled, gatewayInstalled) {
-    runRelaySetup((relayOk) => finishInstall(memoryInstalled, visualizerInstalled, gatewayInstalled, relayOk));
-  }
-
-  // Helper: run gateway setup (auto-install like visualizer), then chain to relay
-  function maybeRunGateway(memoryInstalled, visualizerInstalled) {
-    runGatewaySetup((gatewayOk) => maybeRunRelay(memoryInstalled, visualizerInstalled, gatewayOk));
-  }
-
-  // Helper: auto-install visualizer after memory, then chain to gateway
-  // On upgrades, always attempt visualizer install even if memory step had issues,
-  // since the database likely already exists from a prior install.
-  function maybeRunVisualizer(memoryInstalled) {
-    const memoryDbExists = existsSync(join(homedir(), '.claudia', 'memory'));
-    if (memoryInstalled || isUpgrade || memoryDbExists) {
-      runVisualizerSetup((vizOk) => maybeRunGateway(memoryInstalled, vizOk));
-    } else {
-      // Fresh install with no memory system -- skip visualizer
-      maybeRunGateway(memoryInstalled, false);
+      showNextSteps(memoryInstalled, obsidianDetected, true);
     }
   }
 
   // Memory system always installs (no prompt)
-  console.log(`\n${colors.boldYellow}━━━ Phase 1/4: Memory System ━━━${colors.reset}\n`);
+  console.log(`\n${colors.boldYellow}━━━ Phase 1/2: Memory System ━━━${colors.reset}\n`);
 
   const memoryDaemonPath = isWindows
     ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
@@ -480,7 +394,7 @@ async function main() {
           // Seed demo database if --demo flag was passed
           if (isDemoMode) {
             const mcpPathForDemo = join(targetPath, '.mcp.json');
-            seedDemoDatabase(targetPath, mcpPathForDemo, () => maybeRunVisualizer(memoryOk));
+            seedDemoDatabase(targetPath, mcpPathForDemo, () => runObsidianSetup((obsidianOk) => finishInstall(memoryOk, obsidianOk)));
             return; // Wait for demo seed to complete
           }
         } else {
@@ -492,8 +406,8 @@ async function main() {
           }
         }
 
-        // Chain visualizer setup (auto), then gateway
-        maybeRunVisualizer(memoryOk);
+        // Chain Obsidian vault setup, then finish
+        runObsidianSetup((obsidianOk) => finishInstall(memoryOk, obsidianOk));
       });
 
       return; // Wait for spawn to complete
@@ -505,10 +419,10 @@ async function main() {
     console.log(`${colors.yellow}!${colors.reset} Memory daemon files not found. Skipping.`);
   }
 
-  // Memory failed to spawn -- continue with visualizer/gateway
-  maybeRunVisualizer(false);
+  // Memory failed to spawn -- continue with Obsidian setup
+  runObsidianSetup((obsidianOk) => finishInstall(false, obsidianOk));
 
-  function showNextSteps(memoryInstalled, visualizerInstalled, gatewayInstalled, relayInstalled, systemHealthy = true) {
+  function showNextSteps(memoryInstalled, obsidianDetected, systemHealthy = true) {
     const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
 
     // Installation summary
@@ -518,17 +432,7 @@ async function main() {
     const warn = `${colors.yellow}○${colors.reset}`;
 
     console.log(`${memoryInstalled ? check : warn} Memory system    ${memoryInstalled ? 'Active' : 'Skipped'}`);
-    console.log(`${visualizerInstalled ? check : warn} Brain visualizer ${visualizerInstalled ? 'Active' : 'Skipped'}`);
-    console.log(`${gatewayInstalled ? check : warn} Gateway          ${gatewayInstalled ? 'Installed' : 'Skipped'}`);
-    console.log(`${relayInstalled ? check : warn} Telegram relay   ${relayInstalled ? 'Installed' : 'Skipped'}`);
-
-    if (gatewayInstalled) {
-      console.log(`${colors.yellow}->${colors.reset} Configure tokens: ~/.claudia/gateway.json`);
-    }
-
-    if (relayInstalled) {
-      console.log(`${colors.yellow}->${colors.reset} Configure relay: run /setup-telegram inside Claude`);
-    }
+    console.log(`${obsidianDetected ? check : warn} Obsidian vault    ${obsidianDetected ? 'Detected' : 'Not found (optional)'}`);
 
     if (!systemHealthy) {
       console.log(`\n${colors.yellow}Some issues were detected above.${colors.reset}`);

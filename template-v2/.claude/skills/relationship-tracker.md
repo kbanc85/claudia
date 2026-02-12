@@ -147,6 +147,31 @@ Track where relationships are in their development:
 
 ---
 
+## Automatic Path Discovery
+
+When the user mentions wanting to connect with someone new or reach a specific person/organization:
+
+1. **Proactively check the graph** using `memory.find_path` BEFORE the user asks
+2. **If a path exists**, share it: "By the way, you're connected to [target] through [intermediate contacts]"
+3. **If no direct path**, check if any existing contacts work at the same organization or in the same industry
+
+### Velocity-Aware Surfacing
+
+When discussing a person, include their contact velocity trend if relevant:
+- **Decelerating**: "Your contact with [person] has been slowing down. Last spoke [X] days ago."
+- **Dormant**: "You haven't been in touch with [person] for a while. Want to reconnect? Last topic was [context]."
+- **Accelerating**: This is healthy, no need to surface unless there's an open commitment.
+
+### Reconnection Context
+
+When surfacing reconnection suggestions (from `memory.reconnections`), include:
+- Days since last contact
+- Last topic discussed
+- Any open commitments (especially overdue ones)
+- Suggested action based on the context
+
+---
+
 ## Discretion
 
 **What I surface depends on context:**

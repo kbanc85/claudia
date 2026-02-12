@@ -198,6 +198,11 @@ def main():
         action="store_true",
         help="Export memory to Obsidian vault and exit (full rebuild)",
     )
+    parser.add_argument(
+        "--import-vault",
+        action="store_true",
+        help="Import user edits from Obsidian vault back into memory and exit",
+    )
 
     args = parser.parse_args()
 
@@ -689,6 +694,30 @@ def main():
             print(f"  {key}: {value}")
         print(f"\nVault at: {vault_path}")
         print("Open this folder in Obsidian to browse your memory graph.")
+        return
+
+    if args.import_vault:
+        setup_logging(debug=args.debug)
+        from .services.vault_sync import get_vault_path, get_vault_sync_service
+
+        db = get_db()
+        db.initialize()
+        vault_path = get_vault_path(project_id)
+        print(f"Scanning vault for user edits: {vault_path}")
+        svc = get_vault_sync_service(project_id)
+        try:
+            results = svc.import_all_edits()
+        except Exception as e:
+            print(f"Error importing vault edits: {e}")
+            sys.exit(1)
+
+        if not results:
+            print("No user edits detected in vault.")
+        else:
+            print(f"Imported {len(results)} edits from vault:")
+            for r in results:
+                status = "OK" if r.get("success") else "FAILED"
+                print(f"  [{status}] {r.get('file', 'unknown')}: {r.get('summary', '')}")
         return
 
     # Run the daemon

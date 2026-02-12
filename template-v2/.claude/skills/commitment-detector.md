@@ -213,6 +213,45 @@ Move from active to completed section with date.
 
 ---
 
+## Deadline Extraction
+
+When detecting commitments, identify any explicit or implicit deadlines:
+
+### Supported Patterns
+
+- **Explicit dates**: "by Friday", "due March 15", "before end of month"
+- **Relative dates**: "in 2 weeks", "next Monday", "tomorrow"
+- **Quarter-based**: "Q2", "end of quarter", "before Q3"
+
+### How It Works
+
+The memory system automatically extracts and indexes deadlines when storing commitments. When calling `memory.remember` with `type: "commitment"`, include the full commitment text with the deadline language. The system will:
+
+1. Parse temporal references from the content
+2. Resolve relative dates to absolute ISO dates
+3. Store the resolved date in `deadline_at` for indexing
+4. Track the raw temporal markers for context
+
+### What to Tell the User
+
+When a commitment has a detected deadline, confirm it:
+```
+"Got it. I've noted your commitment to [X] with a deadline of [resolved date]."
+```
+
+If the resolved date seems wrong (e.g., "next Friday" resolving to the wrong week), the user can correct it and the system will update.
+
+### Integration with Warnings
+
+Deadlines drive the importance surge system:
+- **Overdue**: Importance surges to 1.0 (highest priority)
+- **Due within 48 hours**: Importance surges to 0.95
+- **Due within 7 days**: Importance surges to 0.85
+
+This means approaching deadlines naturally float to the top of recall results and morning briefs without manual prioritization.
+
+---
+
 ## Integration
 
 ### With Relationship Tracker

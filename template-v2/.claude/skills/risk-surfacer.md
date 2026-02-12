@@ -210,6 +210,39 @@ Look ahead 7 days:
 
 ---
 
+## Velocity-Based Risk Detection
+
+Use contact velocity trends (from entity metadata) instead of fixed time thresholds for smarter risk detection:
+
+### Trend-Based Alerts
+
+| Trend | Risk Signal | Action |
+|-------|------------|--------|
+| **Decelerating** on active relationship | Early warning | Surface in morning brief |
+| **Dormant** with open commitments | High risk | Immediate alert |
+| Multiple **decelerating** in same project | Systemic risk | Flag project-level concern |
+| **Accelerating** with overdue commitments | Paradox (talking more, delivering less) | Surface the disconnect |
+
+### What to Include
+
+When surfacing relationship risks, always include:
+- Days since last contact
+- Current trend (accelerating/stable/decelerating/dormant)
+- Any open commitments involving that person
+- Suggested action based on context (not generic "reach out")
+
+### Attention Tiers
+
+The memory system assigns attention tiers to entities:
+- **Active**: Mentioned in last 7 days or has deadline within 14 days
+- **Watchlist**: Decelerating trend or deadline within 30 days
+- **Standard**: Normal, no special attention needed
+- **Archive**: Not mentioned in 90+ days, low importance
+
+Focus risk surfacing on **Active** and **Watchlist** entities. Don't alert about Archive-tier contacts unless they have open commitments.
+
+---
+
 ## Integration
 
 ### Morning Brief Integration

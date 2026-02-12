@@ -114,24 +114,75 @@ Open it in Obsidian to see the interactive graph."
 
 ---
 
-## Handling User Edits (Phase 1)
+## Deep Links
 
-In the current phase, the vault is **read-only from Claudia's side**. User edits in Obsidian are NOT automatically synced back.
-
-### When the user edits a note in Obsidian
-
-If the user says "I updated Sarah's note in Obsidian" or "I changed some info in the vault":
-
-1. Ask what they changed
-2. Apply the changes to memory using the appropriate tools (`memory.correct`, `memory.entity`, `memory.relate`, etc.)
-3. The next sync will overwrite their Obsidian edits with the corrected memory data
-
-### User guidance
+When referencing entities in conversation, generate `obsidian://` URIs so the user can jump directly to the note:
 
 ```
-"Right now, changes in Obsidian don't flow back to my memory automatically.
-If you edit a note, just tell me what you changed and I'll update my memory.
-The next sync will then reflect the corrected info."
+obsidian://open?vault=claudia-vault&file={type_dir}/{entity_name}
+```
+
+### Type-to-Directory Mapping
+
+| Entity Type | Directory |
+|-------------|-----------|
+| person | people |
+| project | projects |
+| organization | organizations |
+| concept | concepts |
+| location | locations |
+
+### Examples
+
+- `obsidian://open?vault=claudia-vault&file=people/Sarah%20Chen`
+- `obsidian://open?vault=claudia-vault&file=projects/Website%20Redesign`
+
+### When to Include Deep Links
+
+- Morning briefs: link each person/project mentioned
+- Meeting prep: link to the person's note
+- Relationship tracking: link entities when surfacing context
+- Reconnection suggestions: link to the person's note
+
+### Vault Name
+
+The vault name defaults to `claudia-vault` but is configurable via `vault_name` in `~/.claudia/config.json`. URL-encode entity names with spaces.
+
+---
+
+## Bidirectional Sync
+
+User edits in Obsidian can flow back to Claudia's memory. The sync uses `sync_hash` in YAML frontmatter to detect changes.
+
+### Automatic Detection
+
+Each entity note has a `sync_hash` in its frontmatter. When the note content changes (user edits), the hash no longer matches. Claudia detects this during import.
+
+### What Gets Imported
+
+| Edit Type | How It's Handled |
+|-----------|------------------|
+| Description changes | Entity description updated |
+| New bullets in Key Facts | New memories created (origin: user_stated) |
+| Checkbox completions (- [x]) | Commitment marked completed |
+| Removed lines | Memory invalidated (reason: user_removed_from_vault) |
+
+### Human Edits Always Win
+
+All imported changes use `origin_type='user_stated'` and `confidence=1.0`. If there's a conflict between vault content and memory, the vault version takes priority.
+
+### Running Import
+
+- **MCP tool:** `memory.import_vault_edits` scans for changes and applies them
+- **CLI:** `python3 -m claudia_memory --import-vault`
+- **Nightly sync** continues as a safety net for anything missed
+
+### User Guidance
+
+```
+"You can edit notes directly in Obsidian. Change descriptions, add facts,
+check off completed commitments. Run /sync-vault or ask me to import your
+edits and I'll update my memory to match."
 ```
 
 ---

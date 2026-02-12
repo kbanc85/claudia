@@ -822,6 +822,68 @@ class Database:
             conn.commit()
             logger.info("Applied migration 16: source_channel on memories")
 
+        if current_version < 17:
+            # Migration 17: Temporal intelligence -- deadline tracking on memories
+            migration_stmts = [
+                "ALTER TABLE memories ADD COLUMN deadline_at TEXT",
+                "ALTER TABLE memories ADD COLUMN temporal_markers TEXT",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"Migration 17 statement failed: {e}")
+
+            # Index for deadline queries (upcoming deadlines, overdue items)
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memories_deadline ON memories(deadline_at)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 17 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (17, 'Add deadline_at and temporal_markers to memories for temporal intelligence')"
+            )
+            conn.commit()
+            logger.info("Applied migration 17: temporal intelligence (deadline tracking)")
+
+        if current_version < 18:
+            # Migration 18: Proactive relationship intelligence -- contact velocity + attention tiers
+            migration_stmts = [
+                "ALTER TABLE entities ADD COLUMN last_contact_at TEXT",
+                "ALTER TABLE entities ADD COLUMN contact_frequency_days REAL",
+                "ALTER TABLE entities ADD COLUMN contact_trend TEXT",
+                "ALTER TABLE entities ADD COLUMN attention_tier TEXT DEFAULT 'standard'",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"Migration 18 statement failed: {e}")
+
+            # Indexes for velocity and tier queries
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_last_contact ON entities(last_contact_at)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_trend ON entities(contact_trend)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_attention_tier ON entities(attention_tier)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 18 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (18, 'Add contact velocity and attention tier to entities for proactive relationship intelligence')"
+            )
+            conn.commit()
+            logger.info("Applied migration 18: proactive relationship intelligence (velocity, tiers)")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -959,6 +1021,16 @@ class Database:
         if "source_channel" not in memory_cols:
             logger.warning("Migration 16 incomplete: memories missing source_channel column")
             return 15
+
+        # Migration 17 added deadline_at, temporal_markers to memories
+        if "deadline_at" not in memory_cols or "temporal_markers" not in memory_cols:
+            logger.warning("Migration 17 incomplete: memories missing temporal columns")
+            return 16
+
+        # Migration 18 added contact velocity + attention tier to entities
+        if "last_contact_at" not in entity_cols or "attention_tier" not in entity_cols:
+            logger.warning("Migration 18 incomplete: entities missing velocity/tier columns")
+            return 17
 
         return None  # All good
 

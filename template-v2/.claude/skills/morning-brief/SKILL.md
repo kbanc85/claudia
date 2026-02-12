@@ -28,6 +28,23 @@ Use `context/commitments.md`, `context/waiting.md`, and `people/` files.
 
 ---
 
+## Temporal Awareness
+
+When enhanced memory is available, use urgency-driven ordering. Call `memory.upcoming` and `memory.since` to organize the brief by time sensitivity:
+
+### Urgency Tiers (in order)
+
+1. **Urgent** (`memory.upcoming` with days=2): Overdue commitments + due today + due tomorrow. These lead the brief.
+2. **This Week** (`memory.upcoming` with days=7): Remaining commitments due this week.
+3. **Since Last Session** (`memory.since`): New memories, entities, and changes since the last conversation.
+4. **Reconnections** (`memory.reconnections`): People trending toward dormancy who need attention, with context (last topic, open commitments).
+5. **Cooling Relationships**: From pattern detection (existing behavior).
+6. **Reflections**: Active high-importance reflections from `/meditate`.
+
+The brief should be urgency-driven, not category-driven. The old approach said "here are your commitments." The new approach says "here's what needs your attention RIGHT NOW."
+
+---
+
 ## What to Surface
 
 ### 1. Predictions First (Enhanced Memory)

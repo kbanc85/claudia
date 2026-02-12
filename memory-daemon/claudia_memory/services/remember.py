@@ -201,6 +201,22 @@ class RememberService:
             else:
                 origin_type = "inferred"
 
+        # Extract deadline for commitments (temporal intelligence)
+        deadline_at = None
+        temporal_markers_json = None
+        if memory_type == "commitment":
+            try:
+                from ..extraction.temporal import (
+                    extract_deadline,
+                    extract_temporal_markers,
+                    build_temporal_markers_json,
+                )
+                deadline_at = extract_deadline(content)
+                markers = extract_temporal_markers(content)
+                temporal_markers_json = build_temporal_markers_json(markers)
+            except Exception as e:
+                logger.debug(f"Deadline extraction failed: {e}")
+
         # Insert new memory
         insert_data = {
             "content": content,
@@ -219,6 +235,10 @@ class RememberService:
             insert_data["source_context"] = source_context
         if source_channel:
             insert_data["source_channel"] = source_channel
+        if deadline_at:
+            insert_data["deadline_at"] = deadline_at
+        if temporal_markers_json:
+            insert_data["temporal_markers"] = temporal_markers_json
 
         memory_id = self.db.insert("memories", insert_data)
 
@@ -258,6 +278,10 @@ class RememberService:
             details={"type": memory_type, "source": source, "importance": importance},
             memory_id=memory_id,
         )
+
+        # Real-time vault write-through: update vault notes for linked entities
+        if about_entities:
+            self._vault_write_through(about_entities)
 
         return memory_id
 
@@ -368,7 +392,32 @@ class RememberService:
                 except Exception:
                     pass  # Duplicate alias, ignore
 
+        # Real-time vault write-through for this entity
+        self._vault_write_through([name])
+
         return entity_id
+
+    def _vault_write_through(self, entity_names: List[str]) -> None:
+        """Trigger real-time vault export for entities.
+
+        Fire-and-forget: vault write errors never break memory operations.
+        """
+        try:
+            from ..config import get_config
+            config = get_config()
+            if not getattr(config, "vault_sync_enabled", True):
+                return
+
+            from .vault_sync import get_vault_sync_service
+            vault = get_vault_sync_service()
+            if vault:
+                for entity_name in entity_names:
+                    try:
+                        vault.export_entity_by_name(entity_name)
+                    except Exception as e:
+                        logger.debug(f"Vault write-through skipped for {entity_name}: {e}")
+        except Exception as e:
+            logger.debug(f"Vault write-through unavailable: {e}")
 
     def relate_entities(
         self,

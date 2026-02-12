@@ -81,6 +81,11 @@ class MemoryConfig:
     # Vault sync settings (Obsidian integration)
     vault_base_dir: Path = field(default_factory=lambda: Path.home() / ".claudia" / "vault")
     vault_sync_enabled: bool = True
+    vault_name: str = "claudia-vault"  # Obsidian vault name (for deep link URIs)
+
+    # Obsidian REST API (optional, for bidirectional communication)
+    obsidian_rest_api_port: int = 27124
+    obsidian_rest_api_enabled: bool = False
 
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
@@ -151,6 +156,12 @@ class MemoryConfig:
                     config.vault_base_dir = Path(data["vault_base_dir"])
                 if "vault_sync_enabled" in data:
                     config.vault_sync_enabled = data["vault_sync_enabled"]
+                if "vault_name" in data:
+                    config.vault_name = data["vault_name"]
+                if "obsidian_rest_api_port" in data:
+                    config.obsidian_rest_api_port = data["obsidian_rest_api_port"]
+                if "obsidian_rest_api_enabled" in data:
+                    config.obsidian_rest_api_enabled = data["obsidian_rest_api_enabled"]
 
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Could not load config from {config_path}: {e}. Using defaults.")
@@ -246,6 +257,9 @@ class MemoryConfig:
             "log_path": str(self.log_path),
             "vault_base_dir": str(self.vault_base_dir),
             "vault_sync_enabled": self.vault_sync_enabled,
+            "vault_name": self.vault_name,
+            "obsidian_rest_api_port": self.obsidian_rest_api_port,
+            "obsidian_rest_api_enabled": self.obsidian_rest_api_enabled,
         }
 
         with open(config_path, "w") as f:

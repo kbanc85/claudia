@@ -495,27 +495,123 @@ class CanvasGenerator:
         filepath.write_text(json.dumps(canvas, indent=2), encoding="utf-8")
         return filepath
 
+    def _load_canvas_hashes(self) -> Dict[str, str]:
+        """Load stored canvas hashes from _meta/last-sync.json."""
+        meta_file = self.vault_path / "_meta" / "last-sync.json"
+        if not meta_file.exists():
+            return {}
+        try:
+            data = json.loads(meta_file.read_text(encoding="utf-8"))
+            return data.get("canvas_hashes", {})
+        except Exception:
+            return {}
+
+    def _save_canvas_hashes(self, hashes: Dict[str, str]) -> None:
+        """Save canvas hashes to _meta/last-sync.json."""
+        meta_dir = self.vault_path / "_meta"
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        meta_file = meta_dir / "last-sync.json"
+        try:
+            if meta_file.exists():
+                data = json.loads(meta_file.read_text(encoding="utf-8"))
+            else:
+                data = {}
+            data["canvas_hashes"] = hashes
+            meta_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.debug(f"Could not save canvas hashes: {e}")
+
+    def _content_hash(self, filepath: Path) -> str:
+        """Compute SHA256 hash of a file's content."""
+        content = filepath.read_bytes()
+        return hashlib.sha256(content).hexdigest()
+
+    def _check_canvas_preserved(self, canvas_name: str, stored_hashes: Dict[str, str]) -> bool:
+        """Check if a canvas was modified by the user and should be preserved.
+
+        Returns True if the canvas should NOT be overwritten (user modified it).
+        """
+        filepath = self.canvas_dir / f"{canvas_name}.canvas"
+        if not filepath.exists():
+            return False
+
+        stored_hash = stored_hashes.get(canvas_name)
+        if not stored_hash:
+            # No stored hash means we never generated it, or it's from before preservation
+            return False
+
+        current_hash = self._content_hash(filepath)
+        if current_hash != stored_hash:
+            logger.info(f"Canvas '{canvas_name}' was modified by user, preserving")
+            return True
+
+        return False
+
     def generate_all(self) -> Dict[str, Any]:
-        """Generate all standard canvases.
+        """Generate all standard canvases with user-edit preservation.
+
+        If a canvas was modified by the user since last generation,
+        the new version is written to {name}-generated.canvas instead,
+        preserving the user's customized version.
 
         Returns a dict with paths and status for each canvas.
         """
         results = {}
+        stored_hashes = self._load_canvas_hashes()
+        new_hashes = dict(stored_hashes)  # Start with existing hashes
 
+        # Relationship map
+        canvas_name = "relationship-map"
         try:
-            path = self.generate_relationship_map()
-            results["relationship_map"] = {"path": str(path), "status": "ok"}
+            if self._check_canvas_preserved(canvas_name, stored_hashes):
+                # Save user's version before regenerating
+                user_path = self.canvas_dir / f"{canvas_name}.canvas"
+                user_content = user_path.read_text(encoding="utf-8")
+                path = self.generate_relationship_map()
+                # Write generated version to alternate path
+                alt_path = self.canvas_dir / f"{canvas_name}-generated.canvas"
+                alt_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+                # Restore user's version
+                user_path.write_text(user_content, encoding="utf-8")
+                results["relationship_map"] = {
+                    "path": str(user_path), "status": "preserved",
+                    "generated_path": str(alt_path),
+                }
+            else:
+                path = self.generate_relationship_map()
+                new_hashes[canvas_name] = self._content_hash(path)
+                results["relationship_map"] = {"path": str(path), "status": "ok"}
         except Exception as e:
             logger.exception("Error generating relationship map")
             results["relationship_map"] = {"status": "error", "error": str(e)}
 
+        # Morning brief
+        canvas_name = "morning-brief"
         try:
-            path = self.generate_morning_brief()
-            results["morning_brief"] = {"path": str(path), "status": "ok"}
+            if self._check_canvas_preserved(canvas_name, stored_hashes):
+                # Save user's version before regenerating
+                user_path = self.canvas_dir / f"{canvas_name}.canvas"
+                user_content = user_path.read_text(encoding="utf-8")
+                path = self.generate_morning_brief()
+                # Write generated version to alternate path
+                alt_path = self.canvas_dir / f"{canvas_name}-generated.canvas"
+                alt_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+                # Restore user's version
+                user_path.write_text(user_content, encoding="utf-8")
+                # Don't update hash for the user-modified canvas
+                results["morning_brief"] = {
+                    "path": str(user_path), "status": "preserved",
+                    "generated_path": str(alt_path),
+                }
+            else:
+                path = self.generate_morning_brief()
+                new_hashes[canvas_name] = self._content_hash(path)
+                results["morning_brief"] = {"path": str(path), "status": "ok"}
         except Exception as e:
             logger.exception("Error generating morning brief")
             results["morning_brief"] = {"status": "error", "error": str(e)}
 
+        self._save_canvas_hashes(new_hashes)
         return results
 
 

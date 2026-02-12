@@ -27,6 +27,7 @@ dependencies = [
     "httpx>=0.25.0",
     "apscheduler>=3.10.0",
     "mcp>=1.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
