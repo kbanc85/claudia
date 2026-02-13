@@ -104,23 +104,25 @@ def test_detect_modified_note(db, tmp_path):
 
 
 def test_dataview_templates_created(db, tmp_path):
-    """Calling _export_dataview_templates creates 5 query notes in _queries/."""
+    """Calling _export_dataview_templates creates 7 query notes in _queries/."""
     service = VaultSyncService(tmp_path, db=db)
 
     count = service._export_dataview_templates()
 
-    assert count == 5
+    assert count == 7
     queries_dir = tmp_path / "_queries"
     assert queries_dir.is_dir()
     md_files = list(queries_dir.glob("*.md"))
-    assert len(md_files) == 5
+    assert len(md_files) == 7
 
     expected_names = {
         "Upcoming Deadlines.md",
         "Cooling Relationships.md",
+        "Active Network.md",
         "Recent Memories.md",
         "Open Commitments.md",
-        "Network Map.md",
+        "Entity Overview.md",
+        "Session Log.md",
     }
     actual_names = {f.name for f in md_files}
     assert actual_names == expected_names
@@ -132,8 +134,8 @@ def test_dataview_templates_not_overwritten(db, tmp_path):
     service._export_dataview_templates()
 
     # Modify one template
-    target = tmp_path / "_queries" / "Network Map.md"
-    custom_content = "# My Custom Network Map\nI changed this."
+    target = tmp_path / "_queries" / "Active Network.md"
+    custom_content = "# My Custom Active Network\nI changed this."
     target.write_text(custom_content)
 
     # Call again -- should not overwrite

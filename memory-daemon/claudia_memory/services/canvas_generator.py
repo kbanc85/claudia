@@ -94,15 +94,30 @@ class CanvasGenerator:
 
     # ── Relationship Map ────────────────────────────────────────
 
+    def _layout_grid(
+        self, count: int, cols: int = 4, spacing: Tuple[float, float] = (300, 120),
+        origin: Tuple[float, float] = (0, 0),
+    ) -> List[Tuple[float, float]]:
+        """Compute positions for nodes in a grid layout."""
+        positions = []
+        for i in range(count):
+            row = i // cols
+            col = i % cols
+            x = origin[0] + col * spacing[0]
+            y = origin[1] + row * spacing[1]
+            positions.append((x, y))
+        return positions
+
     def generate_relationship_map(
         self,
         min_relationships: int = 2,
         max_entities: int = 50,
     ) -> Path:
-        """Generate a relationship map canvas.
+        """Generate a relationship map canvas with quadrant grouping by entity type.
 
-        Shows entities as file-linked nodes with relationship edges.
-        Only includes entities with at least `min_relationships` connections.
+        Entities are grouped into type-based quadrants (People top-left,
+        Projects top-right, Orgs bottom-left, Concepts bottom-right).
+        Each group gets a visual container (group node).
 
         Returns the path to the generated .canvas file.
         """
@@ -147,29 +162,68 @@ class CanvasGenerator:
             fetch=True,
         ) or []
 
-        # Layout entities in a circle
-        positions = self._layout_circle(len(entities))
+        # Group entities by type for quadrant layout
+        by_type: Dict[str, List[Dict]] = {}
+        for e in entities:
+            by_type.setdefault(e["type"], []).append(e)
+
+        # Quadrant origins (type -> (x, y))
+        quadrant_origins = {
+            "person": (-600, -400),
+            "project": (400, -400),
+            "organization": (-600, 300),
+            "concept": (400, 300),
+            "location": (400, 600),
+        }
+        # Quadrant labels
+        quadrant_labels = {
+            "person": "People",
+            "project": "Projects",
+            "organization": "Organizations",
+            "concept": "Concepts",
+            "location": "Locations",
+        }
+
         nodes = []
         id_map = {}
 
-        for i, entity in enumerate(entities):
-            nid = _node_id("e", entity["id"])
-            id_map[entity["id"]] = nid
-            w, h = NODE_SIZES.get(entity["type"], DEFAULT_NODE_SIZE)
-            color = NODE_COLORS.get(entity["type"], "0")
-            x, y = positions[i]
+        for etype, group_entities in by_type.items():
+            origin = quadrant_origins.get(etype, (0, 0))
+            label = quadrant_labels.get(etype, etype.title())
 
-            note_path = self._entity_to_note_path(entity)
+            # Create group node as visual container
+            group_w = max(4, min(len(group_entities), 4)) * 300 + 40
+            group_h = max(1, math.ceil(len(group_entities) / 4)) * 120 + 80
             nodes.append({
-                "id": nid,
-                "type": "file",
-                "file": note_path,
-                "x": int(x),
-                "y": int(y),
-                "width": w,
-                "height": h,
-                "color": color,
+                "id": f"group-{etype}",
+                "type": "group",
+                "label": label,
+                "x": int(origin[0] - 20),
+                "y": int(origin[1] - 40),
+                "width": group_w,
+                "height": group_h,
             })
+
+            # Layout entities in grid within the quadrant
+            positions = self._layout_grid(len(group_entities), origin=origin)
+            for i, entity in enumerate(group_entities):
+                nid = _node_id("e", entity["id"])
+                id_map[entity["id"]] = nid
+                w, h = NODE_SIZES.get(entity["type"], DEFAULT_NODE_SIZE)
+                color = NODE_COLORS.get(entity["type"], "0")
+                x, y = positions[i]
+
+                note_path = self._entity_to_note_path(entity)
+                nodes.append({
+                    "id": nid,
+                    "type": "file",
+                    "file": note_path,
+                    "x": int(x),
+                    "y": int(y),
+                    "width": w,
+                    "height": h,
+                    "color": color,
+                })
 
         # Build edges
         edges = []
@@ -342,6 +396,46 @@ class CanvasGenerator:
             "color": "6",
         })
 
+        # Row 2: People to Reconnect card
+        reconnect = self.db.execute(
+            """
+            SELECT name, contact_trend, last_contact_at, importance
+            FROM entities
+            WHERE type = 'person'
+              AND deleted_at IS NULL
+              AND (contact_trend IN ('dormant', 'decelerating'))
+              AND importance > 0.3
+            ORDER BY last_contact_at ASC NULLS FIRST
+            LIMIT 8
+            """,
+            fetch=True,
+        ) or []
+
+        if reconnect:
+            reconnect_lines = ["## People to Reconnect\n"]
+            for r in reconnect:
+                trend = r["contact_trend"] or "unknown"
+                last = r["last_contact_at"]
+                if last:
+                    try:
+                        days_ago = (datetime.utcnow() - datetime.fromisoformat(last[:19])).days
+                        reconnect_lines.append(f"- [[{r['name']}]] ({trend}, {days_ago}d ago)")
+                    except (ValueError, TypeError):
+                        reconnect_lines.append(f"- [[{r['name']}]] ({trend})")
+                else:
+                    reconnect_lines.append(f"- [[{r['name']}]] ({trend})")
+
+            row2_y = max(200, len(commitments) * 35 + 80) + card_gap
+            nodes.append({
+                "id": "reconnect",
+                "type": "text",
+                "text": "\n".join(reconnect_lines),
+                "x": 0, "y": row2_y,
+                "width": card_width * 2 + card_gap,
+                "height": max(150, len(reconnect) * 30 + 60),
+                "color": "3",
+            })
+
         canvas = {"nodes": nodes, "edges": []}
         filepath = self.canvas_dir / "morning-brief.canvas"
         filepath.write_text(json.dumps(canvas, indent=2), encoding="utf-8")
@@ -473,6 +567,107 @@ class CanvasGenerator:
             f"Generated project board for '{project_name}': "
             f"{len(nodes)} nodes, {len(edges)} edges"
         )
+        return filepath
+
+    # ── People Overview ────────────────────────────────────────
+
+    def generate_people_overview(self) -> Path:
+        """Generate a person-to-person relationship canvas.
+
+        Shows only person entities and relationships between them.
+        This is the "interesting graph" showing who works with whom.
+        """
+        self._ensure_dir()
+
+        # Fetch people with mutual relationships
+        people = self.db.execute(
+            """
+            SELECT DISTINCT e.*
+            FROM entities e
+            JOIN relationships r
+              ON (e.id = r.source_entity_id OR e.id = r.target_entity_id)
+              AND r.invalid_at IS NULL
+            JOIN entities other
+              ON (other.id = CASE WHEN e.id = r.source_entity_id
+                  THEN r.target_entity_id ELSE r.source_entity_id END)
+              AND other.type = 'person' AND other.deleted_at IS NULL
+            WHERE e.type = 'person' AND e.deleted_at IS NULL
+            ORDER BY e.importance DESC
+            LIMIT 40
+            """,
+            fetch=True,
+        ) or []
+
+        if not people:
+            return self._write_empty_canvas("people-overview")
+
+        people_ids = {p["id"] for p in people}
+        id_list = ",".join(str(pid) for pid in people_ids)
+
+        # Fetch person-to-person relationships
+        relationships = self.db.execute(
+            f"""
+            SELECT r.*, s.name as source_name, t.name as target_name
+            FROM relationships r
+            JOIN entities s ON r.source_entity_id = s.id
+            JOIN entities t ON r.target_entity_id = t.id
+            WHERE r.source_entity_id IN ({id_list})
+              AND r.target_entity_id IN ({id_list})
+              AND r.invalid_at IS NULL
+              AND s.type = 'person' AND t.type = 'person'
+            """,
+            fetch=True,
+        ) or []
+
+        # Layout in circle
+        positions = self._layout_circle(len(people), radius=500)
+        nodes = []
+        id_map = {}
+
+        for i, person in enumerate(people):
+            nid = _node_id("p", person["id"])
+            id_map[person["id"]] = nid
+            w, h = NODE_SIZES.get("person", DEFAULT_NODE_SIZE)
+            x, y = positions[i]
+
+            note_path = self._entity_to_note_path(person)
+            nodes.append({
+                "id": nid,
+                "type": "file",
+                "file": note_path,
+                "x": int(x),
+                "y": int(y),
+                "width": w,
+                "height": h,
+                "color": NODE_COLORS.get("person", "4"),
+            })
+
+        # Build edges
+        edges = []
+        seen_edges = set()
+        for rel in relationships:
+            src_id = id_map.get(rel["source_entity_id"])
+            tgt_id = id_map.get(rel["target_entity_id"])
+            if not src_id or not tgt_id:
+                continue
+
+            edge_key = tuple(sorted([src_id, tgt_id]))
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+
+            eid = _edge_id(src_id, tgt_id, rel["relationship_type"])
+            edges.append({
+                "id": eid,
+                "fromNode": src_id,
+                "toNode": tgt_id,
+                "label": rel["relationship_type"],
+            })
+
+        canvas = {"nodes": nodes, "edges": edges}
+        filepath = self.canvas_dir / "people-overview.canvas"
+        filepath.write_text(json.dumps(canvas, indent=2), encoding="utf-8")
+        logger.info(f"Generated people overview: {len(nodes)} people, {len(edges)} connections")
         return filepath
 
     # ── Helpers ──────────────────────────────────────────────────
@@ -610,6 +805,28 @@ class CanvasGenerator:
         except Exception as e:
             logger.exception("Error generating morning brief")
             results["morning_brief"] = {"status": "error", "error": str(e)}
+
+        # People overview
+        canvas_name = "people-overview"
+        try:
+            if self._check_canvas_preserved(canvas_name, stored_hashes):
+                user_path = self.canvas_dir / f"{canvas_name}.canvas"
+                user_content = user_path.read_text(encoding="utf-8")
+                path = self.generate_people_overview()
+                alt_path = self.canvas_dir / f"{canvas_name}-generated.canvas"
+                alt_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+                user_path.write_text(user_content, encoding="utf-8")
+                results["people_overview"] = {
+                    "path": str(user_path), "status": "preserved",
+                    "generated_path": str(alt_path),
+                }
+            else:
+                path = self.generate_people_overview()
+                new_hashes[canvas_name] = self._content_hash(path)
+                results["people_overview"] = {"path": str(path), "status": "ok"}
+        except Exception as e:
+            logger.exception("Error generating people overview")
+            results["people_overview"] = {"status": "error", "error": str(e)}
 
         self._save_canvas_hashes(new_hashes)
         return results

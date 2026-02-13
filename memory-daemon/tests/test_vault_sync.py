@@ -27,12 +27,16 @@ def vault_svc(db, vault_dir):
     return VaultSyncService(vault_dir, db=db)
 
 
-def _seed_entity(db, name, entity_type="person", description="", importance=0.8):
+def _seed_entity(db, name, entity_type="person", description="", importance=0.8,
+                 attention_tier=None, contact_trend=None, contact_frequency_days=None,
+                 last_contact_at=None):
     """Insert a test entity and return its id."""
     db.execute(
-        """INSERT INTO entities (name, canonical_name, type, description, importance)
-           VALUES (?, ?, ?, ?, ?)""",
-        (name, name.lower(), entity_type, description, importance),
+        """INSERT INTO entities (name, canonical_name, type, description, importance,
+           attention_tier, contact_trend, contact_frequency_days, last_contact_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (name, name.lower(), entity_type, description, importance,
+         attention_tier, contact_trend, contact_frequency_days, last_contact_at),
     )
     rows = db.execute(
         "SELECT id FROM entities WHERE canonical_name = ?",
@@ -42,12 +46,14 @@ def _seed_entity(db, name, entity_type="person", description="", importance=0.8)
     return rows[0]["id"]
 
 
-def _seed_memory(db, content, entity_id, memory_type="fact", importance=0.7):
+def _seed_memory(db, content, entity_id, memory_type="fact", importance=0.7,
+                 origin_type="user_stated", verification_status="pending"):
     """Insert a test memory linked to an entity."""
     db.execute(
-        """INSERT INTO memories (content, type, importance, source, origin_type, confidence)
-           VALUES (?, ?, ?, 'test', 'user_stated', 1.0)""",
-        (content, memory_type, importance),
+        """INSERT INTO memories (content, type, importance, source, origin_type, confidence,
+           verification_status)
+           VALUES (?, ?, ?, 'test', ?, 1.0, ?)""",
+        (content, memory_type, importance, origin_type, verification_status),
     )
     rows = db.execute(
         "SELECT id FROM memories WHERE content = ?", (content,), fetch=True
@@ -125,18 +131,21 @@ def test_export_single_entity(db, vault_svc, vault_dir):
     assert "---" in content
     assert f"claudia_id: {eid}" in content
     assert "type: person" in content
+    assert 'name: "Sarah Chen"' in content
     assert "sync_hash:" in content
     # Check title
     assert "# Sarah Chen" in content
     # Check description
     assert "VP of Engineering" in content
-    # Check memories by type
+    # Check memories
     assert "Prefers email over Slack" in content
     assert "Send proposal by Friday" in content
+    # Check sync footer
+    assert "Last synced:" in content
 
 
 def test_export_entity_with_relationships(db, vault_svc, vault_dir):
-    """Relationships render as [[wikilinks]]."""
+    """Relationships render as a table with [[wikilinks]]."""
     sarah_id = _seed_entity(db, "Sarah Chen", "person")
     jim_id = _seed_entity(db, "Jim Ferry", "person")
     _seed_relationship(db, sarah_id, jim_id, "works_with", 0.9)
@@ -150,6 +159,8 @@ def test_export_entity_with_relationships(db, vault_svc, vault_dir):
     assert "## Relationships" in content
     assert "[[Jim Ferry]]" in content
     assert "works_with" in content
+    # Table format
+    assert "| Connection | Type | Strength |" in content
 
 
 def test_export_entity_type_directories(db, vault_svc, vault_dir):
@@ -166,7 +177,7 @@ def test_export_entity_type_directories(db, vault_svc, vault_dir):
 
 
 def test_export_entity_with_aliases(db, vault_svc, vault_dir):
-    """Aliases appear in frontmatter."""
+    """Aliases appear as proper YAML list in frontmatter."""
     eid = _seed_entity(db, "Sarah Chen", "person")
     db.execute(
         "INSERT INTO entity_aliases (entity_id, alias, canonical_alias) VALUES (?, ?, ?)",
@@ -178,7 +189,7 @@ def test_export_entity_with_aliases(db, vault_svc, vault_dir):
     content = path.read_text()
 
     assert "aliases:" in content
-    assert "S. Chen" in content
+    assert '  - "S. Chen"' in content
 
 
 # ── Full export tests ────────────────────────────────────────────
@@ -201,12 +212,12 @@ def test_export_all(db, vault_svc, vault_dir):
 
 
 def test_export_all_creates_directory_structure(db, vault_svc, vault_dir):
-    """Full export creates all subdirectories even if empty."""
+    """Full export creates all subdirectories including .obsidian."""
     vault_svc.export_all()
 
     for subdir in ["people", "projects", "organizations", "concepts",
                    "locations", "patterns", "reflections", "sessions",
-                   "canvases", "_meta"]:
+                   "canvases", "_meta", ".obsidian"]:
         assert (vault_dir / subdir).is_dir()
 
 
@@ -291,8 +302,9 @@ def test_get_status_after_sync(db, vault_svc, vault_dir):
     status = vault_svc.get_status()
     assert status["synced"] is True
     assert status["last_sync"] is not None
-    assert status["file_counts"]["people"] == 1
-    assert status["file_counts"]["organizations"] == 1
+    # Counts include entity notes + _Index.md MOC files
+    assert status["file_counts"]["people"] >= 1
+    assert status["file_counts"]["organizations"] >= 1
 
 
 # ── Pattern export tests ────────────────────────────────────────
@@ -341,7 +353,7 @@ def test_export_reflections(db, vault_svc, vault_dir):
 
 
 def test_export_sessions(db, vault_svc, vault_dir):
-    """Summarized episodes are exported as daily session notes."""
+    """Sessions export to hierarchical date paths."""
     db.execute(
         """INSERT INTO episodes
            (session_id, is_summarized, narrative, started_at, ended_at, key_topics, summary)
@@ -352,9 +364,10 @@ def test_export_sessions(db, vault_svc, vault_dir):
     count = vault_svc._export_sessions()
     assert count == 1
 
-    session_files = list((vault_dir / "sessions").glob("*.md"))
-    assert len(session_files) == 1
-    content = session_files[0].read_text()
+    # Hierarchical path: sessions/2026/02/2026-02-10.md
+    session_file = vault_dir / "sessions" / "2026" / "02" / "2026-02-10.md"
+    assert session_file.exists()
+    content = session_file.read_text()
     assert "2026-02-10" in content
     assert "roadmap" in content
 
@@ -390,3 +403,240 @@ def test_commitment_checkboxes(db, vault_svc, vault_dir):
 
     assert "## Commitments" in content
     assert "- [ ] Send report by Friday" in content
+
+
+# ══════════════════════════════════════════════════════════════════
+# NEW V2 TESTS: Frontmatter, Note Body, Navigation, Config
+# ══════════════════════════════════════════════════════════════════
+
+
+# ── Frontmatter v2 tests ─────────────────────────────────────────
+
+
+def test_frontmatter_contact_fields(db, vault_svc, vault_dir):
+    """Frontmatter includes contact velocity fields when available."""
+    eid = _seed_entity(
+        db, "Sarah Chen", "person", importance=0.85,
+        attention_tier="active", contact_trend="stable",
+        contact_frequency_days=4.2, last_contact_at="2026-02-10T14:00:00",
+    )
+
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (eid,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "attention_tier: active" in content
+    assert "contact_trend: stable" in content
+    assert "contact_frequency_days: 4.2" in content
+    assert "last_contact: 2026-02-10" in content
+
+
+def test_frontmatter_compound_tags(db, vault_svc, vault_dir):
+    """Tags include entity type, attention tier, and contact trend."""
+    eid = _seed_entity(
+        db, "Sarah Chen", "person",
+        attention_tier="active", contact_trend="stable",
+    )
+
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (eid,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "  - person" in content
+    assert "  - active" in content
+    assert "  - stable" in content
+
+
+def test_frontmatter_cssclasses(db, vault_svc, vault_dir):
+    """CSS classes include entity type for per-type styling."""
+    eid = _seed_entity(db, "Sarah Chen", "person")
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (eid,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "cssclasses:" in content
+    assert "  - entity-person" in content
+
+
+# ── Note body v2 tests ───────────────────────────────────────────
+
+
+def test_status_callout_person(db, vault_svc, vault_dir):
+    """Person entities get a status callout box."""
+    eid = _seed_entity(
+        db, "Sarah Chen", "person", importance=0.85,
+        attention_tier="active", contact_trend="stable",
+        last_contact_at="2026-02-10T14:00:00",
+    )
+
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (eid,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "> [!info] Status" in content
+    assert "**Attention:** Active" in content
+    assert "**Trend:** Stable" in content
+
+
+def test_relationship_table(db, vault_svc, vault_dir):
+    """Relationships render as a markdown table."""
+    sarah_id = _seed_entity(db, "Sarah Chen", "person")
+    jim_id = _seed_entity(db, "Jim Ferry", "person")
+    _seed_relationship(db, sarah_id, jim_id, "works_with", 0.9)
+
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (sarah_id,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "| [[Jim Ferry]] | works_with | 0.9 |" in content
+
+
+def test_verification_grouping(db, vault_svc, vault_dir):
+    """Memories are grouped by verification status in callouts."""
+    eid = _seed_entity(db, "Sarah Chen", "person")
+    _seed_memory(db, "Verified fact", eid, "fact", origin_type="user_stated",
+                 verification_status="verified")
+    _seed_memory(db, "Unverified observation", eid, "observation", origin_type="inferred",
+                 verification_status="pending")
+
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (eid,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "> [!note] Verified" in content
+    assert "Verified fact" in content
+    assert "> [!warning] Unverified" in content
+    assert "Unverified observation" in content
+
+
+def test_interaction_timeline(db, vault_svc, vault_dir):
+    """Recent sessions render as callout blocks."""
+    eid = _seed_entity(db, "Sarah Chen", "person")
+    db.execute(
+        """INSERT INTO episodes (session_id, is_summarized, narrative, started_at)
+           VALUES ('sess-1', 1, 'Discussed roadmap with Sarah Chen', '2026-02-10T14:00:00')""",
+    )
+
+    entity = db.execute("SELECT * FROM entities WHERE id = ?", (eid,), fetch=True)[0]
+    path = vault_svc.export_entity(entity)
+    content = path.read_text()
+
+    assert "## Recent Interactions" in content
+    assert "> [!example]" in content
+    assert "Discussed roadmap" in content
+
+
+# ── Navigation tests ─────────────────────────────────────────────
+
+
+def test_home_dashboard_created(db, vault_svc, vault_dir):
+    """Full export creates Home.md dashboard."""
+    _seed_entity(db, "Alice", "person")
+    vault_svc.export_all()
+
+    home = vault_dir / "Home.md"
+    assert home.exists()
+    content = home.read_text()
+    assert "# Claudia Memory Vault" in content
+    assert "Quick Navigation" in content
+
+
+def test_moc_indices_created(db, vault_svc, vault_dir):
+    """Full export creates _Index.md in each entity type directory."""
+    _seed_entity(db, "Alice", "person")
+    _seed_entity(db, "Acme", "organization")
+    vault_svc.export_all()
+
+    assert (vault_dir / "people" / "_Index.md").exists()
+    assert (vault_dir / "organizations" / "_Index.md").exists()
+
+    content = (vault_dir / "people" / "_Index.md").read_text()
+    assert "[[Alice]]" in content
+
+
+def test_attention_items_in_dashboard(db, vault_svc, vault_dir):
+    """Dashboard shows entities needing attention."""
+    _seed_entity(
+        db, "Jim Ferry", "person", importance=0.7,
+        attention_tier="watchlist", contact_trend="dormant",
+        last_contact_at="2026-01-01T10:00:00",
+    )
+    vault_svc.export_all()
+
+    content = (vault_dir / "Home.md").read_text()
+    assert "[[Jim Ferry]]" in content
+    assert "dormant" in content
+
+
+# ── Session tests ────────────────────────────────────────────────
+
+
+def test_session_hierarchical_path(db, vault_svc, vault_dir):
+    """Sessions use hierarchical YYYY/MM/date.md paths."""
+    db.execute(
+        """INSERT INTO episodes
+           (session_id, is_summarized, narrative, started_at)
+           VALUES ('s1', 1, 'Test narrative', '2026-02-10T14:00:00')""",
+    )
+    vault_svc._ensure_directories()
+    vault_svc._export_sessions()
+
+    assert (vault_dir / "sessions" / "2026" / "02" / "2026-02-10.md").exists()
+
+
+def test_narrative_wikification(db, vault_svc, vault_dir):
+    """Entity names in session narratives are wrapped in [[wikilinks]]."""
+    _seed_entity(db, "Sarah Chen", "person")
+    db.execute(
+        """INSERT INTO episodes
+           (session_id, is_summarized, narrative, started_at)
+           VALUES ('s1', 1, 'Met with Sarah Chen about the project', '2026-02-10T14:00:00')""",
+    )
+
+    vault_svc._ensure_directories()
+    vault_svc._export_sessions()
+
+    session_file = vault_dir / "sessions" / "2026" / "02" / "2026-02-10.md"
+    content = session_file.read_text()
+    assert "[[Sarah Chen]]" in content
+
+
+# ── .obsidian config tests ───────────────────────────────────────
+
+
+def test_obsidian_config_created(db, vault_svc, vault_dir):
+    """Full export creates .obsidian/ config files."""
+    vault_svc.export_all()
+
+    assert (vault_dir / ".obsidian" / "graph.json").exists()
+    assert (vault_dir / ".obsidian" / "snippets" / "claudia-theme.css").exists()
+    assert (vault_dir / ".obsidian" / "app.json").exists()
+    assert (vault_dir / ".obsidian" / "workspace.json").exists()
+    assert (vault_dir / ".obsidian" / "appearance.json").exists()
+
+
+def test_obsidian_config_not_overwritten(db, vault_svc, vault_dir):
+    """Obsidian config files are not overwritten on subsequent syncs."""
+    vault_svc.export_all()
+
+    # Modify graph.json
+    graph_path = vault_dir / ".obsidian" / "graph.json"
+    custom = '{"custom": true}'
+    graph_path.write_text(custom)
+
+    # Run again
+    vault_svc.export_all()
+
+    # Should not be overwritten
+    assert graph_path.read_text() == custom
+
+
+# ── Format versioning tests ──────────────────────────────────────
+
+
+def test_format_version_in_metadata(db, vault_svc, vault_dir):
+    """Sync metadata includes vault_format_version."""
+    vault_svc.export_all()
+
+    meta = json.loads((vault_dir / "_meta" / "last-sync.json").read_text())
+    assert meta["vault_format_version"] == 2

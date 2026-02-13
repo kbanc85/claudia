@@ -19,32 +19,63 @@ Claudia's memory lives in SQLite (the source of truth). The vault at `~/.claudia
 
 ```
 vault/
-  people/           Entity notes for persons
-  projects/         Entity notes for projects
-  organizations/    Entity notes for organizations
-  concepts/         Entity notes for concepts
-  locations/        Entity notes for locations
-  patterns/         Detected patterns
-  reflections/      Reflections from /meditate
-  sessions/         Daily session logs
-  canvases/         Visual dashboards (.canvas files)
-  _meta/            Sync metadata (last-sync.json, sync-log.md)
+  Home.md             Dashboard entry point (regenerated each sync)
+  people/             Entity notes for persons
+    _Index.md         MOC grouped by attention tier
+  projects/           Entity notes for projects
+    _Index.md         MOC grouped by attention tier
+  organizations/      Entity notes for organizations
+    _Index.md         MOC grouped by attention tier
+  concepts/           Entity notes for concepts
+    _Index.md         MOC
+  locations/          Entity notes for locations
+    _Index.md         MOC
+  patterns/           Detected patterns
+  reflections/        Reflections from /meditate
+  sessions/           Hierarchical session logs (YYYY/MM/YYYY-MM-DD.md)
+  canvases/           Visual dashboards (.canvas files)
+  _queries/           Dataview query templates (7 templates)
+  _meta/              Sync metadata (last-sync.json, sync-log.md)
+  .obsidian/          Obsidian config (graph colors, CSS theme, workspace)
+    graph.json        Color groups by entity type
+    app.json          Readable line length, show frontmatter
+    appearance.json   Enable claudia-theme CSS snippet
+    workspace.json    Open Home.md on launch
+    snippets/
+      claudia-theme.css  Entity type emoji prefixes, tag colors
 ```
 
 ### How Notes Map to Memory
 
 Each entity gets one markdown note with:
-- **YAML frontmatter**: `claudia_id`, `type`, `importance`, timestamps, `sync_hash`
-- **Wikilinks**: Relationships become `[[Entity Name]]` links (Obsidian's graph view shows these)
-- **Memories**: Grouped by type (Key Facts, Commitments, Preferences, etc.)
-- **Recent sessions**: Last 5 session narratives mentioning this entity
+- **YAML frontmatter**: `claudia_id`, `type`, `name`, `importance`, `attention_tier`, `contact_trend`, `contact_frequency_days`, `last_contact`, timestamps, `aliases` (YAML list), compound `tags`, `cssclasses`, `sync_hash`
+- **Status callout**: Attention tier, trend, last contact, frequency at a glance
+- **Relationships table**: Connection, type, and strength in scannable table format
+- **Key Facts**: Memories grouped by verification status (verified in `[!note]`, unverified in `[!warning]`)
+- **Recent Interactions**: Last 10 session narratives in dated `[!example]` callout blocks
+- **Wikilinks**: Relationships and session narratives use `[[Entity Name]]` links for graph connectivity
+- **Sync footer**: Last sync timestamp
+
+### Navigation
+
+- **Home.md**: Dashboard with quick navigation links (entity counts), attention watchlist, open commitments, recent activity
+- **_Index.md**: Map of Content (MOC) files in each entity type directory, grouped by attention tier (active, watchlist, standard, archive)
+- **Dataview queries**: 7 templates in `_queries/` (Upcoming Deadlines, Cooling Relationships, Active Network, Recent Memories, Open Commitments, Entity Overview, Session Log)
 
 ### Canvas Files
 
 `.canvas` files are Obsidian-native visual boards:
-- **relationship-map.canvas**: Full entity graph with color-coded nodes
-- **morning-brief.canvas**: Commitments, alerts, recent activity dashboard
+- **relationship-map.canvas**: Entity graph with quadrant grouping by type (People top-left, Projects top-right, Orgs bottom-left, Concepts bottom-right) and color-coded nodes
+- **morning-brief.canvas**: Commitments, alerts, recent activity, and reconnection suggestions
+- **people-overview.canvas**: Person-to-person relationship graph (who works with whom)
 - **project-*.canvas**: Per-project boards with connected people and tasks
+
+### .obsidian Config
+
+Ships on first sync (never overwrites existing files):
+- **Graph colors**: person=green, project=red, organization=purple, concept=cyan, location=yellow, session=gray, pattern=orange, MOC=yellow
+- **CSS theme**: Entity type emoji prefixes in Reading View, tag color pills matching graph
+- **Workspace**: Opens Home.md with graph view in right sidebar
 
 ---
 
@@ -54,16 +85,16 @@ Each entity gets one markdown note with:
 Point them to the vault:
 ```
 "Your memory vault is at ~/.claudia/vault/[project]/. Open it in Obsidian
-to browse entities, relationships, and session logs. The graph view shows
-how people and projects connect."
+to browse entities, relationships, and session logs. Home.md is your
+dashboard, and the graph view shows how people and projects connect."
 ```
 
 ### User mentions Obsidian
 Explain the integration:
 ```
-"Your Obsidian vault syncs from my memory. Every entity, relationship, and
-session log becomes a markdown note with [[wikilinks]] - so Obsidian's
-graph view doubles as your relationship visualizer."
+"Your Obsidian vault syncs from my memory. Every entity becomes a note
+with status callouts, relationship tables, and [[wikilinks]]. The graph
+view is color-coded by entity type, and Home.md surfaces what needs attention."
 ```
 
 ### User asks about sync status
@@ -93,6 +124,10 @@ Trigger a sync when:
 - User is about to open Obsidian and wants current data
 - After a large batch of memory operations
 
+### Format Versioning
+
+The vault uses `vault_format_version: 2` in `_meta/last-sync.json`. When upgrading from an older format, the sync automatically runs a full rebuild to migrate all notes to the new format.
+
 ---
 
 ## Generating Canvases
@@ -103,6 +138,7 @@ Users can request visual dashboards:
 |---------|--------|
 | "Show me my relationship map" | `memory.generate_canvas(canvas_type: "relationship_map")` |
 | "Generate a morning brief canvas" | `memory.generate_canvas(canvas_type: "morning_brief")` |
+| "Show people connections" | `memory.generate_canvas(canvas_type: "people_overview")` |
 | "Make a project board for [name]" | `memory.generate_canvas(canvas_type: "project_board", project_name: "[name]")` |
 | "Update all canvases" | `memory.generate_canvas(canvas_type: "all")` |
 
@@ -204,5 +240,7 @@ The `project_hash` is the same 12-char SHA256 used for database paths (`~/.claud
 | Vault folder empty | Run `memory.sync_vault(full: true)` or `python3 -m claudia_memory --vault-sync` |
 | Stale data in Obsidian | Trigger an on-demand sync |
 | Graph view shows no connections | Ensure entities have relationships (use `memory.relate`) |
+| Graph all one color | Check `.obsidian/graph.json` exists (created on first sync) |
 | Canvas won't open | Verify `.canvas` is valid JSON, regenerate with `memory.generate_canvas` |
 | Vault not updating overnight | Check scheduler is running via `memory.system_health` |
+| Old format after upgrade | Sync will auto-rebuild when format version < 2 |
