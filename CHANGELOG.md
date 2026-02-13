@@ -2,6 +2,40 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.37.3 (2026-02-12)
+
+### The Second Brain Upgrade
+
+The Obsidian vault is no longer a data dump. It's a genuinely useful knowledge base with visual hierarchy, navigation, and graph theming out of the box.
+
+#### Added
+- **Home dashboard** - `Home.md` serves as the vault entry point with quick navigation links (entity counts), attention watchlist, open commitments, and recent activity table. Regenerated on every sync.
+- **MOC index files** - `_Index.md` in each entity type directory, grouped by attention tier (active, watchlist, standard, archive) with sortable tables.
+- **Status callouts** - Person notes show attention tier, trend, last contact, and frequency in an `[!info]` callout. Project notes show connected people count and open commitments.
+- **Verification-grouped memories** - Key facts split into verified (`[!note]`) and unverified (`[!warning]`) callout blocks with origin and confidence tags.
+- **Relationship tables** - Connections displayed as scannable tables (Connection | Type | Strength) instead of flat bullet lists.
+- **Interaction timeline** - Last 10 sessions in dated `[!example]` callouts instead of 5 truncated bullets.
+- **People overview canvas** - New `people-overview.canvas` showing person-to-person relationships only (who works with whom).
+- **Morning brief reconnection card** - Surfaces dormant/decelerating contacts with importance > 0.3 in the morning brief canvas.
+- **Narrative wikification** - Session narratives wrap known entity names in `[[wikilinks]]`, connecting sessions to entities in graph view.
+- **7 Dataview templates** - Added Active Network, Entity Overview, Session Log. Open Commitments upgraded to TASK query.
+- **.obsidian config** - Ships graph.json (7 color groups by entity type), claudia-theme.css (emoji prefixes, tag color pills), workspace.json (opens Home.md with graph sidebar). Created on first sync, never overwrites.
+- **Vault format versioning** - `vault_format_version: 2` in `_meta/last-sync.json`. Old vaults auto-rebuild on sync.
+
+#### Changed
+- **Rich frontmatter** - Added `name`, `attention_tier`, `contact_trend`, `contact_frequency_days`, `last_contact`, compound `tags` (type + tier + trend), `cssclasses` for CSS styling. Fixed `aliases` to proper YAML list format.
+- **Hierarchical sessions** - Session files now use `sessions/YYYY/MM/YYYY-MM-DD.md` paths instead of flat `sessions/YYYY-MM-DD.md`.
+- **Grouped relationship map** - Quadrant layout by entity type (People top-left, Projects top-right, Orgs bottom-left, Concepts bottom-right) with group container nodes instead of flat circular layout.
+
+#### Fixed
+- **sqlite3.Row access** - Added `_row_get()` helper for safe field access on `sqlite3.Row` objects (which lack `.get()`). Fixes crashes in frontmatter and status callout rendering.
+
+#### Stats
+- 456 tests pass, 5 skipped, 0 regressions
+- Install: `npx get-claudia`
+
+---
+
 ## 1.37.2 (2026-02-12)
 
 ### Python 3.14 Compatibility
