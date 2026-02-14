@@ -156,6 +156,9 @@ argument-hint: [arg]
 | `brain/` | 3D memory visualizer | "show your brain" |
 | `brain-monitor/` | Terminal memory dashboard | "brain monitor", "memory dashboard" |
 | `meditate/` | End-of-session reflection | "let's wrap up", "end the session" |
+| `new-workspace/` | Create workspace for project/client | "new workspace", "new project" |
+| `gateway/` | Start/stop/status of Gateway service | "gateway status", "start gateway" |
+| `inbox-check/` | Two-tier email inbox triage | "check my inbox", "any emails?" |
 
 ### Explicit Only (`/skill-name`)
 
@@ -169,6 +172,8 @@ argument-hint: [arg]
 | `file-document/` | Save documents with provenance |
 | `new-person/` | Create relationship file |
 | `diagnose/` | Check memory daemon health |
+| `setup-gateway.md` | Guided gateway setup walkthrough |
+| `setup-telegram.md` | Guided Telegram bot setup |
 
 ## Effort Levels
 
@@ -193,8 +198,8 @@ effort-level: medium
 
 | Effort | Skills |
 |--------|--------|
-| **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor |
-| **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher |
+| **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor, gateway, inbox-check |
+| **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher, new-workspace, setup-gateway, setup-telegram |
 | **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
 | **max** | ingest-sources, pipeline-review, deep-context |
 

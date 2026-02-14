@@ -192,6 +192,7 @@ Ask for confirmation on:
 - [ ] Summary is actionable, not just descriptive
 - [ ] Related person files flagged for update
 - [ ] No unexplained jargon or unclear references
+- [ ] All markdown tables render correctly (header, separator, and data rows on separate lines)
 
 ## Tone
 

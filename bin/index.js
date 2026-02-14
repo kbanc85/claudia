@@ -97,9 +97,10 @@ async function main() {
   // Determine target directory and flags
   const args = process.argv.slice(2);
 
-  // Check for --demo flag
+  // Check for --demo and --no-memory flags
   const isDemoMode = args.includes('--demo');
-  const filteredArgs = args.filter(a => a !== '--demo');
+  const skipMemory = args.includes('--no-memory');
+  const filteredArgs = args.filter(a => a !== '--demo' && a !== '--no-memory');
   const arg = filteredArgs[0];
 
   // Support "." or "upgrade" for current directory
@@ -110,6 +111,9 @@ async function main() {
 
   if (isDemoMode) {
     console.log(`${colors.yellow}Demo mode${colors.reset} - Will seed with example data after install`);
+  }
+  if (skipMemory) {
+    console.log(`${colors.yellow}Template-only${colors.reset} - Skipping memory daemon installation`);
   }
 
   // Check if directory already exists with Claudia files
@@ -146,7 +150,7 @@ async function main() {
     // Framework = .claude/ (skills, commands, rules, hooks), CLAUDE.md, .gitignore,
     //             .mcp.json.example, LICENSE, NOTICE
     // User data = context/, people/, projects/, .mcp.json (has user's config)
-    const frameworkPaths = ['.claude', 'CLAUDE.md', '.gitignore', '.mcp.json.example', 'LICENSE', 'NOTICE'];
+    const frameworkPaths = ['.claude', 'CLAUDE.md', '.gitignore', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
     let upgraded = 0;
 
     try {
@@ -339,7 +343,15 @@ async function main() {
     }
   }
 
-  // Memory system always installs (no prompt)
+  // Memory system installation (skip with --no-memory)
+  if (skipMemory) {
+    console.log(`\n${colors.dim}Skipping memory daemon (--no-memory flag).${colors.reset}`);
+    console.log(`${colors.dim}You can install it later by running the installer again without --no-memory.${colors.reset}\n`);
+    // Skip to Phase 2 (Obsidian detection)
+    finishInstall(false, false);
+    return;
+  }
+
   console.log(`\n${colors.boldYellow}━━━ Phase 1/2: Memory System ━━━${colors.reset}\n`);
 
   const memoryDaemonPath = isWindows

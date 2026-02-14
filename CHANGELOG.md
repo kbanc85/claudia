@@ -2,6 +2,65 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.38.0 (2026-02-14)
+
+### Workspace Templates
+
+9 new Obsidian workspace templates for project management. These ship with the installer and are available in your vault's `workspaces/_templates/` directory.
+
+- **Agreement** - Contract and agreement tracking with key terms and change history
+- **Dashboard** - Project overview with phase tracker, deliverables, and dataview queries
+- **Deliverable** - Individual deliverable tracking with evidence strength scoring
+- **Interview** - Assessment interview template with 6-dimension scoring
+- **Invoice** - Invoice tracking with line items and payment status
+- **Meeting** - Meeting capture with decisions, action items, and themes
+- **Pipeline** - Sales pipeline with active engagements, leads, and capacity tracking
+- **Theme** - Theme/topic tracking with evidence and deliverable implications
+- **Timeline** - Chronological project timeline
+
+### New Skills
+
+- **new-workspace** - Create a workspace skeleton for a new project, client, or venture. Gathers details, creates directory structure with populated templates, validates generated files, and updates your main dashboard.
+- **gateway** - Start, stop, or check status of the Claudia Gateway service for Telegram and Slack messaging integration.
+- **setup-gateway** - Guided walkthrough for setting up the API-based gateway (lightweight, fast chat interface).
+- **setup-telegram** - Guided walkthrough for setting up the Telegram relay (full agent sessions with all skills and memory).
+- **inbox-check** - Lightweight inbox triage across all configured email accounts. Uses a fast subagent to fetch messages, then provides judgment on what matters and what needs a reply.
+
+### Vault Sync Improvements
+
+#### Markdown table validation
+The vault sync service now validates markdown tables at every entity export write point. Detects corrupted tables where header and separator rows have been merged onto a single line (a rendering issue that causes tables to display as raw text in Obsidian). Warnings are logged when corruption is detected.
+
+#### Table repair method
+New `_repair_broken_tables()` method that can split merged header/separator lines back into proper multi-line format. Available for future automatic repair integration.
+
+### Skill Improvements
+
+- **capture-meeting** - Added table rendering validation to the quality checklist
+- **new-workspace** - Includes Step 3 "Validate Generated Files" to catch table corruption at creation time
+
+### Installer
+
+#### Python 3.13 support
+- Added Python 3.13 to pyproject.toml classifiers (was already working, now official)
+
+#### Visible spaCy status
+- When spaCy can't install (e.g., Python 3.14+), the installer now displays a clear message explaining that entity extraction will use pattern matching instead of NLP, rather than failing silently
+
+#### Optional memory daemon
+- New `--no-memory` flag for template-only installs without the Python memory daemon
+- Upgrades now also receive workspace templates (`workspaces/` added to framework paths)
+
+### Compatibility
+
+- **Python:** 3.10, 3.11, 3.12, 3.13 (tested)
+- **Python 3.14+:** Installs with reduced NLP (pattern matching instead of spaCy). Core functionality unaffected.
+
+#### Stats
+- Install: `npx get-claudia@1.38.0`
+
+---
+
 ## 1.37.3 (2026-02-12)
 
 ### The Second Brain Upgrade

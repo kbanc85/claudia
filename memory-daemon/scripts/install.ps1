@@ -327,15 +327,24 @@ $ErrorActionPreference = "SilentlyContinue"
 $ErrorActionPreference = "Continue"
 Write-Host "  ${GREEN}✓${NC} Dependencies installed"
 
-# Install spaCy
+# Install spaCy (optional, degrades gracefully)
 Write-Host "  ${CYAN}◐${NC} Installing NLP engine..."
 $msg = Get-RandomMessage
 Write-Host "    ${DIM}$msg${NC}"
 $ErrorActionPreference = "SilentlyContinue"
 & $VENV_PIP install spacy 2>&1 | Out-Null
-& $VENV_PYTHON -m spacy download en_core_web_sm 2>&1 | Out-Null
+$spacyInstalled = $LASTEXITCODE -eq 0
 $ErrorActionPreference = "Continue"
-Write-Host "  ${GREEN}✓${NC} NLP ready"
+if ($spacyInstalled) {
+    $ErrorActionPreference = "SilentlyContinue"
+    & $VENV_PYTHON -m spacy download en_core_web_sm 2>&1 | Out-Null
+    $ErrorActionPreference = "Continue"
+    Write-Host "  ${GREEN}✓${NC} NLP ready"
+} else {
+    Write-Host "  ${YELLOW}!${NC} spaCy could not be installed (this is non-critical)"
+    Write-Host "    Entity extraction will use pattern matching instead of NLP."
+    Write-Host "    ${DIM}This is common on Python 3.14+. For full NLP support, use Python 3.13.${NC}"
+}
 
 Write-Host ""
 Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

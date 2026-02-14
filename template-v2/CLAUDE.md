@@ -308,6 +308,9 @@ These respond to natural language triggers AND can be invoked explicitly:
 | `/brain-monitor` | Terminal dashboard for real-time memory stats | "brain monitor", "memory dashboard" |
 | `/sync-vault` | Sync memory to Obsidian vault | "update vault", "sync to Obsidian" |
 | `/meditate` | End-of-session reflection, generate persistent learnings | "let's wrap up", "end the session" |
+| `/new-workspace [name]` | Create workspace for project, client, or venture | "new workspace", "new project" |
+| `/gateway [start\|stop\|status]` | Manage Gateway messaging service | "gateway status", "start gateway" |
+| `/inbox-check` | Two-tier inbox triage across email accounts | "check my inbox", "any emails?" |
 
 ### Explicit Skills (`/skill-name` Only)
 
@@ -324,6 +327,8 @@ These run only when explicitly invoked:
 | `/new-person [name]` | Create a relationship tracking file |
 | `/curate-vault` | Check vault for duplicates, orphans, consistency issues |
 | `/diagnose` | Check memory daemon health and troubleshoot issues |
+| `/setup-gateway` | Guided walkthrough for Gateway setup |
+| `/setup-telegram` | Guided walkthrough for Telegram bot setup |
 
 ---
 

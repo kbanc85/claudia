@@ -156,6 +156,98 @@ class VaultSyncService:
         with open(log_path, "a") as f:
             f.write(f"- [{timestamp}] {message}\n")
 
+    # ── Table validation ─────────────────────────────────────────
+
+    def _validate_markdown_tables(self, content: str) -> List[str]:
+        """Scan markdown content for broken tables where header and separator
+        rows are merged onto a single line.
+
+        A valid markdown table has:
+            Line 1: | Header1 | Header2 |
+            Line 2: |---------|---------|
+            Line 3+: | data    | data    |
+
+        A broken table has these merged:
+            | Header1 | Header2 |---------|---------|
+
+        Returns a list of warning strings describing each broken table found.
+        """
+        warnings = []
+        for line in content.split("\n"):
+            # Look for lines that have pipe-delimited text cells followed
+            # immediately by separator dashes (no newline between them).
+            # Pattern: a cell with text (| word |) followed by separator (|---|)
+            if re.search(
+                r"\|[^|\-\n][^|\n]*\|[-\s|]{3,}",
+                line,
+            ) and "---" in line:
+                warnings.append(
+                    "Broken table detected: header and separator merged "
+                    "on single line"
+                )
+        return warnings
+
+    def _repair_broken_tables(self, content: str) -> str:
+        """Attempt to repair broken markdown tables where header, separator,
+        and optional data rows have been merged onto a single line.
+
+        The corruption looks like:
+            | Col1 | Col2 |------|------| data1 | data2 |
+
+        Repair splits this back into proper multi-line format:
+            | Col1 | Col2 |
+            |------|------|
+            | data1 | data2 |
+
+        Returns the repaired content string.
+        """
+        repaired_lines = []
+        for line in content.split("\n"):
+            # Match a line that starts with header cells and then has
+            # a separator portion (dashes and pipes) on the same line.
+            match = re.match(
+                r"^(\|[^-\n]+(?:\|[^-\n]+)*\|)([-|\s]*---[-|\s]*)(.*)$",
+                line,
+            )
+            if not match:
+                repaired_lines.append(line)
+                continue
+
+            header_part = match.group(1).strip()
+            sep_raw = match.group(2).strip()
+            remainder = match.group(3).strip()
+
+            # Reconstruct a clean separator row based on the number of
+            # columns in the header row.
+            header_cells = [
+                c.strip()
+                for c in header_part.strip("|").split("|")
+            ]
+            col_count = len(header_cells)
+            separator = "|" + "|".join(
+                " " + "-" * max(len(c), 3) + " " for c in header_cells
+            ) + "|"
+
+            repaired_lines.append(header_part)
+            repaired_lines.append(separator)
+
+            # If there is leftover content after the separator, split it
+            # into data rows.
+            if remainder:
+                data_cells = [
+                    c.strip()
+                    for c in remainder.strip("|").split("|")
+                    if c.strip()
+                ]
+                for i in range(0, len(data_cells), col_count):
+                    row_cells = data_cells[i : i + col_count]
+                    while len(row_cells) < col_count:
+                        row_cells.append("")
+                    row_line = "| " + " | ".join(row_cells) + " |"
+                    repaired_lines.append(row_line)
+
+        return "\n".join(repaired_lines)
+
     # ── Entity export ───────────────────────────────────────────
 
     def _get_all_entities(self, since: Optional[str] = None) -> List[Dict]:
@@ -555,6 +647,10 @@ class VaultSyncService:
         filepath = target_dir / filename
         try:
             filepath.write_text(full_content, encoding="utf-8")
+            # Validate markdown tables in the exported note
+            table_warnings = self._validate_markdown_tables(full_content)
+            for warning in table_warnings:
+                logger.warning("%s in %s", warning, filepath.name)
             return filepath
         except IOError as e:
             logger.error(f"Failed to write entity note {filepath}: {e}")

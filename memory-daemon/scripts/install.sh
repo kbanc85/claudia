@@ -471,12 +471,17 @@ echo -e "    ${DIM}$(random_message)${NC}"
 "$VENV_DIR/bin/pip" install -e "$DAEMON_DIR[tui]" > /dev/null 2>&1
 echo -e "  ${GREEN}✓${NC} Dependencies installed"
 
-# Install spaCy
+# Install spaCy (optional, degrades gracefully)
 echo -e "  ${CYAN}◐${NC} Installing NLP engine..."
 echo -e "    ${DIM}$(random_message)${NC}"
-"$VENV_DIR/bin/pip" install spacy > /dev/null 2>&1 || true
-"$VENV_DIR/bin/python" -m spacy download en_core_web_sm > /dev/null 2>&1 || true
-echo -e "  ${GREEN}✓${NC} NLP ready"
+if "$VENV_DIR/bin/pip" install spacy > /dev/null 2>&1; then
+    "$VENV_DIR/bin/python" -m spacy download en_core_web_sm > /dev/null 2>&1 || true
+    echo -e "  ${GREEN}✓${NC} NLP ready"
+else
+    echo -e "  ${YELLOW}!${NC} spaCy could not be installed (this is non-critical)"
+    echo -e "    Entity extraction will use pattern matching instead of NLP."
+    echo -e "    ${DIM}This is common on Python 3.14+. For full NLP support, use Python 3.13.${NC}"
+fi
 
 echo
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
