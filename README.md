@@ -23,11 +23,6 @@ Catches commitments. Remembers context. Connects the dots across your network.
 
 ---
 
-<!-- TODO: Add GIF of /brain 3D visualization here -->
-<!-- <p align="center">
-<img src="assets/brain-visualization.gif" alt="Claudia's 3D Memory Graph" width="700">
-</p> -->
-
 ## The Problem With AI Assistants
 
 You tell ChatGPT about Sarah on Monday. By Wednesday, it's forgotten.
@@ -61,8 +56,8 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 <p>Every fact traces to its source. Ask "how do you know that?" and she shows the receipt.</p>
 </td>
 <td width="33%" align="center">
-<h3>🧠 Visualize Your Memory</h3>
-<p>Run <code>/brain</code> to see a 3D graph of everything she knows: people, projects, connections.</p>
+<h3>🧠 Obsidian Vault Sync</h3>
+<p>Memory syncs to an Obsidian vault as markdown notes with wikilinks. Graph view visualizes your entire network. Plain files you own forever.</p>
 </td>
 <td width="33%" align="center">
 <h3>🔒 Fully Local</h3>
@@ -88,7 +83,6 @@ claude
 - 15 organizations and 15 projects
 - 115 memories (facts, commitments, observations)
 - Overdue items and relationship warnings to explore
-- Full 3D brain visualization
 
 The demo database is isolated in `~/.claudia/demo/`. Your real data is never touched.
 
@@ -108,7 +102,18 @@ claude
 
 Say hi. She'll introduce herself, learn about you in a natural conversation, and generate a personalized workspace within a few sessions.
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 14+, Python 3.10+ (for memory)
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 18+, Python 3.10+ (for memory)
+
+<details>
+<summary><strong>Template-only install (no memory system)</strong></summary>
+
+```bash
+npx get-claudia my-project --no-memory
+```
+
+Installs only the template layer (skills, commands, rules). Claudia works using markdown files without semantic search or pattern detection. You can add the memory system later by running the installer again without `--no-memory`.
+
+</details>
 
 <details>
 <summary><strong>Upgrading from a previous version?</strong></summary>
@@ -119,19 +124,6 @@ npx get-claudia .
 ```
 
 This upgrades framework files while preserving your data (context/, people/, projects/).
-
-</details>
-
-<details>
-<summary><strong>Add Brain Visualizer to existing install</strong></summary>
-
-```bash
-# macOS/Linux
-bash "$(npm root -g)/get-claudia/visualizer/scripts/install.sh"
-
-# Windows (PowerShell)
-& "$(npm root -g)\get-claudia\visualizer\scripts\install.ps1"
-```
 
 </details>
 
@@ -184,10 +176,12 @@ Claudia detects your work style and generates structure that fits:
 | Command | What It Does |
 |---------|--------------|
 | `/morning-brief` | What needs attention today: commitments, meetings, warnings |
-| `/brain` | Launch 3D memory visualization |
+| `/new-workspace [name]` | Spin up a new project workspace from templates |
 | `/meeting-prep [person]` | One-page briefing before a call |
 | `/capture-meeting` | Process notes into decisions, commitments, action items |
 | `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
+| `/inbox-check` | Review Telegram and webhook messages |
+| `/gateway` | Manage external message gateway |
 | `/memory-audit` | See everything Claudia knows, with source chains |
 
 <details>
@@ -202,6 +196,9 @@ Claudia detects your work style and generates structure that fits:
 | `/new-person [name]` | Create a relationship file |
 | `/pipeline-review` | Active deals, capacity, pipeline health |
 | `/client-health` | Status across all client relationships |
+| `/setup-gateway` | Configure external message gateway |
+| `/setup-telegram` | Connect Telegram bot integration |
+| `/diagnose` | Check memory daemon health and troubleshoot |
 
 </details>
 
@@ -211,7 +208,7 @@ Claudia detects your work style and generates structure that fits:
 
 Claudia has two layers:
 
-**Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup.
+**Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup. Workspace templates let you spin up new projects with `/new-workspace [name]`.
 
 **Memory system** (Python) defines what she remembers. SQLite + vector embeddings + three services:
 
@@ -219,7 +216,7 @@ Claudia has two layers:
 |---------|--------------|
 | **Remember** | Stores facts, entities, relationships with embeddings |
 | **Recall** | Retrieves via hybrid ranking (vector + importance + recency) |
-| **Consolidate** | Background: decay old memories, detect patterns, generate predictions |
+| **Consolidate** | Background: decay old memories, detect patterns, track relationships |
 
 ```
 You ──► Claude Code ──► Reads Claudia's templates ──► Becomes Claudia
@@ -227,8 +224,10 @@ You ──► Claude Code ──► Reads Claudia's templates ──► Becomes 
                                                            ▼
                               Memory daemon (local) ◄── MCP tools
                                       │
-                                      ▼
-                        SQLite + vectors + Ollama (all local)
+                               ┌──────┴──────┐
+                               ▼              ▼
+              SQLite + vectors + Ollama    Obsidian vault
+                   (all local)           (markdown notes)
 ```
 
 <details>
@@ -269,7 +268,8 @@ Four extraction modes: **meeting**, **email**, **document**, **general**.
 
 - **Fully local.** Memory, embeddings, cognitive tools run on your machine. No external APIs for storage.
 - **No external actions without approval.** Every email, calendar event, external action requires your explicit "yes."
-- **Your data is yours.** `~/.claudia/memory/` (SQLite), `~/.claudia/files/` (documents), readable markdown. Delete anything.
+- **Your data in two formats.** SQLite database (`~/.claudia/memory/`) for fast semantic search, plus plain markdown files in your Obsidian vault for reading and graph navigation. Two independent copies you own forever.
+- **Delete anything, anytime.** Full control over your data. No lock-in, no cloud dependency.
 
 ---
 
@@ -278,11 +278,11 @@ Four extraction modes: **meeting**, **email**, **document**, **general**.
 | Component | Required | Purpose |
 |-----------|----------|---------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Yes | Runtime |
-| Node.js 14+ | Yes | Installer |
-| Python 3.10+ | Recommended | Memory system |
+| Node.js 18+ | Yes | Installer |
+| Python 3.10-3.13 | Recommended | Memory system |
 | [Ollama](https://ollama.com) | Recommended | Embeddings + cognitive tools |
 
-Without the memory system, Claudia still works using markdown files. With it, she gains semantic search, pattern detection, and predictions.
+Without the memory system, Claudia still works using markdown files. With it, she gains semantic search, pattern detection, and relationship tracking.
 
 **Platforms:** macOS, Linux, Windows
 
