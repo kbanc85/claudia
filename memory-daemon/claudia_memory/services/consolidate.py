@@ -2340,12 +2340,13 @@ class ConsolidateService:
         threshold = self.config.auto_dedupe_threshold
         candidates = []
 
+        seen_pairs = set()
+
+        # Method 1: vec0 KNN search on entity embeddings
+        # vec0 stores embeddings as binary FLOAT[] blobs, not JSON strings.
+        # Wrapped in its own try/except so Method 2 (alias overlap) still runs
+        # when sqlite-vec or entity_embeddings is unavailable.
         try:
-            # Method 1: vec0 KNN search on entity embeddings
-            # vec0 stores embeddings as binary FLOAT[] blobs, not JSON strings.
-            # Instead of extracting embeddings for pairwise comparison (which fails
-            # because json.loads cannot parse binary blobs), use vec0's native KNN
-            # search: for each entity, find its nearest neighbors directly.
             entities = self.db.execute(
                 """
                 SELECT e.id, e.name, e.canonical_name, e.type, e.importance
@@ -2359,16 +2360,12 @@ class ConsolidateService:
 
             entity_map = {e["id"]: e for e in entities}
 
-            # Identify which of our candidate entities have embeddings
             emb_rows = self.db.execute(
                 "SELECT entity_id FROM entity_embeddings",
                 fetch=True,
             ) or []
             entity_ids_with_emb = {r["entity_id"] for r in emb_rows} & set(entity_map.keys())
 
-            # For each entity with an embedding, use vec0 KNN to find neighbors.
-            # The subquery retrieves the binary blob and passes it directly to MATCH.
-            seen_pairs = set()
             for eid in entity_ids_with_emb:
                 try:
                     neighbors = self.db.execute(
@@ -2398,7 +2395,6 @@ class ConsolidateService:
                         if e1["type"] != e2["type"]:
                             continue
 
-                        # vec0 distance is cosine distance; convert to similarity
                         dist = neighbor["distance"]
                         sim = 1.0 - dist
                         if sim < threshold:
@@ -2418,8 +2414,11 @@ class ConsolidateService:
                 except Exception as e:
                     logger.debug(f"KNN search failed for entity {eid}: {e}")
                     continue
+        except Exception as e:
+            logger.debug(f"Embedding-based dedupe unavailable: {e}")
 
-            # Method 2: Alias overlap detection
+        # Method 2: Alias overlap detection
+        try:
             alias_rows = self.db.execute(
                 """
                 SELECT a1.entity_id as eid1, a2.entity_id as eid2,
