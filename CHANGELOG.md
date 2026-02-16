@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.39.1 (2026-02-16)
+
+### Installer Bug Fixes
+
+- **Fixed `set -e` abort during upgrade** - The install script would abort at "Checking embeddings..." and report "Memory setup had issues" even though the core installation succeeded. The `--backfill-embeddings` and markdown migration commands now properly capture exit codes under `set -e`
+- **Actionable error messages** - Backfill failures now explain *why* (Ollama not responding, embedding model changed, etc.) instead of silently skipping
+- **Suppressed harmless Python warnings** - Pydantic V1 deprecation warnings on Python 3.14 no longer appear during install
+- **Failure details logged** - Backfill errors are written to `~/.claudia/install.log` for debugging
+- **Improved retry guidance** - The installer now points to diagnostics (`~/.claudia/diagnose.sh`) when memory setup fails
+
+### Session Greeting
+
+- **Claudia now shows her robot logo** at the start of every session, giving a consistent visual identity in the terminal
+
 ## 1.39.0 (2026-02-16) - The Graph Intelligence Upgrade
 
 ### Enhanced Graph Retrieval

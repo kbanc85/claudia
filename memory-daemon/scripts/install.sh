@@ -611,14 +611,12 @@ if [ -n "$CLAUDIA_PROJECT_PATH" ]; then
         # Wait a moment for daemon to start
         sleep 2
 
-        # Run migration in quiet mode
-        "$VENV_DIR/bin/python" "$DAEMON_DIR/scripts/migrate_markdown.py" --quiet "$CLAUDIA_PROJECT_PATH"
-
-        if [ $? -eq 0 ]; then
+        # Run migration in quiet mode (if block is immune to set -e)
+        if PYTHONWARNINGS="ignore::DeprecationWarning" "$VENV_DIR/bin/python" "$DAEMON_DIR/scripts/migrate_markdown.py" --quiet "$CLAUDIA_PROJECT_PATH" 2>&1; then
             echo -e "  ${GREEN}✓${NC} Memories migrated to database"
         else
             echo -e "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
-            echo -e "    ${DIM}You can retry manually: ~/.claudia/daemon/venv/bin/python -m claudia_memory.scripts.migrate_markdown $CLAUDIA_PROJECT_PATH${NC}"
+            echo -e "    ${DIM}You can retry: ~/.claudia/daemon/venv/bin/python ~/.claudia/daemon/scripts/migrate_markdown.py --quiet $CLAUDIA_PROJECT_PATH${NC}"
         fi
     else
         echo -e "  ${DIM}No existing memories found to migrate${NC}"
@@ -644,14 +642,20 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
 
         for db_file in "${EMBED_DBS[@]}"; do
             DB_NAME=$(basename "$db_file")
-            RESULT=$(CLAUDIA_DB_OVERRIDE="$db_file" "$VENV_DIR/bin/python" -m claudia_memory --backfill-embeddings 2>&1)
-            EXITCODE=$?
+            RESULT=$(PYTHONWARNINGS="ignore::DeprecationWarning" CLAUDIA_DB_OVERRIDE="$db_file" "$VENV_DIR/bin/python" -m claudia_memory --backfill-embeddings 2>&1) && EXITCODE=0 || EXITCODE=$?
 
             if [ $EXITCODE -ne 0 ]; then
                 if echo "$RESULT" | grep -q "Dimension mismatch"; then
                     MISMATCH_FOUND=true
                     echo -e "  ${YELLOW}!${NC} ${DB_NAME}: Embedding model change detected"
+                elif echo "$RESULT" | grep -qi "not available\|connection refused\|connect call failed"; then
+                    echo -e "  ${YELLOW}!${NC} ${DB_NAME}: Ollama not responding (embeddings will backfill on next restart)"
+                else
+                    echo -e "  ${YELLOW}!${NC} ${DB_NAME}: Embedding check skipped"
                 fi
+                # Log details for debugging
+                echo "[$(date)] Backfill failed for $DB_NAME (exit=$EXITCODE):" >> "$CLAUDIA_DIR/install.log"
+                echo "$RESULT" >> "$CLAUDIA_DIR/install.log"
                 continue
             fi
 

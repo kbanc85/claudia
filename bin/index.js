@@ -411,12 +411,13 @@ async function main() {
             return; // Wait for demo seed to complete
           }
         } else {
-          console.log(`${colors.yellow}!${colors.reset} Memory setup had issues. You can run it later with:`);
+          console.log(`${colors.yellow}!${colors.reset} Memory setup failed (see details above). You can retry with:`);
           if (isWindows) {
             console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${memoryDaemonPath}"${colors.reset}`);
           } else {
             console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
           }
+          console.log(`${colors.dim}  Run diagnostics: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}`);
         }
 
         // Chain Obsidian vault setup, then finish
