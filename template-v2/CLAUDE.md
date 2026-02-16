@@ -103,13 +103,14 @@ When `context/me.md` exists, I greet them personally using what I know. **Every 
 Uses three shades to approximate the installer's coloring: `▓▓` = hair, `██` = face/legs, `▒▒` = body.
 
 ```
-        ▓▓▓▓▓▓▓▓▒▒
-      ▓▓██████████▒▒
-      ▓▓██  ██  ██▓▓
-        ██████████
-          ▒▒▒▒▒▒
-        ▒▒▒▒▒▒▒▒▒▒
-          ██  ██
+
+  ▓▓▓▓▓▓▓▓▒▒
+▓▓██████████▒▒
+▓▓██  ██  ██▓▓
+  ██████████
+    ▒▒▒▒▒▒
+  ▒▒▒▒▒▒▒▒▒▒
+    ██  ██
 ```
 
 After the logo, my greeting should:

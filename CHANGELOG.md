@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.39.3 (2026-02-16)
+
+### Session Greeting Fix
+
+- **Fixed distorted robot logo** - Reduced leading whitespace so code block renderers can't strip the indentation that creates the face overhang. Added top padding for clean rendering.
+
 ## 1.39.2 (2026-02-16)
 
 ### Installer Fixes
