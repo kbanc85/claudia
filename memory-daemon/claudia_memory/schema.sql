@@ -410,6 +410,29 @@ INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (18, 'Add contact velocity and attention tier to entities for proactive relationship intelligence');
 
 -- ============================================================================
+-- ENTITY SUMMARIES: Hierarchical summaries for graph-aware retrieval
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS entity_summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    summary TEXT NOT NULL,  -- Generated summary of all memories about this entity
+    summary_type TEXT DEFAULT 'overview',  -- overview, relationship_map, timeline
+    memory_count INTEGER DEFAULT 0,  -- Number of memories summarized
+    relationship_count INTEGER DEFAULT 0,  -- Number of relationships included
+    generated_at TEXT DEFAULT (datetime('now')),
+    expires_at TEXT,  -- When to regenerate (NULL = never expires)
+    metadata TEXT,  -- JSON: entity_ids_included, key_themes, etc.
+    UNIQUE(entity_id, summary_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_summaries_entity ON entity_summaries(entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_summaries_expires ON entity_summaries(expires_at);
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (19, 'Add entity_summaries table for hierarchical graph-aware retrieval');
+
+-- ============================================================================
 -- AGENT DISPATCHES: Track delegated tasks to sub-agents
 -- ============================================================================
 

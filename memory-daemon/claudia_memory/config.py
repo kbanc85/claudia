@@ -60,6 +60,14 @@ class MemoryConfig:
     llm_consolidation_batch_size: int = 10  # Memories to LLM-improve per run
     enable_llm_consolidation: bool = True  # Enable LLM-powered overnight consolidation
 
+    # Graph retrieval enhancements
+    enable_entity_summaries: bool = True  # Generate hierarchical entity summaries during consolidation
+    entity_summary_min_memories: int = 5  # Minimum memories to generate a summary for an entity
+    entity_summary_max_age_days: int = 7  # Regenerate summaries older than this
+    enable_auto_dedupe: bool = True  # Embedding-based automatic entity deduplication during consolidation
+    auto_dedupe_threshold: float = 0.90  # Cosine similarity threshold for auto-dedupe suggestions
+    graph_proximity_weight: float = 0.15  # Weight for graph proximity signal in RRF (additive)
+
     # Document storage
     files_base_dir: Path = field(default_factory=lambda: Path.home() / ".claudia" / "files")
     document_dormant_days: int = 90

@@ -884,6 +884,38 @@ class Database:
             conn.commit()
             logger.info("Applied migration 18: proactive relationship intelligence (velocity, tiers)")
 
+        if current_version < 19:
+            # Migration 19: Entity summaries for hierarchical graph-aware retrieval
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS entity_summaries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+                    summary TEXT NOT NULL,
+                    summary_type TEXT DEFAULT 'overview',
+                    memory_count INTEGER DEFAULT 0,
+                    relationship_count INTEGER DEFAULT 0,
+                    generated_at TEXT DEFAULT (datetime('now')),
+                    expires_at TEXT,
+                    metadata TEXT,
+                    UNIQUE(entity_id, summary_type)
+                )
+            """)
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entity_summaries_entity ON entity_summaries(entity_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entity_summaries_expires ON entity_summaries(expires_at)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 19 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (19, 'Add entity_summaries table for hierarchical graph-aware retrieval')"
+            )
+            conn.commit()
+            logger.info("Applied migration 19: entity_summaries for graph-aware retrieval")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
