@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.39.2 (2026-02-16)
+
+### Installer Fixes
+
+- **Cognitive tools now auto-install** - Non-interactive mode (via `npx`) now installs the recommended LLM (qwen3:4b) instead of silently skipping. Previously, upgrading via `npx get-claudia .` would leave cognitive tools disabled with no prompt offered.
+- **Suppressed confection/Pydantic UserWarning** - The previous fix only filtered DeprecationWarning; confection emits a UserWarning on Python 3.14. Now all Python warnings are suppressed during install.
+- **Clean venv on upgrade** - `python -m venv --clear` ensures stale packages from a previous Python version don't persist (fixes Python 3.14 packages lingering after selecting 3.13)
+
 ## 1.39.1 (2026-02-16)
 
 ### Installer Bug Fixes

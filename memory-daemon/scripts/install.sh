@@ -347,9 +347,9 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
     echo
 
     if [ "$NONINTERACTIVE" = "1" ]; then
-        LLM_CHOICE=4
-        LLM_MODEL=""
-        echo -e "  ${DIM}Skipping model selection (non-interactive mode)${NC}"
+        LLM_CHOICE=1
+        LLM_MODEL="qwen3:4b"
+        echo -e "  ${CYAN}◐${NC} Auto-installing recommended model (qwen3:4b)..."
     else
         echo -e "  ${BOLD}Choose a model:${NC}"
         echo -e "    ${CYAN}1)${NC} qwen3:4b    ${DIM}(~3GB, recommended, strong tool calling)${NC}"
@@ -468,7 +468,7 @@ echo
 echo -e "${BOLD}Step 5/8: Python Environment${NC}"
 echo
 echo -e "  ${CYAN}◐${NC} Creating isolated environment..."
-$PYTHON -m venv "$VENV_DIR"
+$PYTHON -m venv --clear "$VENV_DIR"
 echo -e "  ${GREEN}✓${NC} Virtual environment created"
 
 echo -e "  ${CYAN}◐${NC} Installing dependencies..."
@@ -612,7 +612,7 @@ if [ -n "$CLAUDIA_PROJECT_PATH" ]; then
         sleep 2
 
         # Run migration in quiet mode (if block is immune to set -e)
-        if PYTHONWARNINGS="ignore::DeprecationWarning" "$VENV_DIR/bin/python" "$DAEMON_DIR/scripts/migrate_markdown.py" --quiet "$CLAUDIA_PROJECT_PATH" 2>&1; then
+        if PYTHONWARNINGS="ignore" "$VENV_DIR/bin/python" "$DAEMON_DIR/scripts/migrate_markdown.py" --quiet "$CLAUDIA_PROJECT_PATH" 2>&1; then
             echo -e "  ${GREEN}✓${NC} Memories migrated to database"
         else
             echo -e "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
@@ -642,7 +642,7 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
 
         for db_file in "${EMBED_DBS[@]}"; do
             DB_NAME=$(basename "$db_file")
-            RESULT=$(PYTHONWARNINGS="ignore::DeprecationWarning" CLAUDIA_DB_OVERRIDE="$db_file" "$VENV_DIR/bin/python" -m claudia_memory --backfill-embeddings 2>&1) && EXITCODE=0 || EXITCODE=$?
+            RESULT=$(PYTHONWARNINGS="ignore" CLAUDIA_DB_OVERRIDE="$db_file" "$VENV_DIR/bin/python" -m claudia_memory --backfill-embeddings 2>&1) && EXITCODE=0 || EXITCODE=$?
 
             if [ $EXITCODE -ne 0 ]; then
                 if echo "$RESULT" | grep -q "Dimension mismatch"; then
