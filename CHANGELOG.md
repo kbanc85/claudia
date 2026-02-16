@@ -2,21 +2,62 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## 1.38.1 (2026-02-16)
+## 1.39.0 (2026-02-16) - The Graph Intelligence Upgrade
+
+### Enhanced Graph Retrieval
+
+Six GraphRAG-inspired enhancements to Claudia's memory system, improving how she understands relationships and connections between entities.
+
+#### Strength-Aware Graph Traversal
+- Graph proximity scoring now accounts for relationship strength instead of flat hop-distance values
+- 1-hop scores scale with edge strength (0.5-0.8 range); 2-hop scores multiply path strengths
+- Multi-entity bonus: memories connecting multiple query entities get a 15% boost per additional connection, helping "connect-the-dots" queries
+
+#### Entity Summaries
+- New `entity_summaries` table caches structured overviews for entities with sufficient memories
+- Summaries include key facts, relationships, open commitments, and contact velocity
+- Generated during consolidation, refreshed on a configurable schedule (default: 7 days)
+
+#### Entity Overview MCP Tool
+- New `memory.entity_overview` tool for community-style queries across one or more entities
+- Returns cross-entity patterns, relationship maps, shared memories, and open commitments
+- Enables questions like "what connects Sarah, the Acme deal, and the budget review?"
+
+#### Auto-Dedupe Entity Detection
+- Identifies potential duplicate entities using vec0's native KNN search on embeddings and alias overlap
+- Stores merge suggestions as predictions for user review (does not auto-merge)
+- Each detection method runs independently, so alias overlap works even without sqlite-vec
+
+#### Provenance Chain Rendering
+- `memory.trace` now returns structured provenance chains showing a memory's full lifecycle
+- Chain steps: origin, source document, episode, context, memory, correction, invalidation, entities
+
+#### New Configuration Options
+- `enable_entity_summaries` (default: true), `entity_summary_min_memories` (default: 2), `entity_summary_max_age_days` (default: 7)
+- `enable_auto_dedupe` (default: true), `auto_dedupe_threshold` (default: 0.90)
+- `graph_proximity_weight` (default: 0.15) - all configurable via `~/.claudia/config.json`
 
 ### Installer UX for Non-Technical Users
 
-Six quick wins to reduce friction for users who aren't comfortable with terminals and dependency management.
+Six improvements to reduce friction for users who aren't comfortable with terminals and dependency management.
 
-- **Unmissable restart instruction** - The "restart Claude Code" message is now bold yellow with an explicit command, instead of dim text at the bottom of output
-- **pip install logging** - Dependency installation output is now logged to `~/.claudia/install.log` instead of `/dev/null`, with a helpful message on failure
-- **Post-install health check** - After starting the daemon, the installer verifies it's actually running (on both macOS and Linux) and warns if it isn't
-- **Non-interactive LLM skip** - When running via `npx` (non-interactive), the cognitive tools model prompt is skipped entirely instead of hanging on empty input
-- **Onboarding time estimate** - First-run greeting now conveys "this takes about 5 minutes" so users know what to expect
-- **Obsidian explainer** - When Obsidian isn't detected, the installer now explains what it is: "a free app that lets you browse Claudia's knowledge as a visual graph"
+- **Unmissable restart instruction** - Bold yellow with explicit command, instead of dim text users miss
+- **pip install logging** - Output goes to `~/.claudia/install.log` instead of `/dev/null`, with failure guidance
+- **Post-install health check** - Verifies the daemon actually started on both macOS and Linux
+- **Non-interactive LLM skip** - `npx` installs no longer hang on the cognitive tools prompt
+- **Onboarding time estimate** - First-run greeting sets expectations ("takes about 5 minutes")
+- **Obsidian explainer** - Tells users what Obsidian is when it's not detected
+
+### Database
+- New migration 19: `entity_summaries` table with indexes and integrity check
+- Migration integrity now covers all 19 migrations
+
+### Testing
+- 22 new tests in `test_graph_retrieval.py` covering all graph enhancements
+- 478 tests passing, 0 regressions
 
 #### Stats
-- Install: `npx get-claudia@1.38.1`
+- Install: `npx get-claudia@1.39.0`
 
 ## 1.38.0 (2026-02-14)
 
