@@ -259,6 +259,7 @@ async function main() {
       console.log(`${colors.green}✓${colors.reset} Obsidian detected`);
     } else {
       console.log(`${colors.yellow}○${colors.reset} Obsidian not found (optional, recommended)`);
+      console.log(`  ${colors.dim}Obsidian is a free app that lets you browse Claudia's knowledge as a visual graph.${colors.reset}`);
       if (process.platform === 'darwin') {
         console.log(`  Install: ${colors.cyan}brew install --cask obsidian${colors.reset} or download from ${colors.cyan}https://obsidian.md${colors.reset}`);
       } else if (isWindows) {
@@ -458,7 +459,8 @@ ${cdStep}  ${colors.cyan}claude${colors.reset}
 `);
 
     if (memoryInstalled) {
-      console.log(`${colors.dim}If Claude was already running elsewhere, restart it to activate memory tools.${colors.reset}`);
+      console.log(`\n${colors.boldYellow}⚡ IMPORTANT: If Claude Code is already running, you MUST restart it for memory to work.${colors.reset}`);
+      console.log(`${colors.bold}   Close Claude Code and re-open it with: ${colors.cyan}claude${colors.reset}\n`);
     }
   }
 }

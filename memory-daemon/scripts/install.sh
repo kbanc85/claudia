@@ -345,23 +345,30 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
     echo -e "  ${DIM}facts, and commitments from text locally -- no API keys.${NC}"
     echo -e "  ${DIM}Without it, Claude handles extraction directly.${NC}"
     echo
-    echo -e "  ${BOLD}Choose a model:${NC}"
-    echo -e "    ${CYAN}1)${NC} qwen3:4b    ${DIM}(~3GB, recommended, strong tool calling)${NC}"
-    echo -e "    ${CYAN}2)${NC} smollm3:3b  ${DIM}(~2GB, 95% JSON accuracy, Hugging Face)${NC}"
-    echo -e "    ${CYAN}3)${NC} llama3.2:3b ${DIM}(~2GB, solid general extraction)${NC}"
-    echo -e "    ${CYAN}4)${NC} Skip        ${DIM}(Claude handles everything, no extra download)${NC}"
-    echo
-    read -p "  Your choice [1-4, default=4]: " LLM_CHOICE
-    LLM_CHOICE=${LLM_CHOICE:-4}
 
-    LLM_MODEL=""
-    case "$LLM_CHOICE" in
-        1) LLM_MODEL="qwen3:4b" ;;
-        2) LLM_MODEL="smollm3:3b" ;;
-        3) LLM_MODEL="llama3.2:3b" ;;
-        4) LLM_MODEL="" ;;
-        *) LLM_MODEL="" ;;
-    esac
+    if [ "$NONINTERACTIVE" = "1" ]; then
+        LLM_CHOICE=4
+        LLM_MODEL=""
+        echo -e "  ${DIM}Skipping model selection (non-interactive mode)${NC}"
+    else
+        echo -e "  ${BOLD}Choose a model:${NC}"
+        echo -e "    ${CYAN}1)${NC} qwen3:4b    ${DIM}(~3GB, recommended, strong tool calling)${NC}"
+        echo -e "    ${CYAN}2)${NC} smollm3:3b  ${DIM}(~2GB, 95% JSON accuracy, Hugging Face)${NC}"
+        echo -e "    ${CYAN}3)${NC} llama3.2:3b ${DIM}(~2GB, solid general extraction)${NC}"
+        echo -e "    ${CYAN}4)${NC} Skip        ${DIM}(Claude handles everything, no extra download)${NC}"
+        echo
+        read -p "  Your choice [1-4, default=4]: " LLM_CHOICE
+        LLM_CHOICE=${LLM_CHOICE:-4}
+
+        LLM_MODEL=""
+        case "$LLM_CHOICE" in
+            1) LLM_MODEL="qwen3:4b" ;;
+            2) LLM_MODEL="smollm3:3b" ;;
+            3) LLM_MODEL="llama3.2:3b" ;;
+            4) LLM_MODEL="" ;;
+            *) LLM_MODEL="" ;;
+        esac
+    fi
 
     if [ -n "$LLM_MODEL" ]; then
         if ollama list 2>/dev/null | grep -q "${LLM_MODEL%%:*}"; then
@@ -466,10 +473,13 @@ echo -e "  ${GREEN}✓${NC} Virtual environment created"
 
 echo -e "  ${CYAN}◐${NC} Installing dependencies..."
 echo -e "    ${DIM}$(random_message)${NC}"
-"$VENV_DIR/bin/pip" install --upgrade pip > /dev/null 2>&1
-"$VENV_DIR/bin/pip" install -r "$DAEMON_DIR/requirements.txt" > /dev/null 2>&1
-"$VENV_DIR/bin/pip" install -e "$DAEMON_DIR[tui]" > /dev/null 2>&1
-echo -e "  ${GREEN}✓${NC} Dependencies installed"
+"$VENV_DIR/bin/pip" install --upgrade pip >> "$CLAUDIA_DIR/install.log" 2>&1
+"$VENV_DIR/bin/pip" install -r "$DAEMON_DIR/requirements.txt" >> "$CLAUDIA_DIR/install.log" 2>&1
+if "$VENV_DIR/bin/pip" install -e "$DAEMON_DIR[tui]" >> "$CLAUDIA_DIR/install.log" 2>&1; then
+    echo -e "  ${GREEN}✓${NC} Dependencies installed"
+else
+    echo -e "  ${YELLOW}!${NC} Some dependencies failed to install. Check ~/.claudia/install.log for details"
+fi
 
 # Install spaCy (optional, degrades gracefully)
 echo -e "  ${CYAN}◐${NC} Installing NLP engine..."
@@ -539,6 +549,14 @@ EOF
     launchctl load "$PLIST_FILE"
     echo -e "  ${GREEN}✓${NC} Daemon launched"
 
+    # Verify daemon actually started
+    sleep 5
+    if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
+        echo -e "  ${GREEN}✓${NC} Memory daemon is running"
+    else
+        echo -e "  ${YELLOW}!${NC} Memory daemon may not have started. Run ~/.claudia/diagnose.sh for details"
+    fi
+
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     SERVICE_DIR="$HOME/.config/systemd/user"
     SERVICE_FILE="$SERVICE_DIR/claudia-memory.service"
@@ -567,6 +585,14 @@ EOF
     systemctl --user enable claudia-memory
     systemctl --user start claudia-memory
     echo -e "  ${GREEN}✓${NC} Daemon started"
+
+    # Verify daemon actually started
+    sleep 5
+    if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
+        echo -e "  ${GREEN}✓${NC} Memory daemon is running"
+    else
+        echo -e "  ${YELLOW}!${NC} Memory daemon may not have started. Run ~/.claudia/diagnose.sh for details"
+    fi
 fi
 
 echo
