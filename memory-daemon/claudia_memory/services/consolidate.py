@@ -2325,11 +2325,11 @@ class ConsolidateService:
         """
         Find and flag potential entity duplicates using embedding similarity.
 
-        Compares entity name embeddings (via stored entity_embeddings) to find
-        entities that likely refer to the same real-world entity. Does NOT
+        Uses vec0's native KNN search on entity_embeddings to find entities with
+        similar embeddings that likely refer to the same real-world entity. Does NOT
         auto-merge -- instead stores suggestions in predictions for user review.
 
-        Also checks canonical name similarity and alias overlap.
+        Also checks alias overlap between entities of the same type.
 
         Returns:
             List of duplicate candidate pairs with similarity scores
@@ -2341,13 +2341,15 @@ class ConsolidateService:
         candidates = []
 
         try:
-            # Method 1: Embedding similarity on entity names
+            # Method 1: vec0 KNN search on entity embeddings
+            # vec0 stores embeddings as binary FLOAT[] blobs, not JSON strings.
+            # Instead of extracting embeddings for pairwise comparison (which fails
+            # because json.loads cannot parse binary blobs), use vec0's native KNN
+            # search: for each entity, find its nearest neighbors directly.
             entities = self.db.execute(
                 """
-                SELECT e.id, e.name, e.canonical_name, e.type, e.importance,
-                       ee.embedding
+                SELECT e.id, e.name, e.canonical_name, e.type, e.importance
                 FROM entities e
-                LEFT JOIN entity_embeddings ee ON e.id = ee.entity_id
                 WHERE e.deleted_at IS NULL AND e.importance > 0.05
                 ORDER BY e.importance DESC
                 LIMIT 200
@@ -2355,45 +2357,67 @@ class ConsolidateService:
                 fetch=True,
             ) or []
 
-            entities_with_emb = []
-            entities_without_emb = []
-            for e in entities:
-                if e["embedding"]:
-                    try:
-                        emb = json.loads(e["embedding"]) if isinstance(e["embedding"], str) else e["embedding"]
-                        entities_with_emb.append({
-                            "id": e["id"],
-                            "name": e["name"],
-                            "canonical_name": e["canonical_name"],
-                            "type": e["type"],
-                            "importance": e["importance"],
-                            "embedding": emb,
-                        })
-                    except (json.JSONDecodeError, TypeError):
-                        entities_without_emb.append(e)
-                else:
-                    entities_without_emb.append(e)
+            entity_map = {e["id"]: e for e in entities}
 
-            # Pairwise embedding comparison (same type only)
+            # Identify which of our candidate entities have embeddings
+            emb_rows = self.db.execute(
+                "SELECT entity_id FROM entity_embeddings",
+                fetch=True,
+            ) or []
+            entity_ids_with_emb = {r["entity_id"] for r in emb_rows} & set(entity_map.keys())
+
+            # For each entity with an embedding, use vec0 KNN to find neighbors.
+            # The subquery retrieves the binary blob and passes it directly to MATCH.
             seen_pairs = set()
-            for i in range(len(entities_with_emb)):
-                for j in range(i + 1, len(entities_with_emb)):
-                    e1, e2 = entities_with_emb[i], entities_with_emb[j]
-                    if e1["type"] != e2["type"]:
-                        continue
-                    pair_key = (min(e1["id"], e2["id"]), max(e1["id"], e2["id"]))
-                    if pair_key in seen_pairs:
-                        continue
-                    seen_pairs.add(pair_key)
+            for eid in entity_ids_with_emb:
+                try:
+                    neighbors = self.db.execute(
+                        """
+                        SELECT ee.entity_id, ee.distance
+                        FROM entity_embeddings ee
+                        WHERE ee.embedding MATCH (
+                            SELECT embedding FROM entity_embeddings WHERE entity_id = ?
+                        )
+                        AND k = 10
+                        """,
+                        (eid,),
+                        fetch=True,
+                    ) or []
 
-                    sim = _cosine_similarity(e1["embedding"], e2["embedding"])
-                    if sim >= threshold:
+                    e1 = entity_map.get(eid)
+                    if not e1:
+                        continue
+
+                    for neighbor in neighbors:
+                        nid = neighbor["entity_id"]
+                        if nid == eid:
+                            continue
+                        e2 = entity_map.get(nid)
+                        if not e2:
+                            continue
+                        if e1["type"] != e2["type"]:
+                            continue
+
+                        # vec0 distance is cosine distance; convert to similarity
+                        dist = neighbor["distance"]
+                        sim = 1.0 - dist
+                        if sim < threshold:
+                            continue
+
+                        pair_key = (min(eid, nid), max(eid, nid))
+                        if pair_key in seen_pairs:
+                            continue
+                        seen_pairs.add(pair_key)
+
                         candidates.append({
                             "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
                             "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},
                             "similarity": round(sim, 3),
                             "method": "embedding",
                         })
+                except Exception as e:
+                    logger.debug(f"KNN search failed for entity {eid}: {e}")
+                    continue
 
             # Method 2: Alias overlap detection
             alias_rows = self.db.execute(

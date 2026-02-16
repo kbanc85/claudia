@@ -1064,6 +1064,11 @@ class Database:
             logger.warning("Migration 18 incomplete: entities missing velocity/tier columns")
             return 17
 
+        # Migration 19 added entity_summaries table
+        if "entity_summaries" not in tables:
+            logger.warning("Migration 19 incomplete: entity_summaries table missing")
+            return 18
+
         return None  # All good
 
     def _store_workspace_path(self, conn: sqlite3.Connection) -> None:
