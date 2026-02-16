@@ -2,6 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.38.1 (2026-02-16)
+
+### Installer UX for Non-Technical Users
+
+Six quick wins to reduce friction for users who aren't comfortable with terminals and dependency management.
+
+- **Unmissable restart instruction** - The "restart Claude Code" message is now bold yellow with an explicit command, instead of dim text at the bottom of output
+- **pip install logging** - Dependency installation output is now logged to `~/.claudia/install.log` instead of `/dev/null`, with a helpful message on failure
+- **Post-install health check** - After starting the daemon, the installer verifies it's actually running (on both macOS and Linux) and warns if it isn't
+- **Non-interactive LLM skip** - When running via `npx` (non-interactive), the cognitive tools model prompt is skipped entirely instead of hanging on empty input
+- **Onboarding time estimate** - First-run greeting now conveys "this takes about 5 minutes" so users know what to expect
+- **Obsidian explainer** - When Obsidian isn't detected, the installer now explains what it is: "a free app that lets you browse Claudia's knowledge as a visual graph"
+
+#### Stats
+- Install: `npx get-claudia@1.38.1`
+
 ## 1.38.0 (2026-02-14)
 
 ### Workspace Templates
