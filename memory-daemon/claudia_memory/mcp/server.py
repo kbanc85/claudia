@@ -28,6 +28,7 @@ from ..services.consolidate import (
     run_full_consolidation,
 )
 from ..services.recall import (
+    entity_overview,
     fetch_by_ids,
     find_duplicate_entities,
     find_path,
@@ -1015,6 +1016,40 @@ async def list_tools() -> ListToolsResult:
                         "default": 20,
                     },
                 },
+            },
+        ),
+        Tool(
+            name="memory.entity_overview",
+            title="Entity Overview",
+            description=(
+                "Generate a community-style overview of one or more entities. "
+                "Surfaces higher-level intelligence: entity summaries, relationship maps, "
+                "cross-entity patterns, open commitments, and clusters. Use for broad "
+                "questions like 'What's the status across all my stalled projects?' or "
+                "'Give me an overview of my key relationships.' Returns hierarchical "
+                "summaries when available (generated during overnight consolidation)."
+            ),
+            annotations=ToolAnnotations(readOnlyHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entities": {
+                        "type": ["array", "string"],
+                        "items": {"type": "string"},
+                        "description": "Entity names to include in the overview",
+                    },
+                    "include_network": {
+                        "type": "boolean",
+                        "description": "Include 1-hop network connections (default true)",
+                        "default": True,
+                    },
+                    "include_summaries": {
+                        "type": "boolean",
+                        "description": "Include cached entity summaries (default true)",
+                        "default": True,
+                    },
+                },
+                "required": ["entities"],
             },
         ),
         Tool(
@@ -2158,6 +2193,25 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     TextContent(
                         type="text",
                         text=json.dumps({"dormant": result, "count": len(result)}),
+                    )
+                ]
+            )
+
+        elif name == "memory.entity_overview":
+            _coerce_arg(arguments, "entities", list)
+            entities_arg = arguments.get("entities", [])
+            if isinstance(entities_arg, str):
+                entities_arg = [entities_arg]
+            result = entity_overview(
+                entity_names=entities_arg,
+                include_network=arguments.get("include_network", True),
+                include_summaries=arguments.get("include_summaries", True),
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result),
                     )
                 ]
             )

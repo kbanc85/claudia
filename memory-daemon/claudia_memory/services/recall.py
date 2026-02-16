@@ -440,7 +440,13 @@ class RecallService:
         Compute graph proximity scores for candidate memories.
 
         Memories linked to entities mentioned in the query get a boost.
-        Direct entity links get 1.0, 1-hop neighbors 0.7, 2-hop 0.4.
+        Uses relationship strength and type to weight proximity:
+        - Direct entity links: 1.0
+        - 1-hop neighbors: 0.5-0.8 (scaled by relationship strength)
+        - 2-hop neighbors: 0.2-0.5 (scaled by path strength)
+
+        Strong typed relationships (manages, works_with, client_of) get higher
+        proximity scores than weak inferred links.
 
         Args:
             query: Search query text
@@ -460,18 +466,21 @@ class RecallService:
         scores: Dict[int, float] = {}
 
         try:
-            # Build entity -> hop_distance mapping via graph expansion
-            entity_distances: Dict[int, int] = {}
+            # Build entity -> (hop_distance, path_strength) mapping via strength-aware expansion
+            entity_proximity: Dict[int, Tuple[int, float]] = {}
             for eid in query_entity_ids:
-                entity_distances[eid] = 0  # Direct mention
+                entity_proximity[eid] = (0, 1.0)  # Direct mention, full strength
 
-                # Expand graph to depth 2
-                neighbors = self._expand_graph(eid, depth=2, limit_per_hop=10)
+                # Expand graph to depth 2 with strength-aware scoring
+                neighbors = self._expand_graph_weighted(eid, depth=2, limit_per_hop=15)
                 for neighbor in neighbors:
                     nid = neighbor["id"]
                     dist = neighbor.get("distance", 1)
-                    if nid not in entity_distances or dist < entity_distances[nid]:
-                        entity_distances[nid] = dist
+                    path_strength = neighbor.get("path_strength", 0.5)
+                    if nid not in entity_proximity or dist < entity_proximity[nid][0]:
+                        entity_proximity[nid] = (dist, path_strength)
+                    elif dist == entity_proximity[nid][0] and path_strength > entity_proximity[nid][1]:
+                        entity_proximity[nid] = (dist, path_strength)
 
             # Score each candidate memory by its entity links
             placeholders = ", ".join(["?" for _ in candidate_ids])
@@ -488,21 +497,152 @@ class RecallService:
             for row in mem_entities:
                 mid = row["memory_id"]
                 eid = row["entity_id"]
-                if eid in entity_distances:
-                    dist = entity_distances[eid]
-                    # Score: 1.0 direct, 0.7 one-hop, 0.4 two-hop
+                if eid in entity_proximity:
+                    dist, path_strength = entity_proximity[eid]
+                    # Base score by hop distance, scaled by path strength
                     if dist == 0:
                         score = 1.0
                     elif dist == 1:
-                        score = 0.7
+                        score = 0.5 + 0.3 * path_strength  # 0.5-0.8
                     else:
-                        score = 0.4
+                        score = 0.2 + 0.3 * path_strength  # 0.2-0.5
                     scores[mid] = max(scores.get(mid, 0.0), score)
+
+            # Multi-entity bonus: memories connected to multiple query entities
+            # get a multiplicative boost (connect-the-dots queries)
+            if len(query_entity_ids) > 1:
+                mem_entity_hits: Dict[int, int] = {}
+                for row in mem_entities:
+                    mid = row["memory_id"]
+                    eid = row["entity_id"]
+                    if eid in entity_proximity:
+                        mem_entity_hits[mid] = mem_entity_hits.get(mid, 0) + 1
+                for mid, hit_count in mem_entity_hits.items():
+                    if hit_count > 1 and mid in scores:
+                        # Boost by 15% per additional entity connection
+                        scores[mid] = min(1.0, scores[mid] * (1.0 + 0.15 * (hit_count - 1)))
 
         except Exception as e:
             logger.debug(f"Graph proximity scoring failed: {e}")
 
         return scores
+
+    def _expand_graph_weighted(
+        self,
+        entity_id: int,
+        depth: int = 2,
+        limit_per_hop: int = 15,
+    ) -> List[Dict[str, Any]]:
+        """
+        Traverse the relationship graph with strength-aware scoring.
+
+        Like _expand_graph but tracks cumulative path strength through
+        the graph, allowing typed/strong relationships to score higher.
+
+        Args:
+            entity_id: Starting entity ID
+            depth: Maximum hops (default 2)
+            limit_per_hop: Max connected entities per hop
+
+        Returns:
+            List of dicts with entity info, distance, and path_strength
+        """
+        try:
+            # Get direct neighbors with relationship strength and type
+            direct_rows = self.db.execute(
+                """
+                SELECT DISTINCT
+                    CASE WHEN r.source_entity_id = ? THEN r.target_entity_id
+                         ELSE r.source_entity_id END as neighbor_id,
+                    e.name, e.type, e.importance,
+                    r.strength as rel_strength,
+                    r.relationship_type
+                FROM relationships r
+                JOIN entities e ON e.id = CASE
+                    WHEN r.source_entity_id = ? THEN r.target_entity_id
+                    ELSE r.source_entity_id END
+                WHERE (r.source_entity_id = ? OR r.target_entity_id = ?)
+                  AND r.strength > 0.1
+                  AND r.invalid_at IS NULL
+                  AND e.importance > 0.05
+                  AND e.id != ?
+                ORDER BY r.strength DESC, e.importance DESC
+                LIMIT ?
+                """,
+                (entity_id, entity_id, entity_id, entity_id, entity_id, limit_per_hop),
+                fetch=True,
+            ) or []
+
+            connected = []
+            seen_ids = {entity_id}
+
+            for row in direct_rows:
+                nid = row["neighbor_id"]
+                if nid in seen_ids:
+                    continue
+                seen_ids.add(nid)
+                path_strength = row["rel_strength"]
+                connected.append({
+                    "id": nid,
+                    "name": row["name"],
+                    "type": row["type"],
+                    "importance": row["importance"],
+                    "distance": 1,
+                    "path_strength": path_strength,
+                    "via_relationship": row["relationship_type"],
+                })
+
+            # Second hop if requested
+            if depth >= 2:
+                hop1_ids = [c["id"] for c in connected]
+                for hop1 in connected[:10]:  # Limit fan-out
+                    hop2_rows = self.db.execute(
+                        """
+                        SELECT DISTINCT
+                            CASE WHEN r.source_entity_id = ? THEN r.target_entity_id
+                                 ELSE r.source_entity_id END as neighbor_id,
+                            e.name, e.type, e.importance,
+                            r.strength as rel_strength,
+                            r.relationship_type
+                        FROM relationships r
+                        JOIN entities e ON e.id = CASE
+                            WHEN r.source_entity_id = ? THEN r.target_entity_id
+                            ELSE r.source_entity_id END
+                        WHERE (r.source_entity_id = ? OR r.target_entity_id = ?)
+                          AND r.strength > 0.1
+                          AND r.invalid_at IS NULL
+                          AND e.importance > 0.05
+                          AND e.id != ?
+                        ORDER BY r.strength DESC
+                        LIMIT ?
+                        """,
+                        (hop1["id"], hop1["id"], hop1["id"], hop1["id"],
+                         entity_id, limit_per_hop // 2),
+                        fetch=True,
+                    ) or []
+
+                    for row in hop2_rows:
+                        nid = row["neighbor_id"]
+                        if nid in seen_ids:
+                            continue
+                        seen_ids.add(nid)
+                        # Path strength is product of edge strengths
+                        path_strength = hop1["path_strength"] * row["rel_strength"]
+                        connected.append({
+                            "id": nid,
+                            "name": row["name"],
+                            "type": row["type"],
+                            "importance": row["importance"],
+                            "distance": 2,
+                            "path_strength": path_strength,
+                            "via_relationship": row["relationship_type"],
+                        })
+
+            return connected
+
+        except Exception as e:
+            logger.debug(f"Weighted graph traversal failed: {e}")
+            return []
 
     def _update_access_counts(self, results: List[RecallResult], now: datetime) -> None:
         """Update access counts for rehearsal effect."""
@@ -919,6 +1059,180 @@ class RecallService:
 
         return ratio
 
+    def entity_overview(
+        self,
+        entity_names: List[str],
+        include_network: bool = True,
+        include_summaries: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Generate a community-style overview of one or more entities.
+
+        Inspired by GraphRAG "global search": retrieves top entities, their
+        summaries, key relationships, and cross-entity patterns to surface
+        higher-level intelligence.
+
+        Args:
+            entity_names: List of entity names to include in overview
+            include_network: Include 1-hop network connections
+            include_summaries: Include cached entity summaries
+
+        Returns:
+            Dict with entity details, summaries, relationships, patterns, and clusters
+        """
+        result: Dict[str, Any] = {
+            "entities": [],
+            "cross_entity_patterns": [],
+            "clusters": [],
+            "relationship_map": [],
+            "open_commitments": [],
+        }
+
+        entity_ids = []
+        for name in entity_names:
+            canonical = self.extractor.canonical_name(name)
+            entity = self.db.get_one(
+                "entities",
+                where="canonical_name = ? AND deleted_at IS NULL",
+                where_params=(canonical,),
+            )
+            if not entity:
+                entity = self.db.get_one(
+                    "entities",
+                    where="canonical_name LIKE ? AND deleted_at IS NULL",
+                    where_params=(f"%{canonical}%",),
+                )
+            if entity:
+                entity_ids.append(entity["id"])
+                entity_keys = entity.keys()
+
+                entity_data: Dict[str, Any] = {
+                    "id": entity["id"],
+                    "name": entity["name"],
+                    "type": entity["type"],
+                    "description": entity["description"],
+                    "importance": entity["importance"],
+                    "attention_tier": entity["attention_tier"] if "attention_tier" in entity_keys else "standard",
+                    "contact_trend": entity["contact_trend"] if "contact_trend" in entity_keys else None,
+                }
+
+                # Attach cached summary if available
+                if include_summaries:
+                    summary = self.db.get_one(
+                        "entity_summaries",
+                        where="entity_id = ? AND summary_type = 'overview'",
+                        where_params=(entity["id"],),
+                    )
+                    if summary:
+                        entity_data["summary"] = summary["summary"]
+                        entity_data["summary_generated_at"] = summary["generated_at"]
+
+                result["entities"].append(entity_data)
+
+        if not entity_ids:
+            return result
+
+        # Cross-entity relationships
+        if len(entity_ids) >= 2:
+            for i in range(len(entity_ids)):
+                for j in range(i + 1, len(entity_ids)):
+                    rels = self.db.execute(
+                        """
+                        SELECT r.relationship_type, r.strength, r.origin_type,
+                               s.name as source_name, t.name as target_name
+                        FROM relationships r
+                        JOIN entities s ON r.source_entity_id = s.id
+                        JOIN entities t ON r.target_entity_id = t.id
+                        WHERE ((r.source_entity_id = ? AND r.target_entity_id = ?)
+                            OR (r.source_entity_id = ? AND r.target_entity_id = ?))
+                          AND r.invalid_at IS NULL
+                        """,
+                        (entity_ids[i], entity_ids[j], entity_ids[j], entity_ids[i]),
+                        fetch=True,
+                    ) or []
+                    for rel in rels:
+                        result["relationship_map"].append({
+                            "source": rel["source_name"],
+                            "target": rel["target_name"],
+                            "type": rel["relationship_type"],
+                            "strength": rel["strength"],
+                            "origin": rel["origin_type"],
+                        })
+
+        # Network connections for each entity (1-hop)
+        if include_network:
+            for eid in entity_ids:
+                neighbors = self._expand_graph_weighted(eid, depth=1, limit_per_hop=10)
+                for n in neighbors:
+                    if n["id"] not in entity_ids:
+                        result["relationship_map"].append({
+                            "source": next(
+                                (e["name"] for e in result["entities"] if e["id"] == eid),
+                                "unknown"
+                            ),
+                            "target": n["name"],
+                            "type": n.get("via_relationship", "connected_to"),
+                            "strength": n.get("path_strength", 0.5),
+                            "hop": 1,
+                        })
+
+        # Co-mentioned memories across the queried entities
+        if len(entity_ids) >= 2:
+            placeholders = ", ".join(["?" for _ in entity_ids])
+            co_memories = self.db.execute(
+                f"""
+                SELECT m.content, m.type, m.importance,
+                       GROUP_CONCAT(e.name) as entity_names,
+                       COUNT(DISTINCT me.entity_id) as entity_hit_count
+                FROM memories m
+                JOIN memory_entities me ON m.id = me.memory_id
+                JOIN entities e ON me.entity_id = e.id
+                WHERE me.entity_id IN ({placeholders})
+                  AND m.invalidated_at IS NULL
+                GROUP BY m.id
+                HAVING entity_hit_count >= 2
+                ORDER BY m.importance DESC
+                LIMIT 10
+                """,
+                tuple(entity_ids),
+                fetch=True,
+            ) or []
+
+            for mem in co_memories:
+                result["cross_entity_patterns"].append({
+                    "content": mem["content"],
+                    "type": mem["type"],
+                    "importance": mem["importance"],
+                    "entities_involved": mem["entity_names"].split(",") if mem["entity_names"] else [],
+                })
+
+        # Open commitments across all entities
+        placeholders = ", ".join(["?" for _ in entity_ids])
+        commitments = self.db.execute(
+            f"""
+            SELECT m.content, m.deadline_at, e.name as entity_name
+            FROM memories m
+            JOIN memory_entities me ON m.id = me.memory_id
+            JOIN entities e ON me.entity_id = e.id
+            WHERE me.entity_id IN ({placeholders})
+              AND m.type = 'commitment'
+              AND m.invalidated_at IS NULL
+            ORDER BY m.deadline_at ASC, m.importance DESC
+            LIMIT 10
+            """,
+            tuple(entity_ids),
+            fetch=True,
+        ) or []
+
+        for c in commitments:
+            result["open_commitments"].append({
+                "content": c["content"],
+                "deadline": c["deadline_at"],
+                "entity": c["entity_name"],
+            })
+
+        return result
+
     def get_recent_memories(
         self,
         limit: int = 10,
@@ -1211,7 +1525,119 @@ class RecallService:
             # Graceful degradation if documents table doesn't exist yet
             logger.debug(f"Could not fetch document provenance: {e}")
 
+        # 6. Build provenance chain -- a human-readable path showing how we know this
+        result["provenance_chain"] = self._build_provenance_chain(memory_row, result)
+
+        # 7. Fetch audit trail for this memory
+        try:
+            audit_rows = self.db.execute(
+                """
+                SELECT operation, details, timestamp
+                FROM audit_log
+                WHERE memory_id = ?
+                ORDER BY timestamp ASC
+                """,
+                (memory_id,),
+                fetch=True,
+            ) or []
+            if audit_rows:
+                result["audit_trail"] = [
+                    {
+                        "operation": row["operation"],
+                        "details": row["details"],
+                        "timestamp": row["timestamp"],
+                    }
+                    for row in audit_rows
+                ]
+        except Exception as e:
+            logger.debug(f"Could not fetch audit trail: {e}")
+
         return result
+
+    def _build_provenance_chain(self, memory_row, trace_result: Dict) -> List[Dict[str, str]]:
+        """
+        Build a human-readable provenance chain for a memory.
+
+        Returns a list of steps showing the memory's origin path:
+        user -> source_document -> extracted_fact -> correction_event
+
+        Each step has 'type', 'label', and optional 'timestamp'.
+        """
+        chain = []
+        row_keys = memory_row.keys()
+
+        # Step 1: Origin type
+        origin = memory_row["origin_type"] if "origin_type" in row_keys else "inferred"
+        source_channel = memory_row["source_channel"] if "source_channel" in row_keys else "claude_code"
+        chain.append({
+            "type": "origin",
+            "label": f"Origin: {origin} via {source_channel or 'claude_code'}",
+            "timestamp": memory_row["created_at"],
+        })
+
+        # Step 2: Source document (if linked)
+        if trace_result.get("documents"):
+            doc = trace_result["documents"][0]
+            chain.append({
+                "type": "source_document",
+                "label": f"Source: {doc['source_type']} - {doc['filename']}",
+                "timestamp": doc["created_at"],
+            })
+
+        # Step 3: Episode context (if from a session)
+        if trace_result.get("episode"):
+            ep = trace_result["episode"]
+            topics = ", ".join(ep.get("key_topics", [])[:3]) if ep.get("key_topics") else "general"
+            chain.append({
+                "type": "episode",
+                "label": f"Session ({topics})",
+                "timestamp": ep.get("started_at"),
+            })
+
+        # Step 4: Source context breadcrumb
+        source_context = memory_row["source_context"] if "source_context" in row_keys else None
+        if source_context:
+            chain.append({
+                "type": "context",
+                "label": f"Context: {source_context}",
+            })
+
+        # Step 5: Extracted fact
+        chain.append({
+            "type": "memory",
+            "label": f"Stored as {memory_row['type']} (importance: {memory_row['importance']:.2f}, confidence: {memory_row['confidence']:.2f})",
+            "timestamp": memory_row["created_at"],
+        })
+
+        # Step 6: Corrections (if any)
+        corrected_at = memory_row["corrected_at"] if "corrected_at" in row_keys else None
+        corrected_from = memory_row["corrected_from"] if "corrected_from" in row_keys else None
+        if corrected_at:
+            chain.append({
+                "type": "correction",
+                "label": f"Corrected: was '{corrected_from[:80]}...'" if corrected_from else "Corrected by user",
+                "timestamp": corrected_at,
+            })
+
+        # Step 7: Invalidation (if any)
+        invalidated_at = memory_row["invalidated_at"] if "invalidated_at" in row_keys else None
+        invalidated_reason = memory_row["invalidated_reason"] if "invalidated_reason" in row_keys else None
+        if invalidated_at:
+            chain.append({
+                "type": "invalidation",
+                "label": f"Invalidated: {invalidated_reason or 'no reason given'}",
+                "timestamp": invalidated_at,
+            })
+
+        # Step 8: Related entities
+        if trace_result.get("entities"):
+            entity_names = [e["name"] for e in trace_result["entities"][:5]]
+            chain.append({
+                "type": "entities",
+                "label": f"About: {', '.join(entity_names)}",
+            })
+
+        return chain
 
     def _expand_graph(
         self,
@@ -2434,3 +2860,8 @@ def recall_timeline(entity_name: str, **kwargs) -> List[RecallResult]:
 def project_relationship_health(entity_name: str, days_ahead: int = 30) -> Dict[str, Any]:
     """Project when a relationship will go dormant"""
     return get_recall_service().project_relationship_health(entity_name, days_ahead)
+
+
+def entity_overview(entity_names: List[str], **kwargs) -> Dict[str, Any]:
+    """Generate community-style overview of entities"""
+    return get_recall_service().entity_overview(entity_names, **kwargs)

@@ -2077,6 +2077,426 @@ class ConsolidateService:
         logger.info(f"Retention cleanup: {results}")
         return results
 
+    def generate_entity_summaries(self) -> int:
+        """
+        Generate hierarchical summaries for entities with enough memories.
+
+        Creates or updates entity_summaries rows that provide a high-level
+        overview of each significant entity. These summaries serve as
+        "parent nodes" in retrieval -- queries can hit summaries first,
+        then drill down to individual memories.
+
+        Summaries include:
+        - Key facts and recent activity
+        - Relationship map (who they're connected to)
+        - Open commitments and deadlines
+        - Contact velocity and attention tier
+
+        Returns:
+            Count of summaries generated or updated
+        """
+        if not self.config.enable_entity_summaries:
+            return 0
+
+        min_memories = self.config.entity_summary_min_memories
+        max_age_days = self.config.entity_summary_max_age_days
+        now = datetime.utcnow()
+        cutoff = (now - timedelta(days=max_age_days)).isoformat()
+        count = 0
+
+        try:
+            # Find entities that need summaries (enough memories, no recent summary)
+            entities = self.db.execute(
+                """
+                SELECT e.id, e.name, e.type, e.description, e.importance,
+                       e.last_contact_at, e.contact_frequency_days, e.contact_trend,
+                       e.attention_tier,
+                       COUNT(DISTINCT me.memory_id) as mem_count,
+                       es.generated_at as last_summary_at
+                FROM entities e
+                JOIN memory_entities me ON e.id = me.entity_id
+                LEFT JOIN entity_summaries es ON e.id = es.entity_id AND es.summary_type = 'overview'
+                WHERE e.deleted_at IS NULL
+                  AND e.importance > 0.1
+                GROUP BY e.id
+                HAVING mem_count >= ?
+                  AND (es.generated_at IS NULL OR es.generated_at < ?)
+                ORDER BY e.importance DESC, mem_count DESC
+                LIMIT 50
+                """,
+                (min_memories, cutoff),
+                fetch=True,
+            ) or []
+
+            for entity in entities:
+                summary = self._build_entity_summary(entity)
+                if summary:
+                    self._store_entity_summary(entity["id"], summary, entity)
+                    count += 1
+
+        except Exception as e:
+            logger.warning(f"Entity summary generation failed: {e}")
+
+        if count > 0:
+            logger.info(f"Generated {count} entity summaries")
+        return count
+
+    def _build_entity_summary(self, entity) -> Optional[str]:
+        """Build a structured summary for a single entity.
+
+        Gathers memories, relationships, commitments, and velocity data
+        to create a concise overview suitable for retrieval.
+        """
+        entity_id = entity["id"]
+        parts = []
+
+        # Header
+        entity_type = entity["type"]
+        name = entity["name"]
+        description = entity["description"] or ""
+        if description:
+            parts.append(f"{name} ({entity_type}): {description}")
+        else:
+            parts.append(f"{name} ({entity_type})")
+
+        # Key facts (top 5 by importance)
+        facts = self.db.execute(
+            """
+            SELECT m.content, m.type, m.importance
+            FROM memories m
+            JOIN memory_entities me ON m.id = me.memory_id
+            WHERE me.entity_id = ?
+              AND m.invalidated_at IS NULL
+              AND m.importance > 0.2
+            ORDER BY m.importance DESC
+            LIMIT 5
+            """,
+            (entity_id,),
+            fetch=True,
+        ) or []
+
+        if facts:
+            fact_lines = []
+            for f in facts:
+                prefix = f["type"].upper() if f["type"] != "fact" else ""
+                content = f["content"][:120]
+                if prefix:
+                    fact_lines.append(f"  [{prefix}] {content}")
+                else:
+                    fact_lines.append(f"  - {content}")
+            parts.append("Key information:\n" + "\n".join(fact_lines))
+
+        # Relationships
+        relationships = self.db.execute(
+            """
+            SELECT r.relationship_type, r.strength, r.origin_type,
+                   e.name as connected_name, e.type as connected_type
+            FROM relationships r
+            JOIN entities e ON e.id = CASE
+                WHEN r.source_entity_id = ? THEN r.target_entity_id
+                ELSE r.source_entity_id END
+            WHERE (r.source_entity_id = ? OR r.target_entity_id = ?)
+              AND r.invalid_at IS NULL
+              AND r.strength > 0.1
+            ORDER BY r.strength DESC
+            LIMIT 10
+            """,
+            (entity_id, entity_id, entity_id),
+            fetch=True,
+        ) or []
+
+        if relationships:
+            rel_lines = []
+            for r in relationships:
+                rel_lines.append(
+                    f"  {r['relationship_type']} -> {r['connected_name']} "
+                    f"({r['connected_type']}, strength: {r['strength']:.1f})"
+                )
+            parts.append("Relationships:\n" + "\n".join(rel_lines))
+
+        # Open commitments
+        commitments = self.db.execute(
+            """
+            SELECT m.content, m.deadline_at
+            FROM memories m
+            JOIN memory_entities me ON m.id = me.memory_id
+            WHERE me.entity_id = ?
+              AND m.type = 'commitment'
+              AND m.invalidated_at IS NULL
+            ORDER BY m.importance DESC
+            LIMIT 3
+            """,
+            (entity_id,),
+            fetch=True,
+        ) or []
+
+        if commitments:
+            commit_lines = []
+            for c in commitments:
+                deadline = f" (due: {c['deadline_at']})" if c["deadline_at"] else ""
+                commit_lines.append(f"  - {c['content'][:100]}{deadline}")
+            parts.append("Open commitments:\n" + "\n".join(commit_lines))
+
+        # Contact velocity (for person entities)
+        if entity["type"] == "person":
+            velocity_parts = []
+            if entity["contact_trend"]:
+                velocity_parts.append(f"trend: {entity['contact_trend']}")
+            if entity["contact_frequency_days"]:
+                velocity_parts.append(f"avg frequency: {entity['contact_frequency_days']:.0f} days")
+            if entity["attention_tier"]:
+                velocity_parts.append(f"tier: {entity['attention_tier']}")
+            if entity["last_contact_at"]:
+                try:
+                    last_dt = datetime.fromisoformat(entity["last_contact_at"])
+                    days_since = (datetime.utcnow() - last_dt).days
+                    velocity_parts.append(f"last contact: {days_since} days ago")
+                except (ValueError, TypeError):
+                    pass
+            if velocity_parts:
+                parts.append("Contact velocity: " + ", ".join(velocity_parts))
+
+        if len(parts) <= 1:
+            return None  # Not enough data for a useful summary
+
+        return "\n\n".join(parts)
+
+    def _store_entity_summary(self, entity_id: int, summary: str, entity) -> None:
+        """Store or update an entity summary."""
+        now = datetime.utcnow()
+        expires = (now + timedelta(days=self.config.entity_summary_max_age_days)).isoformat()
+
+        # Count relationships
+        rel_count_row = self.db.execute(
+            """
+            SELECT COUNT(*) as cnt FROM relationships
+            WHERE (source_entity_id = ? OR target_entity_id = ?)
+              AND invalid_at IS NULL AND strength > 0.1
+            """,
+            (entity_id, entity_id),
+            fetch=True,
+        )
+        rel_count = rel_count_row[0]["cnt"] if rel_count_row else 0
+
+        metadata = json.dumps({
+            "entity_name": entity["name"],
+            "entity_type": entity["type"],
+            "attention_tier": entity["attention_tier"],
+            "contact_trend": entity["contact_trend"],
+        })
+
+        # Upsert: try update first, then insert
+        existing = self.db.get_one(
+            "entity_summaries",
+            where="entity_id = ? AND summary_type = 'overview'",
+            where_params=(entity_id,),
+        )
+
+        if existing:
+            self.db.update(
+                "entity_summaries",
+                {
+                    "summary": summary,
+                    "memory_count": entity["mem_count"],
+                    "relationship_count": rel_count,
+                    "generated_at": now.isoformat(),
+                    "expires_at": expires,
+                    "metadata": metadata,
+                },
+                "id = ?",
+                (existing["id"],),
+            )
+        else:
+            self.db.insert(
+                "entity_summaries",
+                {
+                    "entity_id": entity_id,
+                    "summary": summary,
+                    "summary_type": "overview",
+                    "memory_count": entity["mem_count"],
+                    "relationship_count": rel_count,
+                    "generated_at": now.isoformat(),
+                    "expires_at": expires,
+                    "metadata": metadata,
+                },
+            )
+
+    def auto_dedupe_entities(self) -> List[Dict[str, Any]]:
+        """
+        Find and flag potential entity duplicates using embedding similarity.
+
+        Uses vec0's native KNN search on entity_embeddings to find entities with
+        similar embeddings that likely refer to the same real-world entity. Does NOT
+        auto-merge -- instead stores suggestions in predictions for user review.
+
+        Also checks alias overlap between entities of the same type.
+
+        Returns:
+            List of duplicate candidate pairs with similarity scores
+        """
+        if not self.config.enable_auto_dedupe:
+            return []
+
+        threshold = self.config.auto_dedupe_threshold
+        candidates = []
+
+        try:
+            # Method 1: vec0 KNN search on entity embeddings
+            # vec0 stores embeddings as binary FLOAT[] blobs, not JSON strings.
+            # Instead of extracting embeddings for pairwise comparison (which fails
+            # because json.loads cannot parse binary blobs), use vec0's native KNN
+            # search: for each entity, find its nearest neighbors directly.
+            entities = self.db.execute(
+                """
+                SELECT e.id, e.name, e.canonical_name, e.type, e.importance
+                FROM entities e
+                WHERE e.deleted_at IS NULL AND e.importance > 0.05
+                ORDER BY e.importance DESC
+                LIMIT 200
+                """,
+                fetch=True,
+            ) or []
+
+            entity_map = {e["id"]: e for e in entities}
+
+            # Identify which of our candidate entities have embeddings
+            emb_rows = self.db.execute(
+                "SELECT entity_id FROM entity_embeddings",
+                fetch=True,
+            ) or []
+            entity_ids_with_emb = {r["entity_id"] for r in emb_rows} & set(entity_map.keys())
+
+            # For each entity with an embedding, use vec0 KNN to find neighbors.
+            # The subquery retrieves the binary blob and passes it directly to MATCH.
+            seen_pairs = set()
+            for eid in entity_ids_with_emb:
+                try:
+                    neighbors = self.db.execute(
+                        """
+                        SELECT ee.entity_id, ee.distance
+                        FROM entity_embeddings ee
+                        WHERE ee.embedding MATCH (
+                            SELECT embedding FROM entity_embeddings WHERE entity_id = ?
+                        )
+                        AND k = 10
+                        """,
+                        (eid,),
+                        fetch=True,
+                    ) or []
+
+                    e1 = entity_map.get(eid)
+                    if not e1:
+                        continue
+
+                    for neighbor in neighbors:
+                        nid = neighbor["entity_id"]
+                        if nid == eid:
+                            continue
+                        e2 = entity_map.get(nid)
+                        if not e2:
+                            continue
+                        if e1["type"] != e2["type"]:
+                            continue
+
+                        # vec0 distance is cosine distance; convert to similarity
+                        dist = neighbor["distance"]
+                        sim = 1.0 - dist
+                        if sim < threshold:
+                            continue
+
+                        pair_key = (min(eid, nid), max(eid, nid))
+                        if pair_key in seen_pairs:
+                            continue
+                        seen_pairs.add(pair_key)
+
+                        candidates.append({
+                            "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
+                            "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},
+                            "similarity": round(sim, 3),
+                            "method": "embedding",
+                        })
+                except Exception as e:
+                    logger.debug(f"KNN search failed for entity {eid}: {e}")
+                    continue
+
+            # Method 2: Alias overlap detection
+            alias_rows = self.db.execute(
+                """
+                SELECT a1.entity_id as eid1, a2.entity_id as eid2,
+                       a1.canonical_alias as alias
+                FROM entity_aliases a1
+                JOIN entity_aliases a2 ON a1.canonical_alias = a2.canonical_alias
+                    AND a1.entity_id < a2.entity_id
+                JOIN entities e1 ON a1.entity_id = e1.id AND e1.deleted_at IS NULL
+                JOIN entities e2 ON a2.entity_id = e2.id AND e2.deleted_at IS NULL
+                    AND e1.type = e2.type
+                """,
+                fetch=True,
+            ) or []
+
+            for row in alias_rows:
+                pair_key = (row["eid1"], row["eid2"])
+                if pair_key not in seen_pairs:
+                    seen_pairs.add(pair_key)
+                    # Look up names
+                    e1 = self.db.get_one("entities", where="id = ?", where_params=(row["eid1"],))
+                    e2 = self.db.get_one("entities", where="id = ?", where_params=(row["eid2"],))
+                    if e1 and e2:
+                        candidates.append({
+                            "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
+                            "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},
+                            "similarity": 0.95,
+                            "method": "alias_overlap",
+                            "shared_alias": row["alias"],
+                        })
+
+            # Store top candidates as predictions for user review
+            now = datetime.utcnow()
+            for candidate in candidates[:10]:
+                content = (
+                    f"Possible duplicate entities: '{candidate['entity_1']['name']}' "
+                    f"and '{candidate['entity_2']['name']}' "
+                    f"({candidate['similarity']:.0%} similar via {candidate['method']}). "
+                    f"Consider merging with memory.merge_entities."
+                )
+                # Check for existing dedupe prediction
+                existing = self.db.execute(
+                    """
+                    SELECT id FROM predictions
+                    WHERE prediction_type = 'suggestion'
+                      AND metadata LIKE ?
+                      AND expires_at > ?
+                    LIMIT 1
+                    """,
+                    (f'%"dedupe_pair": [{candidate["entity_1"]["id"]}, {candidate["entity_2"]["id"]}]%',
+                     now.isoformat()),
+                    fetch=True,
+                )
+
+                if not existing:
+                    self.db.insert(
+                        "predictions",
+                        {
+                            "content": content,
+                            "prediction_type": "suggestion",
+                            "priority": 0.6 + 0.3 * candidate["similarity"],
+                            "expires_at": (now + timedelta(days=14)).isoformat(),
+                            "created_at": now.isoformat(),
+                            "metadata": json.dumps({
+                                "dedupe_pair": [candidate["entity_1"]["id"], candidate["entity_2"]["id"]],
+                                "similarity": candidate["similarity"],
+                                "method": candidate["method"],
+                            }),
+                        },
+                    )
+
+        except Exception as e:
+            logger.warning(f"Auto dedupe failed: {e}")
+
+        if candidates:
+            logger.info(f"Found {len(candidates)} potential entity duplicates")
+        return candidates
+
     def run_full_consolidation(self) -> Dict[str, Any]:
         """
         Run complete consolidation: decay, patterns, predictions.
@@ -2122,7 +2542,22 @@ class ConsolidateService:
             logger.warning(f"Pattern detection failed: {e}")
             results["patterns_detected"] = 0
 
-        # Phase 4: Retention cleanup (removes old data)
+        # Phase 4: Entity summaries (hierarchical graph retrieval)
+        try:
+            results["entity_summaries_generated"] = self.generate_entity_summaries()
+        except Exception as e:
+            logger.warning(f"Entity summary generation failed: {e}")
+            results["entity_summaries_generated"] = 0
+
+        # Phase 5: Auto-dedupe entities
+        try:
+            dedupe_candidates = self.auto_dedupe_entities()
+            results["dedupe_candidates_found"] = len(dedupe_candidates)
+        except Exception as e:
+            logger.warning(f"Auto dedupe failed: {e}")
+            results["dedupe_candidates_found"] = 0
+
+        # Phase 6: Retention cleanup (removes old data)
         try:
             results["retention"] = self.run_retention_cleanup()
         except Exception as e:

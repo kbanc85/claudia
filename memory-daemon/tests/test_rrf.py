@@ -214,7 +214,11 @@ class TestGraphProximity:
         assert scores.get(ids["mem_sarah"]) == 1.0
 
     def test_one_hop_neighbor_gets_partial_boost(self):
-        """Memory about 1-hop neighbor entity gets score=0.7."""
+        """Memory about 1-hop neighbor entity gets strength-scaled score.
+
+        With the enhanced graph proximity scoring, 1-hop score = 0.5 + 0.3 * strength.
+        Sarah -> Acme has strength 1.0, so expected score = 0.8.
+        """
         db, _ = _setup_db()
         ids = self._setup_graph(db)
 
@@ -228,8 +232,8 @@ class TestGraphProximity:
         candidates = {ids["mem_sarah"], ids["mem_acme"], ids["mem_beta"], ids["mem_unrelated"]}
         scores = svc._compute_graph_scores("Sarah Chen", candidates)
 
-        # Acme is 1-hop from Sarah
-        assert scores.get(ids["mem_acme"]) == 0.7
+        # Acme is 1-hop from Sarah (strength=1.0): score = 0.5 + 0.3 * 1.0 = 0.8
+        assert scores.get(ids["mem_acme"]) == 0.8
 
     def test_unrelated_memory_gets_no_boost(self):
         """Memory about unrelated entity gets no graph boost."""

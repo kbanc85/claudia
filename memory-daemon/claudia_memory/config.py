@@ -60,6 +60,14 @@ class MemoryConfig:
     llm_consolidation_batch_size: int = 10  # Memories to LLM-improve per run
     enable_llm_consolidation: bool = True  # Enable LLM-powered overnight consolidation
 
+    # Graph retrieval enhancements
+    enable_entity_summaries: bool = True  # Generate hierarchical entity summaries during consolidation
+    entity_summary_min_memories: int = 5  # Minimum memories to generate a summary for an entity
+    entity_summary_max_age_days: int = 7  # Regenerate summaries older than this
+    enable_auto_dedupe: bool = True  # Embedding-based automatic entity deduplication during consolidation
+    auto_dedupe_threshold: float = 0.90  # Cosine similarity threshold for auto-dedupe suggestions
+    graph_proximity_weight: float = 0.15  # Weight for graph proximity signal in RRF (additive)
+
     # Document storage
     files_base_dir: Path = field(default_factory=lambda: Path.home() / ".claudia" / "files")
     document_dormant_days: int = 90
@@ -162,6 +170,18 @@ class MemoryConfig:
                     config.obsidian_rest_api_port = data["obsidian_rest_api_port"]
                 if "obsidian_rest_api_enabled" in data:
                     config.obsidian_rest_api_enabled = data["obsidian_rest_api_enabled"]
+                if "enable_entity_summaries" in data:
+                    config.enable_entity_summaries = data["enable_entity_summaries"]
+                if "entity_summary_min_memories" in data:
+                    config.entity_summary_min_memories = data["entity_summary_min_memories"]
+                if "entity_summary_max_age_days" in data:
+                    config.entity_summary_max_age_days = data["entity_summary_max_age_days"]
+                if "enable_auto_dedupe" in data:
+                    config.enable_auto_dedupe = data["enable_auto_dedupe"]
+                if "auto_dedupe_threshold" in data:
+                    config.auto_dedupe_threshold = data["auto_dedupe_threshold"]
+                if "graph_proximity_weight" in data:
+                    config.graph_proximity_weight = data["graph_proximity_weight"]
 
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Could not load config from {config_path}: {e}. Using defaults.")
@@ -226,6 +246,18 @@ class MemoryConfig:
                 f"embedding_dimensions={self.embedding_dimensions} is not a common value "
                 f"({sorted(common_dims)}). Verify this matches your embedding model's output."
             )
+        if not (0.0 <= self.auto_dedupe_threshold <= 1.0):
+            logger.warning(f"auto_dedupe_threshold={self.auto_dedupe_threshold} out of range [0,1], using default 0.90")
+            self.auto_dedupe_threshold = 0.90
+        if self.entity_summary_min_memories < 1:
+            logger.warning(f"entity_summary_min_memories={self.entity_summary_min_memories} below minimum, using 1")
+            self.entity_summary_min_memories = 1
+        if self.entity_summary_max_age_days < 1:
+            logger.warning(f"entity_summary_max_age_days={self.entity_summary_max_age_days} below minimum, using 1")
+            self.entity_summary_max_age_days = 1
+        if not (0.0 <= self.graph_proximity_weight <= 1.0):
+            logger.warning(f"graph_proximity_weight={self.graph_proximity_weight} out of range [0,1], using default 0.15")
+            self.graph_proximity_weight = 0.15
 
     def save(self) -> None:
         """Save current configuration to ~/.claudia/config.json"""
@@ -260,6 +292,12 @@ class MemoryConfig:
             "vault_name": self.vault_name,
             "obsidian_rest_api_port": self.obsidian_rest_api_port,
             "obsidian_rest_api_enabled": self.obsidian_rest_api_enabled,
+            "enable_entity_summaries": self.enable_entity_summaries,
+            "entity_summary_min_memories": self.entity_summary_min_memories,
+            "entity_summary_max_age_days": self.entity_summary_max_age_days,
+            "enable_auto_dedupe": self.enable_auto_dedupe,
+            "auto_dedupe_threshold": self.auto_dedupe_threshold,
+            "graph_proximity_weight": self.graph_proximity_weight,
         }
 
         with open(config_path, "w") as f:
