@@ -201,3 +201,78 @@ def test_sqlite_vec_loads_with_enable_extension():
         assert len(result) > 0, "memory_embeddings vec0 table should exist when sqlite-vec is loaded"
 
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Lockfile tests
+# ---------------------------------------------------------------------------
+
+import sys
+
+
+def test_lockfile_acquired_on_posix():
+    """On POSIX, _acquire_daemon_lock should succeed for the first caller."""
+    if sys.platform == "win32":
+        pytest.skip("POSIX-only test")
+
+    from claudia_memory.__main__ import _acquire_daemon_lock
+    import fcntl, atexit
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        lock_path = Path(tmpdir) / "claudia.lock"
+        # Should not raise and should create the lock file
+        _acquire_daemon_lock(lock_path)
+        assert lock_path.exists()
+
+
+def test_lockfile_blocks_second_process_on_posix(monkeypatch):
+    """On POSIX, a second _acquire_daemon_lock call should detect contention.
+
+    We simulate contention by holding an exclusive flock on the lock file
+    in the test process, then calling _acquire_daemon_lock, which should
+    detect the lock is taken and call sys.exit(0).
+    """
+    if sys.platform == "win32":
+        pytest.skip("POSIX-only test")
+
+    import fcntl
+    from claudia_memory.__main__ import _acquire_daemon_lock
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        lock_path = Path(tmpdir) / "claudia.lock"
+
+        # Pre-acquire the lock file exclusively (simulates running daemon)
+        holder = open(lock_path, "w")
+        fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        exit_called_with = []
+
+        def fake_exit(code):
+            exit_called_with.append(code)
+            raise SystemExit(code)
+
+        monkeypatch.setattr("sys.exit", fake_exit)
+
+        try:
+            _acquire_daemon_lock(lock_path)
+        except SystemExit:
+            pass
+        finally:
+            fcntl.flock(holder, fcntl.LOCK_UN)
+            holder.close()
+
+        assert exit_called_with == [0], "Should have called sys.exit(0) when lock is held"
+
+
+def test_wal_checkpoint_pragma_runs():
+    """WAL checkpoint pragma should run without error on a fresh database."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test_wal.db"
+        db = Database(db_path)
+        db.initialize()
+
+        # The checkpoint pragma should have run during _get_connection().
+        # Verify the connection is valid and queries work post-checkpoint.
+        result = db.execute("SELECT 1 as ok", fetch=True)
+        assert result[0]["ok"] == 1
+        db.close()

@@ -267,8 +267,20 @@ class HealthServer:
             self._thread.start()
             self._running = True
             logger.info(f"Health server started on port {self.port}")
+        except OSError as e:
+            import errno as _errno
+            if e.errno == _errno.EADDRINUSE:
+                logger.error(
+                    f"Port {self.port} is already in use. "
+                    "Another Claudia daemon is likely running -- this causes database corruption. "
+                    "Stop the existing daemon before starting a new one."
+                )
+            else:
+                logger.error(f"Failed to start health server on port {self.port}: {e}")
+            raise
         except Exception as e:
             logger.exception(f"Failed to start health server: {e}")
+            raise
 
     def _serve(self) -> None:
         """Serve requests"""

@@ -13,7 +13,7 @@ import pytest
 import jsonschema
 
 from claudia_memory.database import Database
-from claudia_memory.mcp.server import _coerce_arg
+from claudia_memory.mcp.server import _coerce_arg, _coerce_int
 from claudia_memory.services.remember import RememberService
 
 
@@ -36,6 +36,138 @@ def _make_service(db):
     svc.db = db
     svc.embeddings = None
     return svc
+
+
+# ---------------------------------------------------------------------------
+# TestCoerceInt -- unit tests for the _coerce_int utility
+# ---------------------------------------------------------------------------
+
+class TestCoerceInt:
+    """Tests for _coerce_int string/float-to-int coercion.
+
+    LLMs sometimes pass integer arguments as JSON strings (e.g. "days": "7").
+    This test class validates all branches of _coerce_int.
+    """
+
+    def test_string_integer_coerced(self):
+        """String '7' should become int 7 -- the primary bug fix."""
+        args = {"days": "7"}
+        _coerce_int(args, "days")
+        assert args["days"] == 7
+        assert isinstance(args["days"], int)
+
+    def test_string_zero_coerced(self):
+        """String '0' should become int 0."""
+        args = {"limit": "0"}
+        _coerce_int(args, "limit")
+        assert args["limit"] == 0
+
+    def test_float_coerced_to_int(self):
+        """Float 7.0 should become int 7."""
+        args = {"days": 7.0}
+        _coerce_int(args, "days")
+        assert args["days"] == 7
+        assert isinstance(args["days"], int)
+
+    def test_native_int_unchanged(self):
+        """Already-native int should be left unchanged."""
+        args = {"limit": 10}
+        _coerce_int(args, "limit")
+        assert args["limit"] == 10
+        assert isinstance(args["limit"], int)
+
+    def test_noop_on_none(self):
+        """None value should be left unchanged (param omitted)."""
+        args = {"days": None}
+        _coerce_int(args, "days")
+        assert args["days"] is None
+
+    def test_noop_on_missing_key(self):
+        """Missing key should not raise or create the key."""
+        args = {}
+        _coerce_int(args, "days")
+        assert "days" not in args
+
+    def test_bool_not_coerced(self):
+        """bool is a subclass of int -- should not be coerced (already int-compatible)."""
+        args = {"flag": True}
+        _coerce_int(args, "flag")
+        # bool passes through unchanged (isinstance(True, bool) guard)
+        assert args["flag"] is True
+
+    def test_invalid_string_leaves_value(self):
+        """Non-numeric string should be left as-is (with warning logged)."""
+        args = {"days": "seven"}
+        _coerce_int(args, "days")
+        assert args["days"] == "seven"  # unchanged
+
+    def test_string_with_whitespace_coerced(self):
+        """String with surrounding whitespace should coerce via int()."""
+        args = {"limit": "  20  "}
+        _coerce_int(args, "limit")
+        assert args["limit"] == 20
+
+    def test_multiple_params_independent(self):
+        """Coercing multiple params should work independently."""
+        args = {"days": "14", "limit": "50", "max_depth": 4}
+        _coerce_int(args, "days")
+        _coerce_int(args, "limit")
+        _coerce_int(args, "max_depth")
+        assert args["days"] == 14
+        assert args["limit"] == 50
+        assert args["max_depth"] == 4
+
+    def test_upcoming_days_string_scenario(self):
+        """Reproduce the exact bug: memory.upcoming called with days='7'."""
+        # This is what the user's LLM sent, causing the original error
+        args = {"days": "7", "include_overdue": True}
+        _coerce_int(args, "days")
+        assert args["days"] == 7
+        assert isinstance(args["days"], int)
+
+
+# ---------------------------------------------------------------------------
+# TestIntegerSchemas -- verify updated schemas accept both int and string
+# ---------------------------------------------------------------------------
+
+class TestIntegerSchemas:
+    """Tests that integer schemas now accept both native int and string."""
+
+    def _make_int_schema(self, param_name, default=None):
+        """Build a minimal schema for a single integer parameter."""
+        prop = {"type": ["integer", "string"], "description": "test"}
+        if default is not None:
+            prop["default"] = default
+        return {
+            "type": "object",
+            "properties": {param_name: prop},
+        }
+
+    def test_schema_accepts_native_int(self):
+        """Updated schema should accept a native integer."""
+        schema = self._make_int_schema("days", 14)
+        jsonschema.validate({"days": 7}, schema)
+
+    def test_schema_accepts_string_int(self):
+        """Updated schema should accept an integer passed as a string."""
+        schema = self._make_int_schema("days", 14)
+        jsonschema.validate({"days": "7"}, schema)
+
+    def test_schema_accepts_omitted_optional(self):
+        """Optional integer param can be omitted entirely."""
+        schema = self._make_int_schema("days", 14)
+        jsonschema.validate({}, schema)
+
+    def test_original_int_only_rejects_string(self):
+        """Baseline: original 'type: integer' schema rejects string input."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer"}
+            }
+        }
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate({"days": "7"}, schema)
 
 
 # ---------------------------------------------------------------------------

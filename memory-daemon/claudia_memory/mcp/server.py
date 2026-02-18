@@ -101,6 +101,23 @@ def _coerce_arg(arguments: Dict[str, Any], key: str, expected_type: type = list)
             logger.warning(f"Could not parse '{key}' as JSON: {value[:100]}")
 
 
+def _coerce_int(arguments: Dict[str, Any], key: str) -> None:
+    """Coerce a string or float argument to int in-place.
+
+    LLMs sometimes pass integer arguments as JSON strings (e.g. "days": "7"
+    instead of "days": 7). The MCP SDK validates the schema before calling our
+    handler, so we accept ["integer", "string"] in schemas and convert here.
+    """
+    value = arguments.get(key)
+    if value is None:
+        return
+    if isinstance(value, (str, float)) and not isinstance(value, bool):
+        try:
+            arguments[key] = int(value)
+        except (ValueError, TypeError):
+            logger.warning(f"Could not coerce '{key}' to int: {value!r}")
+
+
 # Initialize the MCP server
 server = Server("claudia-memory")
 
@@ -174,7 +191,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "What to search for (required unless ids is provided)",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum number of results",
                         "default": 10,
                     },
@@ -213,7 +230,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Name of the person, project, or entity",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum number of memories to return",
                         "default": 20,
                     },
@@ -333,7 +350,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter by entity types",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum results",
                         "default": 10,
                     },
@@ -358,7 +375,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "What the assistant said in this turn",
                     },
                     "episode_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Episode ID from a previous buffer_turn call (omit on first call to create new episode)",
                     },
                     "source": {
@@ -385,7 +402,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "episode_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Episode ID from buffer_turn calls during the session",
                     },
                     "narrative": {
@@ -585,7 +602,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter to reflections about a specific entity (optional)",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "default": 10,
                         "description": "Maximum results to return",
                     },
@@ -596,7 +613,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Action: get (list), search (semantic), update, delete",
                     },
                     "reflection_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Reflection ID (required for update/delete actions)",
                     },
                     "content": {
@@ -728,7 +745,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "memory_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "The memory ID to trace provenance for",
                     },
                 },
@@ -787,7 +804,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum number of episodes to return",
                         "default": 10,
                     },
@@ -883,7 +900,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter by document source type",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum number of results",
                         "default": 20,
                     },
@@ -902,7 +919,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "document_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "The document ID to purge",
                     },
                 },
@@ -950,7 +967,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Name of the second entity",
                     },
                     "max_depth": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum hops to search (default 4)",
                         "default": 4,
                     },
@@ -971,7 +988,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "min_connections": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Minimum relationships to be considered a hub (default 5)",
                         "default": 5,
                     },
@@ -981,7 +998,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter by entity type (optional)",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum results to return (default 20)",
                         "default": 20,
                     },
@@ -1001,7 +1018,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "days": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Days without activity to consider dormant (default 60)",
                         "default": 60,
                     },
@@ -1011,7 +1028,7 @@ async def list_tools() -> ListToolsResult:
                         "default": 0.3,
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum results to return (default 20)",
                         "default": 20,
                     },
@@ -1102,11 +1119,11 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "source_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Entity ID to merge FROM (will be soft-deleted)",
                     },
                     "target_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Entity ID to merge INTO (will be kept)",
                     },
                     "reason": {
@@ -1130,7 +1147,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "entity_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Entity ID to delete",
                     },
                     "reason": {
@@ -1155,7 +1172,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "memory_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Memory ID to correct",
                     },
                     "correction": {
@@ -1184,7 +1201,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "memory_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Memory ID to invalidate",
                     },
                     "reason": {
@@ -1242,15 +1259,15 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "entity_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Entity ID to get audit history for",
                     },
                     "memory_id": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Memory ID to get audit history for",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum number of entries (default 20)",
                         "default": 20,
                     },
@@ -1275,7 +1292,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "List of entity names to summarize",
                     },
                     "top_facts_limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum top facts per entity (default 5)",
                         "default": 5,
                     },
@@ -1385,7 +1402,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum suggestions to return",
                         "default": 10,
                     },
@@ -1405,7 +1422,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "days": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Look ahead window in days",
                         "default": 14,
                     },
@@ -1437,7 +1454,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Optional: filter to memories about a specific entity",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum results",
                         "default": 50,
                     },
@@ -1462,7 +1479,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Name of the entity to view timeline for",
                     },
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "Maximum results",
                         "default": 50,
                     },
@@ -1488,7 +1505,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Name of the person to project health for",
                     },
                     "days_ahead": {
-                        "type": "integer",
+                        "type": ["integer", "string"],
                         "description": "How far ahead to project (default 30)",
                         "default": 30,
                     },
@@ -1538,6 +1555,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
         elif name == "memory.recall":
             _coerce_arg(arguments, "types")
             _coerce_arg(arguments, "ids")
+            _coerce_int(arguments, "limit")
             # Direct fetch by IDs (skip search)
             if "ids" in arguments and arguments["ids"]:
                 results = fetch_by_ids(arguments["ids"])
@@ -1642,6 +1660,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.about":
+            _coerce_int(arguments, "limit")
             result = recall_about(
                 entity_name=arguments["entity"],
                 limit=arguments.get("limit", 20),
@@ -1722,6 +1741,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.search_entities":
+            _coerce_int(arguments, "limit")
             _coerce_arg(arguments, "types")
             results = search_entities(
                 query=arguments["query"],
@@ -1753,6 +1773,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.buffer_turn":
+            _coerce_int(arguments, "episode_id")
             result = buffer_turn(
                 user_content=arguments.get("user_content"),
                 assistant_content=arguments.get("assistant_content"),
@@ -1769,6 +1790,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.end_session":
+            _coerce_int(arguments, "episode_id")
             # Coerce all array fields (LLMs may send JSON strings)
             for field in ("facts", "commitments", "entities", "relationships", "key_topics", "reflections"):
                 _coerce_arg(arguments, field)
@@ -1843,6 +1865,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.reflections":
+            _coerce_int(arguments, "limit")
+            _coerce_int(arguments, "reflection_id")
             _coerce_arg(arguments, "types")
             action = arguments.get("action", "get")
             limit = arguments.get("limit", 10)
@@ -2113,6 +2137,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.documents":
+            _coerce_int(arguments, "limit")
             doc_svc = get_document_service()
             results = doc_svc.search_documents(
                 query=arguments.get("query"),
@@ -2153,6 +2178,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.find_path":
+            _coerce_int(arguments, "max_depth")
             result = find_path(
                 entity_a=arguments["entity_a"],
                 entity_b=arguments["entity_b"],
@@ -2168,6 +2194,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.network_hubs":
+            _coerce_int(arguments, "min_connections")
+            _coerce_int(arguments, "limit")
             result = get_hub_entities(
                 min_connections=arguments.get("min_connections", 5),
                 entity_type=arguments.get("entity_type"),
@@ -2183,6 +2211,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.dormant_relationships":
+            _coerce_int(arguments, "days")
+            _coerce_int(arguments, "limit")
             result = get_dormant_relationships(
                 days=arguments.get("days", 60),
                 min_strength=arguments.get("min_strength", 0.3),
@@ -2217,6 +2247,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.trace":
+            _coerce_int(arguments, "memory_id")
             result = trace_memory(memory_id=arguments["memory_id"])
             return CallToolResult(
                 content=[
@@ -2228,6 +2259,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.telegram_inbox":
+            _coerce_int(arguments, "limit")
             inbox_text = _build_telegram_inbox(
                 limit=arguments.get("limit", 10),
                 mark_read=True,
@@ -2242,6 +2274,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.merge_entities":
+            _coerce_int(arguments, "source_id")
+            _coerce_int(arguments, "target_id")
             result = merge_entities(
                 source_id=arguments["source_id"],
                 target_id=arguments["target_id"],
@@ -2257,6 +2291,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.delete_entity":
+            _coerce_int(arguments, "entity_id")
             result = delete_entity(
                 entity_id=arguments["entity_id"],
                 reason=arguments.get("reason"),
@@ -2271,6 +2306,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.correct":
+            _coerce_int(arguments, "memory_id")
             result = correct_memory(
                 memory_id=arguments["memory_id"],
                 correction=arguments["correction"],
@@ -2286,6 +2322,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.invalidate":
+            _coerce_int(arguments, "memory_id")
             result = invalidate_memory(
                 memory_id=arguments["memory_id"],
                 reason=arguments.get("reason"),
@@ -2316,6 +2353,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.audit_history":
+            _coerce_int(arguments, "entity_id")
+            _coerce_int(arguments, "memory_id")
+            _coerce_int(arguments, "limit")
             # Get audit history for entity or memory
             entity_id = arguments.get("entity_id")
             memory_id = arguments.get("memory_id")
@@ -2354,6 +2394,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.summary":
+            _coerce_int(arguments, "top_facts_limit")
             entity_names = arguments.get("entities", [])
             top_facts_limit = arguments.get("top_facts_limit", 5)
             db = get_db()
@@ -2543,6 +2584,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.reconnections":
+            _coerce_int(arguments, "limit")
             limit = arguments.get("limit", 10)
             now_str = datetime.utcnow().isoformat()
             rows = get_db().execute(
@@ -2580,6 +2622,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.upcoming":
+            _coerce_int(arguments, "days")
             from ..services.recall import recall_upcoming_deadlines
             days = arguments.get("days", 14)
             include_overdue = arguments.get("include_overdue", True)
@@ -2605,6 +2648,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.since":
+            _coerce_int(arguments, "limit")
             from ..services.recall import recall_since
             since = arguments["since"]
             entity = arguments.get("entity")
@@ -2624,6 +2668,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.timeline":
+            _coerce_int(arguments, "limit")
             from ..services.recall import recall_timeline
             entity = arguments["entity"]
             limit = arguments.get("limit", 50)
@@ -2643,6 +2688,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             )
 
         elif name == "memory.project_health":
+            _coerce_int(arguments, "days_ahead")
             from ..services.recall import project_relationship_health
             entity = arguments["entity"]
             days_ahead = arguments.get("days_ahead", 30)

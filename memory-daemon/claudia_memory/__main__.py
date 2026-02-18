@@ -72,6 +72,47 @@ def signal_handler(signum, frame):
     _shutdown_requested = True
 
 
+def _acquire_daemon_lock(lock_path: Path) -> None:
+    """Acquire an exclusive lock to prevent concurrent daemon instances.
+
+    On POSIX (macOS/Linux): uses fcntl.flock() -- automatically released
+    by the OS even on SIGKILL, so it cannot get stuck stale.
+
+    On Windows: uses msvcrt byte-range locking on the lock file.
+
+    Exits with code 0 if another daemon is already running.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":
+        import atexit
+        import msvcrt
+
+        try:
+            # Open (or create) the lock file
+            lf = open(lock_path, "w+b")
+            lf.write(str(os.getpid()).encode())
+            lf.flush()
+            lf.seek(0)
+            msvcrt.locking(lf.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            logger.warning("Another Claudia daemon is already running. Exiting.")
+            sys.exit(0)
+        atexit.register(lambda: (msvcrt.locking(lf.fileno(), msvcrt.LK_UNLCK, 1), lf.close()))
+    else:
+        import atexit
+        import fcntl
+
+        try:
+            lf = open(lock_path, "w")
+            fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lf.write(str(os.getpid()))
+            lf.flush()
+        except OSError:
+            logger.warning("Another Claudia daemon is already running. Exiting.")
+            sys.exit(0)
+        atexit.register(lambda: (fcntl.flock(lf, fcntl.LOCK_UN), lf.close()))
+
+
 def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = None) -> None:
     """
     Run the Claudia Memory Daemon.
@@ -89,6 +130,12 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
     logger.info("Starting Claudia Memory Daemon")
     if project_id:
         logger.info(f"Project isolation enabled: {project_id}")
+
+    # Acquire lockfile before touching the database -- prevents concurrent
+    # daemon instances from both writing to the same SQLite file, which is
+    # the root cause of "database disk image is malformed" errors.
+    config = get_config()
+    _acquire_daemon_lock(Path(config.db_path).parent / "claudia.lock")
 
     # Set up signal handlers
     signal.signal(signal.SIGTERM, signal_handler)
