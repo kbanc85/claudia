@@ -10,11 +10,15 @@
  */
 
 import { getGraphInstance, getHighlightLinks } from './graph.js';
-import { getActiveTheme, onThemeChange } from './themes.js';
+import { getActiveTheme, getActiveThemeId, onThemeChange } from './themes.js';
 import { getSetting } from './settings.js';
 
-// Re-configure links when theme changes
+// Re-configure links when theme actually changes (guard against redundant calls)
+let lastLinkThemeId = null;
 onThemeChange(() => {
+  const currentId = getActiveThemeId();
+  if (currentId === lastLinkThemeId) return;
+  lastLinkThemeId = currentId;
   const Graph = getGraphInstance();
   if (Graph) configureLinks(Graph);
 });

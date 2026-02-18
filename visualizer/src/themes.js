@@ -61,7 +61,7 @@ const THEMES = {
       strong: '#00ffaa',
       normal: '#818cf8',
     },
-    bloom: { strength: 2.0, radius: 1.0, threshold: 0.12 },
+    bloom: { strength: 1.4, radius: 0.75, threshold: 0.12 },
     emissive: { entity: 0.35, memory: 0.04, pattern: 0.5 },
   },
 
@@ -110,7 +110,7 @@ const THEMES = {
       strong: '#f0abfc',
       normal: '#d946ef',
     },
-    bloom: { strength: 2.2, radius: 1.1, threshold: 0.10 },
+    bloom: { strength: 1.55, radius: 0.8, threshold: 0.10 },
     emissive: { entity: 0.40, memory: 0.04, pattern: 0.55 },
   },
 
@@ -159,7 +159,7 @@ const THEMES = {
       strong: '#4ade80',
       normal: '#06b6d4',
     },
-    bloom: { strength: 2.0, radius: 1.0, threshold: 0.10 },
+    bloom: { strength: 1.4, radius: 0.75, threshold: 0.10 },
     emissive: { entity: 0.38, memory: 0.04, pattern: 0.5 },
   },
 
@@ -208,7 +208,7 @@ const THEMES = {
       strong: '#fbbf24',
       normal: '#f97316',
     },
-    bloom: { strength: 2.2, radius: 1.0, threshold: 0.12 },
+    bloom: { strength: 1.55, radius: 0.75, threshold: 0.12 },
     emissive: { entity: 0.40, memory: 0.05, pattern: 0.5 },
   },
 
@@ -257,7 +257,7 @@ const THEMES = {
       strong: '#e0f2fe',
       normal: '#38bdf8',
     },
-    bloom: { strength: 1.8, radius: 0.9, threshold: 0.14 },
+    bloom: { strength: 1.25, radius: 0.7, threshold: 0.14 },
     emissive: { entity: 0.35, memory: 0.04, pattern: 0.45 },
   },
 
@@ -306,7 +306,7 @@ const THEMES = {
       strong: '#86efac',
       normal: '#22c55e',
     },
-    bloom: { strength: 2.5, radius: 0.8, threshold: 0.08 },
+    bloom: { strength: 1.75, radius: 0.6, threshold: 0.08 },
     emissive: { entity: 0.45, memory: 0.03, pattern: 0.55 },
   },
 
@@ -355,7 +355,7 @@ const THEMES = {
       strong: '#fb923c',
       normal: '#f43f5e',
     },
-    bloom: { strength: 2.0, radius: 1.0, threshold: 0.12 },
+    bloom: { strength: 1.4, radius: 0.75, threshold: 0.12 },
     emissive: { entity: 0.38, memory: 0.05, pattern: 0.50 },
   },
 
@@ -404,7 +404,7 @@ const THEMES = {
       strong: '#e4e4e7',
       normal: '#a1a1aa',
     },
-    bloom: { strength: 1.8, radius: 0.8, threshold: 0.15 },
+    bloom: { strength: 1.25, radius: 0.6, threshold: 0.15 },
     emissive: { entity: 0.32, memory: 0.04, pattern: 0.40 },
   },
 
@@ -453,7 +453,7 @@ const THEMES = {
       strong: '#fbcfe8',
       normal: '#f9a8d4',
     },
-    bloom: { strength: 1.8, radius: 1.0, threshold: 0.14 },
+    bloom: { strength: 1.25, radius: 0.75, threshold: 0.14 },
     emissive: { entity: 0.35, memory: 0.05, pattern: 0.45 },
   },
 
@@ -502,7 +502,7 @@ const THEMES = {
       strong: '#a5b4fc',
       normal: '#6366f1',
     },
-    bloom: { strength: 3.0, radius: 1.2, threshold: 0.08 },
+    bloom: { strength: 2.1, radius: 0.9, threshold: 0.08 },
     emissive: { entity: 0.50, memory: 0.02, pattern: 0.60 },
   },
 };

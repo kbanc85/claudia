@@ -89,7 +89,7 @@ async function init() {
       .backgroundColor(theme.background)
 
       // Force simulation tuning
-      .d3AlphaDecay(getSetting('simulation.alphaDecay') ?? 0.008)
+      .d3AlphaDecay(getSetting('simulation.alphaDecay') ?? 0.02)
       .d3VelocityDecay(getSetting('simulation.velocityDecay') ?? 0.4)
 
       // Node rendering

@@ -6,7 +6,7 @@
  * Patterns use wireframe icosahedra.
  *
  * Colors and emissive intensities are read from the active theme.
- * A theme change listener forces re-render of all nodes.
+ * Theme changes update materials in-place (no geometry recreation).
  */
 
 import {
@@ -20,10 +20,10 @@ import {
   Group,
   Sprite,
   SpriteMaterial,
-  CanvasTexture
+  CanvasTexture,
+  Color
 } from 'three';
-
-import { getActiveTheme, onThemeChange } from './themes.js';
+import { getActiveTheme, getActiveThemeId, onThemeChange } from './themes.js';
 import { getSetting } from './settings.js';
 import { getGraphInstance } from './graph.js';
 
@@ -32,14 +32,45 @@ import { getGraphInstance } from './graph.js';
 export let ENTITY_COLORS = { ...getActiveTheme().entities };
 export let MEMORY_COLORS = { ...getActiveTheme().memories };
 
+// Direct material color update instead of rebuilding all Three.js objects
+let lastNodeThemeId = null;
 onThemeChange((theme) => {
+  const currentId = getActiveThemeId();
+  if (currentId === lastNodeThemeId) return;
+  lastNodeThemeId = currentId;
+
   Object.assign(ENTITY_COLORS, theme.entities);
   Object.assign(MEMORY_COLORS, theme.memories);
 
-  // Force re-render of all nodes
+  // Update existing node materials in-place (no geometry recreation)
   const Graph = getGraphInstance();
-  if (Graph) {
-    Graph.nodeThreeObject(node => createNodeObject(node));
+  if (!Graph) return;
+  const graphData = Graph.graphData();
+  if (!graphData?.nodes) return;
+
+  for (const node of graphData.nodes) {
+    const obj = node.__threeObj;
+    if (!obj) continue;
+
+    const ud = obj.userData;
+    const mesh = ud?.coreMesh;
+    if (!mesh?.material) continue;
+
+    if (ud.nodeType === 'entity') {
+      const color = theme.entities[node.entityType] || node.color || '#888888';
+      mesh.material.color.set(color);
+      mesh.material.emissive.set(color);
+      mesh.material.emissiveIntensity = theme.emissive.entity;
+    } else if (ud.nodeType === 'pattern') {
+      mesh.material.color.set(theme.pattern.color);
+      mesh.material.emissive.set(theme.pattern.emissive);
+      mesh.material.emissiveIntensity = theme.emissive.pattern;
+    } else if (ud.nodeType === 'memory') {
+      const color = theme.memories[node.memoryType] || node.color || '#888888';
+      mesh.material.color.set(color);
+      mesh.material.emissive.set(color);
+      mesh.material.emissiveIntensity = theme.emissive.memory;
+    }
   }
 });
 

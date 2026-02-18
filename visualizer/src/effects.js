@@ -22,7 +22,7 @@ const QUALITY_PRESETS = {
   low:    { bloom: false, bloomStrength: 0,   bloomRadius: 0,   bloomThreshold: 0   },
   medium: { bloom: true,  bloomStrength: 1.0, bloomRadius: 0.8, bloomThreshold: 0.2 },
   high:   null, // use theme defaults
-  ultra:  { bloom: true,  bloomStrength: 3.0, bloomRadius: 1.2, bloomThreshold: 0.05 }
+  ultra:  { bloom: true,  bloomStrength: 2.1, bloomRadius: 0.9, bloomThreshold: 0.05 }
 };
 
 // FPS tracking
@@ -135,6 +135,9 @@ export function animateNodes(Graph, elapsed, delta) {
 
     const ud = obj.userData;
     if (!ud || ud.hidden) continue;
+
+    // Skip memory nodes with no active animations (they don't breathe/rotate)
+    if (ud.nodeType === 'memory' && !node.__spawn && !node.__pulse && !node.__shimmer) continue;
 
     const baseScale = ud.baseScale || 1;
     const phase = ud.phase || 0;

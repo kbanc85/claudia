@@ -6,12 +6,19 @@
  * the library handles all of that internally.
  */
 
+import { Color } from 'three';
+import { getActiveTheme } from './themes.js';
+
 let Graph = null;
 let graphData = { nodes: [], links: [] };
 let fullData = null; // Stashed for filter/reset
 let highlightNodes = new Set();
 let highlightLinks = new Set();
 let selectedNode = null;
+
+// Saved material state for restoring after clearSelection()
+let savedMaterials = new Map(); // nodeId -> { color, emissiveIntensity }
+let savedLinkColors = new Map(); // link -> { color, width }
 
 // ── Graph instance ─────────────────────────────────────────
 
@@ -62,13 +69,13 @@ export function updateNodeData(nodeId, updates) {
 // ── Selection + highlighting ──────────────────────────────
 
 export function highlightNeighborhood(node) {
+  // Restore previous highlight before applying new one
+  restoreSavedMaterials();
+
   highlightNodes.clear();
   highlightLinks.clear();
 
-  if (!node) {
-    triggerRefresh();
-    return;
-  }
+  if (!node) return;
 
   highlightNodes.add(node.id);
 
@@ -86,14 +93,14 @@ export function highlightNeighborhood(node) {
     }
   }
 
-  triggerRefresh();
+  applyHighlightMaterials();
 }
 
 export function clearSelection() {
   selectedNode = null;
+  restoreSavedMaterials();
   highlightNodes.clear();
   highlightLinks.clear();
-  triggerRefresh();
   document.getElementById('detail-panel')?.classList.add('hidden');
 }
 
@@ -130,12 +137,71 @@ function pushData() {
   Graph.graphData({ nodes: graphData.nodes, links: graphData.links });
 }
 
-function triggerRefresh() {
+/**
+ * Apply highlight visuals directly on Three.js materials for the
+ * selected neighborhood. O(k) where k = neighborhood size, not O(N).
+ */
+function applyHighlightMaterials() {
   if (!Graph) return;
-  // Trigger visual refresh without rebuilding the graph
-  Graph.nodeColor(Graph.nodeColor());
-  Graph.linkColor(Graph.linkColor());
-  Graph.linkWidth(Graph.linkWidth());
+  const theme = getActiveTheme();
+  const highlightColor = new Color(0x7dd3fc); // bright cyan highlight
+
+  // Highlight nodes: boost emissive intensity
+  for (const nodeId of highlightNodes) {
+    const node = graphData.nodes.find(n => n.id === nodeId);
+    if (!node?.__threeObj) continue;
+
+    const ud = node.__threeObj.userData;
+    const mesh = ud?.coreMesh;
+    if (!mesh?.material) continue;
+
+    // Save original state
+    savedMaterials.set(nodeId, {
+      emissiveIntensity: mesh.material.emissiveIntensity,
+      emissive: mesh.material.emissive.getHex()
+    });
+
+    // Boost: brighter emissive
+    mesh.material.emissiveIntensity = Math.min(1.0, mesh.material.emissiveIntensity * 2.5);
+  }
+
+  // Highlight links: change color and width
+  for (const link of highlightLinks) {
+    const linkObj = link.__lineObj;
+    if (linkObj?.material) {
+      savedLinkColors.set(link, {
+        color: linkObj.material.color.getHex(),
+        linewidth: linkObj.material.linewidth
+      });
+      linkObj.material.color.set(theme.links.highlight);
+    }
+  }
+}
+
+/**
+ * Restore materials saved before highlighting.
+ */
+function restoreSavedMaterials() {
+  // Restore node materials
+  for (const [nodeId, saved] of savedMaterials) {
+    const node = graphData.nodes.find(n => n.id === nodeId);
+    if (!node?.__threeObj) continue;
+    const mesh = node.__threeObj.userData?.coreMesh;
+    if (!mesh?.material) continue;
+
+    mesh.material.emissiveIntensity = saved.emissiveIntensity;
+    mesh.material.emissive.setHex(saved.emissive);
+  }
+  savedMaterials.clear();
+
+  // Restore link materials
+  for (const [link, saved] of savedLinkColors) {
+    const linkObj = link.__lineObj;
+    if (linkObj?.material) {
+      linkObj.material.color.setHex(saved.color);
+    }
+  }
+  savedLinkColors.clear();
 }
 
 // ── Focus camera on a node ───────────────────────────────
