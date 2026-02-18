@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.39.4 (2026-02-17)
+
+### Daemon Robustness Path B
+
+- **Per-request transaction isolation** - Every MCP tool call is now wrapped in a single SQLite transaction. If a service function fails mid-way, the connection rolls back cleanly instead of leaving dirty state that could corrupt sibling calls.
+- **Startup integrity check with auto-restore** - On daemon start, a read-only `PRAGMA integrity_check` runs before accepting any requests. If the database is corrupt, the latest rolling backup is automatically restored and stale WAL files are removed. A critical log message guides manual recovery if no backup exists.
+- **Session health-check auto-restart** - When the daemon is installed but stopped, the session hook now attempts a silent restart (launchctl on macOS, systemctl on Linux) and re-checks health before falling back to a manual suggestion. Most dropped-daemon situations self-heal without user intervention.
+- **7 new tests** - Transaction isolation (commit on success, rollback on exception, cursor reuse) and startup integrity (healthy db, backup restore, no-backup logging, missing db skip).
+
 ## 1.39.3 (2026-02-16)
 
 ### Session Greeting Fix
