@@ -71,25 +71,34 @@ The memory system is a standalone Python application that gives Claudia persiste
 - `VerifyService` (`verify.py`) - Background verification cascade (deterministic first, LLM fallback)
 - `guards.py` - Validation on writes (content length, importance clamping, deadline detection, near-duplicate warning)
 
-**MCP tools** exposed to Claude Code (`mcp/server.py`):
+**MCP tools** exposed to Claude Code (`mcp/server.py`) - 21 visible tools (13 standalone + 8 merged):
+
+Standalone tools:
 - `memory.remember` - Store facts, preferences, observations, learnings (accepts `origin_type`, `source_channel`)
 - `memory.recall` - Semantic search across all memories (max 50 results); results include `source_channel`
 - `memory.about` - Retrieve all context about a specific entity
 - `memory.relate` - Create/strengthen relationships between entities
-- `memory.entity` - Create/update entity information
-- `memory.search_entities` - Search entities by name or description
-- `memory.consolidate` - Trigger manual consolidation
 - `memory.batch` - Batch multiple memory operations in one call (accepts `source_channel`)
-- `memory.trace` - Trace provenance and source history
-- `memory.correct` - Update memory content (preserves history in `corrected_from`)
-- `memory.invalidate` - Mark memories as no longer true
-- `memory.merge_entities` - Merge duplicate entities, preserving all references
-- `memory.delete_entity` - Soft-delete with reason tracking
-- `memory.find_duplicates` - Fuzzy matching for potential duplicates
+- `memory.end_session` - End session with narrative, reflections, structured extractions
+- `memory.consolidate` - Trigger manual consolidation
+- `memory.briefing` - Compact session-start data
+- `memory.summary` - Lightweight entity summaries
+- `memory.reflections` - Query/update/delete session reflections
 - `memory.system_health` - Current system health and diagnostics
-- `memory.audit_history` - Full provenance trail ("where did you learn that?")
-- `memory.file` - Store documents
-- `memory.buffer_turn` / `memory.end_session` / `memory.session_context` - Session lifecycle
+- `memory.project_health` - Relationship velocity projection
+- `cognitive.ingest` - NLP entity/memory extraction from text
+
+Merged tools (each uses an `operation` parameter to select sub-function):
+- `memory.temporal` - Time-based queries: `upcoming` (deadlines), `since` (recent changes), `timeline` (entity history), `morning` (curated morning digest)
+- `memory.graph` - Relationship graph: `network` (project network), `path` (find connection path), `hubs` (hub entities), `dormant` (dormant relationships), `reconnect` (reconnection suggestions)
+- `memory.entities` - Entity management: `create`, `search`, `merge`, `delete`, `overview`
+- `memory.vault` - Obsidian vault: `sync`, `status`, `canvas` (generate canvas), `import` (import vault edits)
+- `memory.modify` - Memory corrections: `correct`, `invalidate`, `invalidate_relationship`
+- `memory.session` - Session lifecycle: `buffer` (buffer turn), `context` (session context), `unsummarized` (unsummarized turns)
+- `memory.document` - Document storage: `store`, `search`
+- `memory.provenance` - Audit trails: `trace` (memory provenance), `audit` (entity/memory audit history)
+
+All 28 old tool names (e.g. `memory.entity`, `memory.search_entities`, `memory.trace`) remain callable as backward-compatible aliases in `call_tool()` but are hidden from `list_tools()`.
 
 **Background daemon** (`daemon/`)
 - 3 scheduled jobs via APScheduler: daily decay at 2 AM, pattern detection every 6 hours, full consolidation at 3 AM
@@ -247,7 +256,7 @@ claudia/
 │   │   ├── config.py        ← Settings from ~/.claudia/config.json
 │   │   ├── embeddings.py    ← Ollama 384-dim embedding generation
 │   │   ├── language_model.py ← Local LLM client for cognitive tools
-│   │   ├── mcp/server.py    ← 20+ MCP tool definitions
+│   │   ├── mcp/server.py    ← 21 MCP tools (13 standalone + 8 merged, 28 hidden aliases)
 │   │   ├── daemon/          ← Scheduler (APScheduler) + health check (port 3848)
 │   │   ├── extraction/      ← Entity extraction (spaCy or regex fallback)
 │   │   ├── tui/             ← Brain Monitor terminal dashboard (Textual)
