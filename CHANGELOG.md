@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.40.0 (2026-02-18)
+
+### MCP Tool Consolidation
+
+- **41 tools reduced to 21 visible tools** - Related MCP tools consolidated into 8 composite tools with `operation` parameters, improving LLM tool selection accuracy (degrades above ~15-20 tools)
+- **8 new merged tools** - `memory.temporal`, `memory.graph`, `memory.entities`, `memory.vault`, `memory.modify`, `memory.session`, `memory.document`, `memory.provenance` each combine 2-5 related operations
+- **Full backward compatibility** - All 28 old tool names remain callable as aliases in `call_tool()`, just hidden from `list_tools()`. Existing hooks, scripts, and integrations continue working
+- **`memory.purge` hidden** - Destructive admin operation removed from tool listing (still callable by skills that need it)
+- **Template files updated** - 19 skill, hook, and rule files updated to reference new merged tool names
+- **Archived gateway/telegram references cleaned** - Removed stale references to archived relay/gateway/visualizer components from template files
+
 ## 1.39.4 (2026-02-17)
 
 ### Daemon Robustness Path B
