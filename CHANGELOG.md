@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.40.4 (2026-02-18)
+
+### Brain Visualizer: One-Command Experience
+
+- **Visualizer now ships with npm package** - Added `visualizer` to `package.json` `files` array so `npx get-claudia` installs the 3D brain visualizer automatically
+- **Pre-built frontend included** - Removed `dist/` from `.npmignore` so the Vite-built frontend ships ready to serve. No dev tools needed on the user's machine.
+- **Auto-open browser** - New `--open` flag on `server.js` launches the browser automatically after the server starts. Uses `execFile` (not `exec`) for shell injection safety, with platform detection for macOS/Linux/Windows.
+- **Single-server brain skill** - Rewrote `/brain` skill from a 6-step two-server flow (Express + Vite dev server) to a 4-step single-server experience. One process, one port (3849), one command.
+
 ## 1.40.3 (2026-02-18)
 
 ### MCP Tool UnboundLocalError Fixes
