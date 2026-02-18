@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.40.5 (2026-02-18)
+
+### Brain Visualizer: Performance Fix
+
+- **Replaced O(N) triggerRefresh() with O(k) targeted material updates** - Node clicks no longer force 3d-force-graph to re-evaluate color/width callbacks on every node and link. Instead, directly manipulates Three.js materials on just the selected neighborhood (~5-20 items). Saves/restores original materials on selection change.
+- **Skipped idle memory nodes in per-frame animation loop** - Memory nodes that aren't actively spawning, pulsing, or shimmering are now skipped in `animateNodes()`. Since memories outnumber entities 3:1+, this eliminates ~75% of per-frame iterations.
+- **Reduced bloom strength 30% across all 10 themes** - UnrealBloomPass strength reduced by 0.7x and radius by 0.75x. Maintains glow aesthetic while cutting GPU bloom cost. Ultra quality preset scaled proportionally.
+- **Faster force simulation settling** - Increased `d3AlphaDecay` default from 0.008 to 0.02, so the graph stabilizes ~2.5x faster and stops burning CPU on force calculations.
+- **Guarded theme change listeners** - Both `links.js` and `nodes.js` theme listeners now track the previous theme ID and skip reconfiguration when it hasn't changed.
+- **Replaced full node rebuild on theme change** - Theme switches no longer call `Graph.nodeThreeObject()` (which recreated all geometries, materials, and textures). Now updates `material.color` and `material.emissive` in-place on existing meshes.
+
 ## 1.40.4 (2026-02-18)
 
 ### Brain Visualizer: One-Command Experience
