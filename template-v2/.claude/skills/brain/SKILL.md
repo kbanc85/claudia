@@ -14,44 +14,23 @@ Launch the Claudia Brain Visualizer, a real-time 3D cosmos visualization of my m
 
 ## Overview
 
-The visualizer has two parts, both in `~/.claudia/visualizer/`:
-- **API server** (`server.js`) — Express on port 3849, reads SQLite directly
-- **Frontend** (`src/`) — Three.js + Vite dev server on port 5173
-
-The API server must be started with `--project-dir` pointing to the current Claudia installation to access the correct per-project database.
+The visualizer is a single Express server (`server.js`) in `~/.claudia/visualizer/` that serves both the API (reads SQLite directly) and the pre-built 3D frontend from `dist/`. One process, one port (3849).
 
 ---
 
 ## Launch
 
-### Step 1: Identify the current project directory
+### Step 1: Check if already running
 
 ```bash
-PROJECT_DIR="$(pwd)"
-echo "PROJECT_DIR:$PROJECT_DIR"
-```
-
-### Step 2: Check what is already running
-
-```bash
-# Check API server
 if curl -s http://localhost:3849/health > /dev/null 2>&1; then
-  echo "API_RUNNING"
+  echo "ALREADY_RUNNING"
 else
-  echo "API_NOT_RUNNING"
-fi
-
-# Check Vite dev server
-if curl -s http://localhost:5173 > /dev/null 2>&1; then
-  echo "FRONTEND_RUNNING:5173"
-elif curl -s http://localhost:5174 > /dev/null 2>&1; then
-  echo "FRONTEND_RUNNING:5174"
-else
-  echo "FRONTEND_NOT_RUNNING"
+  echo "NOT_RUNNING"
 fi
 ```
 
-### Step 3: Find the visualizer directory
+### Step 2: Find the visualizer directory
 
 ```bash
 VISUALIZER_DIR=""
@@ -71,11 +50,10 @@ else
 fi
 ```
 
-### Step 4: Start API server if not running
-
-If **API_NOT_RUNNING** and **VISUALIZER_FOUND**:
+### Step 3: Start the server (if NOT_RUNNING and VISUALIZER_FOUND)
 
 ```bash
+PROJECT_DIR="$(pwd)"
 cd "$VISUALIZER_DIR"
 
 # Install deps if needed
@@ -84,52 +62,25 @@ if [ ! -d "node_modules" ]; then
   npm install --production 2>&1
 fi
 
-# Start API server with project directory for database isolation
-nohup node server.js --project-dir "$PROJECT_DIR" > /tmp/claudia-brain-api.log 2>&1 &
+# Start server with --open to auto-launch browser
+nohup node server.js --project-dir "$PROJECT_DIR" --open > /tmp/claudia-brain.log 2>&1 &
 sleep 2
 
 # Verify it started
 if curl -s http://localhost:3849/health > /dev/null 2>&1; then
-  echo "API_STARTED"
+  echo "STARTED"
 else
-  echo "API_FAILED"
-  tail -10 /tmp/claudia-brain-api.log
+  echo "FAILED"
+  tail -10 /tmp/claudia-brain.log
 fi
 ```
 
-### Step 5: Start Vite dev server if not running
+### Step 4: Open browser (if ALREADY_RUNNING)
 
-If **FRONTEND_NOT_RUNNING** and **VISUALIZER_FOUND**:
-
-```bash
-cd "$VISUALIZER_DIR"
-
-# Install dev deps if needed (vite)
-if [ ! -d "node_modules/.bin/vite" ] && [ ! -d "node_modules/vite" ]; then
-  echo "Installing dev dependencies..."
-  npm install 2>&1
-fi
-
-# Start Vite in background
-nohup npm run dev > /tmp/claudia-brain.log 2>&1 &
-sleep 3
-
-# Check which port Vite claimed
-if curl -s http://localhost:5173 > /dev/null 2>&1; then
-  echo "FRONTEND_STARTED:5173"
-elif curl -s http://localhost:5174 > /dev/null 2>&1; then
-  echo "FRONTEND_STARTED:5174"
-else
-  echo "FRONTEND_FAILED"
-  tail -20 /tmp/claudia-brain.log
-fi
-```
-
-### Step 6: Open in browser
+If the server was already running, just open the browser:
 
 ```bash
-PORT="${FRONTEND_PORT:-5173}"
-open "http://localhost:$PORT" 2>/dev/null || xdg-open "http://localhost:$PORT" 2>/dev/null || echo "OPEN_MANUALLY:http://localhost:$PORT"
+open "http://localhost:3849" 2>/dev/null || xdg-open "http://localhost:3849" 2>/dev/null || echo "OPEN_MANUALLY:http://localhost:3849"
 ```
 
 ---
@@ -138,25 +89,25 @@ open "http://localhost:$PORT" 2>/dev/null || xdg-open "http://localhost:$PORT" 2
 
 **If already running:**
 ```
-Your brain is live at http://localhost:[PORT]
+Your brain is live at http://localhost:3849
 ```
 
 **If started successfully:**
 ```
 **Brain Visualizer**
-Live at http://localhost:[PORT]
+Live at http://localhost:3849
 
 Viewing database for: [PROJECT_DIR]
 
 What you're seeing:
-- **Entities** (people, orgs, projects, concepts) as colored nodes — size scales with importance
+- **Entities** (people, orgs, projects, concepts) as colored nodes, size scales with importance
 - **Relationships** as arcing edges with traveling pulse particles
 - **Patterns** as wireframe clusters
-- **Starfield** background — the galaxy is just ambiance
+- **Starfield** background, the galaxy is just ambiance
 
 **Controls:**
 - Click any node to see details, memories, and relationships
-- Search bar (top left) to find specific entities — camera flies to matches
+- Search bar (top left) to find specific entities, camera flies to matches
 - H = toggle HUD, R = reset camera, F = fullscreen, Esc = close panel
 - The graph updates live as I learn new things
 ```
@@ -171,11 +122,11 @@ To install: run `npx get-claudia` again, or manually copy the visualizer directo
 3. Try `/brain` again
 ```
 
-**If API server failed:**
+**If server failed to start:**
 ```
-The API server couldn't start. Check the log:
+The server couldn't start. Check the log:
 ```bash
-tail -50 /tmp/claudia-brain-api.log
+tail -50 /tmp/claudia-brain.log
 ```
 
 Common issues:
@@ -183,9 +134,6 @@ Common issues:
 - Database not found for this project (make sure --project-dir is correct)
 - Missing node_modules (run `npm install --production` in ~/.claudia/visualizer/)
 ```
-
-**If frontend failed:**
-Show the log output from `/tmp/claudia-brain.log` and suggest checking for port conflicts or missing node_modules.
 
 ---
 

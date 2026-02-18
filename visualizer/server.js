@@ -5,13 +5,14 @@
  * Reads Claudia's SQLite database in read-only mode (WAL-safe).
  *
  * Usage:
- *   node server.js [--project-dir /path/to/project] [--port 3849] [--db /path/to/db]
+ *   node server.js [--project-dir /path/to/project] [--port 3849] [--db /path/to/db] [--open]
  */
 
 import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { execFile } from 'child_process';
 import { openDatabase, findDbPath, closeDatabase, getDb, listDatabases, getProjectHash } from './lib/database.js';
 import { buildGraph } from './lib/graph.js';
 import { getProjectedPositions } from './lib/projection.js';
@@ -23,7 +24,7 @@ const __dirname = dirname(__filename);
 // Parse CLI arguments
 function parseArgs() {
   const args = process.argv.slice(2);
-  const parsed = { port: 3849, projectDir: null, dbPath: null };
+  const parsed = { port: 3849, projectDir: null, dbPath: null, open: false };
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -35,6 +36,9 @@ function parseArgs() {
         break;
       case '--db':
         parsed.dbPath = args[++i];
+        break;
+      case '--open':
+        parsed.open = true;
         break;
     }
   }
@@ -346,8 +350,17 @@ function start() {
   currentProjectDir = config.projectDir || null;
 
   app.listen(config.port, () => {
+    const url = `http://localhost:${config.port}`;
     console.log(`\n  Claudia Brain Visualizer`);
-    console.log(`  http://localhost:${config.port}\n`);
+    console.log(`  ${url}\n`);
+
+    if (config.open) {
+      const cmd = process.platform === 'darwin' ? 'open'
+                : process.platform === 'win32' ? 'cmd'
+                : 'xdg-open';
+      const args = process.platform === 'win32' ? ['/c', 'start', url] : [url];
+      execFile(cmd, args, () => {});
+    }
   });
 }
 

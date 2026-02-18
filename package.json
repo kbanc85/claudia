@@ -32,7 +32,8 @@
     "bin",
     "template-v2",
     "memory-daemon",
-    "assets"
+    "assets",
+    "visualizer"
   ],
   "engines": {
     "node": ">=18.0.0"
