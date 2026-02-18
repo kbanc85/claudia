@@ -82,10 +82,35 @@ def check_health():
     if system == "Darwin":
         plist = home / "Library" / "LaunchAgents" / "com.claudia.memory.plist"
         if plist.exists():
+            import subprocess
+            import time
+            restarted = False
+            try:
+                subprocess.run(["launchctl", "unload", str(plist)],
+                               capture_output=True, timeout=10)
+                time.sleep(0.5)
+                subprocess.run(["launchctl", "load", str(plist)],
+                               capture_output=True, timeout=10)
+                time.sleep(3)
+                try:
+                    resp = urlopen("http://localhost:3848/health", timeout=5)
+                    if "healthy" in resp.read().decode():
+                        restarted = True
+                except (URLError, OSError, TimeoutError):
+                    pass
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                pass
+            if restarted:
+                status_msg = _get_status_summary()
+                msg = "Memory daemon was stopped but has been restarted automatically."
+                if status_msg:
+                    msg = f"{msg} {status_msg}"
+                print(json.dumps({"additionalContext": msg}))
+                return
             context_parts.append(
-                "Daemon is installed (LaunchAgent exists) but not running. "
-                "Suggest: 'Your memory daemon is installed but stopped. Want me to try starting it? "
-                "I can run: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist'"
+                "Daemon is installed (LaunchAgent exists) but could not be auto-restarted. "
+                "Suggest: 'Your memory daemon is stopped. "
+                "Please run: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist'"
             )
         else:
             context_parts.append(
@@ -96,10 +121,32 @@ def check_health():
     elif system == "Linux":
         service = home / ".config" / "systemd" / "user" / "claudia-memory.service"
         if service.exists():
+            import subprocess
+            import time
+            restarted = False
+            try:
+                subprocess.run(["systemctl", "--user", "restart", "claudia-memory"],
+                               capture_output=True, timeout=15)
+                time.sleep(3)
+                try:
+                    resp = urlopen("http://localhost:3848/health", timeout=5)
+                    if "healthy" in resp.read().decode():
+                        restarted = True
+                except (URLError, OSError, TimeoutError):
+                    pass
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                pass
+            if restarted:
+                status_msg = _get_status_summary()
+                msg = "Memory daemon was stopped but has been restarted automatically."
+                if status_msg:
+                    msg = f"{msg} {status_msg}"
+                print(json.dumps({"additionalContext": msg}))
+                return
             context_parts.append(
-                "Daemon is installed (systemd service exists) but not running. "
-                "Suggest: 'Your memory daemon is installed but stopped. Want me to try starting it? "
-                "I can run: systemctl --user start claudia-memory'"
+                "Daemon is installed (systemd service exists) but could not be auto-restarted. "
+                "Suggest: 'Your memory daemon is stopped. "
+                "Please run: systemctl --user restart claudia-memory'"
             )
         else:
             context_parts.append(

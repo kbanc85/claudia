@@ -276,3 +276,35 @@ def test_wal_checkpoint_pragma_runs():
         result = db.execute("SELECT 1 as ok", fetch=True)
         assert result[0]["ok"] == 1
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Transaction isolation tests (B1)
+# ---------------------------------------------------------------------------
+
+def test_transaction_commits_on_success(db):
+    """Writes inside transaction() are visible after clean exit."""
+    with db.transaction():
+        db.insert("_meta", {"key": "tx_test", "value": "hello"})
+    result = db.execute("SELECT value FROM _meta WHERE key = 'tx_test'", fetch=True)
+    assert result and result[0]["value"] == "hello"
+
+
+def test_transaction_rolls_back_on_exception(db):
+    """An exception inside transaction() causes a rollback -- no data persists."""
+    try:
+        with db.transaction():
+            db.insert("_meta", {"key": "tx_rollback", "value": "ephemeral"})
+            raise RuntimeError("simulated error")
+    except RuntimeError:
+        pass
+    result = db.execute("SELECT value FROM _meta WHERE key = 'tx_rollback'", fetch=True)
+    assert not result
+
+
+def test_cursor_reuses_tx_connection(db):
+    """cursor() uses the active transaction connection when one is open."""
+    with db.transaction():
+        tx_conn = db._local.tx_conn
+        with db.cursor() as cur:
+            assert cur.connection is tx_conn

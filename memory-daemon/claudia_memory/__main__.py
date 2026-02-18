@@ -113,6 +113,55 @@ def _acquire_daemon_lock(lock_path: Path) -> None:
         atexit.register(lambda: (fcntl.flock(lf, fcntl.LOCK_UN), lf.close()))
 
 
+def _check_and_repair_database(db_path: Path) -> None:
+    """Run integrity check and auto-restore from backup if database is corrupt.
+
+    Called after acquiring the daemon lock, before db.initialize().
+    Uses a read-only connection so we don't touch the WAL before checking.
+    """
+    import glob
+    import shutil
+
+    if not db_path.exists():
+        return  # Fresh install, nothing to check
+
+    is_corrupt = False
+    try:
+        ro_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+        result = ro_conn.execute("PRAGMA integrity_check").fetchone()
+        ro_conn.close()
+        if result and result[0] == "ok":
+            logger.info("Database integrity check passed.")
+            return
+        logger.error(f"Database integrity check FAILED: {result}")
+        is_corrupt = True
+    except Exception as e:
+        logger.error(f"Could not open database for integrity check: {e}")
+        is_corrupt = True
+
+    if not is_corrupt:
+        return
+
+    backup_pattern = str(db_path) + ".backup-*.db"
+    backups = sorted(glob.glob(backup_pattern))
+    if backups:
+        latest = backups[-1]
+        logger.warning(f"Restoring database from backup: {latest}")
+        shutil.copy2(latest, db_path)
+        for suffix in (".db-shm", ".db-wal"):
+            stale = Path(str(db_path).replace(".db", "") + suffix)
+            if stale.exists():
+                stale.unlink()
+                logger.info(f"Removed stale WAL file: {stale}")
+        logger.info("Database restored from backup successfully.")
+    else:
+        logger.critical(
+            "Database is corrupt and no backup exists. "
+            "Memory system will attempt to start but may have errors. "
+            f"Manual recovery: sqlite3 {db_path} '.dump' | sqlite3 repaired.db"
+        )
+
+
 def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = None) -> None:
     """
     Run the Claudia Memory Daemon.
@@ -136,6 +185,7 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
     # the root cause of "database disk image is malformed" errors.
     config = get_config()
     _acquire_daemon_lock(Path(config.db_path).parent / "claudia.lock")
+    _check_and_repair_database(Path(config.db_path))
 
     # Set up signal handlers
     signal.signal(signal.SIGTERM, signal_handler)
@@ -562,11 +612,11 @@ def main():
 
         # Step 2: Drop and recreate vec0 tables with new dimensions
         print("\nStep 2/4: Recreating vector tables...")
-        with db.transaction() as conn:
+        with db.transaction():
             for table, pk in Database.VEC0_TABLES:
                 try:
-                    conn.execute(f"DROP TABLE IF EXISTS {table}")
-                    conn.execute(f"""
+                    db.execute(f"DROP TABLE IF EXISTS {table}")
+                    db.execute(f"""
                         CREATE VIRTUAL TABLE {table} USING vec0(
                             {pk} INTEGER PRIMARY KEY,
                             embedding FLOAT[{new_dim}]

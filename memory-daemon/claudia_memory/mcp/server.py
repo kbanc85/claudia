@@ -1520,45 +1520,119 @@ async def list_tools() -> ListToolsResult:
 @server.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
     """Handle tool calls"""
+    db = get_db()
     try:
-        if name == "memory.remember":
-            _coerce_arg(arguments, "about")
-            memory_id = remember_fact(
-                content=arguments["content"],
-                memory_type=arguments.get("type", "fact"),
-                about_entities=arguments.get("about"),
-                importance=arguments.get("importance", 1.0),
-                source=arguments.get("source"),
-                source_context=arguments.get("source_context"),
-                source_channel=arguments.get("source_channel"),
-            )
-            # Save source material to disk if provided
-            if memory_id and arguments.get("source_material"):
-                svc = get_remember_service()
-                svc.save_source_material(
-                    memory_id,
-                    arguments["source_material"],
-                    metadata={
-                        "source": arguments.get("source"),
-                        "source_context": arguments.get("source_context"),
-                    },
+        with db.transaction():
+            if name == "memory.remember":
+                _coerce_arg(arguments, "about")
+                memory_id = remember_fact(
+                    content=arguments["content"],
+                    memory_type=arguments.get("type", "fact"),
+                    about_entities=arguments.get("about"),
+                    importance=arguments.get("importance", 1.0),
+                    source=arguments.get("source"),
+                    source_context=arguments.get("source_context"),
+                    source_channel=arguments.get("source_channel"),
                 )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"success": True, "memory_id": memory_id}),
+                # Save source material to disk if provided
+                if memory_id and arguments.get("source_material"):
+                    svc = get_remember_service()
+                    svc.save_source_material(
+                        memory_id,
+                        arguments["source_material"],
+                        metadata={
+                            "source": arguments.get("source"),
+                            "source_context": arguments.get("source_context"),
+                        },
                     )
-                ]
-            )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"success": True, "memory_id": memory_id}),
+                        )
+                    ]
+                )
 
-        elif name == "memory.recall":
-            _coerce_arg(arguments, "types")
-            _coerce_arg(arguments, "ids")
-            _coerce_int(arguments, "limit")
-            # Direct fetch by IDs (skip search)
-            if "ids" in arguments and arguments["ids"]:
-                results = fetch_by_ids(arguments["ids"])
+            elif name == "memory.recall":
+                _coerce_arg(arguments, "types")
+                _coerce_arg(arguments, "ids")
+                _coerce_int(arguments, "limit")
+                # Direct fetch by IDs (skip search)
+                if "ids" in arguments and arguments["ids"]:
+                    results = fetch_by_ids(arguments["ids"])
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "results": [
+                                            {
+                                                "id": r.id,
+                                                "content": r.content,
+                                                "type": r.type,
+                                                "score": r.score,
+                                                "importance": r.importance,
+                                                "entities": r.entities,
+                                                "created_at": r.created_at,
+                                                "source": r.source,
+                                                "source_id": r.source_id,
+                                                "source_context": r.source_context,
+                                                "source_channel": r.source_channel,
+                                            }
+                                            for r in results
+                                        ]
+                                    }
+                                ),
+                            )
+                        ]
+                    )
+
+                # Search mode
+                query = arguments.get("query", "")
+                if not query:
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps({"error": "Either 'query' or 'ids' is required"}),
+                            )
+                        ],
+                        isError=True,
+                    )
+
+                results = recall(
+                    query=query,
+                    limit=arguments.get("limit", 10),
+                    memory_types=arguments.get("types"),
+                    about_entity=arguments.get("about"),
+                )
+
+                compact = arguments.get("compact", False)
+                if compact:
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "results": [
+                                            {
+                                                "id": r.id,
+                                                "snippet": r.content[:80] + ("..." if len(r.content) > 80 else ""),
+                                                "type": r.type,
+                                                "score": round(r.score, 3),
+                                                "entities": r.entities[:3],
+                                            }
+                                            for r in results
+                                        ]
+                                    }
+                                ),
+                            )
+                        ]
+                    )
+
                 return CallToolResult(
                     content=[
                         TextContent(
@@ -1587,43 +1661,112 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     ]
                 )
 
-            # Search mode
-            query = arguments.get("query", "")
-            if not query:
+            elif name == "memory.about":
+                _coerce_int(arguments, "limit")
+                result = recall_about(
+                    entity_name=arguments["entity"],
+                    limit=arguments.get("limit", 20),
+                    include_historical=arguments.get("include_historical", False),
+                )
+
+                # Convert RecallResult objects to dicts
+                if result.get("memories"):
+                    result["memories"] = [
+                        {
+                            "id": m.id,
+                            "content": m.content,
+                            "type": m.type,
+                            "importance": m.importance,
+                            "created_at": m.created_at,
+                            "source": m.source,
+                            "source_id": m.source_id,
+                            "source_context": m.source_context,
+                        }
+                        for m in result["memories"]
+                    ]
+
                 return CallToolResult(
                     content=[
                         TextContent(
                             type="text",
-                            text=json.dumps({"error": "Either 'query' or 'ids' is required"}),
+                            text=json.dumps(result),
                         )
-                    ],
-                    isError=True,
+                    ]
                 )
 
-            results = recall(
-                query=query,
-                limit=arguments.get("limit", 10),
-                memory_types=arguments.get("types"),
-                about_entity=arguments.get("about"),
-            )
+            elif name == "memory.relate":
+                relationship_id = relate_entities(
+                    source=arguments["source"],
+                    target=arguments["target"],
+                    relationship=arguments["relationship"],
+                    strength=arguments.get("strength", 1.0),
+                    valid_at=arguments.get("valid_at"),
+                    supersedes=arguments.get("supersedes", False),
+                    origin_type=arguments.get("origin_type", "extracted"),
+                    direction=arguments.get("direction", "bidirectional"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"success": True, "relationship_id": relationship_id}),
+                        )
+                    ]
+                )
 
-            compact = arguments.get("compact", False)
-            if compact:
+            elif name == "memory.consolidate":
+                result = run_full_consolidation()
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.entity":
+                _coerce_arg(arguments, "aliases")
+                entity_id = remember_entity(
+                    name=arguments["name"],
+                    entity_type=arguments.get("type", "person"),
+                    description=arguments.get("description"),
+                    aliases=arguments.get("aliases"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"success": True, "entity_id": entity_id}),
+                        )
+                    ]
+                )
+
+            elif name == "memory.search_entities":
+                _coerce_int(arguments, "limit")
+                _coerce_arg(arguments, "types")
+                results = search_entities(
+                    query=arguments["query"],
+                    entity_types=arguments.get("types"),
+                    limit=arguments.get("limit", 10),
+                )
                 return CallToolResult(
                     content=[
                         TextContent(
                             type="text",
                             text=json.dumps(
                                 {
-                                    "results": [
+                                    "entities": [
                                         {
-                                            "id": r.id,
-                                            "snippet": r.content[:80] + ("..." if len(r.content) > 80 else ""),
-                                            "type": r.type,
-                                            "score": round(r.score, 3),
-                                            "entities": r.entities[:3],
+                                            "id": e.id,
+                                            "name": e.name,
+                                            "type": e.type,
+                                            "description": e.description,
+                                            "importance": e.importance,
+                                            "memory_count": e.memory_count,
+                                            "relationship_count": e.relationship_count,
                                         }
-                                        for r in results
+                                        for e in results
                                     ]
                                 }
                             ),
@@ -1631,1082 +1774,941 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                     ]
                 )
 
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(
-                            {
-                                "results": [
-                                    {
-                                        "id": r.id,
-                                        "content": r.content,
-                                        "type": r.type,
-                                        "score": r.score,
-                                        "importance": r.importance,
-                                        "entities": r.entities,
-                                        "created_at": r.created_at,
-                                        "source": r.source,
-                                        "source_id": r.source_id,
-                                        "source_context": r.source_context,
-                                        "source_channel": r.source_channel,
-                                    }
-                                    for r in results
-                                ]
-                            }
-                        ),
-                    )
-                ]
-            )
+            elif name == "memory.buffer_turn":
+                _coerce_int(arguments, "episode_id")
+                result = buffer_turn(
+                    user_content=arguments.get("user_content"),
+                    assistant_content=arguments.get("assistant_content"),
+                    episode_id=arguments.get("episode_id"),
+                    source=arguments.get("source"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
 
-        elif name == "memory.about":
-            _coerce_int(arguments, "limit")
-            result = recall_about(
-                entity_name=arguments["entity"],
-                limit=arguments.get("limit", 20),
-                include_historical=arguments.get("include_historical", False),
-            )
+            elif name == "memory.end_session":
+                _coerce_int(arguments, "episode_id")
+                # Coerce all array fields (LLMs may send JSON strings)
+                for field in ("facts", "commitments", "entities", "relationships", "key_topics", "reflections"):
+                    _coerce_arg(arguments, field)
 
-            # Convert RecallResult objects to dicts
-            if result.get("memories"):
-                result["memories"] = [
-                    {
-                        "id": m.id,
-                        "content": m.content,
-                        "type": m.type,
-                        "importance": m.importance,
-                        "created_at": m.created_at,
-                        "source": m.source,
-                        "source_id": m.source_id,
-                        "source_context": m.source_context,
-                    }
-                    for m in result["memories"]
-                ]
-
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.relate":
-            relationship_id = relate_entities(
-                source=arguments["source"],
-                target=arguments["target"],
-                relationship=arguments["relationship"],
-                strength=arguments.get("strength", 1.0),
-                valid_at=arguments.get("valid_at"),
-                supersedes=arguments.get("supersedes", False),
-                origin_type=arguments.get("origin_type", "extracted"),
-                direction=arguments.get("direction", "bidirectional"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"success": True, "relationship_id": relationship_id}),
-                    )
-                ]
-            )
-
-        elif name == "memory.consolidate":
-            result = run_full_consolidation()
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.entity":
-            _coerce_arg(arguments, "aliases")
-            entity_id = remember_entity(
-                name=arguments["name"],
-                entity_type=arguments.get("type", "person"),
-                description=arguments.get("description"),
-                aliases=arguments.get("aliases"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"success": True, "entity_id": entity_id}),
-                    )
-                ]
-            )
-
-        elif name == "memory.search_entities":
-            _coerce_int(arguments, "limit")
-            _coerce_arg(arguments, "types")
-            results = search_entities(
-                query=arguments["query"],
-                entity_types=arguments.get("types"),
-                limit=arguments.get("limit", 10),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(
-                            {
-                                "entities": [
-                                    {
-                                        "id": e.id,
-                                        "name": e.name,
-                                        "type": e.type,
-                                        "description": e.description,
-                                        "importance": e.importance,
-                                        "memory_count": e.memory_count,
-                                        "relationship_count": e.relationship_count,
-                                    }
-                                    for e in results
-                                ]
-                            }
-                        ),
-                    )
-                ]
-            )
-
-        elif name == "memory.buffer_turn":
-            _coerce_int(arguments, "episode_id")
-            result = buffer_turn(
-                user_content=arguments.get("user_content"),
-                assistant_content=arguments.get("assistant_content"),
-                episode_id=arguments.get("episode_id"),
-                source=arguments.get("source"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.end_session":
-            _coerce_int(arguments, "episode_id")
-            # Coerce all array fields (LLMs may send JSON strings)
-            for field in ("facts", "commitments", "entities", "relationships", "key_topics", "reflections"):
-                _coerce_arg(arguments, field)
-
-            # Handle missing or invalid episode_id: auto-create
-            episode_id = arguments.get("episode_id")
-            svc = get_remember_service()
-            if episode_id is None:
-                from datetime import datetime
-                episode_id = svc.db.insert("episodes", {
-                    "started_at": datetime.utcnow().isoformat(),
-                    "source": "claude_code",
-                })
-                logger.info(f"Auto-created episode {episode_id} (no episode_id provided)")
-            else:
-                episode = svc.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
-                if not episode:
+                # Handle missing or invalid episode_id: auto-create
+                episode_id = arguments.get("episode_id")
+                svc = get_remember_service()
+                if episode_id is None:
                     from datetime import datetime
-                    new_id = svc.db.insert("episodes", {
+                    episode_id = svc.db.insert("episodes", {
                         "started_at": datetime.utcnow().isoformat(),
-                        "source": arguments.get("source", "claude_code"),
+                        "source": "claude_code",
                     })
-                    logger.info(f"Auto-created episode {new_id} (requested {episode_id} did not exist)")
-                    episode_id = new_id
+                    logger.info(f"Auto-created episode {episode_id} (no episode_id provided)")
+                else:
+                    episode = svc.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
+                    if not episode:
+                        from datetime import datetime
+                        new_id = svc.db.insert("episodes", {
+                            "started_at": datetime.utcnow().isoformat(),
+                            "source": arguments.get("source", "claude_code"),
+                        })
+                        logger.info(f"Auto-created episode {new_id} (requested {episode_id} did not exist)")
+                        episode_id = new_id
 
-            result = end_session(
-                episode_id=episode_id,
-                narrative=arguments["narrative"],
-                facts=arguments.get("facts"),
-                commitments=arguments.get("commitments"),
-                entities=arguments.get("entities"),
-                relationships=arguments.get("relationships"),
-                key_topics=arguments.get("key_topics"),
-            )
-
-            # Process reflections if provided
-            reflections_input = arguments.get("reflections", [])
-            reflections_stored = 0
-            for ref in reflections_input:
-                ref_id = store_reflection(
-                    content=ref["content"],
-                    reflection_type=ref.get("type", "observation"),
+                result = end_session(
                     episode_id=episode_id,
-                    about_entity=ref.get("about"),
-                    importance=ref.get("importance", 0.7),
+                    narrative=arguments["narrative"],
+                    facts=arguments.get("facts"),
+                    commitments=arguments.get("commitments"),
+                    entities=arguments.get("entities"),
+                    relationships=arguments.get("relationships"),
+                    key_topics=arguments.get("key_topics"),
                 )
-                if ref_id:
-                    reflections_stored += 1
-            result["reflections_stored"] = reflections_stored
 
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
+                # Process reflections if provided
+                reflections_input = arguments.get("reflections", [])
+                reflections_stored = 0
+                for ref in reflections_input:
+                    ref_id = store_reflection(
+                        content=ref["content"],
+                        reflection_type=ref.get("type", "observation"),
+                        episode_id=episode_id,
+                        about_entity=ref.get("about"),
+                        importance=ref.get("importance", 0.7),
                     )
-                ]
-            )
+                    if ref_id:
+                        reflections_stored += 1
+                result["reflections_stored"] = reflections_stored
 
-        elif name == "memory.unsummarized":
-            results = get_unsummarized_turns()
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({
-                            "unsummarized_sessions": results,
-                            "count": len(results),
-                        }),
-                    )
-                ]
-            )
-
-        elif name == "memory.reflections":
-            _coerce_int(arguments, "limit")
-            _coerce_int(arguments, "reflection_id")
-            _coerce_arg(arguments, "types")
-            action = arguments.get("action", "get")
-            limit = arguments.get("limit", 10)
-            types = arguments.get("types")
-            about = arguments.get("about")
-            query = arguments.get("query")
-
-            if action == "delete":
-                reflection_id = arguments.get("reflection_id")
-                if not reflection_id:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=json.dumps({"error": "reflection_id required for delete"}))]
-                    )
-                success = delete_reflection(reflection_id)
                 return CallToolResult(
-                    content=[TextContent(type="text", text=json.dumps({"deleted": success, "reflection_id": reflection_id}))]
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
                 )
 
-            elif action == "update":
-                reflection_id = arguments.get("reflection_id")
-                new_content = arguments.get("content")
-                if not reflection_id:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=json.dumps({"error": "reflection_id required for update"}))]
-                    )
-                success = update_reflection(reflection_id, content=new_content)
-                return CallToolResult(
-                    content=[TextContent(type="text", text=json.dumps({"updated": success, "reflection_id": reflection_id}))]
-                )
-
-            elif action == "search" and query:
-                results = search_reflections(query, limit=limit, reflection_types=types)
+            elif name == "memory.unsummarized":
+                results = get_unsummarized_turns()
                 return CallToolResult(
                     content=[
                         TextContent(
                             type="text",
                             text=json.dumps({
-                                "reflections": [
-                                    {
-                                        "id": r.id,
-                                        "content": r.content,
-                                        "type": r.reflection_type,
-                                        "importance": r.importance,
-                                        "confidence": r.confidence,
-                                        "about_entity": r.about_entity,
-                                        "first_observed": r.first_observed_at,
-                                        "last_confirmed": r.last_confirmed_at,
-                                        "times_confirmed": r.aggregation_count,
-                                        "score": r.score,
-                                    }
-                                    for r in results
-                                ],
+                                "unsummarized_sessions": results,
                                 "count": len(results),
                             }),
                         )
                     ]
                 )
 
-            else:  # action == "get" (default)
-                results = get_reflections(
-                    limit=limit,
-                    reflection_types=types,
-                    about_entity=about,
-                )
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=json.dumps({
-                                "reflections": [
-                                    {
-                                        "id": r.id,
-                                        "content": r.content,
-                                        "type": r.reflection_type,
-                                        "importance": r.importance,
-                                        "confidence": r.confidence,
-                                        "about_entity": r.about_entity,
-                                        "first_observed": r.first_observed_at,
-                                        "last_confirmed": r.last_confirmed_at,
-                                        "times_confirmed": r.aggregation_count,
-                                    }
-                                    for r in results
-                                ],
-                                "count": len(results),
-                            }),
+            elif name == "memory.reflections":
+                _coerce_int(arguments, "limit")
+                _coerce_int(arguments, "reflection_id")
+                _coerce_arg(arguments, "types")
+                action = arguments.get("action", "get")
+                limit = arguments.get("limit", 10)
+                types = arguments.get("types")
+                about = arguments.get("about")
+                query = arguments.get("query")
+
+                if action == "delete":
+                    reflection_id = arguments.get("reflection_id")
+                    if not reflection_id:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "reflection_id required for delete"}))]
                         )
-                    ]
-                )
+                    success = delete_reflection(reflection_id)
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"deleted": success, "reflection_id": reflection_id}))]
+                    )
 
-        elif name == "memory.batch":
-            _coerce_arg(arguments, "operations")
-            operations = arguments.get("operations", [])
-
-            # --- Pass 1: Collect all texts that need embeddings ---
-            embed_tasks = []  # list of (index, text) for parallel embedding
-            for i, op in enumerate(operations):
-                op_type = op.get("op")
-                if op_type == "remember":
-                    embed_tasks.append((i, op["content"]))
-                elif op_type == "entity":
-                    # Only new entities need embeddings; collect optimistically
-                    embed_text = f"{op['name']}. {op.get('description') or ''}"
-                    embed_tasks.append((i, embed_text))
-
-            # --- Parallel embedding pass ---
-            embeddings_map = {}  # index -> embedding
-            if embed_tasks:
-                try:
-                    emb_svc = get_embedding_service()
-                    texts = [text for _, text in embed_tasks]
-                    all_embeddings = await emb_svc.embed_batch(texts)
-                    for (idx, _), emb in zip(embed_tasks, all_embeddings):
-                        if emb is not None:
-                            embeddings_map[idx] = emb
-                except Exception as e:
-                    logger.warning(f"Batch parallel embedding failed, falling back to per-op: {e}")
-                    # embeddings_map stays empty; remember_fact/entity will embed individually
-
-            # --- Pass 2: Execute operations with pre-computed embeddings ---
-            results = []
-            for i, op in enumerate(operations):
-                op_type = op.get("op")
-                op_result = {"index": i, "op": op_type}
-                try:
-                    if op_type == "entity":
-                        entity_id = remember_entity(
-                            name=op["name"],
-                            entity_type=op.get("type", "person"),
-                            description=op.get("description"),
-                            aliases=op.get("aliases"),
-                            _precomputed_embedding=embeddings_map.get(i),
+                elif action == "update":
+                    reflection_id = arguments.get("reflection_id")
+                    new_content = arguments.get("content")
+                    if not reflection_id:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "reflection_id required for update"}))]
                         )
-                        op_result["success"] = True
-                        op_result["entity_id"] = entity_id
-                    elif op_type == "remember":
-                        memory_id = remember_fact(
-                            content=op["content"],
-                            memory_type=op.get("type", "fact"),
-                            about_entities=op.get("about"),
-                            importance=op.get("importance", 1.0),
-                            source=op.get("source"),
-                            source_context=op.get("source_context"),
-                            source_channel=op.get("source_channel"),
-                            _precomputed_embedding=embeddings_map.get(i),
-                        )
-                        op_result["success"] = True
-                        op_result["memory_id"] = memory_id
-                        # Save source material to disk if provided
-                        if memory_id and op.get("source_material"):
-                            svc = get_remember_service()
-                            svc.save_source_material(
-                                memory_id,
-                                op["source_material"],
-                                metadata={
-                                    "source": op.get("source"),
-                                    "source_context": op.get("source_context"),
-                                },
+                    success = update_reflection(reflection_id, content=new_content)
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"updated": success, "reflection_id": reflection_id}))]
+                    )
+
+                elif action == "search" and query:
+                    results = search_reflections(query, limit=limit, reflection_types=types)
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps({
+                                    "reflections": [
+                                        {
+                                            "id": r.id,
+                                            "content": r.content,
+                                            "type": r.reflection_type,
+                                            "importance": r.importance,
+                                            "confidence": r.confidence,
+                                            "about_entity": r.about_entity,
+                                            "first_observed": r.first_observed_at,
+                                            "last_confirmed": r.last_confirmed_at,
+                                            "times_confirmed": r.aggregation_count,
+                                            "score": r.score,
+                                        }
+                                        for r in results
+                                    ],
+                                    "count": len(results),
+                                }),
                             )
-                    elif op_type == "relate":
-                        relationship_id = relate_entities(
-                            source=op["source"],
-                            target=op["target"],
-                            relationship=op["relationship"],
-                            strength=op.get("strength", 1.0),
-                            supersedes=op.get("supersedes", False),
-                            valid_at=op.get("valid_at"),
-                            direction=op.get("direction", "bidirectional"),
-                            origin_type=op.get("origin_type", "extracted"),
-                        )
-                        op_result["success"] = True
-                        op_result["relationship_id"] = relationship_id
-                    else:
+                        ]
+                    )
+
+                else:  # action == "get" (default)
+                    results = get_reflections(
+                        limit=limit,
+                        reflection_types=types,
+                        about_entity=about,
+                    )
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps({
+                                    "reflections": [
+                                        {
+                                            "id": r.id,
+                                            "content": r.content,
+                                            "type": r.reflection_type,
+                                            "importance": r.importance,
+                                            "confidence": r.confidence,
+                                            "about_entity": r.about_entity,
+                                            "first_observed": r.first_observed_at,
+                                            "last_confirmed": r.last_confirmed_at,
+                                            "times_confirmed": r.aggregation_count,
+                                        }
+                                        for r in results
+                                    ],
+                                    "count": len(results),
+                                }),
+                            )
+                        ]
+                    )
+
+            elif name == "memory.batch":
+                _coerce_arg(arguments, "operations")
+                operations = arguments.get("operations", [])
+
+                # --- Pass 1: Collect all texts that need embeddings ---
+                embed_tasks = []  # list of (index, text) for parallel embedding
+                for i, op in enumerate(operations):
+                    op_type = op.get("op")
+                    if op_type == "remember":
+                        embed_tasks.append((i, op["content"]))
+                    elif op_type == "entity":
+                        # Only new entities need embeddings; collect optimistically
+                        embed_text = f"{op['name']}. {op.get('description') or ''}"
+                        embed_tasks.append((i, embed_text))
+
+                # --- Parallel embedding pass ---
+                embeddings_map = {}  # index -> embedding
+                if embed_tasks:
+                    try:
+                        emb_svc = get_embedding_service()
+                        texts = [text for _, text in embed_tasks]
+                        all_embeddings = await emb_svc.embed_batch(texts)
+                        for (idx, _), emb in zip(embed_tasks, all_embeddings):
+                            if emb is not None:
+                                embeddings_map[idx] = emb
+                    except Exception as e:
+                        logger.warning(f"Batch parallel embedding failed, falling back to per-op: {e}")
+                        # embeddings_map stays empty; remember_fact/entity will embed individually
+
+                # --- Pass 2: Execute operations with pre-computed embeddings ---
+                results = []
+                for i, op in enumerate(operations):
+                    op_type = op.get("op")
+                    op_result = {"index": i, "op": op_type}
+                    try:
+                        if op_type == "entity":
+                            entity_id = remember_entity(
+                                name=op["name"],
+                                entity_type=op.get("type", "person"),
+                                description=op.get("description"),
+                                aliases=op.get("aliases"),
+                                _precomputed_embedding=embeddings_map.get(i),
+                            )
+                            op_result["success"] = True
+                            op_result["entity_id"] = entity_id
+                        elif op_type == "remember":
+                            memory_id = remember_fact(
+                                content=op["content"],
+                                memory_type=op.get("type", "fact"),
+                                about_entities=op.get("about"),
+                                importance=op.get("importance", 1.0),
+                                source=op.get("source"),
+                                source_context=op.get("source_context"),
+                                source_channel=op.get("source_channel"),
+                                _precomputed_embedding=embeddings_map.get(i),
+                            )
+                            op_result["success"] = True
+                            op_result["memory_id"] = memory_id
+                            # Save source material to disk if provided
+                            if memory_id and op.get("source_material"):
+                                svc = get_remember_service()
+                                svc.save_source_material(
+                                    memory_id,
+                                    op["source_material"],
+                                    metadata={
+                                        "source": op.get("source"),
+                                        "source_context": op.get("source_context"),
+                                    },
+                                )
+                        elif op_type == "relate":
+                            relationship_id = relate_entities(
+                                source=op["source"],
+                                target=op["target"],
+                                relationship=op["relationship"],
+                                strength=op.get("strength", 1.0),
+                                supersedes=op.get("supersedes", False),
+                                valid_at=op.get("valid_at"),
+                                direction=op.get("direction", "bidirectional"),
+                                origin_type=op.get("origin_type", "extracted"),
+                            )
+                            op_result["success"] = True
+                            op_result["relationship_id"] = relationship_id
+                        else:
+                            op_result["success"] = False
+                            op_result["error"] = f"Unknown operation: {op_type}"
+                    except Exception as e:
+                        logger.warning(f"Batch operation {i} ({op_type}) failed: {e}")
                         op_result["success"] = False
-                        op_result["error"] = f"Unknown operation: {op_type}"
-                except Exception as e:
-                    logger.warning(f"Batch operation {i} ({op_type}) failed: {e}")
-                    op_result["success"] = False
-                    op_result["error"] = str(e)
-                results.append(op_result)
+                        op_result["error"] = str(e)
+                    results.append(op_result)
 
-            succeeded = sum(1 for r in results if r.get("success"))
-            failed = len(results) - succeeded
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({
-                            "success": failed == 0,
-                            "total": len(results),
-                            "succeeded": succeeded,
-                            "failed": failed,
-                            "results": results,
-                        }),
-                    )
-                ]
-            )
-
-        elif name == "memory.session_context":
-            budget = arguments.get("token_budget", "normal")
-            context_text = _build_session_context(budget)
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=context_text,
-                    )
-                ]
-            )
-
-        elif name == "memory.morning_context":
-            morning_text = _build_morning_context()
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=morning_text,
-                    )
-                ]
-            )
-
-        elif name == "cognitive.ingest":
-            svc = get_ingest_service()
-            result = await svc.ingest(
-                text=arguments["text"],
-                source_type=arguments.get("source_type", "general"),
-                context=arguments.get("context"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.briefing":
-            briefing_text = _build_briefing()
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=briefing_text,
-                    )
-                ]
-            )
-
-        elif name == "memory.file":
-            _coerce_arg(arguments, "about")
-            _coerce_arg(arguments, "memory_ids")
-            doc_svc = get_document_service()
-            result = doc_svc.file_document_from_text(
-                content=arguments["content"],
-                filename=arguments["filename"],
-                source_type=arguments.get("source_type", "capture"),
-                summary=arguments.get("summary"),
-                about_entities=arguments.get("about"),
-                memory_ids=arguments.get("memory_ids"),
-                source_ref=arguments.get("source_ref"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.documents":
-            _coerce_int(arguments, "limit")
-            doc_svc = get_document_service()
-            results = doc_svc.search_documents(
-                query=arguments.get("query"),
-                source_type=arguments.get("source_type"),
-                entity_name=arguments.get("entity"),
-                limit=arguments.get("limit", 20),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"documents": results, "count": len(results)}),
-                    )
-                ]
-            )
-
-        elif name == "memory.purge":
-            doc_svc = get_document_service()
-            result = doc_svc.purge_document(document_id=arguments["document_id"])
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.project_network":
-            result = get_project_network(project_name=arguments["project"])
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result, default=str),
-                    )
-                ]
-            )
-
-        elif name == "memory.find_path":
-            _coerce_int(arguments, "max_depth")
-            result = find_path(
-                entity_a=arguments["entity_a"],
-                entity_b=arguments["entity_b"],
-                max_depth=arguments.get("max_depth", 4),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"path": result, "connected": result is not None}),
-                    )
-                ]
-            )
-
-        elif name == "memory.network_hubs":
-            _coerce_int(arguments, "min_connections")
-            _coerce_int(arguments, "limit")
-            result = get_hub_entities(
-                min_connections=arguments.get("min_connections", 5),
-                entity_type=arguments.get("entity_type"),
-                limit=arguments.get("limit", 20),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"hubs": result, "count": len(result)}),
-                    )
-                ]
-            )
-
-        elif name == "memory.dormant_relationships":
-            _coerce_int(arguments, "days")
-            _coerce_int(arguments, "limit")
-            result = get_dormant_relationships(
-                days=arguments.get("days", 60),
-                min_strength=arguments.get("min_strength", 0.3),
-                limit=arguments.get("limit", 20),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"dormant": result, "count": len(result)}),
-                    )
-                ]
-            )
-
-        elif name == "memory.entity_overview":
-            _coerce_arg(arguments, "entities", list)
-            entities_arg = arguments.get("entities", [])
-            if isinstance(entities_arg, str):
-                entities_arg = [entities_arg]
-            result = entity_overview(
-                entity_names=entities_arg,
-                include_network=arguments.get("include_network", True),
-                include_summaries=arguments.get("include_summaries", True),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.trace":
-            _coerce_int(arguments, "memory_id")
-            result = trace_memory(memory_id=arguments["memory_id"])
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.telegram_inbox":
-            _coerce_int(arguments, "limit")
-            inbox_text = _build_telegram_inbox(
-                limit=arguments.get("limit", 10),
-                mark_read=True,
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=inbox_text,
-                    )
-                ]
-            )
-
-        elif name == "memory.merge_entities":
-            _coerce_int(arguments, "source_id")
-            _coerce_int(arguments, "target_id")
-            result = merge_entities(
-                source_id=arguments["source_id"],
-                target_id=arguments["target_id"],
-                reason=arguments.get("reason"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.delete_entity":
-            _coerce_int(arguments, "entity_id")
-            result = delete_entity(
-                entity_id=arguments["entity_id"],
-                reason=arguments.get("reason"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.correct":
-            _coerce_int(arguments, "memory_id")
-            result = correct_memory(
-                memory_id=arguments["memory_id"],
-                correction=arguments["correction"],
-                reason=arguments.get("reason"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.invalidate":
-            _coerce_int(arguments, "memory_id")
-            result = invalidate_memory(
-                memory_id=arguments["memory_id"],
-                reason=arguments.get("reason"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.invalidate_relationship":
-            result = invalidate_relationship(
-                source=arguments["source"],
-                target=arguments["target"],
-                relationship=arguments["relationship"],
-                reason=arguments.get("reason"),
-            )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(result),
-                    )
-                ]
-            )
-
-        elif name == "memory.audit_history":
-            _coerce_int(arguments, "entity_id")
-            _coerce_int(arguments, "memory_id")
-            _coerce_int(arguments, "limit")
-            # Get audit history for entity or memory
-            entity_id = arguments.get("entity_id")
-            memory_id = arguments.get("memory_id")
-            limit = arguments.get("limit", 20)
-
-            if entity_id:
-                history = get_entity_audit_history(entity_id)
-            elif memory_id:
-                history = get_memory_audit_history(memory_id)
-            else:
+                succeeded = sum(1 for r in results if r.get("success"))
+                failed = len(results) - succeeded
                 return CallToolResult(
                     content=[
                         TextContent(
                             type="text",
-                            text=json.dumps({"error": "Either entity_id or memory_id is required"}),
+                            text=json.dumps({
+                                "success": failed == 0,
+                                "total": len(results),
+                                "succeeded": succeeded,
+                                "failed": failed,
+                                "results": results,
+                            }),
                         )
-                    ],
-                    isError=True,
+                    ]
                 )
 
-            # Apply limit
-            history = history[:limit]
-
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({
-                            "entity_id": entity_id,
-                            "memory_id": memory_id,
-                            "history": history,
-                            "count": len(history),
-                        }),
-                    )
-                ]
-            )
-
-        elif name == "memory.summary":
-            _coerce_int(arguments, "top_facts_limit")
-            entity_names = arguments.get("entities", [])
-            top_facts_limit = arguments.get("top_facts_limit", 5)
-            db = get_db()
-            summaries = []
-
-            for entity_name in entity_names:
-                from ..extraction.entity_extractor import get_extractor
-                canonical = get_extractor().canonical_name(entity_name)
-
-                entity = db.get_one(
-                    "entities",
-                    where="canonical_name = ? AND deleted_at IS NULL",
-                    where_params=(canonical,),
+            elif name == "memory.session_context":
+                budget = arguments.get("token_budget", "normal")
+                context_text = _build_session_context(budget)
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=context_text,
+                        )
+                    ]
                 )
-                if not entity:
-                    summaries.append({"name": entity_name, "found": False})
-                    continue
 
-                eid = entity["id"]
+            elif name == "memory.morning_context":
+                morning_text = _build_morning_context()
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=morning_text,
+                        )
+                    ]
+                )
 
-                # Memory count (excluding invalidated)
-                mem_count_rows = db.execute(
-                    """
-                    SELECT COUNT(*) as cnt FROM memories m
-                    JOIN memory_entities me ON m.id = me.memory_id
-                    WHERE me.entity_id = ? AND m.invalidated_at IS NULL
-                    """,
-                    (eid,),
-                    fetch=True,
-                ) or []
-                memory_count = mem_count_rows[0]["cnt"] if mem_count_rows else 0
+            elif name == "cognitive.ingest":
+                svc = get_ingest_service()
+                result = await svc.ingest(
+                    text=arguments["text"],
+                    source_type=arguments.get("source_type", "general"),
+                    context=arguments.get("context"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
 
-                # Relationship count
-                rel_count_rows = db.execute(
-                    """
-                    SELECT COUNT(*) as cnt FROM relationships
-                    WHERE (source_entity_id = ? OR target_entity_id = ?)
-                    AND invalid_at IS NULL
-                    """,
-                    (eid, eid),
-                    fetch=True,
-                ) or []
-                relationship_count = rel_count_rows[0]["cnt"] if rel_count_rows else 0
+            elif name == "memory.briefing":
+                briefing_text = _build_briefing()
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=briefing_text,
+                        )
+                    ]
+                )
 
-                # Last mentioned
-                last_rows = db.execute(
-                    """
-                    SELECT MAX(m.created_at) as last_mentioned FROM memories m
-                    JOIN memory_entities me ON m.id = me.memory_id
-                    WHERE me.entity_id = ? AND m.invalidated_at IS NULL
-                    """,
-                    (eid,),
-                    fetch=True,
-                ) or []
-                last_mentioned = last_rows[0]["last_mentioned"] if last_rows else None
+            elif name == "memory.file":
+                _coerce_arg(arguments, "about")
+                _coerce_arg(arguments, "memory_ids")
+                doc_svc = get_document_service()
+                result = doc_svc.file_document_from_text(
+                    content=arguments["content"],
+                    filename=arguments["filename"],
+                    source_type=arguments.get("source_type", "capture"),
+                    summary=arguments.get("summary"),
+                    about_entities=arguments.get("about"),
+                    memory_ids=arguments.get("memory_ids"),
+                    source_ref=arguments.get("source_ref"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
 
-                # Top facts
-                fact_rows = db.execute(
-                    """
-                    SELECT m.content, m.type, m.importance FROM memories m
-                    JOIN memory_entities me ON m.id = me.memory_id
-                    WHERE me.entity_id = ? AND m.invalidated_at IS NULL
-                    ORDER BY m.importance DESC, m.created_at DESC
-                    LIMIT ?
-                    """,
-                    (eid, top_facts_limit),
-                    fetch=True,
-                ) or []
+            elif name == "memory.documents":
+                _coerce_int(arguments, "limit")
+                doc_svc = get_document_service()
+                results = doc_svc.search_documents(
+                    query=arguments.get("query"),
+                    source_type=arguments.get("source_type"),
+                    entity_name=arguments.get("entity"),
+                    limit=arguments.get("limit", 20),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"documents": results, "count": len(results)}),
+                        )
+                    ]
+                )
 
-                summaries.append({
-                    "name": entity["name"],
-                    "type": entity["type"],
-                    "importance": entity["importance"],
-                    "found": True,
-                    "memory_count": memory_count,
-                    "relationship_count": relationship_count,
-                    "last_mentioned": last_mentioned,
-                    "top_facts": [
-                        {"content": r["content"], "type": r["type"], "importance": r["importance"]}
-                        for r in fact_rows
-                    ],
-                })
+            elif name == "memory.purge":
+                doc_svc = get_document_service()
+                result = doc_svc.purge_document(document_id=arguments["document_id"])
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
 
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"summaries": summaries}, indent=2),
+            elif name == "memory.project_network":
+                result = get_project_network(project_name=arguments["project"])
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result, default=str),
+                        )
+                    ]
+                )
+
+            elif name == "memory.find_path":
+                _coerce_int(arguments, "max_depth")
+                result = find_path(
+                    entity_a=arguments["entity_a"],
+                    entity_b=arguments["entity_b"],
+                    max_depth=arguments.get("max_depth", 4),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"path": result, "connected": result is not None}),
+                        )
+                    ]
+                )
+
+            elif name == "memory.network_hubs":
+                _coerce_int(arguments, "min_connections")
+                _coerce_int(arguments, "limit")
+                result = get_hub_entities(
+                    min_connections=arguments.get("min_connections", 5),
+                    entity_type=arguments.get("entity_type"),
+                    limit=arguments.get("limit", 20),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"hubs": result, "count": len(result)}),
+                        )
+                    ]
+                )
+
+            elif name == "memory.dormant_relationships":
+                _coerce_int(arguments, "days")
+                _coerce_int(arguments, "limit")
+                result = get_dormant_relationships(
+                    days=arguments.get("days", 60),
+                    min_strength=arguments.get("min_strength", 0.3),
+                    limit=arguments.get("limit", 20),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"dormant": result, "count": len(result)}),
+                        )
+                    ]
+                )
+
+            elif name == "memory.entity_overview":
+                _coerce_arg(arguments, "entities", list)
+                entities_arg = arguments.get("entities", [])
+                if isinstance(entities_arg, str):
+                    entities_arg = [entities_arg]
+                result = entity_overview(
+                    entity_names=entities_arg,
+                    include_network=arguments.get("include_network", True),
+                    include_summaries=arguments.get("include_summaries", True),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.trace":
+                _coerce_int(arguments, "memory_id")
+                result = trace_memory(memory_id=arguments["memory_id"])
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.telegram_inbox":
+                _coerce_int(arguments, "limit")
+                inbox_text = _build_telegram_inbox(
+                    limit=arguments.get("limit", 10),
+                    mark_read=True,
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=inbox_text,
+                        )
+                    ]
+                )
+
+            elif name == "memory.merge_entities":
+                _coerce_int(arguments, "source_id")
+                _coerce_int(arguments, "target_id")
+                result = merge_entities(
+                    source_id=arguments["source_id"],
+                    target_id=arguments["target_id"],
+                    reason=arguments.get("reason"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.delete_entity":
+                _coerce_int(arguments, "entity_id")
+                result = delete_entity(
+                    entity_id=arguments["entity_id"],
+                    reason=arguments.get("reason"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.correct":
+                _coerce_int(arguments, "memory_id")
+                result = correct_memory(
+                    memory_id=arguments["memory_id"],
+                    correction=arguments["correction"],
+                    reason=arguments.get("reason"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.invalidate":
+                _coerce_int(arguments, "memory_id")
+                result = invalidate_memory(
+                    memory_id=arguments["memory_id"],
+                    reason=arguments.get("reason"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.invalidate_relationship":
+                result = invalidate_relationship(
+                    source=arguments["source"],
+                    target=arguments["target"],
+                    relationship=arguments["relationship"],
+                    reason=arguments.get("reason"),
+                )
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result),
+                        )
+                    ]
+                )
+
+            elif name == "memory.audit_history":
+                _coerce_int(arguments, "entity_id")
+                _coerce_int(arguments, "memory_id")
+                _coerce_int(arguments, "limit")
+                # Get audit history for entity or memory
+                entity_id = arguments.get("entity_id")
+                memory_id = arguments.get("memory_id")
+                limit = arguments.get("limit", 20)
+
+                if entity_id:
+                    history = get_entity_audit_history(entity_id)
+                elif memory_id:
+                    history = get_memory_audit_history(memory_id)
+                else:
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps({"error": "Either entity_id or memory_id is required"}),
+                            )
+                        ],
+                        isError=True,
                     )
-                ]
-            )
 
-        elif name == "memory.system_health":
-            from ..daemon.health import build_status_report
-            report = build_status_report()
-            embedding_svc = get_embedding_service()
-            if hasattr(embedding_svc, '_model_mismatch') and embedding_svc._model_mismatch:
-                if "components" not in report:
-                    report["components"] = {}
-                report["components"]["embedding_model_mismatch"] = True
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(report, indent=2),
+                # Apply limit
+                history = history[:limit]
+
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({
+                                "entity_id": entity_id,
+                                "memory_id": memory_id,
+                                "history": history,
+                                "count": len(history),
+                            }),
+                        )
+                    ]
+                )
+
+            elif name == "memory.summary":
+                _coerce_int(arguments, "top_facts_limit")
+                entity_names = arguments.get("entities", [])
+                top_facts_limit = arguments.get("top_facts_limit", 5)
+                db = get_db()
+                summaries = []
+
+                for entity_name in entity_names:
+                    from ..extraction.entity_extractor import get_extractor
+                    canonical = get_extractor().canonical_name(entity_name)
+
+                    entity = db.get_one(
+                        "entities",
+                        where="canonical_name = ? AND deleted_at IS NULL",
+                        where_params=(canonical,),
                     )
-                ]
-            )
+                    if not entity:
+                        summaries.append({"name": entity_name, "found": False})
+                        continue
 
-        elif name == "memory.sync_vault":
-            from ..config import _project_id
-            from ..services.vault_sync import run_vault_sync
-            full = arguments.get("full", False)
-            result = run_vault_sync(project_id=_project_id, full=full)
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"success": True, **result}),
-                    )
-                ]
-            )
+                    eid = entity["id"]
 
-        elif name == "memory.vault_status":
-            from ..config import _project_id
-            from ..services.vault_sync import get_vault_sync_service
-            svc = get_vault_sync_service(_project_id)
-            status = svc.get_status()
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(status, indent=2),
-                    )
-                ]
-            )
+                    # Memory count (excluding invalidated)
+                    mem_count_rows = db.execute(
+                        """
+                        SELECT COUNT(*) as cnt FROM memories m
+                        JOIN memory_entities me ON m.id = me.memory_id
+                        WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                        """,
+                        (eid,),
+                        fetch=True,
+                    ) or []
+                    memory_count = mem_count_rows[0]["cnt"] if mem_count_rows else 0
 
-        elif name == "memory.generate_canvas":
-            from ..config import _project_id
-            from ..services.vault_sync import get_vault_path
-            from ..services.canvas_generator import CanvasGenerator
-            vault_path = get_vault_path(_project_id)
-            gen = CanvasGenerator(vault_path)
-            canvas_type = arguments["canvas_type"]
+                    # Relationship count
+                    rel_count_rows = db.execute(
+                        """
+                        SELECT COUNT(*) as cnt FROM relationships
+                        WHERE (source_entity_id = ? OR target_entity_id = ?)
+                        AND invalid_at IS NULL
+                        """,
+                        (eid, eid),
+                        fetch=True,
+                    ) or []
+                    relationship_count = rel_count_rows[0]["cnt"] if rel_count_rows else 0
 
-            if canvas_type == "all":
-                result = gen.generate_all()
-            elif canvas_type == "relationship_map":
-                path = gen.generate_relationship_map()
-                result = {"relationship_map": {"path": str(path), "status": "ok"}}
-            elif canvas_type == "morning_brief":
-                path = gen.generate_morning_brief()
-                result = {"morning_brief": {"path": str(path), "status": "ok"}}
-            elif canvas_type == "project_board":
-                project_name = arguments.get("project_name")
-                if not project_name:
+                    # Last mentioned
+                    last_rows = db.execute(
+                        """
+                        SELECT MAX(m.created_at) as last_mentioned FROM memories m
+                        JOIN memory_entities me ON m.id = me.memory_id
+                        WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                        """,
+                        (eid,),
+                        fetch=True,
+                    ) or []
+                    last_mentioned = last_rows[0]["last_mentioned"] if last_rows else None
+
+                    # Top facts
+                    fact_rows = db.execute(
+                        """
+                        SELECT m.content, m.type, m.importance FROM memories m
+                        JOIN memory_entities me ON m.id = me.memory_id
+                        WHERE me.entity_id = ? AND m.invalidated_at IS NULL
+                        ORDER BY m.importance DESC, m.created_at DESC
+                        LIMIT ?
+                        """,
+                        (eid, top_facts_limit),
+                        fetch=True,
+                    ) or []
+
+                    summaries.append({
+                        "name": entity["name"],
+                        "type": entity["type"],
+                        "importance": entity["importance"],
+                        "found": True,
+                        "memory_count": memory_count,
+                        "relationship_count": relationship_count,
+                        "last_mentioned": last_mentioned,
+                        "top_facts": [
+                            {"content": r["content"], "type": r["type"], "importance": r["importance"]}
+                            for r in fact_rows
+                        ],
+                    })
+
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"summaries": summaries}, indent=2),
+                        )
+                    ]
+                )
+
+            elif name == "memory.system_health":
+                from ..daemon.health import build_status_report
+                report = build_status_report()
+                embedding_svc = get_embedding_service()
+                if hasattr(embedding_svc, '_model_mismatch') and embedding_svc._model_mismatch:
+                    if "components" not in report:
+                        report["components"] = {}
+                    report["components"]["embedding_model_mismatch"] = True
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(report, indent=2),
+                        )
+                    ]
+                )
+
+            elif name == "memory.sync_vault":
+                from ..config import _project_id
+                from ..services.vault_sync import run_vault_sync
+                full = arguments.get("full", False)
+                result = run_vault_sync(project_id=_project_id, full=full)
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"success": True, **result}),
+                        )
+                    ]
+                )
+
+            elif name == "memory.vault_status":
+                from ..config import _project_id
+                from ..services.vault_sync import get_vault_sync_service
+                svc = get_vault_sync_service(_project_id)
+                status = svc.get_status()
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(status, indent=2),
+                        )
+                    ]
+                )
+
+            elif name == "memory.generate_canvas":
+                from ..config import _project_id
+                from ..services.vault_sync import get_vault_path
+                from ..services.canvas_generator import CanvasGenerator
+                vault_path = get_vault_path(_project_id)
+                gen = CanvasGenerator(vault_path)
+                canvas_type = arguments["canvas_type"]
+
+                if canvas_type == "all":
+                    result = gen.generate_all()
+                elif canvas_type == "relationship_map":
+                    path = gen.generate_relationship_map()
+                    result = {"relationship_map": {"path": str(path), "status": "ok"}}
+                elif canvas_type == "morning_brief":
+                    path = gen.generate_morning_brief()
+                    result = {"morning_brief": {"path": str(path), "status": "ok"}}
+                elif canvas_type == "project_board":
+                    project_name = arguments.get("project_name")
+                    if not project_name:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps(
+                                {"error": "project_name is required for project_board"}
+                            ))],
+                            isError=True,
+                        )
+                    path = gen.generate_project_board(project_name)
+                    if path:
+                        result = {"project_board": {"path": str(path), "status": "ok"}}
+                    else:
+                        result = {"project_board": {"status": "not_found", "error": f"Project '{project_name}' not found"}}
+                else:
                     return CallToolResult(
                         content=[TextContent(type="text", text=json.dumps(
-                            {"error": "project_name is required for project_board"}
+                            {"error": f"Unknown canvas type: {canvas_type}"}
                         ))],
                         isError=True,
                     )
-                path = gen.generate_project_board(project_name)
-                if path:
-                    result = {"project_board": {"path": str(path), "status": "ok"}}
-                else:
-                    result = {"project_board": {"status": "not_found", "error": f"Project '{project_name}' not found"}}
-            else:
+
                 return CallToolResult(
-                    content=[TextContent(type="text", text=json.dumps(
-                        {"error": f"Unknown canvas type: {canvas_type}"}
-                    ))],
-                    isError=True,
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
                 )
 
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
-            )
+            elif name == "memory.import_vault_edits":
+                from ..config import _project_id
+                from ..services.vault_sync import get_vault_sync_service
+                vault_svc = get_vault_sync_service(_project_id)
+                result = vault_svc.import_all_edits()
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                )
 
-        elif name == "memory.import_vault_edits":
-            from ..config import _project_id
-            from ..services.vault_sync import get_vault_sync_service
-            vault_svc = get_vault_sync_service(_project_id)
-            result = vault_svc.import_all_edits()
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
-            )
+            elif name == "memory.reconnections":
+                _coerce_int(arguments, "limit")
+                limit = arguments.get("limit", 10)
+                now_str = datetime.utcnow().isoformat()
+                rows = get_db().execute(
+                    """
+                    SELECT content, priority, metadata
+                    FROM predictions
+                    WHERE prediction_type = 'reconnection'
+                      AND expires_at > ?
+                    ORDER BY priority DESC
+                    LIMIT ?
+                    """,
+                    (now_str, limit),
+                    fetch=True,
+                ) or []
 
-        elif name == "memory.reconnections":
-            _coerce_int(arguments, "limit")
-            limit = arguments.get("limit", 10)
-            now_str = datetime.utcnow().isoformat()
-            rows = get_db().execute(
-                """
-                SELECT content, priority, metadata
-                FROM predictions
-                WHERE prediction_type = 'reconnection'
-                  AND expires_at > ?
-                ORDER BY priority DESC
-                LIMIT ?
-                """,
-                (now_str, limit),
-                fetch=True,
-            ) or []
+                suggestions = []
+                for row in rows:
+                    meta = {}
+                    try:
+                        meta = json.loads(row["metadata"]) if row["metadata"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    suggestions.append({
+                        "person": meta.get("entity_name", "Unknown"),
+                        "days_since_contact": meta.get("days_since_contact", 0),
+                        "trend": meta.get("trend", "unknown"),
+                        "last_topic": meta.get("last_topic", ""),
+                        "open_commitments": meta.get("open_commitments", []),
+                        "suggestion": row["content"],
+                        "priority": row["priority"],
+                    })
 
-            suggestions = []
-            for row in rows:
-                meta = {}
-                try:
-                    meta = json.loads(row["metadata"]) if row["metadata"] else {}
-                except (json.JSONDecodeError, TypeError):
-                    pass
-                suggestions.append({
-                    "person": meta.get("entity_name", "Unknown"),
-                    "days_since_contact": meta.get("days_since_contact", 0),
-                    "trend": meta.get("trend", "unknown"),
-                    "last_topic": meta.get("last_topic", ""),
-                    "open_commitments": meta.get("open_commitments", []),
-                    "suggestion": row["content"],
-                    "priority": row["priority"],
-                })
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(suggestions, indent=2))]
+                )
 
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(suggestions, indent=2))]
-            )
+            elif name == "memory.upcoming":
+                _coerce_int(arguments, "days")
+                from ..services.recall import recall_upcoming_deadlines
+                days = arguments.get("days", 14)
+                include_overdue = arguments.get("include_overdue", True)
+                results = recall_upcoming_deadlines(days, include_overdue=include_overdue)
 
-        elif name == "memory.upcoming":
-            _coerce_int(arguments, "days")
-            from ..services.recall import recall_upcoming_deadlines
-            days = arguments.get("days", 14)
-            include_overdue = arguments.get("include_overdue", True)
-            results = recall_upcoming_deadlines(days, include_overdue=include_overdue)
+                # Group by urgency
+                grouped = {"overdue": [], "today": [], "tomorrow": [], "this_week": [], "later": []}
+                for r in results:
+                    urgency = (r.metadata or {}).get("urgency", "later")
+                    deadline = (r.metadata or {}).get("deadline_at", "")
+                    grouped.setdefault(urgency, []).append({
+                        "id": r.id,
+                        "content": r.content,
+                        "deadline_at": deadline,
+                        "importance": r.importance,
+                        "entities": r.entities[:3],
+                    })
 
-            # Group by urgency
-            grouped = {"overdue": [], "today": [], "tomorrow": [], "this_week": [], "later": []}
-            for r in results:
-                urgency = (r.metadata or {}).get("urgency", "later")
-                deadline = (r.metadata or {}).get("deadline_at", "")
-                grouped.setdefault(urgency, []).append({
+                # Remove empty groups
+                grouped = {k: v for k, v in grouped.items() if v}
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(grouped, indent=2))]
+                )
+
+            elif name == "memory.since":
+                _coerce_int(arguments, "limit")
+                from ..services.recall import recall_since
+                since = arguments["since"]
+                entity = arguments.get("entity")
+                limit = arguments.get("limit", 50)
+                results = recall_since(since, entity_name=entity, limit=limit)
+
+                formatted = [{
                     "id": r.id,
                     "content": r.content,
-                    "deadline_at": deadline,
+                    "type": r.memory_type,
+                    "created_at": r.created_at,
                     "importance": r.importance,
                     "entities": r.entities[:3],
-                })
+                } for r in results]
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
+                )
 
-            # Remove empty groups
-            grouped = {k: v for k, v in grouped.items() if v}
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(grouped, indent=2))]
-            )
+            elif name == "memory.timeline":
+                _coerce_int(arguments, "limit")
+                from ..services.recall import recall_timeline
+                entity = arguments["entity"]
+                limit = arguments.get("limit", 50)
+                results = recall_timeline(entity, limit=limit)
 
-        elif name == "memory.since":
-            _coerce_int(arguments, "limit")
-            from ..services.recall import recall_since
-            since = arguments["since"]
-            entity = arguments.get("entity")
-            limit = arguments.get("limit", 50)
-            results = recall_since(since, entity_name=entity, limit=limit)
+                formatted = [{
+                    "id": r.id,
+                    "content": r.content,
+                    "type": r.memory_type,
+                    "created_at": r.created_at,
+                    "importance": r.importance,
+                    "deadline_at": (r.metadata or {}).get("deadline_at"),
+                    "has_deadline": (r.metadata or {}).get("has_deadline", False),
+                } for r in results]
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
+                )
 
-            formatted = [{
-                "id": r.id,
-                "content": r.content,
-                "type": r.memory_type,
-                "created_at": r.created_at,
-                "importance": r.importance,
-                "entities": r.entities[:3],
-            } for r in results]
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
-            )
+            elif name == "memory.project_health":
+                _coerce_int(arguments, "days_ahead")
+                from ..services.recall import project_relationship_health
+                entity = arguments["entity"]
+                days_ahead = arguments.get("days_ahead", 30)
+                result = project_relationship_health(entity, days_ahead)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                )
 
-        elif name == "memory.timeline":
-            _coerce_int(arguments, "limit")
-            from ..services.recall import recall_timeline
-            entity = arguments["entity"]
-            limit = arguments.get("limit", 50)
-            results = recall_timeline(entity, limit=limit)
-
-            formatted = [{
-                "id": r.id,
-                "content": r.content,
-                "type": r.memory_type,
-                "created_at": r.created_at,
-                "importance": r.importance,
-                "deadline_at": (r.metadata or {}).get("deadline_at"),
-                "has_deadline": (r.metadata or {}).get("has_deadline", False),
-            } for r in results]
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
-            )
-
-        elif name == "memory.project_health":
-            _coerce_int(arguments, "days_ahead")
-            from ..services.recall import project_relationship_health
-            entity = arguments["entity"]
-            days_ahead = arguments.get("days_ahead", 30)
-            result = project_relationship_health(entity, days_ahead)
-            return CallToolResult(
-                content=[TextContent(type="text", text=json.dumps(result, indent=2))]
-            )
-
-        else:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps({"error": f"Unknown tool: {name}"}),
-                    )
-                ],
-                isError=True,
-            )
+            else:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps({"error": f"Unknown tool: {name}"}),
+                        )
+                    ],
+                    isError=True,
+                )
 
     except Exception as e:
         logger.exception(f"Error in tool {name}")

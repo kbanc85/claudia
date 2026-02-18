@@ -476,16 +476,16 @@ class RememberService:
                 where_params=(source_id, target_id, relationship_type),
             )
             if existing_to_supersede:
-                with self.db.transaction() as conn:
+                with self.db.transaction():
                     # Invalidate the old relationship (mark when it ended)
-                    conn.execute(
+                    self.db.execute(
                         "UPDATE relationships SET invalid_at = ?, updated_at = ? WHERE id = ?",
                         (now, now, existing_to_supersede["id"]),
                     )
                     # Rename the type to free the UNIQUE constraint slot
                     old_meta = json.loads(existing_to_supersede["metadata"] or "{}")
                     old_meta["superseded_by_at"] = now
-                    conn.execute(
+                    self.db.execute(
                         "UPDATE relationships SET relationship_type = ?, metadata = ? WHERE id = ?",
                         (
                             f"{relationship_type}__superseded_{existing_to_supersede['id']}",
@@ -651,13 +651,13 @@ class RememberService:
 
         now = datetime.utcnow().isoformat()
 
-        with self.db.transaction() as conn:
+        with self.db.transaction():
             # Invalidate and rename type atomically
             old_meta = json.loads(existing["metadata"] or "{}")
             old_meta["invalidated_reason"] = reason
             old_meta["invalidated_at"] = now
 
-            conn.execute(
+            self.db.execute(
                 "UPDATE relationships SET invalid_at = ?, updated_at = ?, "
                 "relationship_type = ?, metadata = ? WHERE id = ?",
                 (

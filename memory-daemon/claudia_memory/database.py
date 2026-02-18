@@ -147,29 +147,48 @@ class Database:
             conn.commit()
 
     @contextmanager
-    def transaction(self) -> Generator[sqlite3.Connection, None, None]:
-        """Explicit multi-step transaction. Commits on success, rolls back on error.
+    def transaction(self) -> Generator[None, None, None]:
+        """Context manager that wraps all db operations in this thread in a single transaction.
 
-        Use this when multiple operations must succeed or fail atomically.
-        Unlike connection(), the caller uses conn.execute() directly.
+        While active, cursor() uses the transaction connection instead of auto-committing.
+        Commits on clean exit; rolls back on exception. Supports nesting by restoring
+        any previously active transaction on exit.
         """
         conn = self._get_connection()
+        conn.execute("BEGIN")
+        prev = getattr(self._local, "tx_conn", None)
+        self._local.tx_conn = conn
         try:
-            yield conn
-            conn.commit()
+            yield
+            conn.execute("COMMIT")
         except Exception:
-            conn.rollback()
+            conn.execute("ROLLBACK")
             raise
+        finally:
+            self._local.tx_conn = prev  # restore nesting support
 
     @contextmanager
     def cursor(self) -> Generator[sqlite3.Cursor, None, None]:
-        """Context manager for database cursor"""
-        with self.connection() as conn:
-            cursor = conn.cursor()
+        """Context manager for database cursor.
+
+        If a transaction() is active on this thread, participates in it
+        (no auto-commit). Otherwise opens a normal auto-committing connection.
+        """
+        tx_conn = getattr(self._local, "tx_conn", None)
+        if tx_conn is not None:
+            # Participate in the active transaction -- don't open a new connection
+            cur = tx_conn.cursor()
             try:
-                yield cursor
+                yield cur
             finally:
-                cursor.close()
+                cur.close()
+        else:
+            with self.connection() as conn:
+                cur = conn.cursor()
+                try:
+                    yield cur
+                finally:
+                    cur.close()
 
     def initialize(self) -> None:
         """Initialize database schema"""

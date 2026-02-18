@@ -57,14 +57,74 @@ CONTEXT="IMPORTANT: Memory daemon is NOT running. Without it, you lose semantic 
 if [[ "$OSTYPE" == "darwin"* ]]; then
   PLIST="$HOME/Library/LaunchAgents/com.claudia.memory.plist"
   if [ -f "$PLIST" ]; then
-    CONTEXT="$CONTEXT Daemon is installed (LaunchAgent exists) but not running. Suggest: 'Your memory daemon is installed but stopped. Want me to try starting it? I can run: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist'"
+    # Attempt silent auto-restart before falling through to manual suggestion
+    RESTARTED=false
+    if launchctl unload "$PLIST" 2>/dev/null; sleep 0.5; launchctl load "$PLIST" 2>/dev/null; then
+      sleep 3
+      if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
+        RESTARTED=true
+      fi
+    fi
+    if [ "$RESTARTED" = true ]; then
+      STATUS_JSON=$(curl -s "http://localhost:3848/status" 2>/dev/null)
+      STATUS_SUMMARY=""
+      if [ -n "$STATUS_JSON" ] && command -v python3 &>/dev/null; then
+        STATUS_SUMMARY=$(python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    c = d.get('counts', {})
+    print(f\"{c.get('memories',0)} memories, {c.get('entities',0)} entities, {c.get('patterns',0)} active patterns.\")
+except Exception:
+    pass
+" <<< "$STATUS_JSON" 2>/dev/null)
+      fi
+      MSG="Memory daemon was stopped but has been restarted automatically."
+      if [ -n "$STATUS_SUMMARY" ]; then
+        MSG="$MSG $STATUS_SUMMARY"
+      fi
+      STATUS_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
+      echo "{\"additionalContext\": \"$STATUS_ESC\"}"
+      exit 0
+    fi
+    CONTEXT="$CONTEXT Daemon is installed (LaunchAgent exists) but could not be auto-restarted. Suggest: 'Your memory daemon is stopped. Please run: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist'"
   else
     CONTEXT="$CONTEXT Daemon is NOT installed. Suggest: 'The memory daemon hasn\u0027t been set up yet. Want me to install it? I can run the installer for you.'"
   fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
   SERVICE="$HOME/.config/systemd/user/claudia-memory.service"
   if [ -f "$SERVICE" ]; then
-    CONTEXT="$CONTEXT Daemon is installed (systemd service exists) but not running. Suggest: 'Your memory daemon is installed but stopped. Want me to try starting it? I can run: systemctl --user start claudia-memory'"
+    # Attempt silent auto-restart before falling through to manual suggestion
+    RESTARTED=false
+    if systemctl --user restart claudia-memory 2>/dev/null; then
+      sleep 3
+      if curl -s "http://localhost:3848/health" 2>/dev/null | grep -q "healthy"; then
+        RESTARTED=true
+      fi
+    fi
+    if [ "$RESTARTED" = true ]; then
+      STATUS_JSON=$(curl -s "http://localhost:3848/status" 2>/dev/null)
+      STATUS_SUMMARY=""
+      if [ -n "$STATUS_JSON" ] && command -v python3 &>/dev/null; then
+        STATUS_SUMMARY=$(python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    c = d.get('counts', {})
+    print(f\"{c.get('memories',0)} memories, {c.get('entities',0)} entities, {c.get('patterns',0)} active patterns.\")
+except Exception:
+    pass
+" <<< "$STATUS_JSON" 2>/dev/null)
+      fi
+      MSG="Memory daemon was stopped but has been restarted automatically."
+      if [ -n "$STATUS_SUMMARY" ]; then
+        MSG="$MSG $STATUS_SUMMARY"
+      fi
+      STATUS_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
+      echo "{\"additionalContext\": \"$STATUS_ESC\"}"
+      exit 0
+    fi
+    CONTEXT="$CONTEXT Daemon is installed (systemd service exists) but could not be auto-restarted. Suggest: 'Your memory daemon is stopped. Please run: systemctl --user restart claudia-memory'"
   else
     CONTEXT="$CONTEXT Daemon is NOT installed. Suggest: 'The memory daemon hasn\u0027t been set up yet. Want me to install it? I can run the installer for you.'"
   fi
