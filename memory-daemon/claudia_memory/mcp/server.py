@@ -791,27 +791,6 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.telegram_inbox",
-            title="Fetch Telegram Messages",
-            description=(
-                "Fetch unread Telegram/Slack conversations and extracted notes. Marks them as read. "
-                "Call at session start to catch up on gateway messages, or mid-session when the user "
-                "asks 'check telegram' or 'any new messages?'. Returns conversation summaries and "
-                "extracted facts/commitments from gateway channels."
-            ),
-            annotations=ToolAnnotations(destructiveHint=False),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum number of episodes to return",
-                        "default": 10,
-                    },
-                },
-            },
-        ),
-        Tool(
             name="memory.briefing",
             title="Compact Briefing",
             description=(
@@ -2256,21 +2235,6 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                         TextContent(
                             type="text",
                             text=json.dumps(result),
-                        )
-                    ]
-                )
-
-            elif name == "memory.telegram_inbox":
-                _coerce_int(arguments, "limit")
-                inbox_text = _build_telegram_inbox(
-                    limit=arguments.get("limit", 10),
-                    mark_read=True,
-                )
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=inbox_text,
                         )
                     ]
                 )

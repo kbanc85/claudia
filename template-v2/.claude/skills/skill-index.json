@@ -339,30 +339,6 @@
       "triggers": ["new workspace", "new project", "new client setup", "create workspace"]
     },
     {
-      "name": "gateway",
-      "path": "gateway/SKILL.md",
-      "description": "Start, stop, or check status of the Claudia Gateway service for messaging integrations",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["gateway status", "start gateway", "stop gateway", "gateway check"]
-    },
-    {
-      "name": "setup-gateway",
-      "path": "setup-gateway.md",
-      "description": "Guided walkthrough for setting up the Claudia Gateway (API-based chat for Telegram, Slack, webhooks)",
-      "invocation": "explicit",
-      "effort_level": "medium",
-      "triggers": ["set up gateway", "configure gateway", "install gateway"]
-    },
-    {
-      "name": "setup-telegram",
-      "path": "setup-telegram.md",
-      "description": "Guided walkthrough for setting up Telegram bot integration with BotFather and relay/gateway configuration",
-      "invocation": "explicit",
-      "effort_level": "medium",
-      "triggers": ["set up telegram", "connect telegram", "telegram bot"]
-    },
-    {
       "name": "inbox-check",
       "path": "inbox-check/SKILL.md",
       "description": "Lightweight inbox triage across all configured email accounts with two-tier fetch and judgment",
