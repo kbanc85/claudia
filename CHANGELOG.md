@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.40.2 (2026-02-18)
+
+### Port Conflict Fix + Graceful Degraded Mode
+
+- **Fixed: MCP process crashes with [Errno 48] when standalone daemon is running** - When the LaunchAgent/systemd daemon holds port 3848, Claude Code's ephemeral MCP server process was unconditionally trying to bind the same port and failing before registering any tools. `start_health_server()` and `start_scheduler()` are now guarded by `if not mcp_mode:`, consistent with the existing singleton lock guard. MCP processes are session-bound and ephemeral; the standalone daemon owns the port and the scheduler.
+- **User profile injected in degraded session context** - When the daemon auto-restarts (or is otherwise unavailable), the session-health-check hook now appends the contents of `context/me.md` to the hook output. Claudia can greet the user naturally and work from markdown context even before memory tools become available.
+- **Improved fallback mode in CLAUDE.md** - When memory tools are absent, Claudia now reads `context/me.md` and related files immediately as her first action, before saying anything, then greets the user naturally using that context. Clearer guidance on when to offer troubleshooting vs. when a `/diagnose` run is the right next step.
+- **Cleaner rule language** - `claudia-principles.md` now explicitly prohibits referencing internal implementation details (skill files, hook names, MCP tool IDs) in conversation. `memory-availability.md` rewritten for concision, with the "Why This Matters" section condensed to avoid verbatim surfacing.
+
 ## 1.40.1 (2026-02-18)
 
 ### Memory Tool Guard + Singleton Lock Fix
