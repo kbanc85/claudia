@@ -1,407 +1,1088 @@
-import { CONFIG } from './config.js';
-
 /**
- * HUD management for the brain visualizer.
- *
- * All UI is plain DOM manipulation -- no framework. The HUD consists of:
- * - Top bar: logo, stats chips, quality selector
- * - Search panel: text input with keystroke callback
- * - Legend: color-coded node type reference
- * - FPS counter: updated each frame
- * - Tooltip: follows cursor on entity hover
- * - Detail panel: right-side drawer showing entity details
- * - Loading overlay: shown during initial graph fetch
+ * Claudia Brain -- UI overlays
+ * Search, type filters, detail panel, timeline scrubber, stats HUD,
+ * and the unified settings panel (6 tabs inside the gear icon).
  */
 
-let _hudVisible = true;
-let _statsPoller = null;
+import { getActiveTheme, getActiveThemeId, setActiveTheme, getThemes, onThemeChange } from './themes.js';
+import {
+  getSetting, setSetting, saveSettings,
+  exportSettings, importSettings,
+  savePreset, loadPreset, deletePreset, listPresets
+} from './settings.js';
+import { applyQuality, getBloomPass } from './effects.js';
+import { getCameraModes, getCameraMode, setCameraMode } from './camera.js';
+import { configureLinks } from './links.js';
 
-/** @type {HTMLElement} */
-let _statEntities;
-/** @type {HTMLElement} */
-let _statMemories;
-/** @type {HTMLElement} */
-let _statRels;
-/** @type {HTMLInputElement} */
-let _searchInput;
-/** @type {HTMLElement} */
-let _tooltip;
-/** @type {HTMLElement} */
-let _detailPanel;
-/** @type {HTMLElement} */
-let _detailContent;
-/** @type {HTMLElement} */
-let _loadingOverlay;
+let graphData = null;
+let activeFilters = { entities: new Set(), memories: new Set() };
+let allEntityTypes = ['person', 'organization', 'project', 'concept', 'location'];
+let allMemoryTypes = ['fact', 'commitment', 'learning', 'observation', 'preference', 'pattern'];
+let timelineEvents = [];
+let timelineRange = { start: null, end: null };
 
-// Memory color map for border-left styling on memory items
-const MEMORY_COLORS = {
-  fact: '#e2e8f0',
-  commitment: '#f87171',
-  learning: '#4ade80',
-  observation: '#93c5fd',
-  preference: '#fbbf24',
-  pattern: '#a78bfa',
+// Callbacks set by main.js
+let onFocusNode = null;
+let onFilterNodes = null;
+let onResetFilter = null;
+let getGraph = null;
+
+export function initUI(data, callbacks) {
+  graphData = data;
+  onFocusNode = callbacks.focusNode;
+  onFilterNodes = callbacks.filterNodes;
+  onResetFilter = callbacks.resetFilter;
+  getGraph = callbacks.getGraph || null;
+
+  initSearch();
+  initFilters();
+  initDetailPanel();
+  initTimeline();
+  initSettingsPanel();
+}
+
+export function setUIGraphData(data) {
+  graphData = data;
+}
+
+// ── Search ──────────────────────────────────────────────
+
+function initSearch() {
+  const input = document.getElementById('search-input');
+  const results = document.getElementById('search-results');
+
+  let debounceTimer = null;
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const query = input.value.trim().toLowerCase();
+      if (query.length < 2) {
+        results.classList.remove('active');
+        return;
+      }
+      performSearch(query);
+    }, 200);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      input.value = '';
+      results.classList.remove('active');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#search-container')) {
+      results.classList.remove('active');
+    }
+  });
+}
+
+function performSearch(query) {
+  const results = document.getElementById('search-results');
+  results.replaceChildren();
+
+  const matches = graphData.nodes
+    .filter(n => {
+      const name = (n.name || '').toLowerCase();
+      const content = (n.content || '').toLowerCase();
+      const desc = (n.description || '').toLowerCase();
+      return name.includes(query) || content.includes(query) || desc.includes(query);
+    })
+    .sort((a, b) => (b.importance || 0) - (a.importance || 0))
+    .slice(0, 20);
+
+  if (matches.length === 0) {
+    const noResult = document.createElement('div');
+    noResult.className = 'search-result';
+    noResult.textContent = 'No matches found';
+    noResult.style.color = 'var(--text-dim)';
+    results.appendChild(noResult);
+    results.classList.add('active');
+    return;
+  }
+
+  for (const node of matches) {
+    const div = document.createElement('div');
+    div.className = 'search-result';
+
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'result-type';
+    typeBadge.style.color = node.color;
+    typeBadge.textContent = node.entityType || node.memoryType || node.nodeType;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = node.name;
+
+    div.appendChild(typeBadge);
+    div.appendChild(nameSpan);
+
+    div.addEventListener('click', () => {
+      if (onFocusNode) onFocusNode(node);
+      results.classList.remove('active');
+      document.getElementById('search-input').value = node.name;
+
+      if (node.nodeType === 'entity') {
+        fetch(`/api/entity/${node.dbId}`)
+          .then(r => r.json())
+          .then(detail => showDetail(node, detail));
+      } else {
+        showDetail(node, null);
+      }
+    });
+
+    results.appendChild(div);
+  }
+
+  results.classList.add('active');
+}
+
+// ── Filters ─────────────────────────────────────────────
+
+const ENTITY_SHAPES = {
+  person: 'circle',
+  organization: 'square',
+  project: 'diamond',
+  concept: 'circle',
+  location: 'ring'
 };
 
-/**
- * Initialize UI references and wire up event listeners.
- * Call once after DOM is ready.
- */
-export function initUI() {
-  _statEntities = document.getElementById('stat-entities');
-  _statMemories = document.getElementById('stat-memories');
-  _statRels = document.getElementById('stat-relationships');
-  _searchInput = document.getElementById('search-input');
-  _tooltip = document.getElementById('node-tooltip');
-  _detailPanel = document.getElementById('detail-panel');
-  _detailContent = document.getElementById('detail-content');
-  _loadingOverlay = document.getElementById('loading-overlay'); // optional
+function initFilters() {
+  const entityFilters = document.getElementById('type-filters');
+  const memoryFilters = document.getElementById('memory-filters');
 
-  // Close button on detail panel
-  const closeBtn = document.getElementById('detail-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', closeDetailPanel);
+  for (const type of allEntityTypes) activeFilters.entities.add(type);
+  for (const type of allMemoryTypes) activeFilters.memories.add(type);
+
+  // Use theme colors for filter dots
+  const theme = getActiveTheme();
+
+  for (const type of allEntityTypes) {
+    entityFilters.appendChild(createFilterItem(type, theme.entities[type], true, (checked) => {
+      if (checked) activeFilters.entities.add(type);
+      else activeFilters.entities.delete(type);
+      applyFilters();
+    }, ENTITY_SHAPES[type]));
   }
 
-  // Controls toggle
-  const controlsToggle = document.getElementById('controls-toggle');
-  const controlsPanel = document.getElementById('controls-panel');
-  if (controlsToggle && controlsPanel) {
-    controlsToggle.addEventListener('click', () => {
-      const open = controlsPanel.classList.toggle('open');
-      controlsToggle.classList.toggle('active', open);
-    });
+  for (const type of allMemoryTypes) {
+    memoryFilters.appendChild(createFilterItem(type, theme.memories[type], true, (checked) => {
+      if (checked) activeFilters.memories.add(type);
+      else activeFilters.memories.delete(type);
+      applyFilters();
+    }));
   }
 
-  // Bloom slider
-  const bloomSlider = document.getElementById('bloom-slider');
-  if (bloomSlider) {
-    bloomSlider.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('bloom-change', { detail: { strength: parseFloat(bloomSlider.value) } }));
-    });
-  }
-
-  // Chromatic aberration slider
-  const aberrSlider = document.getElementById('aberr-slider');
-  if (aberrSlider) {
-    aberrSlider.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('aberr-change', { detail: { offset: parseFloat(aberrSlider.value) } }));
-    });
-  }
-
-  // Rotate toggle
-  const rotateBtn = document.getElementById('rotate-btn');
-  if (rotateBtn) {
-    rotateBtn.addEventListener('click', () => {
-      const active = rotateBtn.classList.toggle('active');
-      rotateBtn.textContent = active ? 'On' : 'Off';
-      window.dispatchEvent(new CustomEvent('rotation-change', { detail: { active } }));
-    });
-  }
-
-  // Quality buttons
-  const qualBtns = document.querySelectorAll('.qual-btn');
-  qualBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      qualBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      window.dispatchEvent(new CustomEvent('quality-change', { detail: { level: btn.dataset.q } }));
+  // Update filter dot colors on theme change
+  onThemeChange((newTheme) => {
+    const allDots = document.querySelectorAll('.filter-dot');
+    allDots.forEach(dot => {
+      const type = dot.closest('.filter-item')?.querySelector('span:last-child')?.textContent;
+      if (type) {
+        const color = newTheme.entities[type] || newTheme.memories[type];
+        if (color) {
+          dot.style.color = color;
+          const shape = dot.getAttribute('data-shape');
+          if (shape !== 'ring') dot.style.background = color;
+        }
+      }
     });
   });
 }
 
-/**
- * Update the stat chips in the top HUD bar.
- * Note: backend sends relationships as a plain number, entities/memories as {total, byType}.
- * @param {{ entities: { total: number }, memories: { total: number }, relationships: number }} stats
- */
-export function updateStats(stats) {
-  if (!stats) return;
-  if (_statEntities && stats.entities) {
-    _statEntities.textContent = stats.entities.total ?? 0;
-  }
-  if (_statMemories && stats.memories) {
-    _statMemories.textContent = stats.memories.total ?? 0;
-  }
-  if (_statRels) {
-    _statRels.textContent = stats.relationships ?? 0;
-  }
+function createFilterItem(type, color, checked, onChange, shape) {
+  const label = document.createElement('label');
+  label.className = 'filter-item';
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = checked;
+  checkbox.addEventListener('change', () => onChange(checkbox.checked));
+
+  const dot = document.createElement('span');
+  dot.className = 'filter-dot';
+  dot.style.color = color;
+  if (shape && shape !== 'ring') dot.style.background = color;
+  if (shape) dot.setAttribute('data-shape', shape);
+
+  const text = document.createElement('span');
+  text.textContent = type;
+
+  label.appendChild(checkbox);
+  label.appendChild(dot);
+  label.appendChild(text);
+  return label;
 }
 
-/**
- * Set the quality level programmatically.
- * @param {'LOW'|'MEDIUM'|'HIGH'|'ULTRA'} level
- */
-export function setQuality(level) {
-  window.dispatchEvent(new CustomEvent('quality-change', { detail: { level } }));
-}
-
-/**
- * Toggle visibility of all HUD panels using the body class approach
- * defined in the CSS (.hud-hidden selector).
- */
-export function toggleHUD() {
-  _hudVisible = !_hudVisible;
-  document.body.classList.toggle('hud-hidden', !_hudVisible);
-}
-
-/**
- * Attach a search callback that fires on each keystroke.
- * @param {(query: string) => void} callback
- */
-export function onSearch(callback) {
-  if (_searchInput) {
-    _searchInput.addEventListener('input', () => {
-      callback(_searchInput.value);
+function applyFilters() {
+  if (onFilterNodes) {
+    onFilterNodes(node => {
+      if (node.nodeType === 'entity') return activeFilters.entities.has(node.entityType);
+      if (node.nodeType === 'memory') return activeFilters.memories.has(node.memoryType);
+      if (node.nodeType === 'pattern') return true;
+      return true;
     });
   }
 }
 
-/**
- * Start polling /api/stats at a regular interval and update the HUD.
- * @param {string} url - Base URL of the backend (e.g., 'http://localhost:3849')
- * @param {number} [intervalMs=5000] - Polling interval
- */
-export function initStatsPoller(url, intervalMs = 5000) {
-  if (_statsPoller) clearInterval(_statsPoller);
+// ── Detail panel ────────────────────────────────────────
 
-  const poll = async () => {
-    try {
-      const res = await fetch(`${url}/api/stats`);
-      if (res.ok) {
-        const stats = await res.json();
-        updateStats(stats);
-      }
-    } catch {
-      // Backend unavailable, silently skip
-    }
-  };
-
-  // Poll immediately, then on interval
-  poll();
-  _statsPoller = setInterval(poll, intervalMs);
+function initDetailPanel() {
+  const closeBtn = document.getElementById('detail-close');
+  closeBtn.addEventListener('click', () => {
+    document.getElementById('detail-panel').classList.add('hidden');
+  });
 }
 
-/**
- * Stop the stats poller (for cleanup).
- */
-export function stopStatsPoller() {
-  if (_statsPoller) {
-    clearInterval(_statsPoller);
-    _statsPoller = null;
-  }
-}
+export function showDetail(node, apiDetail) {
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+  content.replaceChildren();
+  panel.classList.remove('hidden');
 
-/**
- * Clear the search input.
- */
-export function clearSearch() {
-  if (_searchInput) {
-    _searchInput.value = '';
-  }
-}
+  // Header
+  const header = document.createElement('div');
+  header.className = 'detail-header';
 
-// ─── Tooltip ─────────────────────────────────────────────────────────────────
+  const h2 = document.createElement('h2');
+  h2.textContent = node.name;
+  h2.style.color = node.color;
 
-/**
- * Show a tooltip near the cursor with the given text.
- * @param {string} text - Tooltip content
- * @param {number} clientX - Mouse X position
- * @param {number} clientY - Mouse Y position
- */
-export function showTooltip(text, clientX, clientY) {
-  if (!_tooltip) return;
-  _tooltip.textContent = text;
-  _tooltip.style.left = `${clientX + 14}px`;
-  _tooltip.style.top = `${clientY - 8}px`;
-  _tooltip.style.display = 'block';
-}
+  const typeLabel = document.createElement('div');
+  typeLabel.className = 'detail-type';
+  typeLabel.textContent = node.entityType || node.memoryType || node.nodeType;
 
-/**
- * Hide the tooltip.
- */
-export function hideTooltip() {
-  if (!_tooltip) return;
-  _tooltip.style.display = 'none';
-}
-
-// ─── Detail Panel ────────────────────────────────────────────────────────────
-
-/**
- * Open the detail panel with entity data from the API.
- * Builds content using safe DOM construction (no innerHTML).
- *
- * @param {object} data - Entity data from /api/entity/:id
- * @param {() => void} onIsolate - Called when Isolate button is clicked
- * @param {() => void} onReset - Called when Reset button is clicked
- */
-export function openDetailPanel(data, onIsolate, onReset) {
-  if (!_detailPanel || !_detailContent) return;
-
-  // The API returns { entity, memories, relationships }
-  const entity = data.entity || data; // fallback if flat object passed
-
-  // Clear previous content
-  _detailContent.replaceChildren();
-
-  const fragment = document.createDocumentFragment();
-
-  // Entity name
-  const nameEl = document.createElement('div');
-  nameEl.className = 'detail-name';
-  nameEl.textContent = entity.name || 'Unknown';
-  fragment.appendChild(nameEl);
-
-  // Type badge + memory count
-  const typeEl = document.createElement('span');
-  typeEl.className = 'detail-type-badge';
-  typeEl.textContent = entity.type || 'entity';
-  const typeColor = CONFIG.NODE_COLORS[entity.type] || '#94a3b8';
-  typeEl.style.color = typeColor;
-  fragment.appendChild(typeEl);
-
-  const memories = data.memories || [];
-  if (memories.length > 0) {
-    const memCountEl = document.createElement('span');
-    memCountEl.className = 'detail-memory-count';
-    memCountEl.textContent = `${memories.length} ${memories.length === 1 ? 'memory' : 'memories'}`;
-    fragment.appendChild(memCountEl);
-  }
-
-  // Importance bar
-  const importance = entity.importance || 0;
-  const barBg = document.createElement('div');
-  barBg.className = 'importance-bar-bg';
-  const barFill = document.createElement('div');
-  barFill.className = 'importance-bar-fill';
-  barFill.style.width = `${Math.round(importance * 100)}%`;
-  barBg.appendChild(barFill);
-  fragment.appendChild(barBg);
+  header.appendChild(h2);
+  header.appendChild(typeLabel);
+  content.appendChild(header);
 
   // Description
-  if (entity.description) {
-    const desc = document.createElement('div');
-    desc.className = 'detail-description';
-    desc.textContent = entity.description;
-    fragment.appendChild(desc);
+  if (node.description || node.content) {
+    const descSection = createSection('Description');
+    const descText = document.createElement('div');
+    descText.className = 'detail-item';
+    descText.textContent = node.description || node.content;
+    descSection.appendChild(descText);
+    content.appendChild(descSection);
   }
 
-  // Recent memories
-  if (memories.length > 0) {
-    const memTitle = document.createElement('div');
-    memTitle.className = 'detail-section-title';
-    memTitle.textContent = 'Recent Memories';
-    fragment.appendChild(memTitle);
+  // Stats
+  const statsSection = createSection('Properties');
+  if (node.importance !== undefined) {
+    statsSection.appendChild(createStatItem('Importance', node.importance.toFixed(2), node.importance));
+  }
+  if (node.confidence !== undefined) {
+    statsSection.appendChild(createStatItem('Confidence', node.confidence.toFixed(2), node.confidence));
+  }
+  if (node.accessCount !== undefined) {
+    statsSection.appendChild(createStatItem('Recalls', String(node.accessCount)));
+  }
+  if (node.verificationStatus) {
+    statsSection.appendChild(createStatItem('Status', node.verificationStatus));
+  }
+  if (node.createdAt) {
+    statsSection.appendChild(createStatItem('Created', formatDate(node.createdAt)));
+  }
+  if (node.llmImproved) {
+    statsSection.appendChild(createStatItem('Refined', 'LLM-improved'));
+  }
+  content.appendChild(statsSection);
 
-    for (const mem of memories.slice(0, 5)) {
-      const memEl = document.createElement('div');
-      memEl.className = 'memory-item';
-      memEl.textContent = mem.content || mem.fact || '';
-      const memType = mem.type || 'fact';
-      memEl.style.borderLeftColor = MEMORY_COLORS[memType] || '#e2e8f0';
-      fragment.appendChild(memEl);
+  // API detail
+  if (apiDetail) {
+    if (apiDetail.relationships?.length > 0) {
+      const relSection = createSection(`Relationships (${apiDetail.relationships.length})`);
+      for (const rel of apiDetail.relationships) {
+        const item = document.createElement('div');
+        item.className = 'detail-item';
+
+        const name = document.createElement('strong');
+        name.textContent = rel.other_name;
+
+        const type = document.createElement('span');
+        type.textContent = ` ${rel.relationship_type}`;
+        type.style.color = 'var(--text-dim)';
+
+        const meta = document.createElement('div');
+        meta.className = 'detail-meta';
+        meta.textContent = `strength: ${rel.strength?.toFixed(2)} | ${rel.direction}`;
+
+        item.appendChild(name);
+        item.appendChild(type);
+        item.appendChild(meta);
+
+        item.addEventListener('click', () => {
+          const targetNode = graphData?.nodes.find(n => n.id === `entity-${rel.other_id}`);
+          if (targetNode && onFocusNode) onFocusNode(targetNode);
+        });
+
+        relSection.appendChild(item);
+      }
+      content.appendChild(relSection);
+    }
+
+    if (apiDetail.memories?.length > 0) {
+      const memSection = createSection(`Memories (${apiDetail.memories.length})`);
+      for (const mem of apiDetail.memories.slice(0, 15)) {
+        const item = document.createElement('div');
+        item.className = 'detail-item';
+
+        const text = document.createElement('div');
+        text.textContent = mem.content;
+
+        const meta = document.createElement('div');
+        meta.className = 'detail-meta';
+        const parts = [mem.type];
+        if (mem.importance) parts.push(`imp: ${mem.importance.toFixed(2)}`);
+        if (mem.relationship) parts.push(mem.relationship);
+        meta.textContent = parts.join(' | ');
+
+        item.appendChild(text);
+        item.appendChild(meta);
+
+        item.addEventListener('click', () => {
+          const memNode = graphData?.nodes.find(n => n.id === `memory-${mem.id}`);
+          if (memNode && onFocusNode) onFocusNode(memNode);
+        });
+
+        memSection.appendChild(item);
+      }
+      content.appendChild(memSection);
+    }
+
+    if (apiDetail.documents?.length > 0) {
+      const docSection = createSection(`Documents (${apiDetail.documents.length})`);
+      for (const doc of apiDetail.documents) {
+        const item = document.createElement('div');
+        item.className = 'detail-item';
+
+        const name = document.createElement('div');
+        name.textContent = doc.filename;
+
+        const meta = document.createElement('div');
+        meta.className = 'detail-meta';
+        const parts = [doc.source_type || 'file', doc.relationship];
+        if (doc.storage_path) parts.push(doc.storage_path);
+        meta.textContent = parts.join(' | ');
+
+        item.appendChild(name);
+        item.appendChild(meta);
+        docSection.appendChild(item);
+      }
+      content.appendChild(docSection);
+    }
+
+    if (apiDetail.aliases?.length > 0) {
+      const aliasSection = createSection('Also known as');
+      const text = document.createElement('div');
+      text.className = 'detail-item';
+      text.textContent = apiDetail.aliases.map(a => a.alias).join(', ');
+      aliasSection.appendChild(text);
+      content.appendChild(aliasSection);
     }
   }
+}
 
-  // Relationships
-  const relationships = data.relationships || [];
-  if (relationships.length > 0) {
-    const relTitle = document.createElement('div');
-    relTitle.className = 'detail-section-title';
-    relTitle.textContent = 'Relationships';
-    fragment.appendChild(relTitle);
+function createSection(title) {
+  const section = document.createElement('div');
+  section.className = 'detail-section';
+  const h3 = document.createElement('h3');
+  h3.textContent = title;
+  section.appendChild(h3);
+  return section;
+}
 
-    for (const rel of relationships.slice(0, 5)) {
-      const relName = rel.other_name || rel.target_name || rel.source_name || 'related';
-      const strength = rel.strength || 0.5;
+function createStatItem(label, value, barValue) {
+  const item = document.createElement('div');
+  item.className = 'detail-item';
+  const text = document.createElement('span');
+  text.textContent = `${label}: ${value}`;
+  item.appendChild(text);
 
-      const relItem = document.createElement('div');
-      relItem.className = 'rel-item';
-
-      const relLabel = document.createElement('span');
-      relLabel.textContent = relName;
-      relItem.appendChild(relLabel);
-
-      const relBar = document.createElement('div');
-      relBar.className = 'rel-strength';
-      const relFill = document.createElement('div');
-      relFill.className = 'rel-strength-fill';
-      relFill.style.width = `${Math.round(strength * 100)}%`;
-      relBar.appendChild(relFill);
-      relItem.appendChild(relBar);
-
-      const pct = document.createElement('span');
-      pct.style.opacity = '0.5';
-      pct.style.fontSize = '11px';
-      pct.style.minWidth = '32px';
-      pct.textContent = `${Math.round(strength * 100)}%`;
-      relItem.appendChild(pct);
-
-      fragment.appendChild(relItem);
-    }
+  if (barValue !== undefined && typeof barValue === 'number') {
+    const bar = document.createElement('span');
+    bar.className = 'importance-bar';
+    bar.style.width = `${Math.round(barValue * 60)}px`;
+    item.appendChild(bar);
   }
 
-  // Action buttons
-  const actions = document.createElement('div');
-  actions.className = 'detail-actions';
+  return item;
+}
 
-  const isolateBtn = document.createElement('button');
-  isolateBtn.className = 'btn-isolate';
-  isolateBtn.textContent = 'Isolate';
-  isolateBtn.addEventListener('click', () => {
-    if (onIsolate) {
-      onIsolate();
-      isolateBtn.style.display = 'none';
-      resetBtn.style.display = 'block';
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr.replace(' ', 'T'));
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── Settings panel (6 tabs) ─────────────────────────────
+
+function initSettingsPanel() {
+  const btn = document.getElementById('settings-btn');
+  const panel = document.getElementById('settings-panel');
+  if (!btn || !panel) return;
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#settings-container')) {
+      panel.classList.add('hidden');
     }
   });
-  actions.appendChild(isolateBtn);
 
-  const resetBtn = document.createElement('button');
-  resetBtn.className = 'btn-reset';
-  resetBtn.style.display = 'none';
-  resetBtn.textContent = 'Reset View';
-  resetBtn.addEventListener('click', () => {
-    if (onReset) {
-      onReset();
-      resetBtn.style.display = 'none';
-      isolateBtn.style.display = 'block';
+  // Build tabs
+  const tabs = [
+    { id: 'theme', label: 'Theme', builder: buildThemeTab },
+    { id: 'perf', label: 'Quality', builder: buildPerformanceTab },
+    { id: 'sim', label: 'Simulation', builder: buildSimulationTab },
+    { id: 'vis', label: 'Visuals', builder: buildVisualsTab },
+    { id: 'cam', label: 'Camera', builder: buildCameraTab },
+    { id: 'presets', label: 'Presets', builder: buildPresetsTab },
+  ];
+
+  const tabBar = document.createElement('div');
+  tabBar.className = 'sp-tabs';
+
+  const contents = [];
+
+  for (let i = 0; i < tabs.length; i++) {
+    const tab = tabs[i];
+
+    const tabBtn = document.createElement('button');
+    tabBtn.className = 'sp-tab' + (i === 0 ? ' active' : '');
+    tabBtn.textContent = tab.label;
+    tabBtn.dataset.tab = tab.id;
+
+    const content = document.createElement('div');
+    content.className = 'sp-content' + (i === 0 ? ' active' : '');
+    content.dataset.tab = tab.id;
+    tab.builder(content);
+
+    tabBtn.addEventListener('click', () => {
+      tabBar.querySelectorAll('.sp-tab').forEach(t => t.classList.remove('active'));
+      panel.querySelectorAll('.sp-content').forEach(c => c.classList.remove('active'));
+      tabBtn.classList.add('active');
+      content.classList.add('active');
+    });
+
+    tabBar.appendChild(tabBtn);
+    contents.push(content);
+  }
+
+  panel.replaceChildren(tabBar, ...contents);
+}
+
+// ── Tab: Theme ──────────────────────────────────────────
+
+function buildThemeTab(container) {
+  const grid = document.createElement('div');
+  grid.className = 'sp-theme-grid';
+
+  const themes = getThemes();
+  const currentId = getActiveThemeId();
+
+  for (const [id, theme] of Object.entries(themes)) {
+    const item = document.createElement('div');
+    item.className = 'sp-theme-item' + (id === currentId ? ' active' : '');
+    item.dataset.themeId = id;
+
+    const swatch = document.createElement('div');
+    swatch.className = 'sp-theme-swatch';
+    swatch.style.background = theme.swatch;
+    swatch.style.color = theme.swatch;
+
+    const name = document.createElement('div');
+    name.className = 'sp-theme-name';
+    name.textContent = theme.name;
+
+    item.appendChild(swatch);
+    item.appendChild(name);
+
+    item.addEventListener('click', () => {
+      grid.querySelectorAll('.sp-theme-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      setActiveTheme(id);
+      setSetting('theme', id);
+    });
+
+    grid.appendChild(item);
+  }
+
+  container.appendChild(grid);
+}
+
+// ── Tab: Performance ────────────────────────────────────
+
+function buildPerformanceTab(container) {
+  const title = document.createElement('div');
+  title.className = 'sp-section-title';
+  title.textContent = 'Quality Preset';
+  container.appendChild(title);
+
+  const qualities = [
+    { value: 'low', label: 'Low', desc: 'No bloom' },
+    { value: 'medium', label: 'Medium', desc: 'Subtle glow' },
+    { value: 'high', label: 'High', desc: 'Theme defaults' },
+    { value: 'ultra', label: 'Ultra', desc: 'Max glow' },
+  ];
+
+  const radioGroup = document.createElement('div');
+  radioGroup.className = 'sp-radio-group';
+  const currentQuality = getSetting('performance.quality') || 'high';
+
+  for (const q of qualities) {
+    const item = document.createElement('label');
+    item.className = 'sp-radio-item';
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'sp-quality';
+    radio.value = q.value;
+    radio.checked = q.value === currentQuality;
+
+    const label = document.createElement('span');
+    label.textContent = q.label;
+
+    const desc = document.createElement('span');
+    desc.className = 'sp-radio-desc';
+    desc.textContent = q.desc;
+
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        setSetting('performance.quality', q.value);
+        applyQuality(q.value);
+      }
+    });
+
+    item.appendChild(radio);
+    item.appendChild(label);
+    item.appendChild(desc);
+    radioGroup.appendChild(item);
+  }
+
+  container.appendChild(radioGroup);
+
+  // Toggles
+  const toggleTitle = document.createElement('div');
+  toggleTitle.className = 'sp-section-title';
+  toggleTitle.textContent = 'Options';
+  container.appendChild(toggleTitle);
+
+  container.appendChild(buildToggle('Antialiasing', 'performance.antialias', () => {
+    // Antialias requires renderer recreation -- inform user
+  }));
+
+  container.appendChild(buildToggle('Node Labels', 'performance.nodeLabels', () => {
+    // Force re-render all nodes to show/hide labels
+    const G = getGraph?.();
+    if (G) G.nodeThreeObject(G.nodeThreeObject());
+  }));
+
+  container.appendChild(buildToggle('Show Memories', 'performance.memoriesVisible', () => {
+    const G = getGraph?.();
+    if (G) G.nodeThreeObject(G.nodeThreeObject());
+  }));
+
+  container.appendChild(buildToggle('Show Cooling Relationships', 'performance.showHistorical', () => {
+    const G = getGraph?.();
+    if (G) configureLinks(G);
+  }));
+
+  container.appendChild(buildSliderRow('Max Particles', 'performance.maxParticles', 0, 5, 1, (val) => {
+    const G = getGraph?.();
+    if (G) {
+      G.linkDirectionalParticles(link => {
+        if (link.linkType === 'relationship') return val;
+        return 0;
+      });
+    }
+  }));
+}
+
+// ── Tab: Simulation ─────────────────────────────────────
+
+function buildSimulationTab(container) {
+  const title = document.createElement('div');
+  title.className = 'sp-section-title';
+  title.textContent = 'Force Parameters';
+  container.appendChild(title);
+
+  container.appendChild(buildSliderRow('Charge', 'simulation.chargeStrength', -500, 0, 1, (val) => {
+    const G = getGraph?.();
+    if (G) {
+      G.d3Force('charge').strength(node => {
+        if (node.nodeType === 'entity') return val;
+        if (node.nodeType === 'pattern') return val * 0.55;
+        return val * 0.08;
+      });
+      G.d3ReheatSimulation();
+    }
+  }));
+
+  container.appendChild(buildSliderRow('Link Distance', 'simulation.linkDistance', 10, 200, 1, (val) => {
+    const G = getGraph?.();
+    if (G) {
+      G.d3Force('link').distance(link => {
+        if (link.linkType === 'relationship') return val + (1 - (link.strength || 0.5)) * 40;
+        return val * 0.22;
+      });
+      G.d3ReheatSimulation();
+    }
+  }));
+
+  container.appendChild(buildSliderRow('Link Strength', 'simulation.linkStrength', 0, 1, 0.01, (val) => {
+    const G = getGraph?.();
+    if (G) {
+      G.d3Force('link').strength(link => {
+        if (link.linkType === 'relationship') return (link.strength || 0.5) * val;
+        return val * 1.33;
+      });
+      G.d3ReheatSimulation();
+    }
+  }));
+
+  container.appendChild(buildSliderRow('Velocity Decay', 'simulation.velocityDecay', 0.01, 0.9, 0.01, (val) => {
+    const G = getGraph?.();
+    if (G) G.d3VelocityDecay(val);
+  }));
+
+  container.appendChild(buildSliderRow('Alpha Decay', 'simulation.alphaDecay', 0.001, 0.05, 0.001, (val) => {
+    const G = getGraph?.();
+    if (G) G.d3AlphaDecay(val);
+  }));
+
+  // Reheat button
+  const reheatBtn = document.createElement('button');
+  reheatBtn.className = 'sp-btn';
+  reheatBtn.textContent = '\u26A1 Reheat Simulation';
+  reheatBtn.addEventListener('click', () => {
+    const G = getGraph?.();
+    if (G) G.d3ReheatSimulation();
+  });
+  container.appendChild(reheatBtn);
+}
+
+// ── Tab: Visuals ────────────────────────────────────────
+
+function buildVisualsTab(container) {
+  const bloomTitle = document.createElement('div');
+  bloomTitle.className = 'sp-section-title';
+  bloomTitle.textContent = 'Bloom';
+  container.appendChild(bloomTitle);
+
+  container.appendChild(buildSliderRow('Strength', 'visuals.bloomStrength', 0, 5, 0.1, (val) => {
+    const bp = getBloomPass();
+    if (bp) bp.strength = val;
+  }, () => getBloomPass()?.strength));
+
+  container.appendChild(buildSliderRow('Radius', 'visuals.bloomRadius', 0, 2, 0.05, (val) => {
+    const bp = getBloomPass();
+    if (bp) bp.radius = val;
+  }, () => getBloomPass()?.radius));
+
+  container.appendChild(buildSliderRow('Threshold', 'visuals.bloomThreshold', 0, 1, 0.01, (val) => {
+    const bp = getBloomPass();
+    if (bp) bp.threshold = val;
+  }, () => getBloomPass()?.threshold));
+
+  const linkTitle = document.createElement('div');
+  linkTitle.className = 'sp-section-title';
+  linkTitle.textContent = 'Links & Particles';
+  container.appendChild(linkTitle);
+
+  container.appendChild(buildSliderRow('Curvature', 'visuals.linkCurvature', 0, 0.6, 0.01, (val) => {
+    const G = getGraph?.();
+    if (G) G.linkCurvature(link => {
+      if (link.linkType === 'relationship') return val;
+      return val * 0.6;
+    });
+  }));
+
+  container.appendChild(buildSliderRow('Particle Speed', 'visuals.particleSpeed', 0.001, 0.02, 0.001, (val) => {
+    const G = getGraph?.();
+    if (G) G.linkDirectionalParticleSpeed(val);
+  }));
+
+  container.appendChild(buildSliderRow('Particle Width', 'visuals.particleWidth', 0.5, 5, 0.1, (val) => {
+    const G = getGraph?.();
+    if (G) G.linkDirectionalParticleWidth(val);
+  }));
+}
+
+// ── Tab: Camera ─────────────────────────────────────────
+
+function buildCameraTab(container) {
+  const title = document.createElement('div');
+  title.className = 'sp-section-title';
+  title.textContent = 'Animation Mode';
+  container.appendChild(title);
+
+  const modes = getCameraModes();
+  const currentMode = getCameraMode();
+  const radioGroup = document.createElement('div');
+  radioGroup.className = 'sp-radio-group';
+
+  for (const [id, mode] of Object.entries(modes)) {
+    const item = document.createElement('label');
+    item.className = 'sp-radio-item';
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'sp-camera-mode';
+    radio.value = id;
+    radio.checked = id === currentMode;
+
+    const label = document.createElement('span');
+    label.textContent = mode.label;
+
+    const desc = document.createElement('span');
+    desc.className = 'sp-radio-desc';
+    desc.textContent = mode.desc;
+
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        setCameraMode(id);
+        setSetting('cameraMode', id);
+      }
+    });
+
+    item.appendChild(radio);
+    item.appendChild(label);
+    item.appendChild(desc);
+    radioGroup.appendChild(item);
+  }
+
+  container.appendChild(radioGroup);
+}
+
+// ── Tab: Presets ─────────────────────────────────────────
+
+function buildPresetsTab(container) {
+  // Export / Import
+  const btnRow = document.createElement('div');
+  btnRow.className = 'sp-btn-row';
+
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'sp-btn';
+  exportBtn.textContent = 'Export Settings';
+  exportBtn.addEventListener('click', () => exportSettings());
+
+  const importBtn = document.createElement('button');
+  importBtn.className = 'sp-btn';
+  importBtn.textContent = 'Import Settings';
+  importBtn.addEventListener('click', () => {
+    document.getElementById('settings-import-input').click();
+  });
+
+  btnRow.appendChild(exportBtn);
+  btnRow.appendChild(importBtn);
+  container.appendChild(btnRow);
+
+  // Wire file input
+  const fileInput = document.getElementById('settings-import-input');
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (importSettings(reader.result)) {
+        // Reload page to apply all settings cleanly
+        window.location.reload();
+      }
+    };
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
+
+  // Save preset
+  const saveTitle = document.createElement('div');
+  saveTitle.className = 'sp-section-title';
+  saveTitle.textContent = 'Save Current As Preset';
+  container.appendChild(saveTitle);
+
+  const saveRow = document.createElement('div');
+  saveRow.className = 'sp-preset-save';
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Preset name...';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.addEventListener('click', () => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    savePreset(name);
+    nameInput.value = '';
+    renderPresetList(presetList);
+  });
+
+  saveRow.appendChild(nameInput);
+  saveRow.appendChild(saveBtn);
+  container.appendChild(saveRow);
+
+  // Preset list
+  const listTitle = document.createElement('div');
+  listTitle.className = 'sp-section-title';
+  listTitle.textContent = 'Saved Presets';
+  container.appendChild(listTitle);
+
+  const presetList = document.createElement('div');
+  presetList.className = 'sp-preset-list';
+  container.appendChild(presetList);
+
+  renderPresetList(presetList);
+}
+
+function renderPresetList(container) {
+  container.replaceChildren();
+  const presets = listPresets();
+
+  if (presets.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'sp-empty';
+    empty.textContent = 'No saved presets';
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const name of presets) {
+    const item = document.createElement('div');
+    item.className = 'sp-preset-item';
+
+    const nameEl = document.createElement('span');
+    nameEl.textContent = name;
+
+    const actions = document.createElement('div');
+
+    const loadBtn = document.createElement('button');
+    loadBtn.textContent = 'Load';
+    loadBtn.addEventListener('click', () => {
+      if (loadPreset(name)) {
+        window.location.reload();
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'sp-preset-delete';
+    delBtn.textContent = '\u2715';
+    delBtn.addEventListener('click', () => {
+      deletePreset(name);
+      renderPresetList(container);
+    });
+
+    actions.appendChild(loadBtn);
+    actions.appendChild(delBtn);
+    item.appendChild(nameEl);
+    item.appendChild(actions);
+    container.appendChild(item);
+  }
+}
+
+// ── Utility: Slider row builder ─────────────────────────
+
+function buildSliderRow(label, settingPath, min, max, step, onChange, getCurrentValue) {
+  const row = document.createElement('div');
+  row.className = 'sp-slider-row';
+
+  const lbl = document.createElement('label');
+  lbl.textContent = label;
+
+  const input = document.createElement('input');
+  input.type = 'range';
+  input.min = min;
+  input.max = max;
+  input.step = step;
+
+  // Use saved setting, or current live value, or default
+  let initial = getSetting(settingPath);
+  if (initial == null && getCurrentValue) initial = getCurrentValue();
+  if (initial == null) initial = (min + max) / 2;
+  input.value = initial;
+
+  const valDisplay = document.createElement('span');
+  valDisplay.className = 'sp-slider-value';
+  valDisplay.textContent = formatSliderValue(parseFloat(input.value));
+
+  input.addEventListener('input', () => {
+    const val = parseFloat(input.value);
+    valDisplay.textContent = formatSliderValue(val);
+    setSetting(settingPath, val);
+    onChange(val);
+  });
+
+  row.appendChild(lbl);
+  row.appendChild(input);
+  row.appendChild(valDisplay);
+  return row;
+}
+
+function formatSliderValue(val) {
+  if (Math.abs(val) >= 10) return Math.round(val).toString();
+  if (Math.abs(val) >= 1) return val.toFixed(1);
+  if (Math.abs(val) >= 0.01) return val.toFixed(2);
+  return val.toFixed(3);
+}
+
+// ── Utility: Toggle builder ─────────────────────────────
+
+function buildToggle(label, settingPath, onChange) {
+  const row = document.createElement('div');
+  row.className = 'sp-toggle-row';
+
+  const lbl = document.createElement('span');
+  lbl.textContent = label;
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = getSetting(settingPath) !== false;
+
+  checkbox.addEventListener('change', () => {
+    setSetting(settingPath, checkbox.checked);
+    onChange(checkbox.checked);
+  });
+
+  row.appendChild(lbl);
+  row.appendChild(checkbox);
+  return row;
+}
+
+// ── Stats HUD ───────────────────────────────────────────
+
+export function updateStats(stats) {
+  setText('stat-entities', stats.entities);
+  setText('stat-memories', stats.memories);
+  setText('stat-patterns', stats.patterns);
+  setText('stat-relationships', stats.relationships);
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value);
+}
+
+// ── Timeline ────────────────────────────────────────────
+
+export function updateTimeline(events) {
+  timelineEvents = events;
+  if (events.length === 0) return;
+
+  const dates = events.map(e => new Date(e.timestamp?.replace(' ', 'T')));
+  const validDates = dates.filter(d => !isNaN(d.getTime()));
+  if (validDates.length === 0) return;
+
+  timelineRange.start = new Date(Math.min(...validDates));
+  timelineRange.end = new Date(Math.max(...validDates));
+
+  const startLabel = document.getElementById('timeline-start');
+  const endLabel = document.getElementById('timeline-end');
+  if (startLabel) startLabel.textContent = formatDate(timelineRange.start.toISOString());
+  if (endLabel) endLabel.textContent = 'Now';
+
+  drawDensityHistogram(events);
+}
+
+function drawDensityHistogram(events) {
+  const container = document.getElementById('timeline-density');
+  container.replaceChildren();
+
+  if (events.length === 0 || !timelineRange.start || !timelineRange.end) return;
+
+  const totalMs = timelineRange.end - timelineRange.start;
+  if (totalMs <= 0) return;
+
+  const bucketCount = 60;
+  const buckets = new Array(bucketCount).fill(0);
+  const bucketSize = totalMs / bucketCount;
+
+  for (const event of events) {
+    const d = new Date(event.timestamp?.replace(' ', 'T'));
+    if (isNaN(d.getTime())) continue;
+    const bucket = Math.min(bucketCount - 1, Math.floor((d - timelineRange.start) / bucketSize));
+    buckets[bucket]++;
+  }
+
+  const maxCount = Math.max(...buckets, 1);
+
+  for (let i = 0; i < bucketCount; i++) {
+    const bar = document.createElement('div');
+    bar.style.cssText = `
+      display: inline-block;
+      width: ${100 / bucketCount}%;
+      height: ${(buckets[i] / maxCount) * 16}px;
+      background: var(--accent);
+      opacity: ${0.2 + (buckets[i] / maxCount) * 0.6};
+      vertical-align: bottom;
+    `;
+    container.appendChild(bar);
+  }
+}
+
+function initTimeline() {
+  const slider = document.getElementById('timeline-slider');
+  const currentLabel = document.getElementById('timeline-current');
+  const playBtn = document.getElementById('timeline-play');
+  const speedBtn = document.getElementById('timeline-speed');
+
+  let playing = false;
+  let speed = 1;
+  let playInterval = null;
+
+  slider.addEventListener('input', () => {
+    const pct = parseInt(slider.value, 10) / 100;
+    if (!timelineRange.start || !timelineRange.end) return;
+
+    const totalMs = timelineRange.end - timelineRange.start;
+    const cutoffDate = new Date(timelineRange.start.getTime() + totalMs * pct);
+
+    if (currentLabel) {
+      currentLabel.textContent = formatDate(cutoffDate.toISOString());
+    }
+
+    if (pct >= 0.99) {
+      if (onResetFilter) onResetFilter();
+    } else {
+      if (onFilterNodes) {
+        onFilterNodes(node => {
+          if (!node.createdAt) return true;
+          const d = new Date(node.createdAt.replace(' ', 'T'));
+          return d <= cutoffDate;
+        });
+      }
     }
   });
-  actions.appendChild(resetBtn);
 
-  fragment.appendChild(actions);
-  _detailContent.appendChild(fragment);
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '\u23F8' : '\u25B6';
 
-  // Slide panel in
-  _detailPanel.classList.add('open');
-}
+    if (playing) {
+      let value = parseInt(slider.value, 10);
+      if (value >= 100) value = 0;
 
-/**
- * Close the detail panel with slide-out animation.
- */
-export function closeDetailPanel() {
-  if (_detailPanel) {
-    _detailPanel.classList.remove('open');
-  }
-}
+      playInterval = setInterval(() => {
+        value = Math.min(100, value + speed);
+        slider.value = value;
+        slider.dispatchEvent(new Event('input'));
+        if (value >= 100) {
+          playing = false;
+          playBtn.textContent = '\u25B6';
+          clearInterval(playInterval);
+        }
+      }, 100);
+    } else {
+      clearInterval(playInterval);
+    }
+  });
 
-// ─── Loading Overlay ─────────────────────────────────────────────────────────
-
-/**
- * Hide the loading overlay with a fade transition.
- */
-export function hideLoading() {
-  if (_loadingOverlay) {
-    _loadingOverlay.classList.add('hidden');
-  }
-}
-
-/**
- * Show the loading overlay.
- */
-export function showLoading() {
-  if (_loadingOverlay) {
-    _loadingOverlay.classList.remove('hidden');
-  }
+  speedBtn.addEventListener('click', () => {
+    const speeds = [1, 2, 5, 10];
+    const idx = (speeds.indexOf(speed) + 1) % speeds.length;
+    speed = speeds[idx];
+    speedBtn.textContent = `${speed}x`;
+  });
 }

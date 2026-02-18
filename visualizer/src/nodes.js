@@ -1,305 +1,217 @@
-import * as THREE from 'three';
-import { CONFIG } from './config.js';
-
 /**
- * Node mesh management for the brain visualizer.
+ * Claudia Brain -- Node rendering with Three.js
  *
- * Entity nodes get unique geometries per type (person=sphere, org=box, etc.).
- * Memory nodes use a single InstancedMesh for performance (can be thousands).
- * Pattern nodes render as translucent wireframes.
- */
-
-/** @type {Map<string, {mesh: THREE.Mesh|THREE.InstancedMesh, node: object, type: string, instanceIndex?: number}>} */
-let _nodeMap = new Map();
-/** @type {THREE.Mesh[]} Entity meshes exposed for raycasting */
-let _entityMeshes = [];
-/** @type {THREE.InstancedMesh|null} Single instanced mesh for all memory nodes */
-let _memoryMesh = null;
-/** @type {object[]} Raw memory node data (parallel to instance indices) */
-let _memoryNodes = [];
-/** @type {string|null} Currently hovered node id */
-let _hoveredId = null;
-
-// Reusable dummy object for instanced mesh matrix updates
-const _dummy = new THREE.Object3D();
-
-/**
- * Create geometry for an entity node based on its semantic type.
- * Each type gets a distinct silhouette so users can identify
- * node categories at a glance even without color.
- */
-function createEntityGeometry(type) {
-  switch (type) {
-    case 'person':
-      return new THREE.SphereGeometry(1, 32, 32);
-    case 'organization':
-      return new THREE.BoxGeometry(1.6, 1.6, 1.6);
-    case 'project':
-      return new THREE.OctahedronGeometry(1.2, 1);
-    case 'concept':
-      return new THREE.IcosahedronGeometry(1.0, 1);
-    case 'location':
-      return new THREE.TorusGeometry(0.8, 0.3, 16, 32);
-    default:
-      return new THREE.SphereGeometry(1, 32, 32);
-  }
-}
-
-/**
- * Compute the visual scale of an entity node from its importance and memory count.
- * Importance provides the base size (sqrt scaling keeps low-importance nodes visible).
- * Memory count adds a log-scaled bonus so entities Claude knows more about appear larger.
- *   0 memories → +0, 5 → +4.5, 20 → +7.6, 50 → +9.8
- */
-function entityScale(importance, memoryCount = 0) {
-  const base = Math.sqrt(Math.max(0.1, importance)) * 8 + 3;
-  const bonus = Math.log1p(memoryCount) * 2.5;
-  return base + bonus;
-}
-
-/**
- * Scatter a position randomly within a sphere of given radius.
- * Used for initial node placement before the physics simulation
- * takes over and arranges them by force-directed layout.
- */
-function randomPosition(range) {
-  return new THREE.Vector3(
-    (Math.random() - 0.5) * range,
-    (Math.random() - 0.5) * range,
-    (Math.random() - 0.5) * range,
-  );
-}
-
-/**
- * Build all node meshes from graph data and add them to the scene.
+ * Returns Three.js Object3D instances for 3d-force-graph's nodeThreeObject callback.
+ * Entity types get distinct geometries. Memories are tiny spheres.
+ * Patterns use wireframe icosahedra.
  *
- * @param {THREE.Scene} scene - The Three.js scene
- * @param {object} graphData - Graph data with nodes array
- * @returns {Map} The node map (id -> {mesh, node, type, instanceIndex?})
+ * Colors and emissive intensities are read from the active theme.
+ * A theme change listener forces re-render of all nodes.
  */
-export function buildNodes(scene, graphData) {
-  // Clear previous state
-  clearNodes(scene);
 
-  const entityNodes = graphData.nodes.filter((n) => n.nodeType === 'entity');
-  const memoryNodes = graphData.nodes.filter((n) => n.nodeType === 'memory');
-  const patternNodes = graphData.nodes.filter((n) => n.nodeType === 'pattern');
+import {
+  Mesh,
+  SphereGeometry,
+  BoxGeometry,
+  OctahedronGeometry,
+  IcosahedronGeometry,
+  TorusGeometry,
+  MeshStandardMaterial,
+  Group,
+  Sprite,
+  SpriteMaterial,
+  CanvasTexture
+} from 'three';
 
-  // --- Entity nodes: individual meshes with type-specific geometry ---
-  for (const node of entityNodes) {
-    const geo = createEntityGeometry(node.type);
-    const color = new THREE.Color(node.color || CONFIG.NODE_COLORS[node.type] || '#94a3b8');
-    const mat = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 0.3,
-      roughness: 0.4,
-      metalness: 0.2,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    const scale = entityScale(node.importance, node.memoryCount);
-    mesh.scale.setScalar(scale);
-    mesh.position.copy(randomPosition(200));
-    mesh.userData = { nodeId: node.id, node, nodeType: 'entity' };
-    scene.add(mesh);
-    _nodeMap.set(node.id, { mesh, node, type: 'entity' });
-    _entityMeshes.push(mesh);
+import { getActiveTheme, onThemeChange } from './themes.js';
+import { getSetting } from './settings.js';
+import { getGraphInstance } from './graph.js';
+
+// ── Mutable color maps (updated on theme change) ─────────
+
+export let ENTITY_COLORS = { ...getActiveTheme().entities };
+export let MEMORY_COLORS = { ...getActiveTheme().memories };
+
+onThemeChange((theme) => {
+  Object.assign(ENTITY_COLORS, theme.entities);
+  Object.assign(MEMORY_COLORS, theme.memories);
+
+  // Force re-render of all nodes
+  const Graph = getGraphInstance();
+  if (Graph) {
+    Graph.nodeThreeObject(node => createNodeObject(node));
   }
+});
 
-  // --- Memory nodes: single InstancedMesh for GPU efficiency ---
-  if (memoryNodes.length > 0) {
-    const geo = new THREE.SphereGeometry(0.4, 8, 8);
-    const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.5,
-      metalness: 0.1,
-    });
-    _memoryMesh = new THREE.InstancedMesh(geo, mat, memoryNodes.length);
-    _memoryMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    _memoryMesh.userData = { nodeType: 'memory_instanced' };
+// ── Geometry factories (one per entity type) ─────────────
 
-    for (let i = 0; i < memoryNodes.length; i++) {
-      const node = memoryNodes[i];
-      const pos = randomPosition(200);
-      _dummy.position.copy(pos);
-      _dummy.scale.setScalar(1);
-      _dummy.updateMatrix();
-      _memoryMesh.setMatrixAt(i, _dummy.matrix);
-
-      const memColor = node.color || CONFIG.MEMORY_COLORS[node.type] || '#e2e8f0';
-      _memoryMesh.setColorAt(i, new THREE.Color(memColor));
-
-      _nodeMap.set(node.id, { mesh: _memoryMesh, node, type: 'memory', instanceIndex: i });
-    }
-
-    _memoryMesh.instanceMatrix.needsUpdate = true;
-    if (_memoryMesh.instanceColor) _memoryMesh.instanceColor.needsUpdate = true;
-
-    // LOD: memory nodes hidden until camera is close enough
-    _memoryMesh.visible = false;
-    scene.add(_memoryMesh);
-    _memoryNodes = memoryNodes;
-  }
-
-  // --- Pattern nodes: wireframe icosahedrons ---
-  for (const node of patternNodes) {
-    const geo = new THREE.IcosahedronGeometry(2);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xa78bfa,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.5,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(randomPosition(200));
-    mesh.userData = { nodeId: node.id, node, nodeType: 'pattern' };
-    scene.add(mesh);
-    _nodeMap.set(node.id, { mesh, node, type: 'pattern' });
-  }
-
-  return _nodeMap;
-}
-
-/**
- * Remove all node meshes from the scene and reset internal state.
- * Disposes geometries and materials to prevent GPU memory leaks.
- */
-export function clearNodes(scene) {
-  for (const [, entry] of _nodeMap) {
-    if (entry.type === 'entity' || entry.type === 'pattern') {
-      scene.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      entry.mesh.material.dispose();
-    }
-  }
-  if (_memoryMesh) {
-    scene.remove(_memoryMesh);
-    _memoryMesh.geometry.dispose();
-    _memoryMesh.material.dispose();
-    _memoryMesh.dispose();
-    _memoryMesh = null;
-  }
-  _nodeMap.clear();
-  _entityMeshes = [];
-  _memoryNodes = [];
-  _hoveredId = null;
-}
-
-/**
- * Update mesh positions from physics simulation output.
- * Entity and pattern nodes set position directly on their mesh.
- * Memory nodes update the instanced mesh matrix at their index.
- *
- * @param {Array<{id: string, x: number, y: number, z: number}>} simNodes
- * @param {THREE.Camera} camera - Used for LOD distance check
- */
-export function updateNodes(simNodes, camera) {
-  if (!simNodes) return;
-
-  let memoryUpdated = false;
-
-  for (const simNode of simNodes) {
-    const entry = _nodeMap.get(simNode.id);
-    if (!entry) continue;
-
-    const x = simNode.x || 0;
-    const y = simNode.y || 0;
-    const z = simNode.z || 0;
-
-    if (entry.type === 'entity' || entry.type === 'pattern') {
-      entry.mesh.position.set(x, y, z);
-    } else if (entry.type === 'memory' && _memoryMesh) {
-      _dummy.position.set(x, y, z);
-      _dummy.scale.setScalar(1);
-      _dummy.updateMatrix();
-      _memoryMesh.setMatrixAt(entry.instanceIndex, _dummy.matrix);
-      memoryUpdated = true;
-    }
-  }
-
-  if (_memoryMesh && memoryUpdated) {
-    _memoryMesh.instanceMatrix.needsUpdate = true;
-  }
-
-  // LOD: toggle memory node visibility based on camera distance
-  if (_memoryMesh && camera) {
-    const camDist = camera.position.length();
-    _memoryMesh.visible = camDist < CONFIG.LOD.memoryVisibleDistance;
+function entityGeometry(entityType) {
+  switch (entityType) {
+    case 'person':       return new SphereGeometry(1, 24, 18);
+    case 'organization': return new BoxGeometry(1.6, 1.6, 1.6);
+    case 'project':      return new OctahedronGeometry(1.2);
+    case 'concept':      return new IcosahedronGeometry(1.1);
+    case 'location':     return new TorusGeometry(1.0, 0.3, 16, 32);
+    default:             return new SphereGeometry(1, 16, 12);
   }
 }
 
-/**
- * Set the hovered node, applying visual highlight (brighter emissive, scale bump).
- * Resets the previously hovered node to its default appearance.
- *
- * @param {string|null} nodeId - The node to highlight, or null to clear
- */
-export function setHovered(nodeId) {
-  // Reset previous hover
-  if (_hoveredId && _hoveredId !== nodeId) {
-    const prev = _nodeMap.get(_hoveredId);
-    if (prev && prev.type === 'entity') {
-      prev.mesh.material.emissiveIntensity = 0.3;
-      prev.mesh.scale.setScalar(entityScale(prev.node.importance, prev.node.memoryCount));
-    }
+// ── Node Three.js object factory ─────────────────────────
+
+export function createNodeObject(node) {
+  if (node.nodeType === 'entity')  return createEntityObject(node);
+  if (node.nodeType === 'pattern') return createPatternObject(node);
+  if (node.nodeType === 'memory')  return createMemoryObject(node);
+  return createMemoryObject(node); // fallback
+}
+
+// ── Entity (neuron -- glowing polyhedra) ─────────────────
+
+function createEntityObject(node) {
+  const theme = getActiveTheme();
+  const group = new Group();
+
+  const color = theme.entities[node.entityType] || node.color || '#888888';
+  const size = node.size || Math.max(3, Math.sqrt(node.importance || 0.5) * 8);
+
+  const geo = entityGeometry(node.entityType);
+  const mat = new MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: theme.emissive.entity,
+    metalness: 0.1,
+    roughness: 0.6,
+    transparent: true,
+    opacity: Math.max(0.6, node.opacity || 1)
+  });
+
+  const mesh = new Mesh(geo, mat);
+  mesh.scale.setScalar(size);
+  group.add(mesh);
+
+  // Text label as sprite (respect nodeLabels setting)
+  if (getSetting('performance.nodeLabels') !== false) {
+    const label = makeLabel(node.name || '', color);
+    label.position.y = size + 3;
+    group.add(label);
   }
 
-  // Apply new hover
-  if (nodeId) {
-    const entry = _nodeMap.get(nodeId);
-    if (entry && entry.type === 'entity') {
-      entry.mesh.material.emissiveIntensity = 0.7;
-      entry.mesh.scale.setScalar(entityScale(entry.node.importance, entry.node.memoryCount) * 1.3);
-    }
+  // Store metadata for animations
+  group.userData = {
+    node,
+    baseScale: size,
+    nodeType: 'entity',
+    phase: Math.random() * Math.PI * 2,
+    coreMesh: mesh,
+    spawnTime: node.__spawn ? Date.now() : null
+  };
+
+  return group;
+}
+
+// ── Pattern (wireframe icosahedron) ─────────────────────
+
+function createPatternObject(node) {
+  const theme = getActiveTheme();
+  const size = node.size || Math.max(4, (node.confidence || 0.5) * 10);
+
+  const geo = new IcosahedronGeometry(1.0);
+  const mat = new MeshStandardMaterial({
+    color: theme.pattern.color,
+    emissive: theme.pattern.emissive,
+    emissiveIntensity: theme.emissive.pattern,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.5
+  });
+
+  const mesh = new Mesh(geo, mat);
+  mesh.scale.setScalar(size);
+
+  mesh.userData = {
+    node,
+    baseScale: size,
+    nodeType: 'pattern',
+    phase: Math.random() * Math.PI * 2,
+    coreMesh: mesh,
+    spawnTime: node.__spawn ? Date.now() : null
+  };
+
+  return mesh;
+}
+
+// ── Memory (tiny glowing particle) ──────────────────────
+
+function createMemoryObject(node) {
+  // Respect memoriesVisible setting
+  if (getSetting('performance.memoriesVisible') === false) {
+    const placeholder = new Group();
+    placeholder.userData = { node, nodeType: 'memory', hidden: true };
+    return placeholder;
   }
 
-  _hoveredId = nodeId;
+  const theme = getActiveTheme();
+  const size = node.size || Math.max(1.5, (node.importance || 0.3) * 3);
+  const color = theme.memories[node.memoryType] || node.color || '#888888';
+
+  const geo = new SphereGeometry(0.8, 8, 6);
+  const mat = new MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: theme.emissive.memory,
+    transparent: true,
+    opacity: Math.max(0.3, node.opacity || 0.55)
+  });
+
+  const mesh = new Mesh(geo, mat);
+  mesh.scale.setScalar(size);
+
+  mesh.userData = {
+    node,
+    baseScale: size,
+    nodeType: 'memory',
+    phase: Math.random() * Math.PI * 2,
+    coreMesh: mesh,
+    spawnTime: node.__spawn ? Date.now() : null
+  };
+
+  return mesh;
 }
 
-/**
- * Clear any active hover highlight.
- */
-export function clearHovered() {
-  setHovered(null);
-}
+// ── Label sprite ────────────────────────────────────────
 
-/**
- * Get entity meshes for raycasting (click/hover detection).
- * Only returns entity-type meshes since memory nodes use instancing
- * and patterns are wireframe (not typically interactive).
- */
-export function getEntityMeshes() {
-  return _entityMeshes;
-}
+function makeLabel(text, color) {
+  if (!text) return new Group(); // empty placeholder
 
-/**
- * Get the full node map for cross-module lookups (e.g., edges need positions).
- */
-export function getNodeMap() {
-  return _nodeMap;
-}
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const fontSize = 48;
+  const padding = 16;
 
-/**
- * Get the memory instanced mesh (for LOD sync with edges).
- */
-export function getMemoryMesh() {
-  return _memoryMesh;
-}
+  ctx.font = `400 ${fontSize}px Inter, system-ui, sans-serif`;
+  const metrics = ctx.measureText(text);
+  const textWidth = metrics.width + padding * 2;
+  const textHeight = fontSize * 1.4;
 
-/**
- * Set visibility for specific nodes (used by the isolation/focus feature).
- * Pass null to show all nodes, or a Set of visible node IDs to filter.
- *
- * @param {Set<string>|null} visibleIds - Node IDs to show, or null for all
- */
-export function setNodeVisibility(visibleIds) {
-  for (const [id, entry] of _nodeMap) {
-    if (entry.type === 'entity' || entry.type === 'pattern') {
-      entry.mesh.visible = visibleIds === null || visibleIds.has(id);
-    }
-  }
-  // For memory nodes, toggle the entire instanced mesh
-  // (fine-grained per-instance visibility would require alpha manipulation)
-  if (_memoryMesh && visibleIds !== null) {
-    _memoryMesh.visible = false;
-  }
+  canvas.width = Math.min(512, Math.pow(2, Math.ceil(Math.log2(textWidth))));
+  canvas.height = Math.pow(2, Math.ceil(Math.log2(textHeight)));
+
+  ctx.font = `400 ${fontSize}px Inter, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = `rgba(255, 255, 255, 0.7)`;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new CanvasTexture(canvas);
+  const spriteMat = new SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false
+  });
+
+  const sprite = new Sprite(spriteMat);
+  const aspect = canvas.width / canvas.height;
+  sprite.scale.set(aspect * 3, 3, 1);
+
+  return sprite;
 }

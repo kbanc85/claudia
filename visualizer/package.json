@@ -1,26 +1,25 @@
 {
-  "name": "claudia-visualizer",
-  "version": "2.0.0",
-  "description": "Claudia Brain Visualizer — Cosmos. A 3D memory graph explorer.",
+  "name": "claudia-brain-visualizer",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Real-time 3D visualization of Claudia's memory system (3d-force-graph)",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server.js"
+    "server": "node --watch server.js"
   },
   "dependencies": {
-    "three": "^0.174.0",
-    "d3-force-3d": "^3.0.5",
-    "umap-js": "^1.4.0",
-    "express": "^4.21.0",
+    "3d-force-graph": "^1.73.0",
+    "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
-    "better-sqlite3": "^11.0.0"
+    "express": "^4.21.0",
+    "three": "^0.172.0",
+    "umap-js": "^1.4.0"
   },
   "devDependencies": {
     "vite": "^6.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

@@ -4,16 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claudia Brain</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <!--
+    Pure ESM loading via import map.
+    Three.js WebGPU build → Metal backend on macOS (no ANGLE/OpenGL translation).
+    - three.js served from jsDelivr (proper CORS for sub-module imports like three.core.js)
+    - 3d-force-graph + SpriteText served from esm.sh with ?external=three
+      (bundles transitive deps but leaves three/* as bare imports for our importmap)
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.module.js",
+      "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.webgpu.js",
+      "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.tsl.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.175.0/examples/jsm/",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.175.0/examples/jsm/",
+      "3d-force-graph": "https://esm.sh/3d-force-graph@1.79.0?external=three",
+      "three-spritetext": "https://esm.sh/three-spritetext@1.9.0?external=three"
+    }
+  }
+  </script>
 </head>
 <body>
-  <!-- 3d-force-graph mounts here (creates its own canvas) -->
+  <!-- 3D graph canvas -->
   <div id="graph-container"></div>
 
   <!-- Top HUD bar -->
   <div id="hud-bar">
     <div id="hud-title">
-      <img src="/claudia-logo.png" alt="Claudia" class="hud-logo-img">
+      <span class="hud-logo">&#x2B22;</span>
       <span>Claudia Brain</span>
       <span id="activity-pulse" class="pulse"></span>
     </div>
@@ -25,11 +46,14 @@
     </div>
     <div id="hud-controls">
       <span id="fps-counter">-- FPS</span>
-      <span id="engine-info"></span>
       <div id="settings-container">
-        <button id="settings-btn" title="Settings">&#x2699;</button>
+        <button id="settings-btn" title="Quality Settings">&#x2699;</button>
         <div id="settings-panel" class="hidden">
-          <!-- Tabs and content built dynamically by ui.js -->
+          <div class="settings-title">Quality</div>
+          <label class="settings-option"><input type="radio" name="quality" value="low"><span>Low</span><span class="settings-desc">No bloom, no particles</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="medium"><span>Medium</span><span class="settings-desc">Half-res bloom</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="high" checked><span>High</span><span class="settings-desc">Half-res bloom, full effects</span></label>
+          <label class="settings-option"><input type="radio" name="quality" value="ultra"><span>Ultra</span><span class="settings-desc">Full-res bloom</span></label>
         </div>
       </div>
     </div>
@@ -47,6 +71,7 @@
       <h3>Memory Types</h3>
       <div id="memory-filters"></div>
     </div>
+    <div id="legend"></div>
   </div>
 
   <!-- Right detail panel (slides in on node click) -->
@@ -72,9 +97,6 @@
     <div id="timeline-density"></div>
   </div>
 
-  <!-- Hidden file input for settings import -->
-  <input type="file" id="settings-import-input" accept=".json" style="display:none">
-
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

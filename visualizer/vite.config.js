@@ -1,33 +1,23 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  root: '.',
+  publicDir: 'public',
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://localhost:3849',
-        changeOrigin: true,
-      },
-      '/health': {
-        target: 'http://localhost:3849',
-        changeOrigin: true,
-      },
-    },
+      '/api': 'http://localhost:3849',
+      '/health': 'http://localhost:3849'
+    }
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          three: ['three'],
-          'd3-force-3d': ['d3-force-3d'],
-        },
-      },
-    },
+    sourcemap: true
   },
   optimizeDeps: {
-    include: ['three', 'd3-force-3d'],
-    exclude: ['better-sqlite3'],
+    exclude: ['public-legacy']
   },
+  resolve: {
+    alias: {}
+  }
 });
