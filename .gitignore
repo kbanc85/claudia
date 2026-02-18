@@ -16,3 +16,4 @@ tmp/
 
 # Tarballs
 *.tgz
+.worktrees/
