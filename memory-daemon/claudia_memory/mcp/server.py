@@ -1915,7 +1915,6 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 episode_id = arguments.get("episode_id")
                 svc = get_remember_service()
                 if episode_id is None:
-                    from datetime import datetime
                     episode_id = svc.db.insert("episodes", {
                         "started_at": datetime.utcnow().isoformat(),
                         "source": "claude_code",
@@ -1924,7 +1923,6 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 else:
                     episode = svc.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
                     if not episode:
-                        from datetime import datetime
                         new_id = svc.db.insert("episodes", {
                             "started_at": datetime.utcnow().isoformat(),
                             "source": arguments.get("source", "claude_code"),
@@ -2724,7 +2722,6 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
 
             elif name == "memory.upcoming":
                 _coerce_int(arguments, "days")
-                from ..services.recall import recall_upcoming_deadlines
                 days = arguments.get("days", 14)
                 include_overdue = arguments.get("include_overdue", True)
                 results = recall_upcoming_deadlines(days, include_overdue=include_overdue)
