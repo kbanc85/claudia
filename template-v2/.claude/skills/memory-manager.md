@@ -15,29 +15,38 @@ effort-level: medium
 
 All available memory tools when the daemon is connected. Skills should only reference tools from this list.
 
-### Core
-`memory.remember`, `memory.recall`, `memory.about`, `memory.entity`, `memory.relate`, `memory.search_entities`, `memory.batch`, `memory.summary`
+### Core (standalone tools)
+`memory.remember`, `memory.recall`, `memory.about`, `memory.relate`, `memory.batch`, `memory.summary`
+
+### Entities
+`memory.entities` (operations: "create", "search", "merge", "delete", "overview")
 
 ### Session Lifecycle
-`memory.session_context`, `memory.buffer_turn`, `memory.end_session`, `memory.unsummarized`, `memory.briefing`
+`memory.session` (operations: "buffer", "context", "unsummarized")
+`memory.end_session`, `memory.briefing`
 
 ### Documents & Files
-`memory.file`, `memory.documents`
+`memory.document` (operations: "store", "search")
 
-### Analysis & Insights
-`memory.morning_context`, `memory.consolidate`, `memory.reflections`, `memory.upcoming`, `memory.since`, `memory.timeline`, `memory.reconnections`, `memory.project_health`
+### Temporal & Insights
+`memory.temporal` (operations: "upcoming", "since", "timeline", "morning")
+`memory.consolidate`, `memory.reflections`, `memory.project_health`
 
-### Trust & Provenance
-`memory.trace`, `memory.correct`, `memory.invalidate`, `memory.audit_history`, `memory.merge_entities`, `memory.delete_entity`
+### Corrections & Provenance
+`memory.modify` (operations: "correct", "invalidate", "invalidate_relationship")
+`memory.provenance` (operations: "trace", "audit")
 
 ### Network Graph
-`memory.project_network`, `memory.find_path`, `memory.network_hubs`, `memory.dormant_relationships`
+`memory.graph` (operations: "network", "path", "hubs", "dormant", "reconnect")
 
 ### Obsidian Vault
-`memory.sync_vault`, `memory.vault_status`, `memory.generate_canvas`, `memory.import_vault_edits`
+`memory.vault` (operations: "sync", "status", "canvas", "import")
 
 ### Admin
-`memory.purge`, `memory.system_health`
+`memory.system_health`
+
+### Cognitive
+`cognitive.ingest`
 
 ---
 
@@ -54,14 +63,15 @@ When processing source material (transcripts, emails, documents):
 ```
 User shares transcript/email/document
          ↓
-    ┌─────────────────────────────────┐
-    │  1. CHECK for duplicates first  │
-    │     (by source_type + source_ref)│
-    │  2. If new: CALL memory.file    │
-    │     with the FULL raw content   │
-    │  3. ASK user about extraction   │
-    │     (don't auto-extract)        │
-    └─────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │  1. CHECK for duplicates first           │
+    │     (by source_type + source_ref)        │
+    │  2. If new: CALL memory.document         │
+    │     (operation: "store")                 │
+    │     with the FULL raw content            │
+    │  3. ASK user about extraction            │
+    │     (don't auto-extract)                 │
+    └──────────────────────────────────────────┘
          ↓
     If user says "extract now":
          ↓
@@ -96,7 +106,7 @@ Call memory.batch with reviewed operations
 
 **When to extract manually:** Very short notes (1-2 sentences), single-fact corrections, quick entity creation.
 
-**If you find yourself reading multiple source documents** without calling `memory.file` for each one, **STOP and fix it**. Go back and file each source before continuing.
+**If you find yourself reading multiple source documents** without calling `memory.document` (operation: "store") for each one, **STOP and fix it**. Go back and file each source before continuing.
 
 **If you find yourself auto-extracting without asking**, **STOP**. File first, then ask if the user wants extraction now or later. This keeps you responsive during long documents.
 
@@ -113,12 +123,12 @@ Before greeting the user:
      - Or `cd [claudia-dir] && ./memory-daemon/scripts/install.sh`
    - Briefly explain what's lost without it: "Without the daemon, I can't search memories semantically, detect patterns, track relationships across sessions, or give you proactive predictions."
    - After starting, the user needs to restart Claude Code for MCP tools to appear
-3. Call `memory.session_context` to load context
+3. Call `memory.session` (operation: "context") to load context
 4. If this fails: Warn user about degraded mode and suggest checking `~/.claudia/daemon-stderr.log`
 
 ### 3. Buffer Turns During Sessions
 
-Call `memory.buffer_turn` for each meaningful exchange. This ensures nothing is lost if the session ends abruptly.
+Call `memory.session` (operation: "buffer") for each meaningful exchange. This ensures nothing is lost if the session ends abruptly.
 
 ### 4. Trust North Star: Origin Tracking
 
@@ -310,7 +320,7 @@ When the enhanced memory system is available:
 Before anything else, check for sessions that ended without a summary:
 
 ```
-Call memory.unsummarized:
+Call memory.session (operation: "unsummarized"):
 ├── If results returned → Previous session(s) ended without summary
 │   For each unsummarized session:
 │   ├── Review the buffered turns
@@ -339,7 +349,7 @@ The briefing returns ~500 tokens of aggregate context. Use it to inform the gree
 
 Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
 
-**Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.morning_context`.
+**Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.temporal` (operation: "morning").
 
 ### 2. Greeting
 
@@ -396,10 +406,10 @@ After each meaningful exchange, buffer the turn for later summarization:
 
 ```
 After each substantive turn:
-└── Call memory.buffer_turn with:
+└── Call memory.session (operation: "buffer") with:
     ├── user_content: What the user said (summarized if very long)
     ├── assistant_content: What I said (key points, not full response)
-    └── episode_id: Reuse the ID from the first buffer_turn call
+    └── episode_id: Reuse the ID from the first buffer call
 ```
 
 **What counts as "meaningful":**
@@ -413,7 +423,7 @@ After each substantive turn:
 - Pure tool output with no discussion
 - Trivial back-and-forth
 
-The first `memory.buffer_turn` call creates an episode and returns an `episode_id`. Reuse that ID for all subsequent turns in the session.
+The first `memory.session` (operation: "buffer") call creates an episode and returns an `episode_id`. Reuse that ID for all subsequent turns in the session.
 
 ### Immediate Memory (Still Active)
 
@@ -446,7 +456,7 @@ Then add it to `context/commitments.md`. Two places is better than zero. If cont
 
 First time a name comes up, just note it mentally. No action needed.
 
-Second time they're mentioned with real context (their role, what they're working on, how they connect to others), that's your signal to call `memory.entity`.
+Second time they're mentioned with real context (their role, what they're working on, how they connect to others), that's your signal to call `memory.entities` (operation: "create").
 
 A casual name-drop doesn't need a database entry. A person who matters to the conversation does.
 
@@ -490,9 +500,9 @@ If you see a context compaction advisory, review what you can recover:
 
 1. Review what remains in your context
 2. Call `memory.remember` for any commitments you can piece together
-3. Call `memory.entity` for people discussed in detail
+3. Call `memory.entities` (operation: "create") for people discussed in detail
 4. Call `memory.relate` for relationships mentioned
-5. Call `memory.buffer_turn` with a summary of recent exchanges
+5. Call `memory.session` (operation: "buffer") with a summary of recent exchanges
 
 This is triage, not standard practice. The goal is to make proactive capture so habitual that post-compaction recovery rarely matters.
 
@@ -500,7 +510,7 @@ This is triage, not standard practice. The goal is to make proactive capture so 
 
 When a person or project is mentioned:
 ```
-Call memory.entity to create/update:
+Call memory.entities (operation: "create") to create/update:
 ├── name: Entity name
 ├── type: person/organization/project
 ├── description: What we learned
@@ -517,7 +527,7 @@ Call memory.relate:
 
 ### Batch Mid-Session Operations
 
-When processing a new person, meeting transcript, or topic that requires multiple memory operations (entity + memories + relationships) mid-session, use `memory.batch` to execute them in a single call instead of separate `memory.entity`, `memory.remember`, and `memory.relate` calls.
+When processing a new person, meeting transcript, or topic that requires multiple memory operations (entity + memories + relationships) mid-session, use `memory.batch` to execute them in a single call instead of separate `memory.entities`, `memory.remember`, and `memory.relate` calls.
 
 ```
 memory.batch({
@@ -550,7 +560,7 @@ Use `memory.batch` for mid-session entity creation (e.g., user pastes meeting no
 #### How to File
 
 ```
-Call memory.file with:
+Call memory.document (operation: "store") with:
 ├── content: The full raw text (do not summarize)
 ├── filename: YYYY-MM-DD-[entity]-[topic].md (e.g., "2026-02-04-sarah-chen-kickoff.md")
 ├── source_type: "transcript", "gmail", "upload", or "capture"
@@ -567,7 +577,7 @@ Call memory.file with:
    - If found: "I already have this filed at [path]. Want me to pull up what I extracted?"
    - If not found: Continue to step 2
 
-2. **File immediately** using `memory.file` with full content
+2. **File immediately** using `memory.document` (operation: "store") with full content
    - Do NOT automatically extract in the same turn
 
 3. **Ask about extraction**
@@ -621,7 +631,7 @@ User: "Here's the transcript from my call with Sarah Chen about the rebrand proj
 
 1. Check if this transcript was filed before (by content hash or filename)
 
-2. Call memory.file:
+2. Call memory.document (operation: "store"):
    - content: [full transcript text]
    - filename: "2026-02-04-sarah-chen-rebrand.md"
    - source_type: "transcript"
@@ -645,7 +655,7 @@ User: "Here's an email from Jim about the partnership. I need to respond."
 
 1. Check if this email was filed before (by Message-ID header if available)
 
-2. Call memory.file:
+2. Call memory.document (operation: "store"):
    - content: [full email text]
    - filename: "2026-02-04-jim-partnership.md"
    - source_type: "gmail"
@@ -698,7 +708,7 @@ Before wrapping up, generate a session summary by calling `memory.end_session`:
 
 ```
 Call memory.end_session with:
-├── episode_id: The episode from buffer_turn calls
+├── episode_id: The episode from session buffer calls
 ├── narrative: Free-form summary of the session (see below)
 ├── facts: Structured facts extracted [{content, type, about, importance}]
 ├── commitments: Promises made [{content, about, importance}]
@@ -790,7 +800,7 @@ Reflections are persistent learnings about working with this user. Unlike memori
 
 ### Applying Reflections at Session Start
 
-When `memory.session_context` or `memory.briefing` returns active reflections, **apply them silently**:
+When `memory.session` (operation: "context") or `memory.briefing` returns active reflections, **apply them silently**:
 
 | Reflection Type | How to Apply |
 |-----------------|--------------|
@@ -855,7 +865,7 @@ User: "Delete the reflection about Monday mornings"
 
 ### How Reflections Surface
 
-Reflections are loaded automatically via `memory.session_context` or `memory.briefing` and inform:
+Reflections are loaded automatically via `memory.session` (operation: "context") or `memory.briefing` and inform:
 - Communication style (don't announce, just apply)
 - When to surface vs stay silent
 - How to format output
@@ -892,8 +902,8 @@ Users can correct mistakes in the memory system through natural language. User c
 2. **Search for the memory**: Use `memory.recall` with the topic
 3. **Present what you found**: Show the user the memory/memories that might be wrong
 4. **Offer options**:
-   - **Correct**: Update the content, keep the history (use `memory.correct`)
-   - **Invalidate**: Mark as no longer true (use `memory.invalidate`)
+   - **Correct**: Update the content, keep the history (use `memory.modify`, operation: "correct")
+   - **Invalidate**: Mark as no longer true (use `memory.modify`, operation: "invalidate")
    - **No change**: User clarifies it's actually correct
 5. **Confirm action**: "Fixed. I've updated [brief description]."
 
@@ -906,9 +916,9 @@ User: "Actually, Sarah works at Acme now, not TechCorp"
 1. Search: memory.recall("Sarah works TechCorp")
 2. Show: "I have a memory that 'Sarah Chen works at TechCorp'. Is this the one?"
 3. User confirms
-4. Call: memory.correct(memory_id=42,
-                        correction="Sarah Chen works at Acme",
-                        reason="User correction: moved companies")
+4. Call: memory.modify(operation="correct", memory_id=42,
+                       correction="Sarah Chen works at Acme",
+                       reason="User correction: moved companies")
 5. Respond: "Updated. I now know Sarah works at Acme."
 ```
 
@@ -919,7 +929,7 @@ User: "That project is cancelled, don't remind me about it"
 1. Search: memory.recall("project [name]")
 2. Show: "I have 5 memories about [project]. Want me to mark them all as no longer relevant?"
 3. User confirms
-4. Call: memory.invalidate for each, with reason="Project cancelled"
+4. Call: memory.modify (operation: "invalidate") for each, with reason="Project cancelled"
 5. Respond: "Done. I won't surface those memories anymore."
 ```
 
@@ -930,7 +940,7 @@ User: "John Smith and Jon Smith are the same person"
 1. Search for both entities
 2. Confirm: "I found both. Jon Smith has fewer memories. Should I merge Jon into John?"
 3. User confirms
-4. Call: memory.merge_entities(source_id=87, target_id=42, reason="User confirmed same person")
+4. Call: memory.entities(operation="merge", source_id=87, target_id=42, reason="User confirmed same person")
 5. Respond: "Merged. All memories about Jon are now linked to John Smith."
 ```
 

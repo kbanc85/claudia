@@ -277,22 +277,22 @@ When someone shares a transcript, email, document, or any substantive source mat
 
 | Source Type | When to File | How |
 |-------------|--------------|-----|
-| **Transcripts** | When user shares meeting notes or recordings | `memory.file` with source_type: "transcript" |
-| **Emails** | When user shares email content to act on | `memory.file` with source_type: "gmail" |
-| **Documents** | When user shares PDFs, contracts, proposals | `memory.file` with source_type: "upload" |
-| **Research** | When I gather information from web/docs | `memory.file` with source_type: "capture" |
+| **Transcripts** | When user shares meeting notes or recordings | `memory.document` (operation: "store") with source_type: "transcript" |
+| **Emails** | When user shares email content to act on | `memory.document` (operation: "store") with source_type: "gmail" |
+| **Documents** | When user shares PDFs, contracts, proposals | `memory.document` (operation: "store") with source_type: "upload" |
+| **Research** | When I gather information from web/docs | `memory.document` (operation: "store") with source_type: "capture" |
 
 ### The Filing Flow
 
 1. **Receive source material** (transcript, email, document)
-2. **File the raw content** using `memory.file` with:
+2. **File the raw content** using `memory.document` (operation: "store") with:
    - `content`: The full raw text
    - `filename`: Descriptive name (e.g., `2026-02-04-sarah-chen-kickoff.md`)
    - `source_type`: gmail, transcript, upload, or capture
    - `about`: Entity names mentioned
    - `summary`: One-line description
 3. **Extract memories** using `memory.remember` or `memory.batch`
-4. **Link provenance** by including `memory_ids` in the file call (or call `memory.file` again with the memory IDs to link them)
+4. **Link provenance** by including `memory_ids` in the file call (or call `memory.document` (operation: "store") again with the memory IDs to link them)
 
 ### Why This Matters
 

@@ -302,91 +302,6 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.entity",
-            title="Create or Update Entity",
-            description="Create or update information about an entity (person, organization, project, etc.)",
-            annotations=ToolAnnotations(destructiveHint=False),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Entity name",
-                    },
-                    "type": {
-                        "type": "string",
-                        "enum": ["person", "organization", "project", "concept", "location"],
-                        "description": "Type of entity",
-                        "default": "person",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Description of the entity",
-                    },
-                    "aliases": {
-                        "type": ["array", "string"],
-                        "items": {"type": "string"},
-                        "description": "Alternative names or spellings",
-                    },
-                },
-                "required": ["name"],
-            },
-        ),
-        Tool(
-            name="memory.search_entities",
-            title="Search Entities",
-            description="Search for entities (people, projects, organizations) by name or description.",
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query",
-                    },
-                    "types": {
-                        "type": ["array", "string"],
-                        "items": {"type": "string"},
-                        "description": "Filter by entity types",
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum results",
-                        "default": 10,
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-        Tool(
-            name="memory.buffer_turn",
-            title="Buffer Conversation Turn",
-            description="Buffer a conversation turn for end-of-session summarization. Call this after each meaningful exchange. Lightweight -- no embedding generation or extraction, just raw storage. Returns an episode_id to reuse on subsequent calls within the same session.",
-            annotations=ToolAnnotations(destructiveHint=False),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "user_content": {
-                        "type": "string",
-                        "description": "What the user said in this turn",
-                    },
-                    "assistant_content": {
-                        "type": "string",
-                        "description": "What the assistant said in this turn",
-                    },
-                    "episode_id": {
-                        "type": ["integer", "string"],
-                        "description": "Episode ID from a previous buffer_turn call (omit on first call to create new episode)",
-                    },
-                    "source": {
-                        "type": "string",
-                        "description": "Origin channel: 'claude_code', 'telegram', 'slack'. Tags the episode for inbox filtering.",
-                    },
-                },
-                "required": [],
-            },
-        ),
-        Tool(
             name="memory.end_session",
             title="End Session",
             description=(
@@ -558,21 +473,6 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.unsummarized",
-            title="List Unsummarized Sessions",
-            description=(
-                "Check for previous sessions that ended without a summary. "
-                "Call at session start. If results are returned, Claude should "
-                "review the buffered turns and generate a retroactive summary "
-                "by calling memory.end_session for each orphaned episode."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
             name="memory.reflections",
             title="Manage Reflections",
             description=(
@@ -732,65 +632,6 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.trace",
-            title="Trace Memory Provenance",
-            description=(
-                "Reconstruct full provenance for a memory. Returns the memory with all fields, "
-                "the source episode narrative and archived conversation turns (if applicable), "
-                "related entities, and a preview of any source material file saved on disk. "
-                "Zero cost until invoked -- use when asked 'where did that come from?'"
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "memory_id": {
-                        "type": ["integer", "string"],
-                        "description": "The memory ID to trace provenance for",
-                    },
-                },
-                "required": ["memory_id"],
-            },
-        ),
-        Tool(
-            name="memory.session_context",
-            title="Load Session Context",
-            description=(
-                "Load relevant context at session start. Call this FIRST at the beginning of every session "
-                "(after confirming context/me.md exists). Returns a pre-formatted context block with: "
-                "unsummarized sessions needing catch-up, recent memories (48h), active predictions, "
-                "active reflections (user preferences and learnings to apply silently), "
-                "active commitments, and recent episode narratives. If unsummarized sessions are "
-                "reported, generate retroactive summaries using memory.end_session."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "token_budget": {
-                        "type": "string",
-                        "enum": ["brief", "normal", "full"],
-                        "description": "How much context to load. brief=minimal, normal=standard, full=comprehensive",
-                        "default": "normal",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.morning_context",
-            title="Morning Digest",
-            description=(
-                "Curated morning digest: stale commitments, cooling relationships, "
-                "cross-entity connections, active predictions, and recent activity (72h). "
-                "Use this when generating the morning brief to get all relevant data in one call."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
             name="memory.briefing",
             title="Compact Briefing",
             description=(
@@ -803,249 +644,6 @@ async def list_tools() -> ListToolsResult:
             inputSchema={
                 "type": "object",
                 "properties": {},
-            },
-        ),
-        Tool(
-            name="memory.file",
-            title="Store Document",
-            description=(
-                "Store a document (transcript, email, file) with entity and memory links. "
-                "The file is saved to managed storage on disk and registered in the database "
-                "with provenance links. Deduplicates by file hash. Use this when the user "
-                "shares a document, transcript, or email that should be preserved."
-            ),
-            annotations=ToolAnnotations(destructiveHint=False),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "Raw text content of the document",
-                    },
-                    "filename": {
-                        "type": "string",
-                        "description": "Display filename (e.g., '2026-02-01-meeting-sarah.md')",
-                    },
-                    "source_type": {
-                        "type": "string",
-                        "enum": ["gmail", "transcript", "upload", "capture", "session"],
-                        "description": "Type of source document",
-                        "default": "capture",
-                    },
-                    "summary": {
-                        "type": "string",
-                        "description": "Brief summary of the document",
-                    },
-                    "about": {
-                        "type": ["array", "string"],
-                        "items": {"type": "string"},
-                        "description": "Entity names this document relates to",
-                    },
-                    "memory_ids": {
-                        "type": ["array", "string"],
-                        "items": {"type": "integer"},
-                        "description": "Memory IDs to link as sourced from this document",
-                    },
-                    "source_ref": {
-                        "type": "string",
-                        "description": "External reference (email ID, URL, etc.)",
-                    },
-                },
-                "required": ["content", "filename"],
-            },
-        ),
-        Tool(
-            name="memory.documents",
-            title="Search Documents",
-            description=(
-                "Search and list documents by entity, source type, or text query. "
-                "Use to find transcripts, emails, or files linked to a person or topic."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Text to search in filenames and summaries",
-                    },
-                    "entity": {
-                        "type": "string",
-                        "description": "Filter documents linked to this entity",
-                    },
-                    "source_type": {
-                        "type": "string",
-                        "enum": ["gmail", "transcript", "upload", "capture", "session"],
-                        "description": "Filter by document source type",
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum number of results",
-                        "default": 20,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.purge",
-            title="Delete File Permanently",
-            description=(
-                "Delete a document's file from disk while keeping its metadata as a tombstone. "
-                "Use when a user requests file deletion but you want to preserve the provenance record."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "document_id": {
-                        "type": ["integer", "string"],
-                        "description": "The document ID to purge",
-                    },
-                },
-                "required": ["document_id"],
-            },
-        ),
-        Tool(
-            name="memory.project_network",
-            title="Project Relationships",
-            description=(
-                "Get all people and organizations connected to a project. "
-                "Returns direct participants, organizations involved, and 1-hop extended network. "
-                "Use when asked 'who's involved in [project]?' or to understand project stakeholders."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "project": {
-                        "type": "string",
-                        "description": "Name of the project to analyze",
-                    },
-                },
-                "required": ["project"],
-            },
-        ),
-        Tool(
-            name="memory.find_path",
-            title="Find Relationship Path",
-            description=(
-                "Find connection path between two entities. "
-                "Returns the shortest chain of relationships connecting them, or null if unconnected. "
-                "Use when asked 'how is [A] connected to [B]?' or 'do [A] and [B] know each other?'"
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity_a": {
-                        "type": "string",
-                        "description": "Name of the first entity",
-                    },
-                    "entity_b": {
-                        "type": "string",
-                        "description": "Name of the second entity",
-                    },
-                    "max_depth": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum hops to search (default 4)",
-                        "default": 4,
-                    },
-                },
-                "required": ["entity_a", "entity_b"],
-            },
-        ),
-        Tool(
-            name="memory.network_hubs",
-            title="Find Network Hubs",
-            description=(
-                "Find most connected entities in the network. "
-                "Identifies 'hub' people or organizations with many relationships. "
-                "Use when asked 'who knows the most people?' or 'who are the key connectors?'"
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "min_connections": {
-                        "type": ["integer", "string"],
-                        "description": "Minimum relationships to be considered a hub (default 5)",
-                        "default": 5,
-                    },
-                    "entity_type": {
-                        "type": "string",
-                        "enum": ["person", "organization", "project"],
-                        "description": "Filter by entity type (optional)",
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum results to return (default 20)",
-                        "default": 20,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.dormant_relationships",
-            title="Find Dormant Relationships",
-            description=(
-                "Find relationships with no recent activity. "
-                "Identifies connections that may need attention because there hasn't been "
-                "any recent memory or interaction. Use for relationship health monitoring."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "days": {
-                        "type": ["integer", "string"],
-                        "description": "Days without activity to consider dormant (default 60)",
-                        "default": 60,
-                    },
-                    "min_strength": {
-                        "type": "number",
-                        "description": "Minimum relationship strength to include (default 0.3)",
-                        "default": 0.3,
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum results to return (default 20)",
-                        "default": 20,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.entity_overview",
-            title="Entity Overview",
-            description=(
-                "Generate a community-style overview of one or more entities. "
-                "Surfaces higher-level intelligence: entity summaries, relationship maps, "
-                "cross-entity patterns, open commitments, and clusters. Use for broad "
-                "questions like 'What's the status across all my stalled projects?' or "
-                "'Give me an overview of my key relationships.' Returns hierarchical "
-                "summaries when available (generated during overnight consolidation)."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entities": {
-                        "type": ["array", "string"],
-                        "items": {"type": "string"},
-                        "description": "Entity names to include in the overview",
-                    },
-                    "include_network": {
-                        "type": "boolean",
-                        "description": "Include 1-hop network connections (default true)",
-                        "default": True,
-                    },
-                    "include_summaries": {
-                        "type": "boolean",
-                        "description": "Include cached entity summaries (default true)",
-                        "default": True,
-                    },
-                },
-                "required": ["entities"],
             },
         ),
         Tool(
@@ -1082,175 +680,6 @@ async def list_tools() -> ListToolsResult:
                     },
                 },
                 "required": ["text"],
-            },
-        ),
-        Tool(
-            name="memory.merge_entities",
-            title="Merge Duplicate Entities",
-            description=(
-                "Merge two duplicate entities into one. All memories, relationships, "
-                "and reflections referencing the source entity will be moved to the target. "
-                "The source entity's name becomes an alias of the target. Use when "
-                "duplicates are found via find_duplicate_entities or user reports."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "source_id": {
-                        "type": ["integer", "string"],
-                        "description": "Entity ID to merge FROM (will be soft-deleted)",
-                    },
-                    "target_id": {
-                        "type": ["integer", "string"],
-                        "description": "Entity ID to merge INTO (will be kept)",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Optional reason for the merge (e.g., 'duplicate', 'same person')",
-                    },
-                },
-                "required": ["source_id", "target_id"],
-            },
-        ),
-        Tool(
-            name="memory.delete_entity",
-            title="Delete Entity",
-            description=(
-                "Soft-delete an entity. Sets deleted_at timestamp but preserves "
-                "all historical data (memories, relationships). Use when an entity "
-                "is no longer relevant or was created in error."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity_id": {
-                        "type": ["integer", "string"],
-                        "description": "Entity ID to delete",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Optional reason for deletion",
-                    },
-                },
-                "required": ["entity_id"],
-            },
-        ),
-        Tool(
-            name="memory.correct",
-            title="Correct a Memory",
-            description=(
-                "Correct a memory's content while preserving history. "
-                "Use when the user says 'that's not right', 'actually...', "
-                "or identifies incorrect information. The original content is "
-                "saved in corrected_from for audit trail."
-            ),
-            annotations=ToolAnnotations(destructiveHint=False),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "memory_id": {
-                        "type": ["integer", "string"],
-                        "description": "Memory ID to correct",
-                    },
-                    "correction": {
-                        "type": "string",
-                        "description": "The corrected content",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Optional reason for the correction",
-                    },
-                },
-                "required": ["memory_id", "correction"],
-            },
-        ),
-        Tool(
-            name="memory.invalidate",
-            title="Invalidate Memory",
-            description=(
-                "Mark a memory as no longer true (soft delete). "
-                "Use when facts become outdated, the user says to forget something, "
-                "or information was wrong. The memory is preserved for history "
-                "but excluded from future queries."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "memory_id": {
-                        "type": ["integer", "string"],
-                        "description": "Memory ID to invalidate",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Why this memory is no longer valid",
-                    },
-                },
-                "required": ["memory_id"],
-            },
-        ),
-        Tool(
-            name="memory.invalidate_relationship",
-            title="Invalidate Relationship",
-            description=(
-                "Mark a relationship as incorrect or ended without creating a replacement. "
-                "Use when the user says a relationship is wrong, or when someone leaves a "
-                "company, ends a partnership, etc. The relationship is preserved for history "
-                "but excluded from active queries."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "source": {
-                        "type": "string",
-                        "description": "Source entity name",
-                    },
-                    "target": {
-                        "type": "string",
-                        "description": "Target entity name",
-                    },
-                    "relationship": {
-                        "type": "string",
-                        "description": "Relationship type to invalidate (works_with, manages, etc.)",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Why this relationship is being invalidated",
-                    },
-                },
-                "required": ["source", "target", "relationship"],
-            },
-        ),
-        Tool(
-            name="memory.audit_history",
-            title="Audit Provenance Trail",
-            description=(
-                "Get the full audit trail for an entity or memory. "
-                "Use when the user asks 'where did you learn that?' or wants to trace "
-                "the provenance of information. Shows all operations (creates, merges, "
-                "corrections, deletions) with timestamps."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity_id": {
-                        "type": ["integer", "string"],
-                        "description": "Entity ID to get audit history for",
-                    },
-                    "memory_id": {
-                        "type": ["integer", "string"],
-                        "description": "Memory ID to get audit history for",
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum number of entries (default 20)",
-                        "default": 20,
-                    },
-                },
             },
         ),
         Tool(
@@ -1294,179 +723,6 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.sync_vault",
-            title="Sync to Obsidian Vault",
-            description=(
-                "Sync memory data to the Obsidian vault. Exports entities, relationships, "
-                "patterns, reflections, and sessions as markdown notes with [[wikilinks]]. "
-                "Use 'full' mode for a complete rebuild or default incremental mode for "
-                "changes since last sync."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "full": {
-                        "type": "boolean",
-                        "description": "If true, do a full rebuild. Otherwise incremental (default).",
-                        "default": False,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.vault_status",
-            title="Vault Sync Status",
-            description=(
-                "Get the status of the Obsidian vault sync: last sync time, file counts, "
-                "and vault path. Use this to check if the vault is up to date."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
-            name="memory.generate_canvas",
-            title="Generate Canvas Dashboard",
-            description=(
-                "Generate an Obsidian canvas file. Types: 'relationship_map' (entity graph), "
-                "'morning_brief' (daily dashboard), 'project_board' (project-specific view, "
-                "requires project_name), 'all' (generate all standard canvases)."
-            ),
-            annotations=ToolAnnotations(destructiveHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "canvas_type": {
-                        "type": "string",
-                        "enum": ["relationship_map", "morning_brief", "project_board", "all"],
-                        "description": "Type of canvas to generate",
-                    },
-                    "project_name": {
-                        "type": "string",
-                        "description": "Project name (required for project_board type)",
-                    },
-                },
-                "required": ["canvas_type"],
-            },
-        ),
-        Tool(
-            name="memory.import_vault_edits",
-            title="Import Vault Edits",
-            description=(
-                "Scan the Obsidian vault for notes that the user has edited and import "
-                "changes back into Claudia's memory. Human edits always win (applied with "
-                "origin_type='user_stated', confidence=1.0). Detects: description changes, "
-                "new facts, commitment completions (checkbox changes)."
-            ),
-            annotations=ToolAnnotations(destructiveHint=False),
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
-            name="memory.reconnections",
-            title="Reconnection Suggestions",
-            description=(
-                "Get reconnection suggestions for contacts trending toward dormancy. "
-                "Each suggestion includes: person name, days since contact, trend, "
-                "last topic, open commitments, and a suggested action. "
-                "Use in morning briefs and relationship health checks."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum suggestions to return",
-                        "default": 10,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.upcoming",
-            title="Upcoming Deadlines",
-            description=(
-                "Get upcoming deadlines from committed tasks. Returns memories with deadlines "
-                "grouped by urgency: overdue, today, tomorrow, this_week, later. "
-                "Essential for morning briefs and accountability checks."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "days": {
-                        "type": ["integer", "string"],
-                        "description": "Look ahead window in days",
-                        "default": 14,
-                    },
-                    "include_overdue": {
-                        "type": "boolean",
-                        "description": "Include overdue items (past deadline)",
-                        "default": True,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="memory.since",
-            title="Recent Changes",
-            description=(
-                "Get memories created or updated since a specific time. "
-                "Use for 'what's new since last session' or tracking changes over a period."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "since": {
-                        "type": "string",
-                        "description": "ISO datetime string (e.g., '2026-02-10T00:00:00')",
-                    },
-                    "entity": {
-                        "type": "string",
-                        "description": "Optional: filter to memories about a specific entity",
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum results",
-                        "default": 50,
-                    },
-                },
-                "required": ["since"],
-            },
-        ),
-        Tool(
-            name="memory.timeline",
-            title="Entity Timeline",
-            description=(
-                "Temporal view of an entity: all memories sorted chronologically "
-                "with deadlines highlighted. Shows the full history of interactions "
-                "and commitments related to a person, project, or organization."
-            ),
-            annotations=ToolAnnotations(readOnlyHint=True),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "description": "Name of the entity to view timeline for",
-                    },
-                    "limit": {
-                        "type": ["integer", "string"],
-                        "description": "Maximum results",
-                        "default": 50,
-                    },
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
             name="memory.project_health",
             title="Project Health Check",
             description=(
@@ -1492,6 +748,426 @@ async def list_tools() -> ListToolsResult:
                 "required": ["entity"],
             },
         ),
+        # ── Merged tools (8 composite tools with operation parameter) ──
+        Tool(
+            name="memory.temporal",
+            title="Temporal Queries",
+            description=(
+                "Time-based memory queries: upcoming deadlines, recent changes, entity timelines, "
+                "and curated morning digests. Use operation='upcoming' for deadlines, 'since' for "
+                "recent changes, 'timeline' for entity history, 'morning' for the full morning digest."
+            ),
+            annotations=ToolAnnotations(readOnlyHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["upcoming", "since", "timeline", "morning"],
+                        "description": "Which temporal query to run",
+                    },
+                    "days": {
+                        "type": ["integer", "string"],
+                        "description": "Look ahead window in days (for upcoming, default 14)",
+                        "default": 14,
+                    },
+                    "include_overdue": {
+                        "type": "boolean",
+                        "description": "Include overdue items (for upcoming, default true)",
+                        "default": True,
+                    },
+                    "since": {
+                        "type": "string",
+                        "description": "ISO datetime string (for since operation)",
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Entity name (for timeline, or optional filter for since)",
+                    },
+                    "limit": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum results",
+                        "default": 50,
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.graph",
+            title="Relationship Graph",
+            description=(
+                "Explore the entity relationship graph: project networks, connection paths, "
+                "hub entities, dormant relationships, and reconnection suggestions. "
+                "Use operation='network' for project stakeholders, 'path' for connection chains, "
+                "'hubs' for key connectors, 'dormant' for neglected relationships, "
+                "'reconnect' for actionable reconnection suggestions."
+            ),
+            annotations=ToolAnnotations(readOnlyHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["network", "path", "hubs", "dormant", "reconnect"],
+                        "description": "Which graph query to run",
+                    },
+                    "project": {
+                        "type": "string",
+                        "description": "Project name (for network operation)",
+                    },
+                    "entity_a": {
+                        "type": "string",
+                        "description": "First entity (for path operation)",
+                    },
+                    "entity_b": {
+                        "type": "string",
+                        "description": "Second entity (for path operation)",
+                    },
+                    "max_depth": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum hops to search (for path, default 4)",
+                        "default": 4,
+                    },
+                    "min_connections": {
+                        "type": ["integer", "string"],
+                        "description": "Minimum relationships to be a hub (for hubs, default 5)",
+                        "default": 5,
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "enum": ["person", "organization", "project"],
+                        "description": "Filter by entity type (for hubs)",
+                    },
+                    "days": {
+                        "type": ["integer", "string"],
+                        "description": "Days without activity (for dormant, default 60)",
+                        "default": 60,
+                    },
+                    "min_strength": {
+                        "type": "number",
+                        "description": "Minimum relationship strength (for dormant, default 0.3)",
+                        "default": 0.3,
+                    },
+                    "limit": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum results to return",
+                        "default": 20,
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.entities",
+            title="Entity Management",
+            description=(
+                "Create, search, merge, delete, or overview entities (people, projects, orgs). "
+                "Use operation='create' to add/update, 'search' to find, 'merge' to deduplicate, "
+                "'delete' to soft-delete, 'overview' for community-style summaries with relationship maps."
+            ),
+            annotations=ToolAnnotations(destructiveHint=False),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["create", "search", "merge", "delete", "overview"],
+                        "description": "Which entity operation to perform",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Entity name (for create)",
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["person", "organization", "project", "concept", "location"],
+                        "description": "Entity type (for create, default person)",
+                        "default": "person",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Entity description (for create)",
+                    },
+                    "aliases": {
+                        "type": ["array", "string"],
+                        "items": {"type": "string"},
+                        "description": "Alternative names (for create)",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (for search)",
+                    },
+                    "types": {
+                        "type": ["array", "string"],
+                        "items": {"type": "string"},
+                        "description": "Filter by entity types (for search)",
+                    },
+                    "source_id": {
+                        "type": ["integer", "string"],
+                        "description": "Entity ID to merge FROM (for merge)",
+                    },
+                    "target_id": {
+                        "type": ["integer", "string"],
+                        "description": "Entity ID to merge INTO (for merge)",
+                    },
+                    "entity_id": {
+                        "type": ["integer", "string"],
+                        "description": "Entity ID (for delete)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for merge or delete",
+                    },
+                    "entities": {
+                        "type": ["array", "string"],
+                        "items": {"type": "string"},
+                        "description": "Entity names for overview",
+                    },
+                    "include_network": {
+                        "type": "boolean",
+                        "description": "Include 1-hop connections in overview (default true)",
+                        "default": True,
+                    },
+                    "include_summaries": {
+                        "type": "boolean",
+                        "description": "Include cached summaries in overview (default true)",
+                        "default": True,
+                    },
+                    "limit": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum results (for search, default 10)",
+                        "default": 10,
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.vault",
+            title="Obsidian Vault",
+            description=(
+                "Manage the Obsidian vault integration: sync memory to vault, check status, "
+                "generate canvas dashboards, or import user edits back. "
+                "Use operation='sync' to export, 'status' to check, 'canvas' to generate dashboards, "
+                "'import' to pull in user edits from the vault."
+            ),
+            annotations=ToolAnnotations(destructiveHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["sync", "status", "canvas", "import"],
+                        "description": "Which vault operation to perform",
+                    },
+                    "full": {
+                        "type": "boolean",
+                        "description": "Full rebuild for sync (default false = incremental)",
+                        "default": False,
+                    },
+                    "canvas_type": {
+                        "type": "string",
+                        "enum": ["relationship_map", "morning_brief", "project_board", "all"],
+                        "description": "Type of canvas to generate (for canvas operation)",
+                    },
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name (for canvas project_board type)",
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.modify",
+            title="Modify Memories & Relationships",
+            description=(
+                "Correct, invalidate, or end relationships. "
+                "Use operation='correct' to fix a memory's content (preserves history), "
+                "'invalidate' to mark a memory as no longer true, "
+                "'invalidate_relationship' to end a relationship between entities."
+            ),
+            annotations=ToolAnnotations(destructiveHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["correct", "invalidate", "invalidate_relationship"],
+                        "description": "Which modification to perform",
+                    },
+                    "memory_id": {
+                        "type": ["integer", "string"],
+                        "description": "Memory ID (for correct, invalidate)",
+                    },
+                    "correction": {
+                        "type": "string",
+                        "description": "Corrected content (for correct)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for the change",
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source entity name (for invalidate_relationship)",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Target entity name (for invalidate_relationship)",
+                    },
+                    "relationship": {
+                        "type": "string",
+                        "description": "Relationship type (for invalidate_relationship)",
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.session",
+            title="Session Lifecycle",
+            description=(
+                "Session management: buffer turns, load context, or check unsummarized sessions. "
+                "Use operation='buffer' to record a conversation turn, 'context' to load session "
+                "start context, 'unsummarized' to find orphaned sessions needing retroactive summaries."
+            ),
+            annotations=ToolAnnotations(destructiveHint=False),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["buffer", "context", "unsummarized"],
+                        "description": "Which session operation to perform",
+                    },
+                    "user_content": {
+                        "type": "string",
+                        "description": "What the user said (for buffer)",
+                    },
+                    "assistant_content": {
+                        "type": "string",
+                        "description": "What the assistant said (for buffer)",
+                    },
+                    "episode_id": {
+                        "type": ["integer", "string"],
+                        "description": "Episode ID from previous buffer call (for buffer)",
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Origin channel (for buffer): claude_code, telegram, slack",
+                    },
+                    "token_budget": {
+                        "type": "string",
+                        "enum": ["brief", "normal", "full"],
+                        "description": "How much context to load (for context, default normal)",
+                        "default": "normal",
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.document",
+            title="Document Storage",
+            description=(
+                "Store or search documents (transcripts, emails, files). "
+                "Use operation='store' to save a document with entity links and provenance, "
+                "'search' to find documents by entity, source type, or text query."
+            ),
+            annotations=ToolAnnotations(destructiveHint=False),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["store", "search"],
+                        "description": "Which document operation to perform",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Raw text content (for store)",
+                    },
+                    "filename": {
+                        "type": "string",
+                        "description": "Display filename (for store)",
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["gmail", "transcript", "upload", "capture", "session"],
+                        "description": "Document source type",
+                        "default": "capture",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief summary (for store)",
+                    },
+                    "about": {
+                        "type": ["array", "string"],
+                        "items": {"type": "string"},
+                        "description": "Entity names this document relates to",
+                    },
+                    "memory_ids": {
+                        "type": ["array", "string"],
+                        "items": {"type": "integer"},
+                        "description": "Memory IDs to link (for store)",
+                    },
+                    "source_ref": {
+                        "type": "string",
+                        "description": "External reference (for store)",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Search text (for search)",
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Filter by entity (for search)",
+                    },
+                    "limit": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum results (for search, default 20)",
+                        "default": 20,
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.provenance",
+            title="Provenance & Audit",
+            description=(
+                "Trace memory origins or get full audit trails. "
+                "Use operation='trace' to reconstruct a memory's full provenance chain, "
+                "'audit' to get the audit history for an entity or memory."
+            ),
+            annotations=ToolAnnotations(readOnlyHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["trace", "audit"],
+                        "description": "Which provenance operation to perform",
+                    },
+                    "memory_id": {
+                        "type": ["integer", "string"],
+                        "description": "Memory ID (for trace, or audit by memory)",
+                    },
+                    "entity_id": {
+                        "type": ["integer", "string"],
+                        "description": "Entity ID (for audit by entity)",
+                    },
+                    "limit": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum audit entries (default 20)",
+                        "default": 20,
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
     ]
     return ListToolsResult(tools=tools)
 
@@ -1502,7 +1178,466 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
     db = get_db()
     try:
         with db.transaction():
-            if name == "memory.remember":
+            # ── Merged tool dispatchers (route to existing handlers) ──
+
+            if name == "memory.temporal":
+                op = arguments.get("operation", "upcoming")
+                if op == "upcoming":
+                    _coerce_int(arguments, "days")
+                    days = arguments.get("days", 14)
+                    include_overdue = arguments.get("include_overdue", True)
+                    results = recall_upcoming_deadlines(days, include_overdue=include_overdue)
+                    grouped = {"overdue": [], "today": [], "tomorrow": [], "this_week": [], "later": []}
+                    for r in results:
+                        urgency = (r.metadata or {}).get("urgency", "later")
+                        deadline = (r.metadata or {}).get("deadline_at", "")
+                        grouped.setdefault(urgency, []).append({
+                            "id": r.id, "content": r.content, "deadline_at": deadline,
+                            "importance": r.importance, "entities": r.entities[:3],
+                        })
+                    grouped = {k: v for k, v in grouped.items() if v}
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(grouped, indent=2))]
+                    )
+                elif op == "since":
+                    _coerce_int(arguments, "limit")
+                    since_val = arguments.get("since", "")
+                    if not since_val:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "'since' is required for operation='since'"}))],
+                            isError=True,
+                        )
+                    entity = arguments.get("entity")
+                    limit = arguments.get("limit", 50)
+                    results = recall_since(since_val, entity_name=entity, limit=limit)
+                    formatted = [{
+                        "id": r.id, "content": r.content, "type": r.memory_type,
+                        "created_at": r.created_at, "importance": r.importance,
+                        "entities": r.entities[:3],
+                    } for r in results]
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
+                    )
+                elif op == "timeline":
+                    _coerce_int(arguments, "limit")
+                    entity = arguments.get("entity", "")
+                    if not entity:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "'entity' is required for operation='timeline'"}))],
+                            isError=True,
+                        )
+                    limit = arguments.get("limit", 50)
+                    results = recall_timeline(entity, limit=limit)
+                    formatted = [{
+                        "id": r.id, "content": r.content, "type": r.memory_type,
+                        "created_at": r.created_at, "importance": r.importance,
+                        "deadline_at": (r.metadata or {}).get("deadline_at"),
+                        "has_deadline": (r.metadata or {}).get("has_deadline", False),
+                    } for r in results]
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(formatted, indent=2))]
+                    )
+                elif op == "morning":
+                    morning_text = _build_morning_context()
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=morning_text)]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown temporal operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.graph":
+                op = arguments.get("operation", "network")
+                if op == "network":
+                    project = arguments.get("project", "")
+                    if not project:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "'project' is required for operation='network'"}))],
+                            isError=True,
+                        )
+                    result = get_project_network(project_name=project)
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result, default=str))]
+                    )
+                elif op == "path":
+                    _coerce_int(arguments, "max_depth")
+                    entity_a = arguments.get("entity_a", "")
+                    entity_b = arguments.get("entity_b", "")
+                    if not entity_a or not entity_b:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "'entity_a' and 'entity_b' required for operation='path'"}))],
+                            isError=True,
+                        )
+                    result = find_path(
+                        entity_a=entity_a, entity_b=entity_b,
+                        max_depth=arguments.get("max_depth", 4),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"path": result, "connected": result is not None}))]
+                    )
+                elif op == "hubs":
+                    _coerce_int(arguments, "min_connections")
+                    _coerce_int(arguments, "limit")
+                    result = get_hub_entities(
+                        min_connections=arguments.get("min_connections", 5),
+                        entity_type=arguments.get("entity_type"),
+                        limit=arguments.get("limit", 20),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"hubs": result, "count": len(result)}))]
+                    )
+                elif op == "dormant":
+                    _coerce_int(arguments, "days")
+                    _coerce_int(arguments, "limit")
+                    result = get_dormant_relationships(
+                        days=arguments.get("days", 60),
+                        min_strength=arguments.get("min_strength", 0.3),
+                        limit=arguments.get("limit", 20),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"dormant": result, "count": len(result)}))]
+                    )
+                elif op == "reconnect":
+                    _coerce_int(arguments, "limit")
+                    limit = arguments.get("limit", 10)
+                    now_str = datetime.utcnow().isoformat()
+                    rows = get_db().execute(
+                        """
+                        SELECT content, priority, metadata
+                        FROM predictions
+                        WHERE prediction_type = 'reconnection'
+                          AND expires_at > ?
+                        ORDER BY priority DESC
+                        LIMIT ?
+                        """,
+                        (now_str, limit),
+                        fetch=True,
+                    ) or []
+                    suggestions = []
+                    for row in rows:
+                        meta = {}
+                        try:
+                            meta = json.loads(row["metadata"]) if row["metadata"] else {}
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                        suggestions.append({
+                            "person": meta.get("entity_name", "Unknown"),
+                            "days_since_contact": meta.get("days_since_contact", 0),
+                            "trend": meta.get("trend", "unknown"),
+                            "last_topic": meta.get("last_topic", ""),
+                            "open_commitments": meta.get("open_commitments", []),
+                            "suggestion": row["content"],
+                            "priority": row["priority"],
+                        })
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(suggestions, indent=2))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown graph operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.entities":
+                op = arguments.get("operation", "search")
+                if op == "create":
+                    _coerce_arg(arguments, "aliases")
+                    name_val = arguments.get("name", "")
+                    if not name_val:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "'name' required for operation='create'"}))],
+                            isError=True,
+                        )
+                    entity_id = remember_entity(
+                        name=name_val,
+                        entity_type=arguments.get("type", "person"),
+                        description=arguments.get("description"),
+                        aliases=arguments.get("aliases"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"success": True, "entity_id": entity_id}))]
+                    )
+                elif op == "search":
+                    _coerce_int(arguments, "limit")
+                    _coerce_arg(arguments, "types")
+                    query = arguments.get("query", "")
+                    if not query:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "'query' required for operation='search'"}))],
+                            isError=True,
+                        )
+                    results = search_entities(
+                        query=query,
+                        entity_types=arguments.get("types"),
+                        limit=arguments.get("limit", 10),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({
+                            "entities": [{
+                                "id": e.id, "name": e.name, "type": e.type,
+                                "description": e.description, "importance": e.importance,
+                                "memory_count": e.memory_count, "relationship_count": e.relationship_count,
+                            } for e in results]
+                        }))]
+                    )
+                elif op == "merge":
+                    _coerce_int(arguments, "source_id")
+                    _coerce_int(arguments, "target_id")
+                    result = merge_entities(
+                        source_id=arguments["source_id"],
+                        target_id=arguments["target_id"],
+                        reason=arguments.get("reason"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "delete":
+                    _coerce_int(arguments, "entity_id")
+                    result = delete_entity(
+                        entity_id=arguments["entity_id"],
+                        reason=arguments.get("reason"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "overview":
+                    _coerce_arg(arguments, "entities", list)
+                    entities_arg = arguments.get("entities", [])
+                    if isinstance(entities_arg, str):
+                        entities_arg = [entities_arg]
+                    result = entity_overview(
+                        entity_names=entities_arg,
+                        include_network=arguments.get("include_network", True),
+                        include_summaries=arguments.get("include_summaries", True),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown entities operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.vault":
+                op = arguments.get("operation", "status")
+                if op == "sync":
+                    from ..config import _project_id
+                    from ..services.vault_sync import run_vault_sync
+                    full = arguments.get("full", False)
+                    result = run_vault_sync(project_id=_project_id, full=full)
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"success": True, **result}))]
+                    )
+                elif op == "status":
+                    from ..config import _project_id
+                    from ..services.vault_sync import get_vault_sync_service
+                    svc = get_vault_sync_service(_project_id)
+                    status = svc.get_status()
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(status, indent=2))]
+                    )
+                elif op == "canvas":
+                    from ..config import _project_id
+                    from ..services.vault_sync import get_vault_path
+                    from ..services.canvas_generator import CanvasGenerator
+                    vault_path = get_vault_path(_project_id)
+                    gen = CanvasGenerator(vault_path)
+                    canvas_type = arguments.get("canvas_type", "all")
+                    if canvas_type == "all":
+                        result = gen.generate_all()
+                    elif canvas_type == "relationship_map":
+                        path = gen.generate_relationship_map()
+                        result = {"relationship_map": {"path": str(path), "status": "ok"}}
+                    elif canvas_type == "morning_brief":
+                        path = gen.generate_morning_brief()
+                        result = {"morning_brief": {"path": str(path), "status": "ok"}}
+                    elif canvas_type == "project_board":
+                        project_name = arguments.get("project_name")
+                        if not project_name:
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=json.dumps(
+                                    {"error": "project_name is required for project_board"}
+                                ))],
+                                isError=True,
+                            )
+                        path = gen.generate_project_board(project_name)
+                        if path:
+                            result = {"project_board": {"path": str(path), "status": "ok"}}
+                        else:
+                            result = {"project_board": {"status": "not_found", "error": f"Project '{project_name}' not found"}}
+                    else:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps(
+                                {"error": f"Unknown canvas type: {canvas_type}"}
+                            ))],
+                            isError=True,
+                        )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                    )
+                elif op == "import":
+                    from ..config import _project_id
+                    from ..services.vault_sync import get_vault_sync_service
+                    vault_svc = get_vault_sync_service(_project_id)
+                    result = vault_svc.import_all_edits()
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown vault operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.modify":
+                op = arguments.get("operation", "correct")
+                if op == "correct":
+                    _coerce_int(arguments, "memory_id")
+                    result = correct_memory(
+                        memory_id=arguments["memory_id"],
+                        correction=arguments["correction"],
+                        reason=arguments.get("reason"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "invalidate":
+                    _coerce_int(arguments, "memory_id")
+                    result = invalidate_memory(
+                        memory_id=arguments["memory_id"],
+                        reason=arguments.get("reason"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "invalidate_relationship":
+                    result = invalidate_relationship(
+                        source=arguments["source"],
+                        target=arguments["target"],
+                        relationship=arguments["relationship"],
+                        reason=arguments.get("reason"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown modify operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.session":
+                op = arguments.get("operation", "context")
+                if op == "buffer":
+                    _coerce_int(arguments, "episode_id")
+                    result = buffer_turn(
+                        user_content=arguments.get("user_content"),
+                        assistant_content=arguments.get("assistant_content"),
+                        episode_id=arguments.get("episode_id"),
+                        source=arguments.get("source"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "context":
+                    budget = arguments.get("token_budget", "normal")
+                    context_text = _build_session_context(budget)
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=context_text)]
+                    )
+                elif op == "unsummarized":
+                    results = get_unsummarized_turns()
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({
+                            "unsummarized_sessions": results,
+                            "count": len(results),
+                        }))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown session operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.document":
+                op = arguments.get("operation", "search")
+                if op == "store":
+                    _coerce_arg(arguments, "about")
+                    _coerce_arg(arguments, "memory_ids")
+                    doc_svc = get_document_service()
+                    result = doc_svc.file_document_from_text(
+                        content=arguments["content"],
+                        filename=arguments["filename"],
+                        source_type=arguments.get("source_type", "capture"),
+                        summary=arguments.get("summary"),
+                        about_entities=arguments.get("about"),
+                        memory_ids=arguments.get("memory_ids"),
+                        source_ref=arguments.get("source_ref"),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "search":
+                    _coerce_int(arguments, "limit")
+                    doc_svc = get_document_service()
+                    results = doc_svc.search_documents(
+                        query=arguments.get("query"),
+                        source_type=arguments.get("source_type"),
+                        entity_name=arguments.get("entity"),
+                        limit=arguments.get("limit", 20),
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"documents": results, "count": len(results)}))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown document operation: {op}"}))],
+                        isError=True,
+                    )
+
+            elif name == "memory.provenance":
+                op = arguments.get("operation", "trace")
+                if op == "trace":
+                    _coerce_int(arguments, "memory_id")
+                    result = trace_memory(memory_id=arguments["memory_id"])
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps(result))]
+                    )
+                elif op == "audit":
+                    _coerce_int(arguments, "entity_id")
+                    _coerce_int(arguments, "memory_id")
+                    _coerce_int(arguments, "limit")
+                    entity_id = arguments.get("entity_id")
+                    memory_id = arguments.get("memory_id")
+                    limit = arguments.get("limit", 20)
+                    if entity_id:
+                        history = get_entity_audit_history(entity_id)
+                    elif memory_id:
+                        history = get_memory_audit_history(memory_id)
+                    else:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=json.dumps({"error": "Either entity_id or memory_id is required"}))],
+                            isError=True,
+                        )
+                    history = history[:limit]
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({
+                            "entity_id": entity_id, "memory_id": memory_id,
+                            "history": history, "count": len(history),
+                        }))]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=json.dumps({"error": f"Unknown provenance operation: {op}"}))],
+                        isError=True,
+                    )
+
+            # ── Standalone + backward-compatible alias handlers ──
+
+            elif name == "memory.remember":
                 _coerce_arg(arguments, "about")
                 memory_id = remember_fact(
                     content=arguments["content"],

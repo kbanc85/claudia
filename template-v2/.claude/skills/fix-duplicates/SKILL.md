@@ -19,10 +19,10 @@ Find and merge duplicate entities in the memory system. Duplicates happen when t
 
 ### Step 1: Find Potential Duplicates
 
-Search for entities with similar names using `memory.search_entities`:
+Search for entities with similar names using `memory.entities`:
 
 ```
-memory.search_entities(query="*", limit=100)
+memory.entities(operation: "search", query="*", limit=100)
 ```
 
 Then compare names using these heuristics:
@@ -56,10 +56,10 @@ Which would you like to merge? (e.g., "merge 1" or "merge all people")
 
 ### Step 3: Execute Merge
 
-When user confirms, call `memory.merge_entities`:
+When user confirms, call `memory.entities` to merge:
 
 ```
-memory.merge_entities(source_id=87, target_id=42, reason="Duplicate detected - same person with name variant")
+memory.entities(operation: "merge", source_id=87, target_id=42, reason="Duplicate detected - same person with name variant")
 ```
 
 **Important:** Always merge the entity with fewer memories INTO the one with more memories. The target entity keeps its name and attributes; the source's name becomes an alias.

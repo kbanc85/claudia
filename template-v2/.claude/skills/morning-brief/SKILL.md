@@ -13,7 +13,7 @@ Provide a concise morning brief to start the day with clarity. Surface what matt
 
 ### Enhanced Memory System (if available)
 
-1. **Call `memory.morning_context`** to get a curated morning digest in a single call:
+1. **Call `memory.temporal`** (operation: "morning") to get a curated morning digest in a single call:
    - Stale commitments (3+ days old, importance > 0.3)
    - Cooling relationships (people not contacted in 30+ days)
    - Cross-entity connections (people who co-appear but have no explicit relationship)
@@ -30,14 +30,14 @@ Use `context/commitments.md`, `context/waiting.md`, and `people/` files.
 
 ## Temporal Awareness
 
-When enhanced memory is available, use urgency-driven ordering. Call `memory.upcoming` and `memory.since` to organize the brief by time sensitivity:
+When enhanced memory is available, use urgency-driven ordering. Call `memory.temporal` to organize the brief by time sensitivity:
 
 ### Urgency Tiers (in order)
 
-1. **Urgent** (`memory.upcoming` with days=2): Overdue commitments + due today + due tomorrow. These lead the brief.
-2. **This Week** (`memory.upcoming` with days=7): Remaining commitments due this week.
-3. **Since Last Session** (`memory.since`): New memories, entities, and changes since the last conversation.
-4. **Reconnections** (`memory.reconnections`): People trending toward dormancy who need attention, with context (last topic, open commitments).
+1. **Urgent** (`memory.temporal` with operation: "upcoming", days=2): Overdue commitments + due today + due tomorrow. These lead the brief.
+2. **This Week** (`memory.temporal` with operation: "upcoming", days=7): Remaining commitments due this week.
+3. **Since Last Session** (`memory.temporal` with operation: "since"): New memories, entities, and changes since the last conversation.
+4. **Reconnections** (`memory.graph` with operation: "reconnect"): People trending toward dormancy who need attention, with context (last topic, open commitments).
 5. **Cooling Relationships**: From pattern detection (existing behavior).
 6. **Reflections**: Active high-importance reflections from `/meditate`.
 
@@ -49,7 +49,7 @@ The brief should be urgency-driven, not category-driven. The old approach said "
 
 ### 1. Predictions First (Enhanced Memory)
 
-If `memory.session_context` returns predictions, lead with them:
+If `memory.session` (operation: "context") returns predictions, lead with them:
 - **Relationship alerts** - "Sarah: no contact in 45 days"
 - **Commitment warnings** - "Proposal deadline was yesterday"
 - **Pattern insights** - "You've mentioned being stretched thin 3 times this week"
@@ -71,7 +71,7 @@ From `memory.recall` or `context/commitments.md`:
 
 ### 4. Relationship Health Dashboard
 
-From `memory.morning_context` relationship health section:
+From `memory.temporal` (morning) relationship health section:
 
 **Dormant relationships by severity:**
 - **30+ days**: Consider reaching out (still warm)

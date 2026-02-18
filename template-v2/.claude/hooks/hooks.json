@@ -15,11 +15,11 @@
         "on_missing_me": "trigger_onboarding",
         "memory_verification": {
           "step_1_check_tools": "BEFORE anything else, verify you have access to memory.* MCP tools. If no memory tools are available, inform the user: 'Memory daemon not connected. Run the /diagnose command or check ~/.claudia/daemon-stderr.log for errors.'",
-          "step_2_health_check": "Call memory.session_context. If it fails or returns an error, the daemon may be crashed. Suggest: 'Memory daemon may need restart. Check: curl http://localhost:3848/health'",
+          "step_2_health_check": "Call memory.session (operation=\"context\"). If it fails or returns an error, the daemon may be crashed. Suggest: 'Memory daemon may need restart. Check: curl http://localhost:3848/health'",
           "fallback": "If memory tools unavailable, proceed with markdown-only mode but WARN the user that memories won't persist."
         },
         "enhanced_memory": {
-          "context_load": "Call memory.session_context to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
+          "context_load": "Call memory.session (operation=\"context\") to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
           "catch_up": "If unsummarized sessions are reported in the context block, review buffered turns and call memory.end_session with a retroactive narrative and structured extractions for each.",
           "recall_context": "Use the loaded context for greeting. For deeper search on specific topics, use memory.recall."
         },
@@ -35,7 +35,7 @@
             {
               "type": "cooling_relationships",
               "description": "Important people not mentioned in >30 days",
-              "query_hint": "Use memory.search_entities to find entities with old last_mentioned dates"
+              "query_hint": "Use memory.entities (operation=\"search\") to find entities with old last_mentioned dates"
             }
           ],
           "examples": [
@@ -75,10 +75,10 @@
   "notes": {
     "implementation": "These hooks define intended behaviors. Claude Code will execute them as behavioral guidelines rather than traditional script execution.",
     "memory_verification": "CRITICAL: At session start, verify memory tools are available BEFORE proceeding. If memory.* tools don't appear in available tools, the daemon isn't connected. This is a hard requirement for full Claudia functionality.",
-    "session_start": "At session start: (1) Verify memory tools available, (2) Call memory.session_context, (3) Read context files, (4) Check for unsummarized sessions. If me.md is missing, trigger onboarding.",
+    "session_start": "At session start: (1) Verify memory tools available, (2) Call memory.session (operation=\"context\"), (3) Read context files, (4) Check for unsummarized sessions. If me.md is missing, trigger onboarding.",
     "session_end": "Before session ends, Claudia should generate a session summary (enhanced memory) or update context files (markdown fallback). The summary includes both a free-form narrative and structured extractions.",
     "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding.",
-    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via memory.buffer_turn. This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start.",
-    "source_filing": "CRITICAL: When processing transcripts, emails, or documents, ALWAYS call memory.file BEFORE extracting information. The Source Preservation principle (#12) is non-negotiable. Raw sources must be filed for provenance."
+    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via memory.session (operation=\"buffer\"). This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start.",
+    "source_filing": "CRITICAL: When processing transcripts, emails, or documents, ALWAYS call memory.document (operation=\"store\") BEFORE extracting information. The Source Preservation principle (#12) is non-negotiable. Raw sources must be filed for provenance."
   }
 }

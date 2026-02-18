@@ -84,7 +84,7 @@ Co-mentioned or contextually implied:
 
 Before creating entities:
 1. Normalize names to canonical form (lowercase, no titles)
-2. Check if entity already exists in memory via `memory.search_entities`
+2. Check if entity already exists in memory via `memory.entities` (operation="search")
 3. Merge new information with existing entity data
 4. Track which entities are new vs updated
 

@@ -19,10 +19,10 @@ Provide a dashboard view of the memory system's health, including entity counts,
 
 ### Step 1: Gather Statistics
 
-Use `memory.session_context` to get current system state:
+Use `memory.session` to get current system state:
 
 ```
-memory.session_context(scope="full")
+memory.session(operation="context", scope="full")
 ```
 
 This returns entity counts, memory counts, relationship counts, and predictions.

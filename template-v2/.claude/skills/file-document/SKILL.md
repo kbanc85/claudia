@@ -48,7 +48,7 @@ Determine:
 ### 3. File It
 
 ```
-Call memory.file with:
+Call memory.document with operation="store":
 ├── content: The FULL raw text (never summarize)
 ├── filename: Descriptive name
 ├── source_type: gmail | transcript | upload | capture
@@ -70,7 +70,7 @@ The document is now searchable and linked to [entities].
 You can find it later with:
 - "Show me documents about [entity]"
 - "Find the email from [person]"
-- memory.documents(entity="[name]")
+- memory.document(operation="search", entity="[name]")
 ```
 
 ## Source Types
@@ -107,7 +107,7 @@ If no entity linked:
 ```
 User: "Here's an email from Jim about the partnership terms. Save it."
 
-Call memory.file:
+Call memory.document (operation="store"):
 - content: [full email text]
 - filename: "2026-02-04-jim-ferry-partnership.md"
 - source_type: "gmail"
@@ -124,7 +124,7 @@ You can find it later by asking about Jim's documents."
 ```
 User: "Here's some info I found about competitor pricing. Keep this."
 
-Call memory.file:
+Call memory.document (operation="store"):
 - content: [research text]
 - filename: "2026-02-04-competitor-pricing-research.md"
 - source_type: "capture"
@@ -140,7 +140,7 @@ Saved to: general/documents/2026-02-04-competitor-pricing-research.md"
 ```
 User: "Save this contract from Acme Corp"
 
-Call memory.file:
+Call memory.document (operation="store"):
 - content: [contract text]
 - filename: "2026-02-04-acme-corp-contract.md"
 - source_type: "upload"
@@ -158,7 +158,7 @@ If you also extract facts from the document:
 
 1. File the document first (get document_id from response)
 2. Extract memories using memory.remember or memory.batch
-3. Call memory.file again with `memory_ids=[...]` to link provenance
+3. Call memory.document again with `memory_ids=[...]` to link provenance
 
 This creates the chain: memory -> document -> file on disk.
 

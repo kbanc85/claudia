@@ -23,9 +23,9 @@ When run without arguments, produce a system-level overview of everything in mem
 Query the memory system for aggregate counts:
 
 ```
-Call memory.search_entities with a broad query ("*" or "") to get total entity count.
+Call memory.entities with operation="search" and a broad query ("*" or "") to get total entity count.
 Call memory.recall with compact=true, limit=1 to estimate memory volume.
-Call memory.documents (no filters) to count documents.
+Call memory.document with operation="search" (no filters) to count documents.
 ```
 
 Display:
@@ -44,7 +44,7 @@ Display:
 ### 2. People (Top 10 by Importance)
 
 ```
-Call memory.search_entities with types=["person"], limit=10
+Call memory.entities with operation="search", types=["person"], limit=10
 For each person:
   Call memory.about to get memory count, last mentioned, key facts
 ```
@@ -62,13 +62,13 @@ Display as a table:
 
 Same pattern with types=["project"]:
 ```
-Call memory.search_entities with types=["project"], limit=10
+Call memory.entities with operation="search", types=["project"], limit=10
 ```
 
 ### 4. Active Patterns
 
 ```
-Call memory.session_context to get active patterns and insights
+Call memory.session with operation="context" to get active patterns and insights
 ```
 
 ### 5. Provenance Sample
@@ -76,7 +76,7 @@ Call memory.session_context to get active patterns and insights
 Pick the 3 most recent high-importance memories and trace them:
 ```
 Call memory.recall with compact=true, limit=3
-For each result, call memory.trace to get full provenance
+For each result, call memory.provenance with operation="trace" to get full provenance
 ```
 
 Display:
@@ -137,7 +137,7 @@ From the memory.about response, group memories:
 ### 4. Linked Documents
 
 ```
-Call memory.documents with entity=[entity name]
+Call memory.document with operation="search", entity=[entity name]
 ```
 
 Display:
@@ -150,7 +150,7 @@ Display:
 
 For each commitment or high-importance memory (importance > 0.7):
 ```
-Call memory.trace for the memory ID
+Call memory.provenance with operation="trace" for the memory ID
 ```
 
 Display:

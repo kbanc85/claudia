@@ -62,7 +62,7 @@ Show inventory to user before proceeding. This prevents partial processing.
 ```
 For each source in inventory:
     1. READ the full content
-    2. CALL memory.file immediately (do not skip!)
+    2. CALL memory.document with operation="store" immediately (do not skip!)
     3. THEN extract entities/facts/commitments
 ```
 
@@ -284,7 +284,7 @@ Ask for confirmation on:
 - [ ] **`dedicated_to` field populated** for sources primarily about an entity
 - [ ] **Verification phase completed** with user confirmation
 - [ ] **Dedicated source rule enforced** (2+ dedicated = must appear proportionally)
-- [ ] **All sources filed** via memory.file
+- [ ] **All sources filed** via memory.document
 - [ ] **Provenance chain complete** (memories link to documents)
 - [ ] **No entity lost** that had dedicated sources
 

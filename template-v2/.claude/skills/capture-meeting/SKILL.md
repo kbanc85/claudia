@@ -31,7 +31,7 @@ User provides one of:
 **Always file the raw transcript/notes FIRST.** This is not optional. Source preservation creates provenance: every extracted fact can trace back to where it came from.
 
 ```
-Call memory.file with:
+Call memory.document with operation="store":
 ├── content: The FULL raw transcript/notes text (do not summarize)
 ├── filename: YYYY-MM-DD-[person]-[topic].md
 ├── source_type: "transcript"
@@ -105,7 +105,7 @@ The file is automatically routed to the right folder:
 
 After extracting memories (facts, commitments) via memory.batch or memory.remember:
 ```
-Call memory.file again with memory_ids=[...] to link the stored transcript
+Call memory.document again with memory_ids=[...] to link the stored transcript
 to the memories extracted from it. This creates the provenance chain:
 memory -> document -> file on disk.
 ```
@@ -184,7 +184,7 @@ Ask for confirmation on:
 
 ## Quality Checklist
 
-- [ ] **Raw transcript/notes filed** (memory.file called with full content)
+- [ ] **Raw transcript/notes filed** (memory.document called with full content)
 - [ ] Memories linked to source document (provenance chain complete)
 - [ ] Every action item has an owner
 - [ ] Every commitment has a deadline (even approximate)

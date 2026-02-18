@@ -42,7 +42,7 @@ Silently retrieve:
 
 ```
 Call memory.reflections to see what already exists
-Call memory.session_context for recent context (if available)
+Call memory.session with operation="context" for recent context (if available)
 ```
 
 ### Step 2: Generate Reflections
@@ -141,7 +141,7 @@ When similar reflections accumulate over time:
 
 Reflections surface through:
 - `memory.reflections` tool for explicit retrieval
-- `memory.session_context` includes relevant reflections
+- `memory.session` (operation="context") includes relevant reflections
 - Semantic search matches reflections to current context
 
 ---

@@ -23,16 +23,15 @@ List your available tools that start with "memory."
 ```
 
 **Expected tools:**
-- `memory.session_context`
+- `memory.session`
 - `memory.remember`
 - `memory.recall`
 - `memory.about`
-- `memory.entity`
+- `memory.entities`
 - `memory.relate`
-- `memory.file`
+- `memory.document`
 - `memory.batch`
 - `memory.end_session`
-- `memory.buffer_turn`
 - `memory.reflections`
 - `memory.consolidate`
 - `memory.system_health`
@@ -44,7 +43,7 @@ If NO memory tools appear, the daemon isn't connected via MCP.
 If tools are available, try a simple operation:
 
 ```
-Call memory.session_context with no arguments
+Call memory.session with operation="context" and no other arguments
 ```
 
 **Possible outcomes:**

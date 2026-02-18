@@ -100,7 +100,7 @@ view is color-coded by entity type, and Home.md surfaces what needs attention."
 ### User asks about sync status
 Use the MCP tool:
 ```
-Call memory.vault_status to check:
+Call memory.vault(operation: "status") to check:
 - When the last sync happened
 - How many notes exist in each category
 - The vault path
@@ -116,7 +116,7 @@ The vault syncs nightly at 3:15 AM (after consolidation), catching all changes f
 ### On-Demand
 When the user wants fresh data:
 ```
-Call memory.sync_vault (full: false for incremental, full: true for complete rebuild)
+Call memory.vault(operation: "sync", full: false for incremental, full: true for complete rebuild)
 ```
 
 Trigger a sync when:
@@ -136,11 +136,11 @@ Users can request visual dashboards:
 
 | Request | Action |
 |---------|--------|
-| "Show me my relationship map" | `memory.generate_canvas(canvas_type: "relationship_map")` |
-| "Generate a morning brief canvas" | `memory.generate_canvas(canvas_type: "morning_brief")` |
-| "Show people connections" | `memory.generate_canvas(canvas_type: "people_overview")` |
-| "Make a project board for [name]" | `memory.generate_canvas(canvas_type: "project_board", project_name: "[name]")` |
-| "Update all canvases" | `memory.generate_canvas(canvas_type: "all")` |
+| "Show me my relationship map" | `memory.vault(operation: "canvas", canvas_type: "relationship_map")` |
+| "Generate a morning brief canvas" | `memory.vault(operation: "canvas", canvas_type: "morning_brief")` |
+| "Show people connections" | `memory.vault(operation: "canvas", canvas_type: "people_overview")` |
+| "Make a project board for [name]" | `memory.vault(operation: "canvas", canvas_type: "project_board", project_name: "[name]")` |
+| "Update all canvases" | `memory.vault(operation: "canvas", canvas_type: "all")` |
 
 After generating, tell the user where to find it:
 ```
@@ -209,7 +209,7 @@ All imported changes use `origin_type='user_stated'` and `confidence=1.0`. If th
 
 ### Running Import
 
-- **MCP tool:** `memory.import_vault_edits` scans for changes and applies them
+- **MCP tool:** `memory.vault(operation: "import")` scans for changes and applies them
 - **CLI:** `python3 -m claudia_memory --import-vault`
 - **Nightly sync** continues as a safety net for anything missed
 
@@ -237,10 +237,10 @@ The `project_hash` is the same 12-char SHA256 used for database paths (`~/.claud
 
 | Issue | Solution |
 |-------|----------|
-| Vault folder empty | Run `memory.sync_vault(full: true)` or `python3 -m claudia_memory --vault-sync` |
+| Vault folder empty | Run `memory.vault(operation: "sync", full: true)` or `python3 -m claudia_memory --vault-sync` |
 | Stale data in Obsidian | Trigger an on-demand sync |
 | Graph view shows no connections | Ensure entities have relationships (use `memory.relate`) |
 | Graph all one color | Check `.obsidian/graph.json` exists (created on first sync) |
-| Canvas won't open | Verify `.canvas` is valid JSON, regenerate with `memory.generate_canvas` |
+| Canvas won't open | Verify `.canvas` is valid JSON, regenerate with `memory.vault(operation: "canvas")` |
 | Vault not updating overnight | Check scheduler is running via `memory.system_health` |
 | Old format after upgrade | Sync will auto-rebuild when format version < 2 |

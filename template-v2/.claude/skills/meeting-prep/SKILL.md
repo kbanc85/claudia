@@ -36,7 +36,7 @@ From `people/[person].md`:
 
 Query for documents linked to this person:
 ```
-Call memory.documents with entity=[person name]
+Call memory.document with operation="search", entity=[person name]
 ```
 This returns recent transcripts, emails, and files involving the person. Include the most relevant (up to 3) in the briefing with their summaries.
 
