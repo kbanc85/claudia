@@ -63,7 +63,7 @@ Use the appropriate command set below (macOS/Linux or Windows).
 **macOS/Linux:**
 
 ```bash
-# Check if daemon process is running
+# Check if daemon process is running (and whether in standalone mode)
 ps aux | grep claudia_memory | grep -v grep
 
 # Check health endpoint
@@ -75,6 +75,11 @@ tail -20 ~/.claudia/daemon-stderr.log 2>/dev/null || echo "No daemon log found"
 # Check database exists and has data
 ls -la ~/.claudia/memory/*.db 2>/dev/null || echo "No database found"
 sqlite3 ~/.claudia/memory/claudia.db "SELECT COUNT(*) as memories FROM memories; SELECT COUNT(*) as entities FROM entities;" 2>/dev/null || echo "Cannot query database"
+
+# Check for standalone/MCP conflict (pre-v1.36 issue)
+# If you see a process with --standalone AND no MCP tools, this is the cause
+STANDALONE_RUNNING=$(ps aux | grep "claudia_memory.*standalone" | grep -v grep | wc -l | tr -d ' ')
+echo "Standalone daemon processes: $STANDALONE_RUNNING"
 ```
 
 **Windows (PowerShell):**
@@ -187,6 +192,24 @@ powershell -ExecutionPolicy Bypass -File memory-daemon\scripts\install.ps1
 1. Kill the old process: `taskkill /F /FI "IMAGENAME eq python.exe"` (or use Task Manager)
 2. Restart Claude Code (this restarts the MCP server)
 3. Check logs: `Get-Content -Tail 50 "$env:USERPROFILE\.claudia\daemon-stderr.log"`
+
+### Issue: Standalone daemon running but MCP tools not registered (pre-v1.36)
+
+**Symptoms:** Daemon process running with `--standalone`, health endpoint healthy, 0 memory tools in Claude Code
+
+**Cause (pre-v1.36):** The LaunchAgent/systemd service starts the daemon with `--standalone`, which acquires a singleton lock. When Claude Code spawns the MCP server, it hits the same lock, sees another daemon running, and exits immediately (exit code 0). Claude Code sees the clean exit and thinks the MCP server started, but no tools register.
+
+**Fix:** Upgrade Claudia to v1.36+ where this conflict is resolved:
+```bash
+npx get-claudia .
+```
+After upgrading, restart Claude Code. The MCP server no longer competes with the standalone daemon's lock.
+
+**If upgrade isn't possible:** Restart Claude Code. If tools still don't register, stop the standalone daemon temporarily:
+```bash
+launchctl unload ~/Library/LaunchAgents/com.claudia.memory.plist
+```
+Then restart Claude Code (which will spawn the MCP server cleanly). Note: background jobs won't run until you reload the LaunchAgent.
 
 ### Issue: .mcp.json uses wrong entry point
 

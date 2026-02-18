@@ -79,9 +79,9 @@ except Exception:
     pass
 " <<< "$STATUS_JSON" 2>/dev/null)
       fi
-      MSG="Memory daemon was stopped but has been restarted automatically."
+      MSG="IMPORTANT: Memory daemon was stopped and has been auto-restarted. However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session because MCP tools connect at session start, before the restart happened. Tell the user: 'The memory daemon was just restarted. Please restart Claude Code (close and reopen the window) to reconnect your memory tools. Your context files are preserved.' Do NOT use plugin:episodic-memory as a substitute."
       if [ -n "$STATUS_SUMMARY" ]; then
-        MSG="$MSG $STATUS_SUMMARY"
+        MSG="$MSG Daemon status: $STATUS_SUMMARY"
       fi
       STATUS_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
       echo "{\"additionalContext\": \"$STATUS_ESC\"}"
@@ -116,9 +116,9 @@ except Exception:
     pass
 " <<< "$STATUS_JSON" 2>/dev/null)
       fi
-      MSG="Memory daemon was stopped but has been restarted automatically."
+      MSG="IMPORTANT: Memory daemon was stopped and has been auto-restarted. However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session because MCP tools connect at session start, before the restart happened. Tell the user: 'The memory daemon was just restarted. Please restart Claude Code (close and reopen the window) to reconnect your memory tools. Your context files are preserved.' Do NOT use plugin:episodic-memory as a substitute."
       if [ -n "$STATUS_SUMMARY" ]; then
-        MSG="$MSG $STATUS_SUMMARY"
+        MSG="$MSG Daemon status: $STATUS_SUMMARY"
       fi
       STATUS_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
       echo "{\"additionalContext\": \"$STATUS_ESC\"}"

@@ -14,9 +14,9 @@
         ],
         "on_missing_me": "trigger_onboarding",
         "memory_verification": {
-          "step_1_check_tools": "BEFORE anything else, verify you have access to memory.* MCP tools. If no memory tools are available, inform the user: 'Memory daemon not connected. Run the /diagnose command or check ~/.claudia/daemon-stderr.log for errors.'",
+          "step_1_check_tools": "BEFORE anything else, verify you have access to mcp__claudia-memory__* tools (check your available tools list). If no memory tools are available: (1) Do NOT fall back to plugin:episodic-memory, mcp__plugin_episodic-memory_*, or any other memory search tool as a substitute — these give inferior, unrelated results and mask the real problem. (2) Tell the user: 'My memory tools are not registered in this session. The daemon likely just auto-restarted — please restart Claude Code (close and reopen the window) to reconnect. Your context files are preserved.' (3) Continue with context files only (context/me.md, etc.) until restarted.",
           "step_2_health_check": "Call memory.session (operation=\"context\"). If it fails or returns an error, the daemon may be crashed. Suggest: 'Memory daemon may need restart. Check: curl http://localhost:3848/health'",
-          "fallback": "If memory tools unavailable, proceed with markdown-only mode but WARN the user that memories won't persist."
+          "fallback": "If mcp__claudia-memory__* tools are not available: (1) Do NOT use plugin:episodic-memory or any other memory search tool as a substitute. (2) Tell the user: 'My memory tools are not registered in this session. The daemon may have just restarted — please restart Claude Code to reconnect. Your context files are preserved.' (3) Read context files directly (context/me.md, context/commitments.md, context/learnings.md, context/patterns.md, context/waiting.md) as the fallback. Make clear to the user they are in degraded mode with no semantic search or cross-session learning."
         },
         "enhanced_memory": {
           "context_load": "Call memory.session (operation=\"context\") to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
@@ -74,7 +74,7 @@
   ],
   "notes": {
     "implementation": "These hooks define intended behaviors. Claude Code will execute them as behavioral guidelines rather than traditional script execution.",
-    "memory_verification": "CRITICAL: At session start, verify memory tools are available BEFORE proceeding. If memory.* tools don't appear in available tools, the daemon isn't connected. This is a hard requirement for full Claudia functionality.",
+    "memory_verification": "CRITICAL: At session start, verify mcp__claudia-memory__* tools are available BEFORE proceeding. If tools don't appear, do NOT use plugin:episodic-memory as a substitute. Tell the user to restart Claude Code — the daemon auto-restarts but MCP tools only register at session start. Fall back to context files only (context/me.md, etc.) in the meantime.",
     "session_start": "At session start: (1) Verify memory tools available, (2) Call memory.session (operation=\"context\"), (3) Read context files, (4) Check for unsummarized sessions. If me.md is missing, trigger onboarding.",
     "session_end": "Before session ends, Claudia should generate a session summary (enhanced memory) or update context files (markdown fallback). The summary includes both a free-form narrative and structured extractions.",
     "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding.",

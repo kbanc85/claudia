@@ -180,11 +180,21 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
     if project_id:
         logger.info(f"Project isolation enabled: {project_id}")
 
-    # Acquire lockfile before touching the database -- prevents concurrent
-    # daemon instances from both writing to the same SQLite file, which is
-    # the root cause of "database disk image is malformed" errors.
     config = get_config()
-    _acquire_daemon_lock(Path(config.db_path).parent / "claudia.lock")
+
+    if not mcp_mode:
+        # Only enforce singleton for the standalone background daemon.
+        # The lock prevents two long-running background processes from
+        # concurrently running scheduled jobs (decay, consolidation) against
+        # the same SQLite file, which caused "database disk image is malformed"
+        # errors.
+        #
+        # MCP servers are ephemeral, session-bound processes spawned by Claude
+        # Code. They must NOT compete for the same lock as a running standalone
+        # daemon (e.g., installed via LaunchAgent/systemd). SQLite WAL mode
+        # handles concurrent read/write access safely across processes.
+        _acquire_daemon_lock(Path(config.db_path).parent / "claudia.lock")
+
     _check_and_repair_database(Path(config.db_path))
 
     # Set up signal handlers

@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.40.1 (2026-02-18)
+
+### Memory Tool Guard + Singleton Lock Fix
+
+- **Fixed: MCP server blocked by standalone daemon (singleton lock conflict)** - When the LaunchAgent or systemd service runs the daemon with `--standalone`, it held the global `claudia.lock`. Claude Code's MCP server would try to acquire the same lock, see another daemon running, and exit silently with code 0 -- leaving memory tools unregistered. Fixed by making the lock conditional on standalone mode only. MCP servers are ephemeral and don't need the lock; SQLite WAL handles concurrent access safely.
+- **Explicit episodic-memory guard** - Claudia now has explicit instructions (hooks.json, new `memory-availability.md` rule) to never use `plugin:episodic-memory` as a substitute for her own `mcp__claudia-memory__*` tools. Using the wrong tool masked the real problem and returned unrelated memories.
+- **Clearer restart message from health hook** - When the daemon auto-restarts, the hook now explicitly tells Claudia that MCP tools are NOT yet registered in the current session (because MCP connects at session start, before the restart). Claudia tells the user to restart Claude Code -- one clear action, no command to type.
+- **New `memory-availability.md` rule** - Session-level rule reinforcing the no-substitute policy and explaining the restart-only fix. Acts as belt-and-suspenders alongside hooks.json.
+- **`/diagnose` updated** - Detects standalone daemon process count, explains the pre-v1.40.1 lock conflict, and provides fix instructions for users on older versions.
+
 ## 1.40.0 (2026-02-18)
 
 ### MCP Tool Consolidation

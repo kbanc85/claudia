@@ -102,9 +102,17 @@ def check_health():
                 pass
             if restarted:
                 status_msg = _get_status_summary()
-                msg = "Memory daemon was stopped but has been restarted automatically."
+                msg = (
+                    "IMPORTANT: Memory daemon was stopped and has been auto-restarted. "
+                    "However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session "
+                    "because MCP tools connect at session start, before the restart happened. "
+                    "Tell the user: 'The memory daemon was just restarted. Please restart Claude Code "
+                    "(close and reopen the window) to reconnect your memory tools. "
+                    "Your context files are preserved.' "
+                    "Do NOT use plugin:episodic-memory as a substitute."
+                )
                 if status_msg:
-                    msg = f"{msg} {status_msg}"
+                    msg = f"{msg} Daemon status: {status_msg}"
                 print(json.dumps({"additionalContext": msg}))
                 return
             context_parts.append(
@@ -138,9 +146,17 @@ def check_health():
                 pass
             if restarted:
                 status_msg = _get_status_summary()
-                msg = "Memory daemon was stopped but has been restarted automatically."
+                msg = (
+                    "IMPORTANT: Memory daemon was stopped and has been auto-restarted. "
+                    "However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session "
+                    "because MCP tools connect at session start, before the restart happened. "
+                    "Tell the user: 'The memory daemon was just restarted. Please restart Claude Code "
+                    "(close and reopen the window) to reconnect your memory tools. "
+                    "Your context files are preserved.' "
+                    "Do NOT use plugin:episodic-memory as a substitute."
+                )
                 if status_msg:
-                    msg = f"{msg} {status_msg}"
+                    msg = f"{msg} Daemon status: {status_msg}"
                 print(json.dumps({"additionalContext": msg}))
                 return
             context_parts.append(
