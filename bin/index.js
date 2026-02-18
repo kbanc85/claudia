@@ -178,6 +178,9 @@ async function main() {
   // Show what's new in this release
   showWhatsNew(isUpgrade);
 
+  // Install brain visualizer to ~/.claudia/visualizer/
+  installVisualizer();
+
   // Helper: seed demo database using spawn (safe, no shell injection)
   function seedDemoDatabase(targetPath, mcpPath, callback) {
     console.log(`\n${colors.cyan}Seeding demo database...${colors.reset}`);
@@ -463,6 +466,37 @@ ${cdStep}  ${colors.cyan}claude${colors.reset}
       console.log(`\n${colors.boldYellow}⚡ IMPORTANT: If Claude Code is already running, you MUST restart it for memory to work.${colors.reset}`);
       console.log(`${colors.bold}   Close Claude Code and re-open it with: ${colors.cyan}claude${colors.reset}\n`);
     }
+  }
+}
+
+function installVisualizer() {
+  const vizSrc = join(__dirname, '..', 'visualizer');
+  if (!existsSync(vizSrc)) return; // not bundled in this release
+
+  const vizDest = join(homedir(), '.claudia', 'visualizer');
+  try {
+    mkdirSync(vizDest, { recursive: true });
+    cpSync(vizSrc, vizDest, { recursive: true, force: true });
+    console.log(`${colors.green}✓${colors.reset} Brain visualizer installed at ~/.claudia/visualizer/`);
+
+    // Run npm install --production in background (non-blocking)
+    const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+    const npmProc = spawn(npmCmd, ['install', '--production'], {
+      cwd: vizDest,
+      stdio: 'pipe',
+    });
+    npmProc.on('close', (code) => {
+      if (code !== 0) {
+        // Non-fatal: user can run npm install manually
+        process.stderr.write(`${colors.yellow}!${colors.reset} Visualizer npm install failed (run "npm install" in ~/.claudia/visualizer/ to fix)\n`);
+      }
+    });
+    npmProc.on('error', () => {
+      // npm not found or spawn failed — non-fatal
+    });
+  } catch (err) {
+    // Non-fatal: visualizer is optional
+    console.log(`${colors.dim}  Brain visualizer install skipped: ${err.message}${colors.reset}`);
   }
 }
 

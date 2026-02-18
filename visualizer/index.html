@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claudia Brain — Cosmos</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #080808;
+      color: #e4e4e4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #cosmos-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: block;
+    }
+
+    .glass-panel {
+      background: rgba(16, 16, 16, 0.90);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Top HUD bar */
+    #hud-top {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      z-index: 100;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .logo-glyph {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.55);
+      margin-right: 6px;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      font-size: 13px;
+      color: #e4e4e4;
+    }
+    .stat-label { color: rgba(228, 228, 228, 0.42); }
+    .stat-sep { color: rgba(255, 255, 255, 0.18); padding: 0 2px; }
+
+    /* Search panel */
+    #search-panel {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      padding: 8px 14px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #search-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #e4e4e4;
+      font-size: 13px;
+      width: 180px;
+    }
+    #search-input::placeholder { color: rgba(228, 228, 228, 0.35); }
+    .search-icon { color: rgba(228, 228, 228, 0.4); font-size: 14px; }
+
+    /* Legend */
+    #legend {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      padding: 12px 16px;
+      z-index: 100;
+      min-width: 130px;
+    }
+    #legend h4 {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(228, 228, 228, 0.42);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      margin: 4px 0;
+      color: rgba(228, 228, 228, 0.72);
+    }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Keyboard hints */
+    #kb-hints {
+      position: fixed;
+      bottom: 14px;
+      right: 14px;
+      font-size: 10px;
+      color: rgba(228, 228, 228, 0.25);
+      z-index: 100;
+      letter-spacing: 0.02em;
+    }
+
+    /* Detail panel */
+    #detail-panel {
+      position: fixed;
+      top: 0; right: 0;
+      height: 100%;
+      width: 320px;
+      background: rgba(10, 10, 10, 0.96);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-y: auto;
+      padding: 24px;
+      z-index: 200;
+    }
+    #detail-panel.open { transform: translateX(0); }
+
+    .detail-close {
+      position: absolute;
+      top: 16px; right: 16px;
+      background: none;
+      border: none;
+      color: rgba(228, 228, 228, 0.4);
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px;
+    }
+    .detail-close:hover { color: #e4e4e4; }
+
+    .detail-type-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      opacity: 0.8;
+    }
+    .detail-memory-count {
+      display: inline-block;
+      font-size: 11px;
+      color: rgba(228, 228, 228, 0.42);
+      margin-left: 8px;
+      margin-bottom: 8px;
+    }
+    .detail-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+    .importance-bar-bg {
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-bottom: 16px;
+    }
+    .importance-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.65);
+    }
+    .detail-description {
+      font-size: 13px;
+      color: rgba(228, 228, 228, 0.6);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .detail-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(228, 228, 228, 0.4);
+      margin-bottom: 10px;
+    }
+    .memory-item {
+      background: rgba(255,255,255,0.03);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: rgba(228, 228, 228, 0.75);
+      border-left: 2px solid;
+    }
+    .rel-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .rel-strength {
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 1px;
+      flex: 1;
+      overflow: hidden;
+    }
+    .rel-strength-fill {
+      height: 100%;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 1px;
+    }
+    .detail-actions {
+      margin-top: 20px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn-isolate, .btn-reset {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .btn-isolate {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e4e4e4;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .btn-isolate:hover { background: rgba(255, 255, 255, 0.14); }
+    .btn-reset {
+      background: rgba(255,255,255,0.05);
+      color: rgba(228, 228, 228, 0.6);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .btn-reset:hover { background: rgba(255,255,255,0.10); }
+
+    /* Tooltip */
+    #node-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(16, 16, 16, 0.92);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      z-index: 300;
+      display: none;
+      max-width: 200px;
+    }
+
+    /* Loading state */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: #080808;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 1000;
+      transition: opacity 0.5s;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-glyph { font-size: 40px; animation: spin 3s linear infinite; }
+    .loading-text { font-size: 13px; color: rgba(228, 228, 228, 0.5); }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* Controls toggle button */
+    #controls-toggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(16, 16, 16, 0.90);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      color: rgba(228, 228, 228, 0.55);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: color 0.2s, background 0.2s;
+      outline: none;
+    }
+    #controls-toggle:hover { color: #e4e4e4; background: rgba(30, 30, 30, 0.95); }
+    #controls-toggle.active { color: #e4e4e4; }
+
+    /* Controls panel */
+    #controls-panel {
+      position: fixed;
+      top: 54px;
+      right: 12px;
+      padding: 14px 16px;
+      z-index: 100;
+      min-width: 210px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #controls-panel.open { display: flex; }
+
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ctrl-label {
+      font-size: 11px;
+      color: rgba(228, 228, 228, 0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      width: 46px;
+      flex-shrink: 0;
+    }
+    .ctrl-slider {
+      flex: 1;
+      height: 3px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .ctrl-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.75);
+      cursor: pointer;
+    }
+    .ctrl-slider::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.75);
+      border: none;
+      cursor: pointer;
+    }
+    .ctrl-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.07);
+      margin: 0 -4px;
+    }
+    .qual-buttons {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+    }
+    .qual-btn {
+      flex: 1;
+      padding: 4px 0;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(228, 228, 228, 0.5);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .qual-btn:hover { background: rgba(255, 255, 255, 0.12); color: #e4e4e4; }
+    .qual-btn.active { background: rgba(255, 255, 255, 0.18); color: #e4e4e4; border-color: rgba(255,255,255,0.25); }
+
+    .rotate-btn {
+      flex: 1;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(228, 228, 228, 0.5);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      text-align: center;
+    }
+    .rotate-btn.active {
+      background: rgba(255, 255, 255, 0.18);
+      color: #e4e4e4;
+      border-color: rgba(255,255,255,0.25);
+    }
+
+    /* HUD hidden state */
+    .hud-hidden #hud-top,
+    .hud-hidden #search-panel,
+    .hud-hidden #legend,
+    .hud-hidden #kb-hints,
+    .hud-hidden #controls-toggle,
+    .hud-hidden #controls-panel { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+
+    /* Scrollbar styling */
+    #detail-panel::-webkit-scrollbar { width: 4px; }
+    #detail-panel::-webkit-scrollbar-track { background: transparent; }
+    #detail-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <canvas id="cosmos-canvas"></canvas>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="loading-glyph">&#x25C8;</div>
+    <div class="loading-text">Loading memory graph...</div>
+  </div>
+
+  <!-- Top HUD -->
+  <div id="hud-top" class="glass-panel">
+    <span class="logo-glyph">&#x25C8;</span>
+    <span id="stat-entities" class="stat-value">--</span><span class="stat-label"> e</span>
+    <span class="stat-sep">·</span>
+    <span id="stat-memories" class="stat-value">--</span><span class="stat-label"> m</span>
+    <span class="stat-sep">·</span>
+    <span id="stat-relationships" class="stat-value">--</span><span class="stat-label"> links</span>
+  </div>
+
+  <!-- Search -->
+  <div id="search-panel" class="glass-panel">
+    <span class="search-icon">&#x2315;</span>
+    <input id="search-input" type="text" placeholder="Search entities..." autocomplete="off" spellcheck="false">
+  </div>
+
+  <!-- Legend -->
+  <div id="legend" class="glass-panel">
+    <h4>Node Types</h4>
+    <div class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span> Person</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#60a5fa"></span> Organization</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#34d399"></span> Project</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#c084fc"></span> Concept</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#fb923c"></span> Location</div>
+  </div>
+
+  <!-- Detail panel -->
+  <div id="detail-panel">
+    <button class="detail-close" id="detail-close">&#x2715;</button>
+    <div id="detail-content"></div>
+  </div>
+
+  <!-- Tooltip -->
+  <div id="node-tooltip"></div>
+
+  <!-- Keyboard hints -->
+  <div id="kb-hints">H &middot; hide &nbsp; R &middot; reset &nbsp; F &middot; fullscreen</div>
+
+  <!-- Controls toggle -->
+  <button id="controls-toggle" title="Visual controls">&#x2699;</button>
+
+  <!-- Controls panel -->
+  <div id="controls-panel" class="glass-panel">
+    <div class="ctrl-row">
+      <span class="ctrl-label">Glow</span>
+      <input id="bloom-slider" class="ctrl-slider" type="range" min="0" max="1.4" step="0.05" value="0.65">
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Aberr</span>
+      <input id="aberr-slider" class="ctrl-slider" type="range" min="0" max="0.003" step="0.0001" value="0.0006">
+    </div>
+    <div class="ctrl-divider"></div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Rotate</span>
+      <button id="rotate-btn" class="rotate-btn active">On</button>
+    </div>
+    <div class="ctrl-divider"></div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Quality</span>
+      <div class="qual-buttons">
+        <button class="qual-btn" data-q="LOW">Lo</button>
+        <button class="qual-btn" data-q="MEDIUM">Mid</button>
+        <button class="qual-btn active" data-q="HIGH">Hi</button>
+        <button class="qual-btn" data-q="ULTRA">4K</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
