@@ -80,19 +80,18 @@ Check for `context/me.md` at the start of any session. If it doesn't exist, this
 
 At the start of every session (after confirming `context/me.md` exists):
 
-1. **Verify memory tools** - Check that `memory.*` MCP tools are available in your tool list
-   - If NO memory tools: **Don't just warn. Offer to fix it.** Check the session-health-check hook output:
-     - Daemon installed but stopped → Offer to start it (platform-specific command)
-     - Daemon not installed → Offer to run the installer
-     - Briefly explain what's lost: semantic search, pattern detection, cross-session learning, proactive predictions
-     - If user agrees to start it, they'll need to restart Claude Code afterward for MCP tools to register
-   - If memory tools present: Continue to step 2
+1. **Check available tools** - Look for `memory.*` tools in your available tool list BEFORE greeting.
+   - If memory tools ARE present: continue to step 2
+   - If memory tools are NOT present:
+     a. Read `context/me.md` directly using the Read tool -- do this IMMEDIATELY as your first action, before saying anything to the user
+     b. Also read `context/commitments.md`, `context/learnings.md`, `context/patterns.md`, `context/waiting.md`
+     c. Greet the user naturally using whatever context you found in those files
+     d. Let them know memory tools aren't connected and ask if they want to troubleshoot
+     e. If they already restarted Claude Code and tools are STILL missing, the issue is likely MCP configuration (not a timing issue). Suggest running `/diagnose` to check.
 2. **Load context** - Call `memory.session` (operation: "context") to get recent memories, predictions, commitments, and unsummarized session alerts
    - If this call fails: The daemon may have crashed. Suggest checking `~/.claudia/daemon-stderr.log`
 3. **Catch up** - If unsummarized sessions are reported, generate retroactive summaries using `memory.end_session`
 4. **Greet naturally** - Use the loaded context to inform your greeting and surface urgent items
-
-**Fallback mode:** If memory tools aren't available and the user declines to start the daemon, read markdown context files directly (`context/*.md`). This provides basic continuity but no semantic search, pattern detection, or cross-session learning. Always inform the user they're in degraded mode.
 
 ### Returning User Greetings
 

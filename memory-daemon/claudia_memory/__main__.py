@@ -207,13 +207,17 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
         db.initialize()
         logger.info(f"Database initialized at {get_config().db_path}")
 
-        # Start health server
-        start_health_server()
-        logger.info(f"Health server started on port {get_config().health_port}")
+        # Start health server and scheduler - ONLY in standalone mode.
+        # MCP server processes are ephemeral and session-bound; the standalone
+        # daemon (LaunchAgent/systemd) owns port 3848 and handles scheduling.
+        # Starting these here in MCP mode causes [Errno 48] Address already in
+        # use and double-scheduling alongside the running standalone daemon.
+        if not mcp_mode:
+            start_health_server()
+            logger.info(f"Health server started on port {get_config().health_port}")
 
-        # Start background scheduler
-        start_scheduler()
-        logger.info("Background scheduler started")
+            start_scheduler()
+            logger.info("Background scheduler started")
 
         if mcp_mode:
             # Run MCP server (blocks until stdin closes)

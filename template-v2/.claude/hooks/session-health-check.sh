@@ -50,6 +50,27 @@ except Exception:
   exit 0
 fi
 
+# Helper: emit JSON for unhealthy-daemon states, appending context/me.md if available
+emit_with_profile() {
+  local MSG="$1"
+  local PROFILE=""
+  if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "${CLAUDE_PROJECT_DIR}/context/me.md" ]; then
+    PROFILE=$(head -c 2000 "${CLAUDE_PROJECT_DIR}/context/me.md" 2>/dev/null || true)
+  fi
+  if [ -n "$PROFILE" ] && command -v python3 &>/dev/null; then
+    CLAUDIA_MSG="$MSG" CLAUDIA_PROFILE="$PROFILE" python3 -c "
+import json, os
+msg = os.environ.get('CLAUDIA_MSG', '')
+profile = os.environ.get('CLAUDIA_PROFILE', '')
+if profile:
+    msg = msg + '\n\nUser profile (from context/me.md):\n' + profile
+print(json.dumps({'additionalContext': msg}))"
+  else
+    MSG_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
+    echo "{\"additionalContext\": \"$MSG_ESC\"}"
+  fi
+}
+
 # Daemon is NOT healthy. Figure out why and provide actionable guidance.
 CONTEXT="IMPORTANT: Memory daemon is NOT running. Without it, you lose semantic search, pattern detection, cross-session learning, and proactive predictions. You MUST surface this to the user and offer to help fix it."
 
@@ -83,8 +104,7 @@ except Exception:
       if [ -n "$STATUS_SUMMARY" ]; then
         MSG="$MSG Daemon status: $STATUS_SUMMARY"
       fi
-      STATUS_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
-      echo "{\"additionalContext\": \"$STATUS_ESC\"}"
+      emit_with_profile "$MSG"
       exit 0
     fi
     CONTEXT="$CONTEXT Daemon is installed (LaunchAgent exists) but could not be auto-restarted. Suggest: 'Your memory daemon is stopped. Please run: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist'"
@@ -120,8 +140,7 @@ except Exception:
       if [ -n "$STATUS_SUMMARY" ]; then
         MSG="$MSG Daemon status: $STATUS_SUMMARY"
       fi
-      STATUS_ESC=$(echo "$MSG" | sed 's/"/\\"/g')
-      echo "{\"additionalContext\": \"$STATUS_ESC\"}"
+      emit_with_profile "$MSG"
       exit 0
     fi
     CONTEXT="$CONTEXT Daemon is installed (systemd service exists) but could not be auto-restarted. Suggest: 'Your memory daemon is stopped. Please run: systemctl --user restart claudia-memory'"
@@ -149,5 +168,5 @@ if [ -f "$HOME/.claudia/daemon-stderr.log" ]; then
   fi
 fi
 
-echo "{\"additionalContext\": \"$CONTEXT\"}"
+emit_with_profile "$CONTEXT"
 exit 0

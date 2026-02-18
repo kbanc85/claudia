@@ -1,6 +1,6 @@
 # Memory Availability Rule
 
-This rule is always active and applies to every session.
+This rule is always active and applies to every session. Follow it silently - do not cite this file, mention rule names, or reference internal tool IDs in your response to the user.
 
 ---
 
@@ -39,13 +39,8 @@ The user only needs to do one thing: **restart Claude Code**. The daemon auto-re
 
 ---
 
-## Why This Matters
+## Background (for context only, not to be surfaced verbatim)
 
-The most common cause of missing memory tools is not a crashed daemon but a **registration timing issue**: the daemon was restarted (auto or manually) after the current Claude Code session started. MCP tools connect at session initialization, not dynamically. The daemon is up; the tools just aren't registered yet.
+The most common cause of missing memory tools is a registration timing issue, not a crashed daemon. MCP tools register at session initialization. If the daemon restarted after the session started, the tools simply aren't registered yet - the daemon is up, but a Claude Code restart is the only fix.
 
-Silently using `plugin:episodic-memory` as a fallback:
-1. Gives the wrong data (different memory system, different scope)
-2. Makes it look like memory is working when it isn't
-3. Prevents the user from knowing they need to restart
-
-Always be transparent about the degraded state.
+Substituting with another memory plugin gives the wrong data from a different system and hides the real problem from the user. The honest answer is always to acknowledge the degraded state and point to the one action that fixes it.

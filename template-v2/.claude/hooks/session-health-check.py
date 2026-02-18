@@ -51,6 +51,23 @@ def _get_status_summary():
         return None
 
 
+def _read_user_profile():
+    """Read context/me.md from CLAUDE_PROJECT_DIR if it exists. Returns snippet or empty string."""
+    project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
+    if not project_dir:
+        return ''
+    me_path = Path(project_dir) / 'context' / 'me.md'
+    if not me_path.exists():
+        return ''
+    try:
+        content = me_path.read_text(encoding='utf-8', errors='replace')
+        if len(content) > 2000:
+            content = content[:2000]
+        return f'\n\nUser profile (from context/me.md):\n{content}'
+    except OSError:
+        return ''
+
+
 def check_health():
     context_parts = []
 
@@ -102,6 +119,7 @@ def check_health():
                 pass
             if restarted:
                 status_msg = _get_status_summary()
+                user_profile = _read_user_profile()
                 msg = (
                     "IMPORTANT: Memory daemon was stopped and has been auto-restarted. "
                     "However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session "
@@ -113,6 +131,7 @@ def check_health():
                 )
                 if status_msg:
                     msg = f"{msg} Daemon status: {status_msg}"
+                msg = msg + user_profile
                 print(json.dumps({"additionalContext": msg}))
                 return
             context_parts.append(
@@ -146,6 +165,7 @@ def check_health():
                 pass
             if restarted:
                 status_msg = _get_status_summary()
+                user_profile = _read_user_profile()
                 msg = (
                     "IMPORTANT: Memory daemon was stopped and has been auto-restarted. "
                     "However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session "
@@ -157,6 +177,7 @@ def check_health():
                 )
                 if status_msg:
                     msg = f"{msg} Daemon status: {status_msg}"
+                msg = msg + user_profile
                 print(json.dumps({"additionalContext": msg}))
                 return
             context_parts.append(
@@ -210,7 +231,8 @@ def check_health():
             pass
 
     output = " ".join(context_parts)
-    print(json.dumps({"additionalContext": output}))
+    user_profile = _read_user_profile()
+    print(json.dumps({"additionalContext": output + user_profile}))
 
 
 if __name__ == "__main__":
