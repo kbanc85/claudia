@@ -2,6 +2,13 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.40.3 (2026-02-18)
+
+### MCP Tool UnboundLocalError Fixes
+
+- **Fixed: `memory.temporal` (operation: "upcoming") crashing with UnboundLocalError** - A `from ..services.recall import recall_upcoming_deadlines` inside the legacy `memory.upcoming` alias branch caused Python to treat `recall_upcoming_deadlines` as a local variable throughout the entire `call_tool` function, making it unbound at the merged-tool dispatch site. Removed the redundant local import; the name is already imported at module level.
+- **Fixed: `memory.graph` (operation: "reconnect") crashing with UnboundLocalError** - Two `from datetime import datetime` imports inside if-branches of the `memory.end_session` handler caused the same scoping problem for `datetime`, which is used earlier in the function by the reconnect handler. Removed the redundant local imports; `datetime` is already imported at module level.
+
 ## 1.40.2 (2026-02-18)
 
 ### Port Conflict Fix + Graceful Degraded Mode
