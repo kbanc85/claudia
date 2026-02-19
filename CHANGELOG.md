@@ -2,6 +2,10 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.42.2 (2026-02-19)
+
+Refreshed README to better communicate Claudia's strengths, cognitive architecture, and real-world value. Added "How Her Mind Works" section explaining Remember/Recall/Consolidate/Vault in plain English. Expanded "See It in Action" with morning brief and pattern detection examples. Updated feature cards for PARA vault, background learning, and pattern detection. Promoted cognitive extraction from hidden details to visible paragraph. Cleaned up commands table (removed archived gateway/relay, added vault sync, brain, deep-context, and more).
+
 ## 1.42.1 (2026-02-19)
 
 Updated vault-awareness skill and architecture docs to reflect the PARA structure shipped in v1.42.0. Claudia now references correct PARA paths (Active/, Relationships/, Reference/, Archive/, Claudia's Desk/) in deep links, routing logic, and navigation guidance. Added vault to ARCHITECTURE.md installed files tree.
