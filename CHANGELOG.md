@@ -2,6 +2,42 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.41.0 (2026-02-19)
+
+### Vault Organizer: Efficiency-First Architecture
+
+The vault is now dual-purpose: a human-browsable Obsidian graph and Claudia's own cheap read layer. Session start overhead drops from ~1,800 tokens to ~550 on healthy days. Every data access path now has a cheaper degraded-mode equivalent.
+
+**Session start token reduction (~70% savings):**
+- `memory.briefing` is now the primary session-start call (~500 tokens) replacing `memory.session op=context` (~1,200 tokens). Deep context loads only when the briefing flags alerts (overdue commitments, cooling relationships, unread messages)
+- Session health hook output trimmed from ~700 tokens to ~50: user profile injection removed (profile lives in `context/me.md`; Claudia reads it when needed), daemon-down messages condensed to one-liners per platform
+- New `/briefing` HTTP endpoint on port 3848 so future hooks can access briefing data without MCP
+
+**Living MOCs as Claudia's read layer:**
+- Three pre-computed vault files generated on every sync: `MOC-People.md` (tier-grouped relationship health map with last contact, trend, open commitments), `MOC-Commitments.md` (overdue / due this week / open / recently completed), `MOC-Projects.md` (tier-grouped with connected people and commitment counts)
+- Reading `MOC-People.md` replaces `memory.graph op=network` for overview queries (~0 MCP tokens vs 200-300+). CLAUDE.md documents the vault file paths and when to use vault reads vs MCP calls
+- MOC files regenerated on every incremental sync (pure SQL, <50ms, no embeddings)
+
+**Pattern backlinks:**
+- Entity notes now include a "Related Patterns" section linking to patterns that reference them
+- Pattern notes include typed entity wikilinks back to the people/projects they describe
+- Vault graph coherent: no orphaned pattern nodes
+
+**Claudia Wing (opt-in vault organizer):**
+- New `--organize-vault` CLI flag migrates an existing flat vault into a typed container structure: `claudia/relational/` for people/concepts, `claudia/ops/` for projects/orgs, `claudia/self/` for reflections, `claudia/` root for MOC files
+- `--organize-vault --preview` shows the migration plan without making changes
+- Copy-not-move semantics: originals preserved, aliases injected into frontmatter so existing Obsidian wikilinks resolve
+- `use_claudia_wing: false` by default -- fully opt-in, no disruption to existing vaults
+
+**Consolidation vault reweave:**
+- After Phase 3 (pattern detection), `run_full_consolidation()` now triggers an incremental vault sync inline, keeping MOC files current for the next morning session
+- 4R phase labels added as inline documentation: Reduce (decay), Reflect (merge), Reweave (pattern detection + vault sync), Verify (dedupe + cleanup)
+- 3:15 AM scheduled full sync retained as safety net
+
+**Fallback chain: MCP tools → vault MOC files → vault entity files → `context/` files**
+
+503 tests pass (5 skipped).
+
 ## 1.40.5 (2026-02-18)
 
 ### Brain Visualizer: Performance Fix
