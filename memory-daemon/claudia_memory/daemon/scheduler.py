@@ -131,6 +131,7 @@ class MemoryScheduler:
     def _run_vault_sync(self) -> None:
         """Run Obsidian vault sync + canvas regeneration"""
         try:
+            logger.info("[Safety-net full sync] Running after 4R Reweave inline in consolidation")
             logger.info("Running vault sync")
             from ..config import _project_id
             from ..services.vault_sync import get_vault_path

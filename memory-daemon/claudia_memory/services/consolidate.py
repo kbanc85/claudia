@@ -2515,6 +2515,7 @@ class ConsolidateService:
                 logger.warning(f"Pre-consolidation backup failed: {e}")
                 results["backup_error"] = str(e)
 
+        # [4R: Reduce]
         # Phase 1: Decay + boost (modifies importance scores)
         try:
             results["decay"] = self.run_decay()
@@ -2524,6 +2525,7 @@ class ConsolidateService:
             results["decay"] = {"error": str(e)}
             results["boosted"] = 0
 
+        # [4R: Reflect]
         # Phase 2: Merging (modifies memory content)
         try:
             results["merged"] = self.merge_similar_memories()
@@ -2533,6 +2535,7 @@ class ConsolidateService:
             results["merged"] = 0
             results["reflections_aggregated"] = 0
 
+        # [4R: Reweave]
         # Phase 3: Detection (read-heavy, writes new pattern rows)
         try:
             patterns = self.detect_patterns()
@@ -2541,6 +2544,17 @@ class ConsolidateService:
             logger.warning(f"Pattern detection failed: {e}")
             results["patterns_detected"] = 0
 
+        # [4R: Reweave] Propagate updated patterns/tiers to vault inline
+        try:
+            if self.config.vault_sync_enabled:
+                from ..services.vault_sync import run_vault_sync
+                from ..config import _project_id
+                run_vault_sync(project_id=_project_id, full=False)
+                logger.info("[4R: Reweave] Vault incremental sync complete")
+        except Exception as e:
+            logger.warning(f"[4R: Reweave] Vault sync skipped: {e}")
+            # Non-fatal: 3:15 AM scheduler will catch any missed updates
+
         # Phase 4: Entity summaries (hierarchical graph retrieval)
         try:
             results["entity_summaries_generated"] = self.generate_entity_summaries()
@@ -2548,6 +2562,7 @@ class ConsolidateService:
             logger.warning(f"Entity summary generation failed: {e}")
             results["entity_summaries_generated"] = 0
 
+        # [4R: Verify]
         # Phase 5: Auto-dedupe entities
         try:
             dedupe_candidates = self.auto_dedupe_entities()

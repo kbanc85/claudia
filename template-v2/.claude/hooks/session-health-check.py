@@ -6,66 +6,35 @@ Outputs JSON with additionalContext for Claude Code hooks.
 """
 
 import json
-import os
 import platform
-import sys
 from pathlib import Path
 from urllib.request import urlopen
 from urllib.error import URLError
 
 
 def _get_status_summary():
-    """Call /status endpoint for richer system data. Returns summary string or None."""
+    """Call /status endpoint for compact memory counts. Returns summary string or None."""
     try:
         resp = urlopen("http://localhost:3848/status", timeout=5)
         data = json.loads(resp.read().decode())
 
-        parts = []
-
-        # Counts summary
         counts = data.get("counts", {})
         memories = counts.get("memories", 0)
         entities = counts.get("entities", 0)
-        patterns = counts.get("patterns", 0)
-        parts.append(f"{memories} memories, {entities} entities, {patterns} active patterns.")
+        parts = [f"Memory: {memories} memories, {entities} entities."]
 
-        # Warnings
-        warnings = []
+        # Embedding warnings only
         components = data.get("components", {})
         embed_status = components.get("embeddings", "ok")
         if embed_status in ("unavailable", "error"):
-            warnings.append(f"WARNING: Embeddings component is '{embed_status}'. Semantic search may not work.")
-
+            parts.append(f"Embeddings {embed_status}.")
         if data.get("embedding_model_mismatch", False):
-            warnings.append(
-                "WARNING: Embedding model mismatch detected. "
-                "Memories may have been created with a different model. "
-                "Consider running /diagnose for details."
-            )
-
-        if warnings:
-            parts.extend(warnings)
+            parts.append("Embedding model mismatch.")
 
         return " ".join(parts)
     except (URLError, OSError, TimeoutError, json.JSONDecodeError, KeyError):
         return None
 
-
-def _read_user_profile():
-    """Read context/me.md from CLAUDE_PROJECT_DIR if it exists. Returns snippet or empty string."""
-    project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
-    if not project_dir:
-        return ''
-    me_path = Path(project_dir) / 'context' / 'me.md'
-    if not me_path.exists():
-        return ''
-    try:
-        content = me_path.read_text(encoding='utf-8', errors='replace')
-        if len(content) > 2000:
-            content = content[:2000]
-        return f'\n\nUser profile (from context/me.md):\n{content}'
-    except OSError:
-        return ''
 
 
 def check_health():
@@ -79,18 +48,14 @@ def check_health():
             # Health OK - try to get richer status data
             status_msg = _get_status_summary()
             if status_msg:
-                print(json.dumps({"additionalContext": f"Memory system healthy. {status_msg}"}))
+                print(json.dumps({"additionalContext": status_msg}))
             else:
                 print(json.dumps({"additionalContext": "Memory system healthy."}))
             return
     except (URLError, OSError, TimeoutError):
         pass
 
-    context_parts.append(
-        "IMPORTANT: Memory daemon is NOT running. Without it, you lose semantic search, "
-        "pattern detection, cross-session learning, and proactive predictions. "
-        "You MUST surface this to the user and offer to help fix it."
-    )
+    context_parts.append("Memory daemon not responding.")
 
     # Check daemon installation status (platform-specific)
     system = platform.system()
@@ -119,30 +84,23 @@ def check_health():
                 pass
             if restarted:
                 status_msg = _get_status_summary()
-                user_profile = _read_user_profile()
                 msg = (
-                    "IMPORTANT: Memory daemon was stopped and has been auto-restarted. "
-                    "However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session "
-                    "because MCP tools connect at session start, before the restart happened. "
-                    "Tell the user: 'The memory daemon was just restarted. Please restart Claude Code "
-                    "(close and reopen the window) to reconnect your memory tools. "
-                    "Your context files are preserved.' "
-                    "Do NOT use plugin:episodic-memory as a substitute."
+                    "Memory daemon was stopped and has been auto-restarted. "
+                    "MCP tools not available this session -- restart Claude Code to reconnect. "
+                    "Context files are preserved."
                 )
                 if status_msg:
-                    msg = f"{msg} Daemon status: {status_msg}"
-                msg = msg + user_profile
+                    msg = f"{msg} {status_msg}"
                 print(json.dumps({"additionalContext": msg}))
                 return
             context_parts.append(
-                "Daemon is installed (LaunchAgent exists) but could not be auto-restarted. "
-                "Suggest: 'Your memory daemon is stopped. "
-                "Please run: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist'"
+                "Memory daemon stopped. "
+                "Restart: launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist. "
+                "If unavailable, read context/ files directly."
             )
         else:
             context_parts.append(
-                "Daemon is NOT installed. Suggest: 'The memory daemon hasn't been set up yet. "
-                "Want me to install it? I can run the installer for you.'"
+                "Memory daemon not installed. Run installer or read context/ files directly."
             )
 
     elif system == "Linux":
@@ -165,30 +123,23 @@ def check_health():
                 pass
             if restarted:
                 status_msg = _get_status_summary()
-                user_profile = _read_user_profile()
                 msg = (
-                    "IMPORTANT: Memory daemon was stopped and has been auto-restarted. "
-                    "However, the memory MCP tools (mcp__claudia-memory__*) are NOT available in this session "
-                    "because MCP tools connect at session start, before the restart happened. "
-                    "Tell the user: 'The memory daemon was just restarted. Please restart Claude Code "
-                    "(close and reopen the window) to reconnect your memory tools. "
-                    "Your context files are preserved.' "
-                    "Do NOT use plugin:episodic-memory as a substitute."
+                    "Memory daemon was stopped and has been auto-restarted. "
+                    "MCP tools not available this session -- restart Claude Code to reconnect. "
+                    "Context files are preserved."
                 )
                 if status_msg:
-                    msg = f"{msg} Daemon status: {status_msg}"
-                msg = msg + user_profile
+                    msg = f"{msg} {status_msg}"
                 print(json.dumps({"additionalContext": msg}))
                 return
             context_parts.append(
-                "Daemon is installed (systemd service exists) but could not be auto-restarted. "
-                "Suggest: 'Your memory daemon is stopped. "
-                "Please run: systemctl --user restart claudia-memory'"
+                "Memory daemon stopped. "
+                "Restart: systemctl --user restart claudia-memory. "
+                "If unavailable, read context/ files directly."
             )
         else:
             context_parts.append(
-                "Daemon is NOT installed. Suggest: 'The memory daemon hasn't been set up yet. "
-                "Want me to install it? I can run the installer for you.'"
+                "Memory daemon not installed. Run installer or read context/ files directly."
             )
 
     elif system == "Windows":
@@ -207,15 +158,12 @@ def check_health():
 
         if task_status:
             context_parts.append(
-                f"Daemon is installed (Task Scheduler, state: {task_status}). "
-                "Suggest: 'Your memory daemon is installed but not responding. "
-                "Want me to check the logs and try restarting it?'"
+                f"Memory daemon installed (Task Scheduler, state: {task_status}) but not responding. "
+                "Restart via Task Scheduler. If unavailable, read context/ files directly."
             )
         else:
             context_parts.append(
-                "Daemon is NOT installed as a scheduled task. "
-                "Suggest: 'The memory daemon hasn't been set up yet. "
-                "Want me to install it? I can run the installer for you.'"
+                "Memory daemon not installed. Run installer or read context/ files directly."
             )
 
     # Check for recent crash logs
@@ -231,8 +179,7 @@ def check_health():
             pass
 
     output = " ".join(context_parts)
-    user_profile = _read_user_profile()
-    print(json.dumps({"additionalContext": output + user_profile}))
+    print(json.dumps({"additionalContext": output}))
 
 
 if __name__ == "__main__":

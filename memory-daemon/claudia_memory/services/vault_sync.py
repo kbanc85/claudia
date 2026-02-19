@@ -99,14 +99,70 @@ class VaultSyncService:
 
     def _ensure_directories(self) -> None:
         """Create the vault directory structure."""
-        dirs = [
-            "people", "projects", "organizations", "concepts",
-            "locations", "patterns", "reflections", "sessions",
-            "canvases", "_meta",
-            ".obsidian", ".obsidian/snippets",
-        ]
+        from ..config import get_config as _get_config
+        config = _get_config()
+        if getattr(config, "use_claudia_wing", False):
+            wing = getattr(config, "claudia_wing_dir", "claudia")
+            dirs = [
+                f"{wing}/relational/people",
+                f"{wing}/relational/concepts",
+                f"{wing}/relational/locations",
+                f"{wing}/relational/patterns",
+                f"{wing}/ops/projects",
+                f"{wing}/ops/organizations",
+                f"{wing}/self",
+                "sessions", "canvases", "_queries", "_meta",
+                ".obsidian", ".obsidian/snippets",
+            ]
+        else:
+            dirs = [
+                "people", "projects", "organizations", "concepts",
+                "locations", "patterns", "reflections", "sessions",
+                "canvases", "_meta",
+                ".obsidian", ".obsidian/snippets",
+            ]
         for d in dirs:
             (self.vault_path / d).mkdir(parents=True, exist_ok=True)
+
+    def _entity_type_dir(self, entity_type: str) -> Path:
+        """Resolve the vault subdirectory for an entity type, respecting wing config."""
+        from ..config import get_config as _get_config
+        config = _get_config()
+        base_subdir = ENTITY_TYPE_DIRS.get(entity_type, "concepts")
+        if getattr(config, "use_claudia_wing", False):
+            wing = getattr(config, "claudia_wing_dir", "claudia")
+            if entity_type in ("person", "concept", "location"):
+                return self.vault_path / wing / "relational" / base_subdir
+            else:  # project, organization
+                return self.vault_path / wing / "ops" / base_subdir
+        return self.vault_path / base_subdir
+
+    def _pattern_dir(self) -> Path:
+        """Resolve the patterns directory, respecting wing config."""
+        from ..config import get_config as _get_config
+        config = _get_config()
+        if getattr(config, "use_claudia_wing", False):
+            wing = getattr(config, "claudia_wing_dir", "claudia")
+            return self.vault_path / wing / "relational" / "patterns"
+        return self.vault_path / "patterns"
+
+    def _reflection_dir(self) -> Path:
+        """Resolve the reflections directory, respecting wing config."""
+        from ..config import get_config as _get_config
+        config = _get_config()
+        if getattr(config, "use_claudia_wing", False):
+            wing = getattr(config, "claudia_wing_dir", "claudia")
+            return self.vault_path / wing / "self"
+        return self.vault_path / "reflections"
+
+    def _moc_dir(self) -> Path:
+        """Resolve the directory for MOC files and Home.md, respecting wing config."""
+        from ..config import get_config as _get_config
+        config = _get_config()
+        if getattr(config, "use_claudia_wing", False):
+            wing = getattr(config, "claudia_wing_dir", "claudia")
+            return self.vault_path / wing
+        return self.vault_path
 
     def _get_last_sync_time(self) -> Optional[str]:
         """Read last sync timestamp from _meta/last-sync.json."""
@@ -579,6 +635,40 @@ class VaultSyncService:
                 lines.append(f"> {nline}")
         return "\n".join(lines)
 
+    def _get_related_patterns(self, entity_id: int) -> List[Dict]:
+        """Fetch active patterns that reference this entity in their evidence."""
+        try:
+            rows = self.db.execute(
+                """
+                SELECT DISTINCT p.id, p.description, p.pattern_type, p.confidence
+                FROM patterns p
+                WHERE p.is_active = 1
+                  AND p.evidence LIKE ?
+                LIMIT 5
+                """,
+                (f"%{entity_id}%",),
+                fetch=True,
+            ) or []
+        except Exception:
+            rows = []
+        return rows
+
+    def _render_related_patterns(self, patterns: List[Dict]) -> str:
+        """Render a 'Related Patterns' section with wikilinks to pattern notes."""
+        if not patterns:
+            return ""
+        lines = ["## Related Patterns", ""]
+        for p in patterns:
+            ptype = p["pattern_type"] if p["pattern_type"] else "pattern"
+            confidence = p["confidence"] if p["confidence"] else 0.0
+            pid = p["id"]
+            slug = f"{ptype}-{pid:03d}"
+            lines.append(
+                f"- [[patterns/{_sanitize_filename(slug)}]] "
+                f"— *{ptype}* (confidence: {confidence:.2f})"
+            )
+        return "\n".join(lines)
+
     def export_entity(self, entity: Dict) -> Optional[Path]:
         """Export a single entity as an Obsidian note.
 
@@ -589,8 +679,7 @@ class VaultSyncService:
         entity_type = entity["type"]
 
         # Determine subdirectory
-        subdir = ENTITY_TYPE_DIRS.get(entity_type, "concepts")
-        target_dir = self.vault_path / subdir
+        target_dir = self._entity_type_dir(entity_type)
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Fetch related data
@@ -628,6 +717,11 @@ class VaultSyncService:
         recent = self._render_recent_sessions(entity_name)
         if recent:
             sections.append(f"\n{recent}")
+
+        # Related patterns backlinks
+        related_patterns = self._get_related_patterns(entity_id)
+        if related_patterns:
+            sections.append(f"\n{self._render_related_patterns(related_patterns)}")
 
         # Sync footer
         sync_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
@@ -716,7 +810,7 @@ class VaultSyncService:
         ) or []
 
         count = 0
-        target_dir = self.vault_path / "patterns"
+        target_dir = self._pattern_dir()
         target_dir.mkdir(parents=True, exist_ok=True)
 
         for row in rows:
@@ -752,6 +846,26 @@ class VaultSyncService:
                             lines.append("## Related Entities")
                             for ent_name in entities:
                                 lines.append(f"- [[{ent_name}]]")
+                        # Also try entity_ids for typed wikilinks
+                        entity_ids = evidence_data.get("entity_ids", [])
+                        if entity_ids and not entities:
+                            ent_links = []
+                            for eid in entity_ids[:5]:
+                                ent_row = self.db.execute(
+                                    "SELECT name, type FROM entities WHERE id = ? AND deleted_at IS NULL",
+                                    (eid,),
+                                    fetch=True,
+                                )
+                                if ent_row:
+                                    ent = ent_row[0]
+                                    subdir = ENTITY_TYPE_DIRS.get(ent["type"], "concepts")
+                                    ent_links.append(f"[[{subdir}/{ent['name']}]]")
+                            if ent_links:
+                                if not entities:
+                                    lines.append("")
+                                    lines.append("## Related Entities")
+                                for link in ent_links:
+                                    lines.append(f"- {link}")
                 except (json.JSONDecodeError, TypeError):
                     pass
 
@@ -776,7 +890,7 @@ class VaultSyncService:
         ) or []
 
         count = 0
-        target_dir = self.vault_path / "reflections"
+        target_dir = self._reflection_dir()
         target_dir.mkdir(parents=True, exist_ok=True)
 
         for row in rows:
@@ -1141,7 +1255,9 @@ class VaultSyncService:
         lines.append(f"\n---\n*Last synced: {sync_time}*")
 
         content = "\n".join(lines) + "\n"
-        filepath = self.vault_path / "Home.md"
+        moc_dir = self._moc_dir()
+        moc_dir.mkdir(parents=True, exist_ok=True)
+        filepath = moc_dir / "Home.md"
         filepath.write_text(content, encoding="utf-8")
 
     def _export_moc_indices(self) -> None:
@@ -1370,6 +1486,316 @@ class VaultSyncService:
         except Exception:
             return False
 
+    # ── MOC generators ──────────────────────────────────────────
+
+    def _generate_moc_people(self) -> str:
+        """Generate MOC-People.md -- relationship health map for Claudia's read layer.
+
+        Pre-computed markdown Claudia can read instead of calling memory.graph op=network.
+        Organized by attention tier for quick scanning.
+        """
+        from datetime import datetime as _dt
+
+        timestamp = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        lines = ["# People — Health Map", "", f"> Last updated: {timestamp}", ""]
+
+        # Query all people with tier/trend/last_contact
+        people = self.db.execute(
+            """
+            SELECT id, name, attention_tier, contact_trend, last_contact_at
+            FROM entities
+            WHERE type = 'person' AND deleted_at IS NULL AND importance > 0.05
+            ORDER BY importance DESC
+            """,
+            fetch=True,
+        ) or []
+
+        if not people:
+            lines.append("*No people tracked yet.*")
+            lines.append(f"\n---\n*Last updated: {timestamp}*")
+            return "\n".join(lines)
+
+        # Group by tier
+        tiers: Dict[str, List] = {"active": [], "watchlist": [], "standard": [], "archive": []}
+        for p in people:
+            tier = (p["attention_tier"] or "standard").lower()
+            if tier not in tiers:
+                tier = "standard"
+            tiers[tier].append(p)
+
+        tier_config = [
+            ("active", "🔴 Active (needs attention now)"),
+            ("watchlist", "🟡 Watchlist (declining attention)"),
+            ("standard", "⚪ Standard"),
+            ("archive", "🔵 Archive (dormant 90+ days)"),
+        ]
+
+        now = datetime.utcnow()
+
+        for tier_key, tier_heading in tier_config:
+            tier_people = tiers.get(tier_key, [])
+            if not tier_people:
+                continue
+
+            lines.append(f"## {tier_heading}")
+            lines.append("")
+            lines.append("| Name | Last Contact | Trend | Open Commitments |")
+            lines.append("|------|-------------|-------|-----------------|")
+
+            for p in tier_people:
+                # Last contact days
+                last_contact = p["last_contact_at"]
+                if last_contact:
+                    try:
+                        dt = datetime.fromisoformat(last_contact[:19])
+                        days_ago = (now - dt).days
+                        last_str = f"{days_ago}d ago"
+                    except (ValueError, TypeError):
+                        last_str = last_contact[:10]
+                else:
+                    last_str = "-"
+
+                trend = p["contact_trend"] or "-"
+
+                # Count open commitments
+                comm_rows = self.db.execute(
+                    """
+                    SELECT COUNT(*) as cnt FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ? AND m.type = 'commitment' AND m.invalidated_at IS NULL
+                    """,
+                    (p["id"],),
+                    fetch=True,
+                )
+                comm_count = comm_rows[0]["cnt"] if comm_rows else 0
+
+                lines.append(
+                    f"| [[people/{_sanitize_filename(p['name'])}]] | {last_str} | {trend} | {comm_count} |"
+                )
+
+            lines.append("")
+
+        lines.append(f"---\n*Last updated: {timestamp}*")
+        return "\n".join(lines)
+
+    def _generate_moc_commitments(self) -> str:
+        """Generate MOC-Commitments.md -- open commitments overview for Claudia's read layer.
+
+        Pre-computed markdown Claudia can read instead of calling memory.recall type=commitment.
+        Organized by urgency: overdue, due this week, open, recently completed.
+        """
+        from datetime import datetime as _dt
+
+        timestamp = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        lines = ["# Open Commitments", "", f"> Last updated: {timestamp}", ""]
+
+        def _get_commitments(sql, params=()):
+            rows = self.db.execute(sql, params, fetch=True) or []
+            result = []
+            for row in rows:
+                # Get entity names
+                ent_rows = self.db.execute(
+                    """
+                    SELECT e.name, e.type FROM entities e
+                    JOIN memory_entities me ON e.id = me.entity_id
+                    WHERE me.memory_id = ? AND e.deleted_at IS NULL
+                    LIMIT 3
+                    """,
+                    (row["id"],),
+                    fetch=True,
+                ) or []
+                entities = ent_rows
+                result.append((row, entities))
+            return result
+
+        # Overdue
+        overdue = _get_commitments(
+            """
+            SELECT id, content, deadline_at FROM memories
+            WHERE type = 'commitment' AND invalidated_at IS NULL
+              AND deadline_at IS NOT NULL AND deadline_at < datetime('now')
+            ORDER BY deadline_at ASC LIMIT 20
+            """
+        )
+        if overdue:
+            lines.append("## ⚠️ Overdue")
+            lines.append("")
+            lines.append("| Commitment | Person/Project | Deadline |")
+            lines.append("|------------|---------------|---------|")
+            for row, entities in overdue:
+                content = row["content"][:80] + ("..." if len(row["content"]) > 80 else "")
+                ent_links = ", ".join(
+                    f"[[{ENTITY_TYPE_DIRS.get(e['type'], 'concepts')}/{_sanitize_filename(e['name'])}]]"
+                    for e in entities
+                ) if entities else "-"
+                deadline = row["deadline_at"][:10] if row["deadline_at"] else "-"
+                lines.append(f"| {content} | {ent_links} | {deadline} |")
+            lines.append("")
+
+        # Due this week
+        due_week = _get_commitments(
+            """
+            SELECT id, content, deadline_at FROM memories
+            WHERE type = 'commitment' AND invalidated_at IS NULL
+              AND deadline_at BETWEEN datetime('now') AND datetime('now', '+7 days')
+            ORDER BY deadline_at ASC LIMIT 20
+            """
+        )
+        if due_week:
+            lines.append("## 📅 Due This Week")
+            lines.append("")
+            lines.append("| Commitment | Person/Project | Deadline |")
+            lines.append("|------------|---------------|---------|")
+            for row, entities in due_week:
+                content = row["content"][:80] + ("..." if len(row["content"]) > 80 else "")
+                ent_links = ", ".join(
+                    f"[[{ENTITY_TYPE_DIRS.get(e['type'], 'concepts')}/{_sanitize_filename(e['name'])}]]"
+                    for e in entities
+                ) if entities else "-"
+                deadline = row["deadline_at"][:10] if row["deadline_at"] else "-"
+                lines.append(f"| {content} | {ent_links} | {deadline} |")
+            lines.append("")
+
+        # Open (no deadline)
+        open_nd = _get_commitments(
+            """
+            SELECT id, content, deadline_at FROM memories
+            WHERE type = 'commitment' AND invalidated_at IS NULL
+              AND (deadline_at IS NULL OR deadline_at > datetime('now', '+7 days'))
+            ORDER BY importance DESC LIMIT 30
+            """
+        )
+        if open_nd:
+            lines.append("## 🔄 Open (no deadline)")
+            lines.append("")
+            for row, entities in open_nd:
+                content = row["content"][:80] + ("..." if len(row["content"]) > 80 else "")
+                ent_links = " ".join(
+                    f"[[{ENTITY_TYPE_DIRS.get(e['type'], 'concepts')}/{_sanitize_filename(e['name'])}]]"
+                    for e in entities
+                )
+                suffix = f" ({ent_links})" if ent_links else ""
+                lines.append(f"- [ ] {content}{suffix}")
+            lines.append("")
+
+        # Recently completed
+        completed = _get_commitments(
+            """
+            SELECT id, content, invalidated_at as deadline_at FROM memories
+            WHERE type = 'commitment' AND invalidated_at IS NOT NULL
+              AND invalidated_at > datetime('now', '-7 days')
+            ORDER BY invalidated_at DESC LIMIT 10
+            """
+        )
+        if completed:
+            lines.append("## ✅ Recently Completed (last 7 days)")
+            lines.append("")
+            for row, entities in completed:
+                content = row["content"][:80] + ("..." if len(row["content"]) > 80 else "")
+                lines.append(f"- [x] {content}")
+            lines.append("")
+
+        if not overdue and not due_week and not open_nd:
+            lines.append("*No open commitments tracked.*")
+            lines.append("")
+
+        lines.append(f"---\n*Last updated: {timestamp}*")
+        return "\n".join(lines)
+
+    def _generate_moc_projects(self) -> str:
+        """Generate MOC-Projects.md -- project status overview for Claudia's read layer."""
+        from datetime import datetime as _dt
+
+        timestamp = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        lines = ["# Projects Overview", "", f"> Last updated: {timestamp}", ""]
+
+        projects = self.db.execute(
+            """
+            SELECT id, name, importance, attention_tier, updated_at
+            FROM entities
+            WHERE type = 'project' AND deleted_at IS NULL
+            ORDER BY importance DESC
+            """,
+            fetch=True,
+        ) or []
+
+        if not projects:
+            lines.append("*No projects tracked yet.*")
+            lines.append(f"\n---\n*Last updated: {timestamp}*")
+            return "\n".join(lines)
+
+        # Group by tier
+        tiers: Dict[str, List] = {"active": [], "standard": [], "archive": []}
+        for p in projects:
+            tier = (p["attention_tier"] or "standard").lower()
+            if tier not in tiers:
+                tier = "standard"
+            tiers[tier].append(p)
+
+        tier_config = [
+            ("active", "## Active Projects"),
+            ("standard", "## Standard Projects"),
+            ("archive", "## Archive"),
+        ]
+
+        for tier_key, tier_heading in tier_config:
+            tier_projects = tiers.get(tier_key, [])
+            if not tier_projects:
+                continue
+
+            lines.append(tier_heading)
+            lines.append("")
+            lines.append("| Name | Connected People | Open Commitments | Importance |")
+            lines.append("|------|-----------------|-----------------|-----------|")
+
+            for p in tier_projects:
+                # Count connected people
+                people_rows = self.db.execute(
+                    """
+                    SELECT COUNT(DISTINCT e.id) as cnt
+                    FROM entities e
+                    JOIN relationships r ON (
+                        (r.source_entity_id = ? AND r.target_entity_id = e.id) OR
+                        (r.target_entity_id = ? AND r.source_entity_id = e.id)
+                    )
+                    WHERE e.type = 'person' AND e.deleted_at IS NULL AND r.invalid_at IS NULL
+                    """,
+                    (p["id"], p["id"]),
+                    fetch=True,
+                )
+                people_count = people_rows[0]["cnt"] if people_rows else 0
+
+                # Count open commitments
+                comm_rows = self.db.execute(
+                    """
+                    SELECT COUNT(*) as cnt FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ? AND m.type = 'commitment' AND m.invalidated_at IS NULL
+                    """,
+                    (p["id"],),
+                    fetch=True,
+                )
+                comm_count = comm_rows[0]["cnt"] if comm_rows else 0
+
+                lines.append(
+                    f"| [[projects/{_sanitize_filename(p['name'])}]] | {people_count} | {comm_count} | {p['importance']} |"
+                )
+
+            lines.append("")
+
+        lines.append(f"---\n*Last updated: {timestamp}*")
+        return "\n".join(lines)
+
+    def _write_moc_file(self, filename: str, content: str) -> None:
+        """Write a MOC file to the correct vault location (respects wing config)."""
+        moc_dir = self._moc_dir()
+        moc_dir.mkdir(parents=True, exist_ok=True)
+        filepath = moc_dir / filename
+        try:
+            filepath.write_text(content, encoding="utf-8")
+        except IOError as e:
+            logger.error(f"Failed to write MOC file {filepath}: {e}")
+
     # ── Public sync methods ─────────────────────────────────────
 
     def export_all(self) -> Dict[str, int]:
@@ -1390,6 +1816,7 @@ class VaultSyncService:
             "patterns": 0,
             "reflections": 0,
             "sessions": 0,
+            "mocs": 0,
         }
 
         # Export all entities
@@ -1416,6 +1843,12 @@ class VaultSyncService:
 
         # Export MOC index files (always regenerated)
         self._export_moc_indices()
+
+        # Write top-level MOC files (Claudia's read layer)
+        self._write_moc_file("MOC-People.md", self._generate_moc_people())
+        self._write_moc_file("MOC-Commitments.md", self._generate_moc_commitments())
+        self._write_moc_file("MOC-Projects.md", self._generate_moc_projects())
+        stats["mocs"] = 3
 
         # Export .obsidian config (idempotent, never overwrites)
         self._export_obsidian_config()
@@ -1450,6 +1883,7 @@ class VaultSyncService:
             "patterns": 0,
             "reflections": 0,
             "sessions": 0,
+            "mocs": 0,
         }
 
         # Export changed entities
@@ -1465,6 +1899,12 @@ class VaultSyncService:
 
         # Sessions since last sync
         stats["sessions"] = self._export_sessions(since=last_sync)
+
+        # Always regenerate MOC files (pure SQL, fast)
+        self._write_moc_file("MOC-People.md", self._generate_moc_people())
+        self._write_moc_file("MOC-Commitments.md", self._generate_moc_commitments())
+        self._write_moc_file("MOC-Projects.md", self._generate_moc_projects())
+        stats["mocs"] = 3
 
         self._save_sync_metadata(stats)
         self._append_sync_log(
@@ -1795,3 +2235,117 @@ def run_vault_sync(project_id: Optional[str] = None, full: bool = False) -> Dict
         return svc.export_all()
     else:
         return svc.export_incremental()
+
+
+def run_vault_migration(vault_path: Path, preview: bool = False) -> Dict[str, Any]:
+    """Migrate an existing flat vault to the Claudia wing structure.
+
+    Walks Claudia-owned notes (frontmatter has claudia_id), copies them to
+    wing paths, adds Obsidian aliases for wikilink compatibility, and enables
+    use_claudia_wing in config.
+
+    Args:
+        vault_path: Path to the vault root.
+        preview: If True, print plan without making changes.
+
+    Returns:
+        Dict with migration results.
+    """
+    import shutil as _shutil
+    from datetime import datetime as _dt
+
+    config = get_config()
+    wing = getattr(config, "claudia_wing_dir", "claudia")
+
+    FLAT_TO_WING = {
+        "people": f"{wing}/relational/people",
+        "concepts": f"{wing}/relational/concepts",
+        "locations": f"{wing}/relational/locations",
+        "patterns": f"{wing}/relational/patterns",
+        "reflections": f"{wing}/self",
+        "projects": f"{wing}/ops/projects",
+        "organizations": f"{wing}/ops/organizations",
+    }
+
+    # Walk vault for Claudia-owned .md files
+    migrations = []  # list of (source_path, dest_path)
+    for subdir, wing_path in FLAT_TO_WING.items():
+        source_dir = vault_path / subdir
+        if not source_dir.exists():
+            continue
+        for filepath in sorted(source_dir.glob("*.md")):
+            try:
+                raw = filepath.read_text(encoding="utf-8", errors="replace")
+                if "claudia_id:" in raw:
+                    dest = vault_path / wing_path / filepath.name
+                    migrations.append((filepath, dest))
+            except IOError:
+                pass
+
+    if preview:
+        print(f"\nVault Migration Preview ({len(migrations)} files)")
+        print(f"Wing directory: {wing}/")
+        print()
+        shown = migrations[:20]
+        for src, dst in shown:
+            print(f"  {src.relative_to(vault_path)} -> {dst.relative_to(vault_path)}")
+        if len(migrations) > 20:
+            print(f"  ... and {len(migrations) - 20} more files")
+        print()
+        total_md = sum(1 for _ in vault_path.rglob("*.md"))
+        user_owned = total_md - len(migrations)
+        print(f"Claudia-owned files to migrate: {len(migrations)}")
+        print(f"User-owned files untouched: {user_owned}")
+        print("\nRun without --preview to execute migration.")
+        return {"preview": True, "files_to_migrate": len(migrations)}
+
+    # Execute migration
+    timestamp = _dt.utcnow().strftime("%Y-%m-%d-%H%M%S")
+    backup_dir = vault_path / f"_backup_pre_wing_{timestamp}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    migrated = 0
+    errors = 0
+
+    for src, dst in migrations:
+        try:
+            _shutil.copy2(src, backup_dir / src.name)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            _shutil.copy2(src, dst)
+            # Add alias to new file's frontmatter for wikilink compat
+            try:
+                raw = dst.read_text(encoding="utf-8")
+                rel_path = str(src.relative_to(vault_path)).replace("\\", "/")
+                if "aliases:" not in raw[:300] and raw.startswith("---"):
+                    alias_line = f"aliases:\n  - \"{rel_path}\"\n"
+                    raw = raw.replace("---\n", f"---\n{alias_line}", 1)
+                    dst.write_text(raw, encoding="utf-8")
+            except Exception:
+                pass
+            migrated += 1
+        except Exception as e:
+            logger.warning(f"Migration failed for {src}: {e}")
+            errors += 1
+
+    # Enable wing in config.json
+    config_path = Path.home() / ".claudia" / "config.json"
+    try:
+        import json as _json
+        existing = {}
+        if config_path.exists():
+            with open(config_path) as f:
+                existing = _json.load(f)
+        existing["use_claudia_wing"] = True
+        with open(config_path, "w") as f:
+            _json.dump(existing, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not update config.json: {e}")
+
+    print(f"\nVault migration complete:")
+    print(f"  Files migrated: {migrated}")
+    print(f"  Errors: {errors}")
+    print(f"  Backup at: {backup_dir}")
+    print(f"  Wing enabled in config.json")
+    print(f"\nOriginal files preserved. Obsidian wikilinks resolve via aliases.")
+
+    return {"migrated": migrated, "errors": errors, "backup_dir": str(backup_dir)}

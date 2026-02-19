@@ -155,6 +155,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self._send_stats_response()
         elif self.path == "/flush":
             self._send_flush_response()
+        elif self.path == "/briefing":
+            self._send_briefing_response()
         else:
             self.send_error(404, "Not Found")
 
@@ -243,6 +245,24 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.exception("Error flushing WAL")
+            self.send_error(500, str(e))
+
+    def _send_briefing_response(self):
+        """Send compact session briefing (same data as memory.briefing MCP tool).
+
+        Lets session hooks call briefing data over HTTP before MCP tools register,
+        providing a pre-MCP layer in the fallback chain.
+        """
+        try:
+            from ..mcp.server import _build_briefing
+            briefing_text = _build_briefing()
+            response = {"briefing": briefing_text}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+        except Exception as e:
+            logger.exception("Error building briefing")
             self.send_error(500, str(e))
 
 

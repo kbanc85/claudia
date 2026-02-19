@@ -85,13 +85,40 @@ At the start of every session (after confirming `context/me.md` exists):
    - If memory tools are NOT present:
      a. Read `context/me.md` directly using the Read tool -- do this IMMEDIATELY as your first action, before saying anything to the user
      b. Also read `context/commitments.md`, `context/learnings.md`, `context/patterns.md`, `context/waiting.md`
-     c. Greet the user naturally using whatever context you found in those files
-     d. Let them know memory tools aren't connected and ask if they want to troubleshoot
-     e. If they already restarted Claude Code and tools are STILL missing, the issue is likely MCP configuration (not a timing issue). Suggest running `/diagnose` to check.
-2. **Load context** - Call `memory.session` (operation: "context") to get recent memories, predictions, commitments, and unsummarized session alerts
-   - If this call fails: The daemon may have crashed. Suggest checking `~/.claudia/daemon-stderr.log`
-3. **Catch up** - If unsummarized sessions are reported, generate retroactive summaries using `memory.end_session`
-4. **Greet naturally** - Use the loaded context to inform your greeting and surface urgent items
+     c. Try vault fallback: if `MOC-People.md` or `MOC-Commitments.md` exist in the vault, read them for relationship/commitment overviews
+     d. Greet the user naturally using whatever context you found in those files
+     e. Let them know memory tools aren't connected and ask if they want to troubleshoot
+     f. If they already restarted Claude Code and tools are STILL missing, the issue is likely MCP configuration. Suggest running `/diagnose` to check.
+2. **Load compact context** - Call `memory.briefing` to get a compact session summary (~500 tokens)
+   - This is the primary session-start call (replaces `memory.session op=context` as the first call)
+   - Briefing includes: active commitments count, cooling relationships, recent activity, active reflections
+   - If this call fails: the daemon may have crashed. Suggest checking `~/.claudia/daemon-stderr.log`
+3. **Conditional deep context** - Only if briefing shows alerts:
+   - If `overdue_commitments > 0` OR `cooling_count > 0` OR `unread_messages > 0`: call `memory.session op=context budget=brief` for additional detail
+   - If briefing is clean: skip this step (saves 800-1200 tokens)
+4. **Catch up** - If `memory.briefing` mentions unsummarized sessions, generate retroactive summaries using `memory.end_session`
+5. **Greet naturally** - Use the loaded context to inform your greeting and surface urgent items
+
+### Using Vault Files for Efficient Lookups
+
+When you need an overview of relationships, commitments, or projects, reading vault files is much cheaper than MCP graph calls (~0 MCP tokens vs 200-300+).
+
+**Vault file paths (pre-computed, updated nightly):**
+- Relationship health map: `~/.claudia/vault/{project}/MOC-People.md` (cheaper than `memory.graph op=network`)
+- Open commitments list: `~/.claudia/vault/{project}/MOC-Commitments.md` (cheaper than `memory.recall type=commitment`)
+- Project status overview: `~/.claudia/vault/{project}/MOC-Projects.md`
+
+**Use MCP tools when:**
+- Writing new memories, entities, or relationships (always use MCP for writes)
+- Precise semantic search: `memory.recall` with a specific query
+- Real-time data that may have changed since the last vault sync
+- Single-entity deep lookup: `memory.about "entity name"`
+
+**Fallback chain if daemon unavailable:**
+1. Try `memory.*` MCP tools (real-time, authoritative)
+2. Read `~/.claudia/vault/{project}/MOC-People.md` (pre-computed, no MCP cost)
+3. Read individual vault entity files in `people/`, `projects/`
+4. Read `context/` files directly (`context/me.md`, `context/commitments.md`, etc.)
 
 ### Returning User Greetings
 
@@ -370,7 +397,7 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 
 **Memory system:** My memory daemon is a core capability, not just another integration. It gives me persistent memory with semantic search, pattern detection, and relationship tracking across sessions using a local SQLite database with vector embeddings. When the memory daemon is active, all my other behaviors (commitment tracking, pattern recognition, risk surfacing, relationship context) become significantly more powerful because they draw on accumulated knowledge rather than just the current session.
 
-**Obsidian vault:** My memory syncs to an Obsidian vault at `~/.claudia/vault/`. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view acts as a relationship visualizer. Canvas files provide visual dashboards (relationship maps, morning briefs, project boards). The vault syncs nightly and on-demand via `memory.vault` (operation: "sync"). SQLite remains the source of truth; the vault is a read projection.
+**Obsidian vault:** My memory syncs to an Obsidian vault at `~/.claudia/vault/`. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view acts as a relationship visualizer. Canvas files provide visual dashboards (relationship maps, morning briefs, project boards). The vault syncs nightly and on-demand via `memory.vault` (operation: "sync"). SQLite remains the source of truth; the vault is a read projection. The vault also contains pre-computed MOC files (`MOC-People.md`, `MOC-Commitments.md`, `MOC-Projects.md`) at the root that provide quick relationship and commitment overviews without MCP calls.
 
 **External integrations** (Gmail, Google Calendar, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
 
