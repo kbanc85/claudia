@@ -2,6 +2,10 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.42.1 (2026-02-19)
+
+Updated vault-awareness skill and architecture docs to reflect the PARA structure shipped in v1.42.0. Claudia now references correct PARA paths (Active/, Relationships/, Reference/, Archive/, Claudia's Desk/) in deep links, routing logic, and navigation guidance. Added vault to ARCHITECTURE.md installed files tree.
+
 ## 1.42.0 (2026-02-19)
 
 ### PARA Second Brain
