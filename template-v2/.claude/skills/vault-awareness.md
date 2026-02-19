@@ -19,30 +19,43 @@ Claudia's memory lives in SQLite (the source of truth). The vault at `~/.claudia
 
 ```
 vault/
-  Home.md             Dashboard entry point (regenerated each sync)
-  people/             Entity notes for persons
-    _Index.md         MOC grouped by attention tier
-  projects/           Entity notes for projects
-    _Index.md         MOC grouped by attention tier
-  organizations/      Entity notes for organizations
-    _Index.md         MOC grouped by attention tier
-  concepts/           Entity notes for concepts
-    _Index.md         MOC
-  locations/          Entity notes for locations
-    _Index.md         MOC
-  patterns/           Detected patterns
-  reflections/        Reflections from /meditate
-  sessions/           Hierarchical session logs (YYYY/MM/YYYY-MM-DD.md)
-  canvases/           Visual dashboards (.canvas files)
-  _queries/           Dataview query templates (7 templates)
-  _meta/              Sync metadata (last-sync.json, sync-log.md)
-  .obsidian/          Obsidian config (graph colors, CSS theme, workspace)
-    graph.json        Color groups by entity type
-    app.json          Readable line length, show frontmatter
-    appearance.json   Enable claudia-theme CSS snippet
-    workspace.json    Open Home.md on launch
+  Home.md                    PARA navigation dashboard (regenerated each sync)
+  Active/                    Projects with active attention
+    Website Redesign.md
+    _Index.md                MOC for active projects
+  Relationships/
+    people/                  Person entities (non-archived)
+      Sarah Chen.md
+      _Index.md              MOC grouped by attention tier
+    organizations/           Organization entities (non-archived)
+      Acme Corp.md
+      _Index.md
+  Reference/
+    concepts/                Knowledge, frameworks, tools
+      _Index.md
+    locations/               Places
+      _Index.md
+  Archive/                   Dormant or archived entities
+    people/
+    projects/
+    organizations/
+  Claudia's Desk/            Claudia's efficient lookup zone
+    MOC-People.md            Flat tier table (Claudia reads, ~0 MCP cost)
+    MOC-Commitments.md       Commitment tracking table
+    MOC-Projects.md          Project overview table
+    patterns/                Detected pattern notes
+    reflections/             Reflections from /meditate
+    sessions/                Session logs (YYYY/MM/YYYY-MM-DD.md)
+    _queries/                Dataview query templates (7 templates)
+  canvases/                  Visual dashboards (.canvas files)
+  _meta/                     Sync metadata (last-sync.json, sync-log.md)
+  .obsidian/                 Obsidian config
+    graph.json               Color groups by entity type
+    app.json                 Readable line length, show frontmatter
+    appearance.json          Enable claudia-theme CSS snippet
+    workspace.json           Open Home.md on launch
     snippets/
-      claudia-theme.css  Entity type emoji prefixes, tag colors
+      claudia-theme.css      Entity type emoji prefixes, tag colors
 ```
 
 ### How Notes Map to Memory
@@ -56,11 +69,25 @@ Each entity gets one markdown note with:
 - **Wikilinks**: Relationships and session narratives use `[[Entity Name]]` links for graph connectivity
 - **Sync footer**: Last sync timestamp
 
+### PARA Routing Logic
+
+Entities are routed to PARA directories based on their type and status:
+
+- `attention_tier = "archive"` OR `contact_trend = "dormant"` → `Archive/{type}/`
+- `entity_type = "project"` → `Active/`
+- `entity_type = "person"` → `Relationships/people/`
+- `entity_type = "organization"` → `Relationships/organizations/`
+- `entity_type = "concept"` → `Reference/concepts/`
+- `entity_type = "location"` → `Reference/locations/`
+
+Archive routing takes precedence: a dormant person goes to `Archive/people/`, not `Relationships/people/`.
+
 ### Navigation
 
-- **Home.md**: Dashboard with quick navigation links (entity counts), attention watchlist, open commitments, recent activity
-- **_Index.md**: Map of Content (MOC) files in each entity type directory, grouped by attention tier (active, watchlist, standard, archive)
-- **Dataview queries**: 7 templates in `_queries/` (Upcoming Deadlines, Cooling Relationships, Active Network, Recent Memories, Open Commitments, Entity Overview, Session Log)
+- **Home.md**: PARA navigation dashboard with active projects, relationship counts, needs-attention callouts, and quick links to Claudia's Desk
+- **_Index.md**: Map of Content files in each PARA subdirectory, grouped by attention tier
+- **Claudia's Desk/MOC-*.md**: Pre-computed flat tables for cheap reads (MOC-People, MOC-Commitments, MOC-Projects)
+- **Dataview queries**: 7 templates in `Claudia's Desk/_queries/` (Upcoming Deadlines, Cooling Relationships, Active Network, Recent Memories, Open Commitments, Entity Overview, Session Log)
 
 ### Canvas Files
 
@@ -155,23 +182,26 @@ Open it in Obsidian to see the interactive graph."
 When referencing entities in conversation, generate `obsidian://` URIs so the user can jump directly to the note:
 
 ```
-obsidian://open?vault=claudia-vault&file={type_dir}/{entity_name}
+obsidian://open?vault=claudia-vault&file={para_dir}/{entity_name}
 ```
 
-### Type-to-Directory Mapping
+### Type-to-Directory Mapping (PARA)
 
-| Entity Type | Directory |
-|-------------|-----------|
-| person | people |
-| project | projects |
-| organization | organizations |
-| concept | concepts |
-| location | locations |
+| Entity Type | PARA Directory | Archive Directory |
+|-------------|---------------|-------------------|
+| person | Relationships/people | Archive/people |
+| project | Active | Archive/projects |
+| organization | Relationships/organizations | Archive/organizations |
+| concept | Reference/concepts | (not archived) |
+| location | Reference/locations | (not archived) |
+
+Archived/dormant entities route to `Archive/{type}/`. Deep links must account for `attention_tier`/`contact_trend` to determine the correct path.
 
 ### Examples
 
-- `obsidian://open?vault=claudia-vault&file=people/Sarah%20Chen`
-- `obsidian://open?vault=claudia-vault&file=projects/Website%20Redesign`
+- `obsidian://open?vault=claudia-vault&file=Relationships/people/Sarah%20Chen`
+- `obsidian://open?vault=claudia-vault&file=Active/Website%20Redesign`
+- `obsidian://open?vault=claudia-vault&file=Claudia's%20Desk/MOC-People`
 
 ### When to Include Deep Links
 

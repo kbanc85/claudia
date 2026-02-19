@@ -309,6 +309,8 @@ claudia/
 │   └── claudia_memory/           # Daemon source code
 ├── memory/
 │   └── claudia.db                # Your memory database (SQLite)
+├── vault/                        # Obsidian vault (PARA structure)
+│   └── {project_hash}/          # Per-project vault
 ├── config.json                   # Memory system settings
 └── daemon.log                    # Activity log
 ```
