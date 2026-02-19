@@ -14,9 +14,10 @@ Both layers are core to how Claudia works. The template layer defines *who* Clau
 This repository also contains:
 - `docs/` - Design plans and internal docs
 - `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package, no tests -- pure markdown)
+- `visualizer/` - 3D brain graph (Express + Vite + 3d-force-graph; included in npm package)
 - `template/` - Legacy template (deprecated)
 
-Previously included gateway, relay, and visualizer directories were archived to the `archive/pre-obsidian` branch and replaced by the Obsidian vault integration.
+Previously included gateway and relay directories were archived to the `archive/pre-obsidian` branch. The visualizer was retained and ships with the npm package.
 
 For full architectural diagrams and pipeline explanations, see `ARCHITECTURE.md`.
 
@@ -151,6 +152,15 @@ claudia-brain                          # Same TUI via entry point
 curl http://localhost:3848/health      # Health check
 ```
 
+### Working on the Visualizer
+
+```bash
+cd visualizer
+npm install
+npm start          # Production mode (Express serves static build on :3847)
+npm run dev        # Dev mode with Vite HMR
+```
+
 ### Adding a Database Migration
 
 Migrations live in two places:
@@ -208,6 +218,13 @@ The package is published to NPM as `get-claudia`. Update version in:
 npm pack      # Build tarball
 npm publish   # Publish to NPM
 ```
+
+## Gotchas
+
+- **`openclaw-skills/` is repo-only** and not included in the npm package. It's for OpenClaw agent development only.
+- **`visualizer/` IS in the npm package** (`files` array in `package.json`). It ships with `get-claudia` and is installed alongside `template-v2/` and `memory-daemon/`.
+- **Obsidian vault sync** (`memory-daemon/claudia_memory/services/vault_sync.py`) is exposed via the `memory.vault` MCP tool (`sync`, `status`, `canvas`, `import` operations). The canvas generator writes `.canvas` files for Obsidian's graph view.
+- **`schema.sql` splits on `;` at line endings.** `CREATE TRIGGER` with internal semicolons must go in `database.py` instead (see inline note in Adding a Database Migration).
 
 ## Design Principles
 
@@ -268,5 +285,6 @@ claudia/
 ├── docs/                    ← Design plans and internal docs
 │   └── plans/
 ├── openclaw-skills/          ← Standalone OpenClaw skills (not in npm package)
+├── visualizer/               ← 3D brain graph (Express + Vite; ships with npm)
 └── template/                 ← Legacy template (deprecated)
 ```
