@@ -5,7 +5,7 @@
 <h3 align="center">A thinking partner who tracks relationships, not just tasks.</h3>
 
 <p align="center">
-Catches commitments. Remembers context. Connects the dots across your network.
+Remembers your people. Catches your commitments. Learns how you work.
 </p>
 
 <p align="center">
@@ -17,6 +17,7 @@ Catches commitments. Remembers context. Connects the dots across your network.
 <p align="center">
 <a href="#try-it-in-30-seconds"><strong>Try the Demo</strong></a> ·
 <a href="#what-makes-claudia-different">Why Claudia</a> ·
+<a href="#how-her-mind-works">Her Mind</a> ·
 <a href="#quick-start">Install</a> ·
 <a href="#how-it-works">How It Works</a>
 </p>
@@ -42,26 +43,53 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 <p>Say "I'll send that by Friday" and she tracks it. On Friday morning, she reminds you.</p>
 </td>
 <td width="33%" align="center">
-<h3>🔗 Remembers Relationships</h3>
-<p>Mention Sarah from Acme and Claudia surfaces: last conversation, open promises, sentiment.</p>
+<h3>🔗 Knows Your People</h3>
+<p>Every person she meets gets a living profile: relationship health, contact trends, connected entities. Ask about anyone and she has the full picture.</p>
 </td>
 <td width="33%" align="center">
-<h3>⚠️ Warns Before Things Slip</h3>
-<p>Haven't talked to your best client in 3 weeks? She tells you before it's a problem.</p>
+<h3>⚠️ Spots Patterns You Miss</h3>
+<p>Overcommitting again? A key relationship going cold? The same mistake twice? She sees it forming and speaks up.</p>
 </td>
 </tr>
 <tr>
 <td width="33%" align="center">
-<h3>📄 Shows Her Work</h3>
+<h3>📄 Shows Her Sources</h3>
 <p>Every fact traces to its source. Ask "how do you know that?" and she shows the receipt.</p>
 </td>
 <td width="33%" align="center">
-<h3>🧠 Obsidian Vault Sync</h3>
-<p>Memory syncs to an Obsidian vault as markdown notes with wikilinks. Graph view visualizes your entire network. Plain files you own forever.</p>
+<h3>🧠 Second Brain in Obsidian</h3>
+<p>Memory syncs to an Obsidian vault organized by activity: Active projects, Relationships, Reference, Archive. Graph view maps your world. Plain markdown you own forever.</p>
 </td>
 <td width="33%" align="center">
-<h3>🔒 Fully Local</h3>
-<p>Everything runs on your machine. Your data never leaves. Delete anything, anytime.</p>
+<h3>🌙 Learns in the Background</h3>
+<p>Overnight, old memories fade, near-duplicates merge, and patterns surface. Each morning she knows a little more than yesterday.</p>
+</td>
+</tr>
+</table>
+
+---
+
+## How Her Mind Works
+
+<table>
+<tr>
+<td width="50%" align="center">
+<h3>💾 Remember</h3>
+<p>Every fact is stored with who said it, when, and how confident she is. Embeddings capture <em>meaning</em>, not just keywords, so "we pushed the launch" and "timeline shifted" connect naturally.</p>
+</td>
+<td width="50%" align="center">
+<h3>🔍 Recall</h3>
+<p>Search blends meaning similarity, importance, recency, and full-text matching. Accessing a memory strengthens it, just like the rehearsal effect in human cognition.</p>
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+<h3>🌙 Consolidate</h3>
+<p>Overnight background jobs fade old memories, merge near-duplicates, and surface patterns: cooling relationships, overdue commitments, repeated behaviors. She wakes up sharper.</p>
+</td>
+<td width="50%" align="center">
+<h3>📓 Vault</h3>
+<p>Memory syncs to an Obsidian vault organized with PARA: Active projects, Relationships, Reference material, Archive. Graph view shows how your world connects. Plain markdown you own forever.</p>
 </td>
 </tr>
 </table>
@@ -153,7 +181,37 @@ Claudia: Sarah Chen is CEO at Meridian Ventures. You met at SaaStr 2025.
          Source: Call notes from Jan 28, Email thread Jan 30
 ```
 
-From here, every conversation builds on the last. She remembers.
+**Morning brief pulls everything together:**
+
+```
+You:     /morning-brief
+
+Claudia: ☀️ Morning Brief — Wednesday, Feb 19
+
+         ⚠️ Needs Attention:
+         • Send updated pitch deck to Sarah Chen [OVERDUE]
+         • Quarterly review with Acme Corp is tomorrow
+
+         👀 Watch:
+         • Haven't spoken to Marcus in 18 days (usually weekly)
+         • Two new commitments this week, zero closed
+
+         📊 Today: 3 meetings, 2 open commitments
+```
+
+**Pattern detection works across weeks, not just moments:**
+
+```
+Claudia: I've noticed something across the last few weeks.
+         You've taken on 4 new commitments without closing any.
+         Last time this happened (early January), two slipped
+         past deadline.
+
+         Want me to flag the lowest-priority ones so you can
+         decide what to defer?
+```
+
+Every conversation builds on the last. She remembers.
 
 ---
 
@@ -180,8 +238,9 @@ Claudia detects your work style and generates structure that fits:
 | `/meeting-prep [person]` | One-page briefing before a call |
 | `/capture-meeting` | Process notes into decisions, commitments, action items |
 | `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
-| `/inbox-check` | Review Telegram and webhook messages |
-| `/gateway` | Manage external message gateway |
+| `/sync-vault` | Sync memory to Obsidian vault |
+| `/brain` | Launch 3D brain visualizer |
+| `/deep-context [topic]` | Full-context deep analysis |
 | `/memory-audit` | See everything Claudia knows, with source chains |
 
 <details>
@@ -196,8 +255,10 @@ Claudia detects your work style and generates structure that fits:
 | `/new-person [name]` | Create a relationship file |
 | `/pipeline-review` | Active deals, capacity, pipeline health |
 | `/client-health` | Status across all client relationships |
-| `/setup-gateway` | Configure external message gateway |
-| `/setup-telegram` | Connect Telegram bot integration |
+| `/inbox-check` | Review messages from connected channels |
+| `/meditate` | End-of-session reflection and persistent learnings |
+| `/fix-duplicates` | Find and merge duplicate entities |
+| `/memory-health` | Check memory system health |
 | `/diagnose` | Check memory daemon health and troubleshoot |
 
 </details>
@@ -224,11 +285,13 @@ You ──► Claude Code ──► Reads Claudia's templates ──► Becomes 
                                                            ▼
                               Memory daemon (local) ◄── MCP tools
                                       │
-                               ┌──────┴──────┐
-                               ▼              ▼
-              SQLite + vectors + Ollama    Obsidian vault
-                   (all local)           (markdown notes)
+                               ┌──────┼──────┐
+                               ▼      ▼      ▼
+                           SQLite  Ollama  Obsidian vault
+                          +vectors         (PARA structure)
 ```
+
+**Local extraction, zero API calls.** Paste a meeting transcript or email thread. A local language model (Qwen3, SmolLM3, or Llama 3.2 via Ollama) extracts entities, commitments, and decisions in seconds. Claude reviews the extractions and applies judgment. No data leaves your machine.
 
 <details>
 <summary><strong>Technical deep dive</strong></summary>
@@ -249,26 +312,13 @@ For full architecture diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 </details>
 
-<details>
-<summary><strong>Cognitive tools (local LLM extraction)</strong></summary>
-
-Paste a meeting transcript. A local language model extracts structured data (entities, facts, commitments) in seconds. Claude reviews and applies judgment.
-
-- Runs locally via [Ollama](https://ollama.com), no API keys
-- Models: Qwen3-4B (recommended), SmolLM3-3B, Llama 3.2-3B
-- Falls back gracefully when no model installed
-
-Four extraction modes: **meeting**, **email**, **document**, **general**.
-
-</details>
-
 ---
 
 ## Privacy and Safety
 
 - **Fully local.** Memory, embeddings, cognitive tools run on your machine. No external APIs for storage.
 - **No external actions without approval.** Every email, calendar event, external action requires your explicit "yes."
-- **Your data in two formats.** SQLite database (`~/.claudia/memory/`) for fast semantic search, plus plain markdown files in your Obsidian vault for reading and graph navigation. Two independent copies you own forever.
+- **Your data in two formats.** SQLite database (`~/.claudia/memory/`) for fast semantic search, plus a PARA-organized Obsidian vault for reading and graph navigation. Two independent copies you own forever.
 - **Delete anything, anytime.** Full control over your data. No lock-in, no cloud dependency.
 
 ---
