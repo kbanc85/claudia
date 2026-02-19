@@ -95,9 +95,8 @@ class MemoryConfig:
     obsidian_rest_api_port: int = 27124
     obsidian_rest_api_enabled: bool = False
 
-    # Claudia Wing (optional vault container for Claudia's notes)
-    use_claudia_wing: bool = False       # Opt-in wing structure; off by default
-    claudia_wing_dir: str = "claudia"    # Customizable container name
+    # Vault layout (PARA-inspired structure)
+    vault_layout: str = "para"           # Vault organization style (only "para" for now)
 
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
@@ -174,10 +173,8 @@ class MemoryConfig:
                     config.obsidian_rest_api_port = data["obsidian_rest_api_port"]
                 if "obsidian_rest_api_enabled" in data:
                     config.obsidian_rest_api_enabled = data["obsidian_rest_api_enabled"]
-                if "use_claudia_wing" in data:
-                    config.use_claudia_wing = data["use_claudia_wing"]
-                if "claudia_wing_dir" in data:
-                    config.claudia_wing_dir = data["claudia_wing_dir"]
+                if "vault_layout" in data:
+                    config.vault_layout = data["vault_layout"]
                 if "enable_entity_summaries" in data:
                     config.enable_entity_summaries = data["enable_entity_summaries"]
                 if "entity_summary_min_memories" in data:
@@ -300,8 +297,7 @@ class MemoryConfig:
             "vault_name": self.vault_name,
             "obsidian_rest_api_port": self.obsidian_rest_api_port,
             "obsidian_rest_api_enabled": self.obsidian_rest_api_enabled,
-            "use_claudia_wing": self.use_claudia_wing,
-            "claudia_wing_dir": self.claudia_wing_dir,
+            "vault_layout": self.vault_layout,
             "enable_entity_summaries": self.enable_entity_summaries,
             "entity_summary_min_memories": self.entity_summary_min_memories,
             "entity_summary_max_age_days": self.entity_summary_max_age_days,

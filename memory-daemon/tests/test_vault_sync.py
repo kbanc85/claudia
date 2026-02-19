@@ -172,8 +172,8 @@ def test_export_entity_type_directories(db, vault_svc, vault_dir):
     for entity in entities:
         vault_svc.export_entity(entity)
 
-    assert (vault_dir / "organizations" / "Acme Corp.md").exists()
-    assert (vault_dir / "projects" / "Website Redesign.md").exists()
+    assert (vault_dir / "Relationships" / "organizations" / "Acme Corp.md").exists()
+    assert (vault_dir / "Active" / "Website Redesign.md").exists()
 
 
 def test_export_entity_with_aliases(db, vault_svc, vault_dir):
@@ -204,9 +204,9 @@ def test_export_all(db, vault_svc, vault_dir):
     stats = vault_svc.export_all()
 
     assert stats["entities"] == 3
-    assert (vault_dir / "people" / "Alice.md").exists()
-    assert (vault_dir / "people" / "Bob.md").exists()
-    assert (vault_dir / "organizations" / "Acme.md").exists()
+    assert (vault_dir / "Relationships" / "people" / "Alice.md").exists()
+    assert (vault_dir / "Relationships" / "people" / "Bob.md").exists()
+    assert (vault_dir / "Relationships" / "organizations" / "Acme.md").exists()
     # Metadata written
     assert (vault_dir / "_meta" / "last-sync.json").exists()
 
@@ -215,10 +215,12 @@ def test_export_all_creates_directory_structure(db, vault_svc, vault_dir):
     """Full export creates all subdirectories including .obsidian."""
     vault_svc.export_all()
 
-    for subdir in ["people", "projects", "organizations", "concepts",
-                   "locations", "patterns", "reflections", "sessions",
+    for subdir in ["Active", "Relationships/people", "Relationships/organizations",
+                   "Reference/concepts", "Reference/locations",
+                   "Claudia's Desk", "Claudia's Desk/patterns",
+                   "Claudia's Desk/reflections", "Claudia's Desk/sessions",
                    "canvases", "_meta", ".obsidian"]:
-        assert (vault_dir / subdir).is_dir()
+        assert (vault_dir / subdir).is_dir(), f"Missing: {subdir}"
 
 
 def test_export_all_skips_deleted_entities(db, vault_svc, vault_dir):
@@ -230,7 +232,7 @@ def test_export_all_skips_deleted_entities(db, vault_svc, vault_dir):
 
     stats = vault_svc.export_all()
     assert stats["entities"] == 0
-    assert not (vault_dir / "people" / "Deleted Person.md").exists()
+    assert not (vault_dir / "Relationships" / "people" / "Deleted Person.md").exists()
 
 
 # ── Incremental export tests ────────────────────────────────────
@@ -255,7 +257,7 @@ def test_incremental_after_full(db, vault_svc, vault_dir):
 
     stats = vault_svc.export_incremental()
     # Bob should be exported (new since last sync)
-    assert (vault_dir / "people" / "Bob.md").exists()
+    assert (vault_dir / "Relationships" / "people" / "Bob.md").exists()
 
 
 # ── Sync metadata tests ─────────────────────────────────────────
@@ -302,9 +304,9 @@ def test_get_status_after_sync(db, vault_svc, vault_dir):
     status = vault_svc.get_status()
     assert status["synced"] is True
     assert status["last_sync"] is not None
-    # Counts include entity notes + _Index.md MOC files
-    assert status["file_counts"]["people"] >= 1
-    assert status["file_counts"]["organizations"] >= 1
+    # Counts include entity notes + _Index.md MOC files (PARA paths)
+    assert status["file_counts"]["Relationships/people"] >= 1
+    assert status["file_counts"]["Relationships/organizations"] >= 1
 
 
 # ── Pattern export tests ────────────────────────────────────────
@@ -321,7 +323,7 @@ def test_export_patterns(db, vault_svc, vault_dir):
     count = vault_svc._export_patterns()
     assert count == 1
 
-    pattern_files = list((vault_dir / "patterns").glob("*.md"))
+    pattern_files = list((vault_dir / "Claudia's Desk" / "patterns").glob("*.md"))
     assert len(pattern_files) == 1
     content = pattern_files[0].read_text()
     assert "cooling_relationship" in content.lower() or "Cooling Relationship" in content
@@ -342,7 +344,7 @@ def test_export_reflections(db, vault_svc, vault_dir):
     count = vault_svc._export_reflections()
     assert count == 1
 
-    ref_files = list((vault_dir / "reflections").glob("*.md"))
+    ref_files = list((vault_dir / "Claudia's Desk" / "reflections").glob("*.md"))
     assert len(ref_files) == 1
     content = ref_files[0].read_text()
     assert "bullet points" in content
@@ -364,8 +366,8 @@ def test_export_sessions(db, vault_svc, vault_dir):
     count = vault_svc._export_sessions()
     assert count == 1
 
-    # Hierarchical path: sessions/2026/02/2026-02-10.md
-    session_file = vault_dir / "sessions" / "2026" / "02" / "2026-02-10.md"
+    # Hierarchical path: Claudia's Desk/sessions/2026/02/2026-02-10.md
+    session_file = vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md"
     assert session_file.exists()
     content = session_file.read_text()
     assert "2026-02-10" in content
@@ -537,8 +539,8 @@ def test_home_dashboard_created(db, vault_svc, vault_dir):
     home = vault_dir / "Home.md"
     assert home.exists()
     content = home.read_text()
-    assert "# Claudia Memory Vault" in content
-    assert "Quick Navigation" in content
+    assert "# Home" in content
+    assert "Active" in content or "Relationships" in content
 
 
 def test_moc_indices_created(db, vault_svc, vault_dir):
@@ -547,10 +549,10 @@ def test_moc_indices_created(db, vault_svc, vault_dir):
     _seed_entity(db, "Acme", "organization")
     vault_svc.export_all()
 
-    assert (vault_dir / "people" / "_Index.md").exists()
-    assert (vault_dir / "organizations" / "_Index.md").exists()
+    assert (vault_dir / "Relationships" / "people" / "_Index.md").exists()
+    assert (vault_dir / "Relationships" / "organizations" / "_Index.md").exists()
 
-    content = (vault_dir / "people" / "_Index.md").read_text()
+    content = (vault_dir / "Relationships" / "people" / "_Index.md").read_text()
     assert "[[Alice]]" in content
 
 
@@ -581,7 +583,7 @@ def test_session_hierarchical_path(db, vault_svc, vault_dir):
     vault_svc._ensure_directories()
     vault_svc._export_sessions()
 
-    assert (vault_dir / "sessions" / "2026" / "02" / "2026-02-10.md").exists()
+    assert (vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md").exists()
 
 
 def test_narrative_wikification(db, vault_svc, vault_dir):
@@ -596,7 +598,7 @@ def test_narrative_wikification(db, vault_svc, vault_dir):
     vault_svc._ensure_directories()
     vault_svc._export_sessions()
 
-    session_file = vault_dir / "sessions" / "2026" / "02" / "2026-02-10.md"
+    session_file = vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md"
     content = session_file.read_text()
     assert "[[Sarah Chen]]" in content
 

@@ -5,18 +5,31 @@ Exports memory data to an Obsidian-compatible vault as markdown notes
 with YAML frontmatter and [[wikilinks]]. The vault is a read projection
 of SQLite data -- SQLite remains the single source of truth.
 
-Vault structure:
+Vault structure (PARA-inspired):
   ~/.claudia/vault/{project_id}/
-    people/         Entity notes for persons
-    projects/       Entity notes for projects
-    organizations/  Entity notes for organizations
-    concepts/       Entity notes for concepts
-    locations/      Entity notes for locations
-    patterns/       Detected pattern notes
-    reflections/    Reflection notes from /meditate
-    sessions/       Daily session logs
-    canvases/       Obsidian canvas files (generated separately)
-    _meta/          Sync metadata (last-sync.json, sync-log.md)
+    Active/                   Projects with attention_tier in (active, watchlist)
+    Relationships/
+      people/                 Person entities (non-archived)
+      organizations/          Organization entities (non-archived)
+    Reference/
+      concepts/               Concept entities
+      locations/              Location entities
+    Archive/
+      people/                 Dormant or archived people
+      projects/               Completed or archived projects
+      organizations/          Past organizations
+    Claudia's Desk/           Claudia's efficient lookup zone
+      MOC-People.md           Flat tier table for quick reads
+      MOC-Commitments.md      Commitment tracking table
+      MOC-Projects.md         Project overview table
+      patterns/               Detected pattern notes
+      reflections/            Reflection notes from /meditate
+      sessions/               Daily session logs (YYYY/MM/YYYY-MM-DD.md)
+      _queries/               Dataview query templates
+    canvases/                 Visual dashboards (human-facing)
+    Home.md                   PARA-style navigation dashboard
+    _meta/                    Sync metadata (last-sync.json, sync-log.md)
+    .obsidian/                Obsidian config
 """
 
 import hashlib
@@ -98,71 +111,59 @@ class VaultSyncService:
         self.db = db or get_db()
 
     def _ensure_directories(self) -> None:
-        """Create the vault directory structure."""
-        from ..config import get_config as _get_config
-        config = _get_config()
-        if getattr(config, "use_claudia_wing", False):
-            wing = getattr(config, "claudia_wing_dir", "claudia")
-            dirs = [
-                f"{wing}/relational/people",
-                f"{wing}/relational/concepts",
-                f"{wing}/relational/locations",
-                f"{wing}/relational/patterns",
-                f"{wing}/ops/projects",
-                f"{wing}/ops/organizations",
-                f"{wing}/self",
-                "sessions", "canvases", "_queries", "_meta",
-                ".obsidian", ".obsidian/snippets",
-            ]
-        else:
-            dirs = [
-                "people", "projects", "organizations", "concepts",
-                "locations", "patterns", "reflections", "sessions",
-                "canvases", "_meta",
-                ".obsidian", ".obsidian/snippets",
-            ]
+        """Create the PARA vault directory structure."""
+        dirs = [
+            "Active",
+            "Relationships/people", "Relationships/organizations",
+            "Reference/concepts", "Reference/locations",
+            "Archive/people", "Archive/projects", "Archive/organizations",
+            "Claudia's Desk", "Claudia's Desk/patterns",
+            "Claudia's Desk/reflections", "Claudia's Desk/sessions",
+            "Claudia's Desk/_queries",
+            "canvases", "_meta",
+            ".obsidian", ".obsidian/snippets",
+        ]
         for d in dirs:
             (self.vault_path / d).mkdir(parents=True, exist_ok=True)
 
-    def _entity_type_dir(self, entity_type: str) -> Path:
-        """Resolve the vault subdirectory for an entity type, respecting wing config."""
-        from ..config import get_config as _get_config
-        config = _get_config()
-        base_subdir = ENTITY_TYPE_DIRS.get(entity_type, "concepts")
-        if getattr(config, "use_claudia_wing", False):
-            wing = getattr(config, "claudia_wing_dir", "claudia")
-            if entity_type in ("person", "concept", "location"):
-                return self.vault_path / wing / "relational" / base_subdir
-            else:  # project, organization
-                return self.vault_path / wing / "ops" / base_subdir
-        return self.vault_path / base_subdir
+    def _para_dir(self, entity_type: str, entity: Dict) -> Path:
+        """Route entity to PARA folder based on type + activity status.
+
+        Archive: explicitly archived or dormant 90+ days.
+        Otherwise: route by entity type to Active/Relationships/Reference.
+        """
+        tier = _row_get(entity, "attention_tier") or "standard"
+        trend = _row_get(entity, "contact_trend")
+
+        # Archive: explicitly archived or dormant 90+ days
+        if tier == "archive" or trend == "dormant":
+            subdir = ENTITY_TYPE_DIRS.get(entity_type, "concepts")
+            return self.vault_path / "Archive" / subdir
+
+        # Route by entity type to remaining PARA buckets
+        if entity_type == "project":
+            return self.vault_path / "Active"
+        elif entity_type == "person":
+            return self.vault_path / "Relationships" / "people"
+        elif entity_type == "organization":
+            return self.vault_path / "Relationships" / "organizations"
+        elif entity_type == "location":
+            return self.vault_path / "Reference" / "locations"
+        else:
+            # concept and anything else
+            return self.vault_path / "Reference" / "concepts"
 
     def _pattern_dir(self) -> Path:
-        """Resolve the patterns directory, respecting wing config."""
-        from ..config import get_config as _get_config
-        config = _get_config()
-        if getattr(config, "use_claudia_wing", False):
-            wing = getattr(config, "claudia_wing_dir", "claudia")
-            return self.vault_path / wing / "relational" / "patterns"
-        return self.vault_path / "patterns"
+        """Patterns live in Claudia's Desk."""
+        return self.vault_path / "Claudia's Desk" / "patterns"
 
     def _reflection_dir(self) -> Path:
-        """Resolve the reflections directory, respecting wing config."""
-        from ..config import get_config as _get_config
-        config = _get_config()
-        if getattr(config, "use_claudia_wing", False):
-            wing = getattr(config, "claudia_wing_dir", "claudia")
-            return self.vault_path / wing / "self"
-        return self.vault_path / "reflections"
+        """Reflections live in Claudia's Desk."""
+        return self.vault_path / "Claudia's Desk" / "reflections"
 
     def _moc_dir(self) -> Path:
-        """Resolve the directory for MOC files and Home.md, respecting wing config."""
-        from ..config import get_config as _get_config
-        config = _get_config()
-        if getattr(config, "use_claudia_wing", False):
-            wing = getattr(config, "claudia_wing_dir", "claudia")
-            return self.vault_path / wing
-        return self.vault_path
+        """MOC files and Home.md live in Claudia's Desk."""
+        return self.vault_path / "Claudia's Desk"
 
     def _get_last_sync_time(self) -> Optional[str]:
         """Read last sync timestamp from _meta/last-sync.json."""
@@ -664,8 +665,8 @@ class VaultSyncService:
             pid = p["id"]
             slug = f"{ptype}-{pid:03d}"
             lines.append(
-                f"- [[patterns/{_sanitize_filename(slug)}]] "
-                f"— *{ptype}* (confidence: {confidence:.2f})"
+                f"- [[{_sanitize_filename(slug)}]] "
+                f"- *{ptype}* (confidence: {confidence:.2f})"
             )
         return "\n".join(lines)
 
@@ -678,8 +679,8 @@ class VaultSyncService:
         entity_name = entity["name"]
         entity_type = entity["type"]
 
-        # Determine subdirectory
-        target_dir = self._entity_type_dir(entity_type)
+        # Determine subdirectory via PARA routing
+        target_dir = self._para_dir(entity_type, entity)
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Fetch related data
@@ -852,14 +853,13 @@ class VaultSyncService:
                             ent_links = []
                             for eid in entity_ids[:5]:
                                 ent_row = self.db.execute(
-                                    "SELECT name, type FROM entities WHERE id = ? AND deleted_at IS NULL",
+                                    "SELECT name FROM entities WHERE id = ? AND deleted_at IS NULL",
                                     (eid,),
                                     fetch=True,
                                 )
                                 if ent_row:
-                                    ent = ent_row[0]
-                                    subdir = ENTITY_TYPE_DIRS.get(ent["type"], "concepts")
-                                    ent_links.append(f"[[{subdir}/{ent['name']}]]")
+                                    # Use simple wikilinks (Obsidian resolves by filename)
+                                    ent_links.append(f"[[{ent_row[0]['name']}]]")
                             if ent_links:
                                 if not entities:
                                     lines.append("")
@@ -1026,13 +1026,14 @@ class VaultSyncService:
 
             content = "\n".join(lines) + "\n"
 
-            # Hierarchical path: sessions/YYYY/MM/YYYY-MM-DD.md
+            # Hierarchical path: Claudia's Desk/sessions/YYYY/MM/YYYY-MM-DD.md
+            desk = self.vault_path / "Claudia's Desk" / "sessions"
             if date_str != "unknown" and len(date_str) >= 7:
                 year = date_str[:4]
                 month = date_str[5:7]
-                target_dir = self.vault_path / "sessions" / year / month
+                target_dir = desk / year / month
             else:
-                target_dir = self.vault_path / "sessions"
+                target_dir = desk
             target_dir.mkdir(parents=True, exist_ok=True)
 
             filepath = target_dir / f"{date_str}.md"
@@ -1052,7 +1053,7 @@ class VaultSyncService:
         These are created once and never overwritten (user may customize).
         Returns count of templates created.
         """
-        queries_dir = self.vault_path / "_queries"
+        queries_dir = self.vault_path / "Claudia's Desk" / "_queries"
         queries_dir.mkdir(parents=True, exist_ok=True)
         created = 0
 
@@ -1063,7 +1064,7 @@ class VaultSyncService:
                 "Commitments sorted by deadline date.\n\n"
                 "```dataview\n"
                 "TABLE type, importance\n"
-                "FROM \"people\" OR \"projects\" OR \"organizations\"\n"
+                "FROM \"Active\" OR \"Relationships\" OR \"Archive\"\n"
                 "WHERE contains(file.content, \"- [ ]\")\n"
                 "SORT importance DESC\n"
                 "```\n\n" + dv_tip
@@ -1073,7 +1074,7 @@ class VaultSyncService:
                 "People with decelerating or dormant contact trends.\n\n"
                 "```dataview\n"
                 "TABLE contact_trend, last_contact, importance\n"
-                "FROM \"people\"\n"
+                "FROM \"Relationships/people\" OR \"Archive/people\"\n"
                 "WHERE contact_trend = \"decelerating\" OR contact_trend = \"dormant\"\n"
                 "SORT last_contact ASC\n"
                 "```\n\n" + dv_tip
@@ -1083,7 +1084,7 @@ class VaultSyncService:
                 "People in the active attention tier.\n\n"
                 "```dataview\n"
                 "TABLE contact_trend, last_contact, contact_frequency_days, importance\n"
-                "FROM \"people\"\n"
+                "FROM \"Relationships/people\"\n"
                 "WHERE attention_tier = \"active\"\n"
                 "SORT importance DESC\n"
                 "```\n\n" + dv_tip
@@ -1093,7 +1094,7 @@ class VaultSyncService:
                 "What Claudia learned this week.\n\n"
                 "```dataview\n"
                 "TABLE type, importance, created\n"
-                "FROM \"people\" OR \"projects\" OR \"organizations\" OR \"concepts\"\n"
+                "FROM \"Active\" OR \"Relationships\" OR \"Reference\"\n"
                 "WHERE date(created) >= date(today) - dur(7 days)\n"
                 "SORT created DESC\n"
                 "LIMIT 50\n"
@@ -1104,7 +1105,7 @@ class VaultSyncService:
                 "All tracked commitments across entities.\n\n"
                 "```dataview\n"
                 "TASK\n"
-                "FROM \"people\" OR \"projects\"\n"
+                "FROM \"Active\" OR \"Relationships\"\n"
                 "WHERE !completed\n"
                 "SORT file.name ASC\n"
                 "```\n\n" + dv_tip
@@ -1114,7 +1115,7 @@ class VaultSyncService:
                 "All entities grouped by type and sorted by importance.\n\n"
                 "```dataview\n"
                 "TABLE type, attention_tier, contact_trend, importance\n"
-                "FROM \"people\" OR \"projects\" OR \"organizations\" OR \"concepts\" OR \"locations\"\n"
+                "FROM \"Active\" OR \"Relationships\" OR \"Reference\" OR \"Archive\"\n"
                 "SORT type ASC, importance DESC\n"
                 "```\n\n" + dv_tip
             ),
@@ -1123,7 +1124,7 @@ class VaultSyncService:
                 "Recent conversation sessions.\n\n"
                 "```dataview\n"
                 "TABLE date, session_count\n"
-                "FROM \"sessions\"\n"
+                "FROM \"Claudia's Desk/sessions\"\n"
                 "SORT date DESC\n"
                 "LIMIT 30\n"
                 "```\n\n" + dv_tip
@@ -1140,39 +1141,66 @@ class VaultSyncService:
                     logger.error(f"Failed to write Dataview template {filepath}: {e}")
 
         if created:
-            logger.info(f"Created {created} Dataview query templates in _queries/")
+            logger.info(f"Created {created} Dataview query templates in Claudia's Desk/_queries/")
         return created
 
     # ── Home dashboard & MOC indices ─────────────────────────────
 
     def _export_home_dashboard(self) -> None:
-        """Generate Home.md dashboard as the vault entry point.
+        """Generate Home.md as a PARA-style navigation dashboard.
 
-        Always regenerated on sync. Surfaces entities needing attention,
-        open commitments, and recent activity with navigation links.
+        Written to vault root (not Claudia's Desk) since it's the
+        human-facing entry point. Always regenerated on sync.
         """
-        lines = ["# Claudia Memory Vault"]
+        lines = ["# Home"]
         lines.append("")
-        lines.append("> [!tip] Welcome")
-        lines.append("> This vault is a live projection of Claudia's memory.")
-        lines.append("> SQLite is the source of truth; this vault syncs automatically.")
 
-        # Quick navigation with counts
+        # Active Projects section
+        active_projects = self.db.execute(
+            """
+            SELECT name, attention_tier, importance
+            FROM entities
+            WHERE type = 'project' AND deleted_at IS NULL
+              AND (attention_tier IN ('active', 'watchlist') OR attention_tier IS NULL)
+              AND COALESCE(contact_trend, '') != 'dormant'
+            ORDER BY importance DESC
+            LIMIT 15
+            """,
+            fetch=True,
+        ) or []
+
+        lines.append("## Active Projects")
+        if active_projects:
+            lines.append("")
+            for p in active_projects:
+                tier = p["attention_tier"] or "standard"
+                lines.append(f"- [[{p['name']}]] ({tier})")
+        else:
+            lines.append("")
+            lines.append("*No active projects yet.*")
+
+        # Relationships
+        people_count = self.db.execute(
+            "SELECT COUNT(*) as c FROM entities WHERE type = 'person' AND deleted_at IS NULL",
+            fetch=True,
+        ) or []
+        org_count = self.db.execute(
+            "SELECT COUNT(*) as c FROM entities WHERE type = 'organization' AND deleted_at IS NULL",
+            fetch=True,
+        ) or []
+        pc = people_count[0]["c"] if people_count else 0
+        oc = org_count[0]["c"] if org_count else 0
+
         lines.append("")
-        lines.append("## Quick Navigation")
-        for etype, subdir in ENTITY_TYPE_DIRS.items():
-            count_rows = self.db.execute(
-                "SELECT COUNT(*) as c FROM entities WHERE type = ? AND deleted_at IS NULL",
-                (etype,),
-                fetch=True,
-            ) or []
-            count = count_rows[0]["c"] if count_rows else 0
-            lines.append(f"- [[{subdir}/_Index|{subdir.title()}]] ({count} tracked)")
+        lines.append("## Relationships")
+        lines.append("")
+        lines.append(f"- [[Relationships/people/|People]] ({pc} tracked)")
+        lines.append(f"- [[Relationships/organizations/|Organizations]] ({oc} tracked)")
 
-        # Needs attention: watchlist + decelerating/dormant entities
+        # Needs attention
         watchlist = self.db.execute(
             """
-            SELECT name, attention_tier, contact_trend, last_contact_at
+            SELECT name, contact_trend, last_contact_at
             FROM entities
             WHERE deleted_at IS NULL
               AND type = 'person'
@@ -1180,50 +1208,36 @@ class VaultSyncService:
                    OR contact_trend IN ('decelerating', 'dormant'))
               AND importance > 0.3
             ORDER BY last_contact_at ASC NULLS FIRST
-            LIMIT 10
+            LIMIT 8
             """,
             fetch=True,
         ) or []
 
         if watchlist:
             lines.append("")
-            lines.append("## Needs Attention")
+            lines.append("### Needs Attention")
             lines.append("")
-            lines.append("> [!warning] Watch List")
             for w in watchlist:
-                trend = w["contact_trend"] or "unknown"
+                trend = w["contact_trend"] or "watch"
                 last = w["last_contact_at"]
                 if last:
                     try:
                         days_ago = (datetime.utcnow() - datetime.fromisoformat(last[:19])).days
-                        lines.append(f"> - [[{w['name']}]] - {trend} ({days_ago} days since last)")
+                        lines.append(f"- [[{w['name']}]] - {trend} ({days_ago}d)")
                     except (ValueError, TypeError):
-                        lines.append(f"> - [[{w['name']}]] - {trend}")
+                        lines.append(f"- [[{w['name']}]] - {trend}")
                 else:
-                    lines.append(f"> - [[{w['name']}]] - {trend}")
+                    lines.append(f"- [[{w['name']}]] - {trend}")
 
-        # Open commitments
-        commitments = self.db.execute(
-            """
-            SELECT m.content, GROUP_CONCAT(e.name) as entities
-            FROM memories m
-            LEFT JOIN memory_entities me ON m.id = me.memory_id
-            LEFT JOIN entities e ON me.entity_id = e.id
-            WHERE m.type = 'commitment' AND m.invalidated_at IS NULL
-            GROUP BY m.id
-            ORDER BY m.importance DESC
-            LIMIT 10
-            """,
-            fetch=True,
-        ) or []
-
-        if commitments:
-            lines.append("")
-            lines.append("## Open Commitments")
-            for c in commitments:
-                entities_val = c["entities"] if c["entities"] else None
-                ent_link = f" ([[{entities_val}]])" if entities_val else ""
-                lines.append(f"- [ ] {c['content']}{ent_link}")
+        # Quick Links
+        lines.append("")
+        lines.append("## Quick Links")
+        lines.append("")
+        lines.append("- [[Claudia's Desk/MOC-Commitments|Open Commitments]]")
+        lines.append("- [[Claudia's Desk/MOC-People|Relationship Map]]")
+        lines.append("- [[Claudia's Desk/MOC-Projects|Project Overview]]")
+        lines.append("- [[Reference/|Reference Materials]]")
+        lines.append("- [[Archive/|Archive]]")
 
         # Recent activity
         recent_sessions = self.db.execute(
@@ -1244,7 +1258,6 @@ class VaultSyncService:
             for s in recent_sessions:
                 date = s["started_at"][:10] if s["started_at"] else "?"
                 narrative = s["narrative"] or ""
-                # Truncate and wikify
                 if len(narrative) > 80:
                     narrative = narrative[:80] + "..."
                 narrative = self._wikify_narrative(narrative)
@@ -1255,37 +1268,64 @@ class VaultSyncService:
         lines.append(f"\n---\n*Last synced: {sync_time}*")
 
         content = "\n".join(lines) + "\n"
-        moc_dir = self._moc_dir()
-        moc_dir.mkdir(parents=True, exist_ok=True)
-        filepath = moc_dir / "Home.md"
+        # Home.md lives at vault root (human-facing entry point)
+        filepath = self.vault_path / "Home.md"
         filepath.write_text(content, encoding="utf-8")
 
     def _export_moc_indices(self) -> None:
-        """Generate Map of Content (MOC) index files in each entity type directory.
+        """Generate _Index.md files in PARA entity directories.
 
-        Creates _Index.md in people/, projects/, organizations/ with tables
+        Creates indices in Relationships/people/, Relationships/organizations/,
+        Active/, Reference/concepts/, Reference/locations/ with tables
         grouped by attention_tier for quick overview.
         """
-        for etype, subdir in ENTITY_TYPE_DIRS.items():
-            entities = self.db.execute(
-                """
-                SELECT name, importance, attention_tier, contact_trend, last_contact_at
-                FROM entities
-                WHERE type = ? AND deleted_at IS NULL
-                ORDER BY importance DESC
-                """,
-                (etype,),
-                fetch=True,
-            ) or []
+        # Map PARA directories to the entity types they contain
+        para_indices = {
+            "Relationships/people": ("person", "People"),
+            "Relationships/organizations": ("organization", "Organizations"),
+            "Active": ("project", "Active Projects"),
+            "Reference/concepts": ("concept", "Concepts"),
+            "Reference/locations": ("location", "Locations"),
+        }
 
-            lines = [f"---"]
+        for para_path, (etype, title) in para_indices.items():
+            # For Active projects, exclude archived/dormant
+            if para_path == "Active":
+                entities = self.db.execute(
+                    """
+                    SELECT name, importance, attention_tier, contact_trend, last_contact_at
+                    FROM entities
+                    WHERE type = ? AND deleted_at IS NULL
+                      AND COALESCE(attention_tier, 'standard') != 'archive'
+                      AND COALESCE(contact_trend, '') != 'dormant'
+                    ORDER BY importance DESC
+                    """,
+                    (etype,),
+                    fetch=True,
+                ) or []
+            else:
+                # For Relationships/Reference, exclude archived/dormant (those go to Archive/)
+                entities = self.db.execute(
+                    """
+                    SELECT name, importance, attention_tier, contact_trend, last_contact_at
+                    FROM entities
+                    WHERE type = ? AND deleted_at IS NULL
+                      AND COALESCE(attention_tier, 'standard') != 'archive'
+                      AND COALESCE(contact_trend, '') != 'dormant'
+                    ORDER BY importance DESC
+                    """,
+                    (etype,),
+                    fetch=True,
+                ) or []
+
+            lines = ["---"]
             lines.append("tags:")
             lines.append("  - moc")
-            lines.append(f"cssclasses:")
-            lines.append(f"  - moc-index")
+            lines.append("cssclasses:")
+            lines.append("  - moc-index")
             lines.append("---")
             lines.append("")
-            lines.append(f"# {subdir.title()}")
+            lines.append(f"# {title}")
 
             if not entities:
                 lines.append("")
@@ -1297,7 +1337,7 @@ class VaultSyncService:
                     tier = e["attention_tier"] or "standard"
                     tiers.setdefault(tier, []).append(e)
 
-                tier_order = ["active", "watchlist", "standard", "archive"]
+                tier_order = ["active", "watchlist", "standard"]
                 for tier in tier_order:
                     tier_entities = tiers.pop(tier, [])
                     if not tier_entities:
@@ -1320,7 +1360,7 @@ class VaultSyncService:
                         for e in tier_entities:
                             lines.append(f"| [[{e['name']}]] | {e['importance']} |")
 
-                # Any remaining tiers not in the predefined order
+                # Any remaining tiers
                 for tier, tier_entities in tiers.items():
                     lines.append("")
                     lines.append(f"## {tier.title()}")
@@ -1331,7 +1371,7 @@ class VaultSyncService:
                         lines.append(f"| [[{e['name']}]] | {e['importance']} |")
 
             content = "\n".join(lines) + "\n"
-            target_dir = self.vault_path / subdir
+            target_dir = self.vault_path / para_path
             target_dir.mkdir(parents=True, exist_ok=True)
             filepath = target_dir / "_Index.md"
             filepath.write_text(content, encoding="utf-8")
@@ -1931,10 +1971,14 @@ class VaultSyncService:
 
         try:
             data = json.loads(meta_path.read_text())
-            # Count files in vault
+            # Count files in vault (PARA structure)
             file_counts = {}
-            for subdir in ["people", "projects", "organizations", "concepts",
-                           "locations", "patterns", "reflections", "sessions"]:
+            for subdir in [
+                "Active", "Relationships/people", "Relationships/organizations",
+                "Reference/concepts", "Reference/locations",
+                "Archive/people", "Archive/projects", "Archive/organizations",
+                "Claudia's Desk/patterns", "Claudia's Desk/reflections",
+            ]:
                 d = self.vault_path / subdir
                 if d.exists():
                     file_counts[subdir] = len(list(d.glob("*.md")))
@@ -1966,7 +2010,11 @@ class VaultSyncService:
         Returns list of edits with file path, entity ID, and change info.
         """
         edits = []
-        for subdir in ["people", "projects", "organizations", "concepts", "locations"]:
+        for subdir in [
+            "Active", "Relationships/people", "Relationships/organizations",
+            "Reference/concepts", "Reference/locations",
+            "Archive/people", "Archive/projects", "Archive/organizations",
+        ]:
             d = self.vault_path / subdir
             if not d.exists():
                 continue
@@ -2237,16 +2285,23 @@ def run_vault_sync(project_id: Optional[str] = None, full: bool = False) -> Dict
         return svc.export_incremental()
 
 
-def run_vault_migration(vault_path: Path, preview: bool = False) -> Dict[str, Any]:
-    """Migrate an existing flat vault to the Claudia wing structure.
+def run_para_migration(vault_path: Path, db=None, preview: bool = False) -> Dict[str, Any]:
+    """Migrate an existing flat or wing vault to the PARA structure.
 
-    Walks Claudia-owned notes (frontmatter has claudia_id), copies them to
-    wing paths, adds Obsidian aliases for wikilink compatibility, and enables
-    use_claudia_wing in config.
+    Safety-first workflow:
+    1. Backup database + vault directory
+    2. Create PARA directory structure
+    3. Copy (not move) entity notes into PARA folders
+    4. Move patterns/reflections/sessions/MOC files into Claudia's Desk/
+    5. Verify all entities accounted for
+    6. Clean up empty old directories
+    7. Run full vault export to regenerate everything
+    8. Report summary
 
     Args:
         vault_path: Path to the vault root.
-        preview: If True, print plan without making changes.
+        db: Optional database instance.
+        preview: If True, print routing plan without making changes.
 
     Returns:
         Dict with migration results.
@@ -2254,98 +2309,287 @@ def run_vault_migration(vault_path: Path, preview: bool = False) -> Dict[str, An
     import shutil as _shutil
     from datetime import datetime as _dt
 
-    config = get_config()
-    wing = getattr(config, "claudia_wing_dir", "claudia")
+    from ..database import get_db as _get_db
+    _db = db or _get_db()
 
-    FLAT_TO_WING = {
-        "people": f"{wing}/relational/people",
-        "concepts": f"{wing}/relational/concepts",
-        "locations": f"{wing}/relational/locations",
-        "patterns": f"{wing}/relational/patterns",
-        "reflections": f"{wing}/self",
-        "projects": f"{wing}/ops/projects",
-        "organizations": f"{wing}/ops/organizations",
+    # Build routing plan: entity -> PARA folder
+    entities = _db.execute(
+        """
+        SELECT id, name, type, attention_tier, contact_trend
+        FROM entities WHERE deleted_at IS NULL
+        ORDER BY type, name
+        """,
+        fetch=True,
+    ) or []
+
+    # Map entity types to legacy flat directories
+    LEGACY_DIRS = {
+        "person": ["people"],
+        "project": ["projects"],
+        "organization": ["organizations"],
+        "concept": ["concepts"],
+        "location": ["locations"],
     }
 
-    # Walk vault for Claudia-owned .md files
-    migrations = []  # list of (source_path, dest_path)
-    for subdir, wing_path in FLAT_TO_WING.items():
-        source_dir = vault_path / subdir
-        if not source_dir.exists():
-            continue
-        for filepath in sorted(source_dir.glob("*.md")):
-            try:
-                raw = filepath.read_text(encoding="utf-8", errors="replace")
-                if "claudia_id:" in raw:
-                    dest = vault_path / wing_path / filepath.name
-                    migrations.append((filepath, dest))
-            except IOError:
-                pass
+    # Also check wing directories for migrations from wing layout
+    WING_DIRS = {
+        "person": ["claudia/relational/people"],
+        "project": ["claudia/ops/projects"],
+        "organization": ["claudia/ops/organizations"],
+        "concept": ["claudia/relational/concepts"],
+        "location": ["claudia/relational/locations"],
+    }
+
+    def _route_entity(etype: str, entity: Dict) -> str:
+        """Compute PARA path for an entity."""
+        tier = _row_get(entity, "attention_tier") or "standard"
+        trend = _row_get(entity, "contact_trend")
+
+        if tier == "archive" or trend == "dormant":
+            subdir = ENTITY_TYPE_DIRS.get(etype, "concepts")
+            return f"Archive/{subdir}"
+
+        if etype == "project":
+            return "Active"
+        elif etype == "person":
+            return "Relationships/people"
+        elif etype == "organization":
+            return "Relationships/organizations"
+        elif etype == "location":
+            return "Reference/locations"
+        else:
+            return "Reference/concepts"
+
+    # Build migration plan
+    migrations = []  # list of (source_path, dest_path, entity_name)
+    missing = []  # entities with no source file found
+
+    for entity in entities:
+        etype = entity["type"]
+        name = entity["name"]
+        filename = _sanitize_filename(name) + ".md"
+        dest_dir = _route_entity(etype, entity)
+
+        # Find source file in legacy or wing locations
+        source = None
+        search_dirs = LEGACY_DIRS.get(etype, []) + WING_DIRS.get(etype, [])
+        for sdir in search_dirs:
+            candidate = vault_path / sdir / filename
+            if candidate.exists():
+                source = candidate
+                break
+
+        if source:
+            dest = vault_path / dest_dir / filename
+            if source != dest:
+                migrations.append((source, dest, name))
+        else:
+            missing.append(name)
+
+    # Also plan Claudia's Desk file moves
+    desk_moves = []  # (source, dest, description)
+
+    # MOC files
+    for moc_name in ["MOC-People.md", "MOC-Commitments.md", "MOC-Projects.md"]:
+        src = vault_path / moc_name
+        if src.exists():
+            desk_moves.append((src, vault_path / "Claudia's Desk" / moc_name, moc_name))
+        # Also check wing root
+        src_wing = vault_path / "claudia" / moc_name
+        if src_wing.exists():
+            desk_moves.append((src_wing, vault_path / "Claudia's Desk" / moc_name, moc_name))
+
+    # Patterns
+    for pdir in [vault_path / "patterns", vault_path / "claudia" / "relational" / "patterns"]:
+        if pdir.exists():
+            for f in pdir.glob("*.md"):
+                desk_moves.append((f, vault_path / "Claudia's Desk" / "patterns" / f.name, f"pattern: {f.name}"))
+
+    # Reflections
+    for rdir in [vault_path / "reflections", vault_path / "claudia" / "self"]:
+        if rdir.exists():
+            for f in rdir.glob("*.md"):
+                desk_moves.append((f, vault_path / "Claudia's Desk" / "reflections" / f.name, f"reflection: {f.name}"))
+
+    # Sessions (recursive)
+    for sdir in [vault_path / "sessions"]:
+        if sdir.exists():
+            for f in sdir.rglob("*.md"):
+                rel = f.relative_to(sdir)
+                desk_moves.append((f, vault_path / "Claudia's Desk" / "sessions" / rel, f"session: {rel}"))
+
+    # _queries
+    for qdir in [vault_path / "_queries"]:
+        if qdir.exists():
+            for f in qdir.glob("*.md"):
+                desk_moves.append((f, vault_path / "Claudia's Desk" / "_queries" / f.name, f"query: {f.name}"))
 
     if preview:
-        print(f"\nVault Migration Preview ({len(migrations)} files)")
-        print(f"Wing directory: {wing}/")
+        print(f"\nPARA Migration Preview")
+        print(f"  Entities to route: {len(entities)}")
+        print(f"  Files to move: {len(migrations)}")
+        print(f"  Desk files to move: {len(desk_moves)}")
+        print(f"  Missing source files: {len(missing)}")
         print()
-        shown = migrations[:20]
-        for src, dst in shown:
+        print("Entity routing plan:")
+        shown = migrations[:25]
+        for src, dst, name in shown:
             print(f"  {src.relative_to(vault_path)} -> {dst.relative_to(vault_path)}")
-        if len(migrations) > 20:
-            print(f"  ... and {len(migrations) - 20} more files")
+        if len(migrations) > 25:
+            print(f"  ... and {len(migrations) - 25} more")
+        if desk_moves:
+            print()
+            print("Claudia's Desk moves:")
+            for src, dst, desc in desk_moves[:10]:
+                print(f"  {desc}")
+            if len(desk_moves) > 10:
+                print(f"  ... and {len(desk_moves) - 10} more")
+        if missing:
+            print()
+            print(f"Entities without vault files (will be created by export_all):")
+            for name in missing[:10]:
+                print(f"  {name}")
         print()
-        total_md = sum(1 for _ in vault_path.rglob("*.md"))
-        user_owned = total_md - len(migrations)
-        print(f"Claudia-owned files to migrate: {len(migrations)}")
-        print(f"User-owned files untouched: {user_owned}")
-        print("\nRun without --preview to execute migration.")
-        return {"preview": True, "files_to_migrate": len(migrations)}
+        print("Run without --preview to execute migration.")
+        return {"preview": True, "entities": len(entities), "files_to_move": len(migrations)}
 
-    # Execute migration
+    # Step 1: Backup
+    print("\nStep 1/7: Creating backups...")
+    backup_path = _db.backup()
+    print(f"  Database backed up to: {backup_path}")
+
     timestamp = _dt.utcnow().strftime("%Y-%m-%d-%H%M%S")
-    backup_dir = vault_path / f"_backup_pre_wing_{timestamp}"
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    vault_backup = vault_path.parent / f"vault-backup-{timestamp}"
+    _shutil.copytree(vault_path, vault_backup)
+    print(f"  Vault backed up to: {vault_backup}")
 
+    # Step 2: Create PARA directory structure
+    print("\nStep 2/7: Creating PARA directories...")
+    para_dirs = [
+        "Active",
+        "Relationships/people", "Relationships/organizations",
+        "Reference/concepts", "Reference/locations",
+        "Archive/people", "Archive/projects", "Archive/organizations",
+        "Claudia's Desk", "Claudia's Desk/patterns",
+        "Claudia's Desk/reflections", "Claudia's Desk/sessions",
+        "Claudia's Desk/_queries",
+    ]
+    for d in para_dirs:
+        (vault_path / d).mkdir(parents=True, exist_ok=True)
+    print(f"  Created {len(para_dirs)} directories")
+
+    # Step 3: Copy entity notes into PARA folders
+    print("\nStep 3/7: Copying entity notes to PARA structure...")
     migrated = 0
     errors = 0
-
-    for src, dst in migrations:
+    for src, dst, name in migrations:
         try:
-            _shutil.copy2(src, backup_dir / src.name)
             dst.parent.mkdir(parents=True, exist_ok=True)
             _shutil.copy2(src, dst)
-            # Add alias to new file's frontmatter for wikilink compat
-            try:
-                raw = dst.read_text(encoding="utf-8")
-                rel_path = str(src.relative_to(vault_path)).replace("\\", "/")
-                if "aliases:" not in raw[:300] and raw.startswith("---"):
-                    alias_line = f"aliases:\n  - \"{rel_path}\"\n"
-                    raw = raw.replace("---\n", f"---\n{alias_line}", 1)
-                    dst.write_text(raw, encoding="utf-8")
-            except Exception:
-                pass
             migrated += 1
         except Exception as e:
-            logger.warning(f"Migration failed for {src}: {e}")
+            logger.warning(f"Migration failed for {name}: {e}")
             errors += 1
+    print(f"  Copied {migrated} entity files ({errors} errors)")
 
-    # Enable wing in config.json
-    config_path = Path.home() / ".claudia" / "config.json"
-    try:
-        import json as _json
-        existing = {}
-        if config_path.exists():
-            with open(config_path) as f:
-                existing = _json.load(f)
-        existing["use_claudia_wing"] = True
-        with open(config_path, "w") as f:
-            _json.dump(existing, f, indent=2)
-    except Exception as e:
-        logger.warning(f"Could not update config.json: {e}")
+    # Step 4: Move Claudia's Desk files
+    print("\nStep 4/7: Moving Claudia's files to Claudia's Desk...")
+    desk_moved = 0
+    for src, dst, desc in desk_moves:
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            _shutil.copy2(src, dst)
+            desk_moved += 1
+        except Exception as e:
+            logger.warning(f"Desk move failed for {desc}: {e}")
+    print(f"  Moved {desk_moved} files to Claudia's Desk/")
 
-    print(f"\nVault migration complete:")
-    print(f"  Files migrated: {migrated}")
-    print(f"  Errors: {errors}")
-    print(f"  Backup at: {backup_dir}")
-    print(f"  Wing enabled in config.json")
-    print(f"\nOriginal files preserved. Obsidian wikilinks resolve via aliases.")
+    # Step 5: Verify
+    print("\nStep 5/7: Verifying migration...")
+    expected = len(entities)
+    # Count .md files in PARA entity directories (excluding _Index.md)
+    actual = 0
+    for para_dir in ["Active", "Relationships/people", "Relationships/organizations",
+                      "Reference/concepts", "Reference/locations",
+                      "Archive/people", "Archive/projects", "Archive/organizations"]:
+        d = vault_path / para_dir
+        if d.exists():
+            actual += sum(1 for f in d.glob("*.md") if f.name != "_Index.md")
 
-    return {"migrated": migrated, "errors": errors, "backup_dir": str(backup_dir)}
+    if actual < expected - len(missing):
+        print(f"  WARNING: Expected {expected - len(missing)} files, found {actual}.")
+        print(f"  Missing files will be created by the full export in Step 7.")
+    else:
+        print(f"  Verified: {actual} entity files in PARA structure")
+
+    # Step 6: Clean up empty old directories
+    print("\nStep 6/7: Cleaning up old directories...")
+    cleaned = 0
+    skipped = []
+    old_dirs = ["people", "projects", "organizations", "concepts", "locations",
+                "patterns", "reflections", "sessions", "_queries"]
+    for old_dir in old_dirs:
+        old_path = vault_path / old_dir
+        if not old_path.exists():
+            continue
+        # Check for user-created files (no claudia_id in frontmatter)
+        user_files = []
+        for f in old_path.rglob("*.md"):
+            try:
+                content = f.read_text(encoding="utf-8", errors="replace")
+                if "claudia_id:" not in content:
+                    user_files.append(f)
+            except IOError:
+                pass
+        if user_files:
+            skipped.append((old_dir, len(user_files)))
+        else:
+            try:
+                _shutil.rmtree(old_path)
+                cleaned += 1
+            except Exception as e:
+                logger.warning(f"Could not remove {old_dir}: {e}")
+
+    # Also clean up wing directories if they exist
+    wing_path = vault_path / "claudia"
+    if wing_path.exists():
+        try:
+            _shutil.rmtree(wing_path)
+            cleaned += 1
+        except Exception:
+            pass
+
+    print(f"  Removed {cleaned} old directories")
+    if skipped:
+        for dirname, count in skipped:
+            print(f"  Kept {dirname}/ ({count} user-created files)")
+
+    # Step 7: Full vault export
+    print("\nStep 7/7: Regenerating vault from SQLite...")
+    svc = VaultSyncService(vault_path, db=_db)
+    stats = svc.export_all()
+    print(f"  Export complete: {stats}")
+
+    # Report
+    print(f"\n{'=' * 50}")
+    print(f"PARA Migration Complete")
+    print(f"  Entity files migrated: {migrated}")
+    print(f"  Claudia's Desk files: {desk_moved}")
+    print(f"  Old directories cleaned: {cleaned}")
+    print(f"  Database backup: {backup_path}")
+    print(f"  Vault backup: {vault_backup}")
+    if missing:
+        print(f"  Entities without prior files (created fresh): {len(missing)}")
+    if skipped:
+        print(f"  Directories with user files (preserved): {[s[0] for s in skipped]}")
+    print(f"\nYour vault is now organized. Claudia will use the new structure from her next session.")
+    print(f"To rollback: delete the vault and rename {vault_backup.name} back.")
+
+    return {
+        "migrated": migrated,
+        "desk_moved": desk_moved,
+        "errors": errors,
+        "cleaned": cleaned,
+        "vault_backup": str(vault_backup),
+        "db_backup": str(backup_path),
+    }

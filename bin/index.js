@@ -178,6 +178,9 @@ async function main() {
   // Show what's new in this release
   showWhatsNew(isUpgrade);
 
+  // Write context/whats-new.md for Claudia's self-awareness
+  writeWhatsNewFile(targetPath, version);
+
   // Install brain visualizer to ~/.claudia/visualizer/
   installVisualizer();
 
@@ -500,36 +503,146 @@ function installVisualizer() {
   }
 }
 
+function extractChangelog(version) {
+  /**
+   * Extract the CHANGELOG section for a specific version.
+   * Returns the text between ## {version} and the next ## heading.
+   */
+  try {
+    const changelogPath = join(__dirname, '..', 'CHANGELOG.md');
+    const changelog = readFileSync(changelogPath, 'utf8');
+    const versionHeader = `## ${version}`;
+    const startIdx = changelog.indexOf(versionHeader);
+    if (startIdx === -1) return null;
+
+    const afterHeader = startIdx + versionHeader.length;
+    // Find the next ## heading
+    const nextHeader = changelog.indexOf('\n## ', afterHeader);
+    const section = nextHeader === -1
+      ? changelog.slice(afterHeader)
+      : changelog.slice(afterHeader, nextHeader);
+
+    return section.trim();
+  } catch {
+    return null;
+  }
+}
+
 function showWhatsNew(isUpgrade) {
-  const c = colors.cyan;
-  const y = colors.yellow;
-  const d = colors.dim;
   const by = colors.boldYellow;
   const bc = colors.boldCyan;
+  const d = colors.dim;
+  const y = colors.yellow;
   const r = colors.reset;
+  const version = getVersion();
 
   const header = isUpgrade ? `${by}What's New${r}` : `${by}What You're Getting${r}`;
   const line = `${y}${'─'.repeat(48)}${r}`;
 
-  console.log(`
+  // Try to extract highlights from CHANGELOG
+  const changelog = extractChangelog(version);
+  if (changelog) {
+    // Extract the first heading (### ...) as the highlight
+    const headingMatch = changelog.match(/^###\s+(.+)$/m);
+    const highlight = headingMatch ? headingMatch[1] : 'Latest improvements';
+
+    // Extract bullet points (lines starting with - **...)
+    const bullets = [];
+    for (const line of changelog.split('\n')) {
+      const m = line.match(/^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)/);
+      if (m && bullets.length < 4) {
+        bullets.push({ title: m[1], desc: m[2] || '' });
+      }
+    }
+
+    console.log(`\n${line}\n  ${header}\n${line}\n`);
+    if (bullets.length > 0) {
+      for (const b of bullets) {
+        const desc = b.desc ? `  ${d}${b.desc}${r}` : '';
+        console.log(`  ${bc}${b.title}${r}${desc}`);
+      }
+    } else {
+      console.log(`  ${bc}${highlight}${r}`);
+    }
+    console.log(`\n${line}\n`);
+  } else {
+    // Fallback: static content
+    console.log(`
 ${line}
   ${header}
 ${line}
 
   ${bc}Zero-Prompt Install${r}  ${d}Everything installs automatically.${r}
-                       ${d}No questions, smart defaults, graceful fallbacks.${r}
-
   ${bc}Obsidian Vault${r}       ${d}Memory syncs to ~/.claudia/vault/ as markdown.${r}
-                       ${d}Open in Obsidian for graph view and search.${r}
-
-  ${bc}Document Storage${r}     ${d}Files, transcripts, and emails are stored${r}
-                       ${d}and linked to people and memories.${r}
-
+  ${bc}Document Storage${r}     ${d}Files stored and linked to people and memories.${r}
   ${bc}Provenance${r}           ${d}Every fact traces back to its source.${r}
-                       ${d}Ask "how do you know that?" and Claudia shows her work.${r}
 
 ${line}
 `);
+  }
+}
+
+function writeWhatsNewFile(targetPath, version) {
+  /**
+   * Write context/whats-new.md so Claudia knows about her own capabilities
+   * after install/upgrade. She reads it at session start, mentions the update,
+   * then deletes it.
+   */
+  try {
+    const contextDir = join(targetPath, 'context');
+    mkdirSync(contextDir, { recursive: true });
+
+    const date = new Date().toISOString().slice(0, 10);
+
+    // Extract changelog for this version
+    const changelogSection = extractChangelog(version) || 'No changelog available for this version.';
+
+    // Read skill-index.json for capabilities list
+    let skillSections = '';
+    try {
+      const skillIndexPath = join(__dirname, '..', 'template-v2', '.claude', 'skills', 'skill-index.json');
+      const skillIndex = JSON.parse(readFileSync(skillIndexPath, 'utf8'));
+      const skills = skillIndex.skills || [];
+
+      const proactive = skills.filter(s => s.invocation === 'proactive');
+      const contextual = skills.filter(s => s.invocation === 'contextual');
+      const explicit = skills.filter(s => s.invocation === 'explicit');
+
+      skillSections = `## Your Complete Skill Set
+
+### Proactive (auto-activate)
+${proactive.map(s => `- **${s.name}** - ${s.description}`).join('\n')}
+
+### Contextual (natural language or /command)
+${contextual.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
+
+### Explicit (/command only)
+${explicit.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
+
+## Memory Tools (21 MCP tools)
+13 standalone: remember, recall, about, relate, batch, end_session, consolidate, briefing, summary, reflections, system_health, project_health, cognitive.ingest
+8 merged: temporal (upcoming/since/timeline/morning), graph (network/path/hubs/dormant/reconnect), entities (create/search/merge/delete/overview), vault (sync/status/canvas/import), modify (correct/invalidate/invalidate_relationship), session (buffer/context/unsummarized), document (store/search), provenance (trace/audit)`;
+    } catch {
+      // skill-index.json not found, skip skills section
+    }
+
+    const content = `# Updated to v${version} (${date})
+
+## What's New
+
+${changelogSection}
+
+${skillSections}
+
+---
+_Surface this update in your first greeting, then delete this file._
+`;
+
+    writeFileSync(join(contextDir, 'whats-new.md'), content);
+  } catch (err) {
+    // Non-fatal: whats-new is a nice-to-have
+    process.stderr.write(`${colors.dim}  Could not write whats-new.md: ${err.message}${colors.reset}\n`);
+  }
 }
 
 main();

@@ -315,14 +315,14 @@ def main():
         help="Import user edits from Obsidian vault back into memory and exit",
     )
     parser.add_argument(
-        "--organize-vault",
+        "--migrate-vault-para",
         action="store_true",
-        help="Migrate vault to Claudia wing structure (use --preview to see plan first)",
+        help="Migrate vault to PARA structure (use --preview to see plan first)",
     )
     parser.add_argument(
         "--preview",
         action="store_true",
-        help="Preview mode for --organize-vault: show migration plan without making changes",
+        help="Preview mode for --migrate-vault-para: show routing plan without making changes",
     )
 
     args = parser.parse_args()
@@ -841,9 +841,9 @@ def main():
                 print(f"  [{status}] {r.get('file', 'unknown')}: {r.get('summary', '')}")
         return
 
-    if args.organize_vault:
+    if args.migrate_vault_para:
         setup_logging(debug=args.debug)
-        from .services.vault_sync import get_vault_path, get_vault_sync_service, run_vault_migration
+        from .services.vault_sync import get_vault_path, run_para_migration
 
         db = get_db()
         db.initialize()
@@ -854,14 +854,7 @@ def main():
             print("Run --vault-sync first to create the vault.")
             sys.exit(1)
 
-        result = run_vault_migration(vault_path, preview=args.preview)
-
-        if not args.preview and result.get("migrated", 0) > 0:
-            # Re-export with wing structure enabled
-            print("\nRegenerating vault with wing structure...")
-            svc = get_vault_sync_service(project_id)
-            stats = svc.export_all()
-            print(f"Vault regenerated: {stats}")
+        run_para_migration(vault_path, db=db, preview=args.preview)
         return
 
     # Run the daemon

@@ -110,7 +110,7 @@ def test_dataview_templates_created(db, tmp_path):
     count = service._export_dataview_templates()
 
     assert count == 7
-    queries_dir = tmp_path / "_queries"
+    queries_dir = tmp_path / "Claudia's Desk" / "_queries"
     assert queries_dir.is_dir()
     md_files = list(queries_dir.glob("*.md"))
     assert len(md_files) == 7
@@ -134,7 +134,7 @@ def test_dataview_templates_not_overwritten(db, tmp_path):
     service._export_dataview_templates()
 
     # Modify one template
-    target = tmp_path / "_queries" / "Active Network.md"
+    target = tmp_path / "Claudia's Desk" / "_queries" / "Active Network.md"
     custom_content = "# My Custom Active Network\nI changed this."
     target.write_text(custom_content)
 
