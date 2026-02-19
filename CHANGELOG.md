@@ -2,6 +2,32 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.42.0 (2026-02-19)
+
+### PARA Second Brain
+
+The vault is now a proper second brain for business. Entities route into PARA-inspired folders based on their activity status, not just their type. Claudia's machine-readable files live in her own named zone.
+
+**Vault PARA restructure:**
+- Four human-facing folders: `Active/` (projects with attention), `Relationships/` (people + organizations), `Reference/` (concepts + locations), `Archive/` (dormant or explicitly archived entities)
+- Routing uses existing `attention_tier` and `contact_trend` fields: archived or dormant entities go to Archive, everything else routes by entity type
+- `Claudia's Desk/` is Claudia's named zone for MOC files, patterns, reflections, sessions, and dataview query templates
+- Home.md rewritten as PARA navigation dashboard with active projects, relationship counts, needs-attention callouts, and quick links
+- `--migrate-vault-para` CLI flag with safety-first workflow: backs up both database and vault, copies (not moves), verifies file counts, cleans up only after verification passes
+- Old `--organize-vault` (wing migration) removed along with `use_claudia_wing` and `claudia_wing_dir` config fields
+
+**Self-awareness mechanism:**
+- Installer now writes `context/whats-new.md` after install/upgrade with the current version's changelog and full skill inventory (grouped by invocation type)
+- Claudia reads it at session start, mentions the update in her greeting, then deletes the file
+- `showWhatsNew()` now reads from CHANGELOG.md dynamically instead of hardcoded bullets
+
+**Fixes:**
+- Logo alignment corrected (hair line shifted 2 spaces right)
+- Removed phantom `/curate-vault` from skills table
+- Added `/brain`, `/deep-context`, `/fix-duplicates`, `/memory-health` to contextual skills table
+
+503 tests pass (5 skipped), 0 regressions.
+
 ## 1.41.0 (2026-02-19)
 
 ### Vault Organizer: Efficiency-First Architecture
