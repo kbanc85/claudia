@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.42.3 (2026-02-21)
+
+Four fixes from a live field report:
+
+- **Critical fix:** Fresh installs now correctly pass `--project-dir` to the standalone daemon's LaunchAgent (macOS) and Task Scheduler entry (Windows). Previously the daemon always ran maintenance jobs (decay, pattern detection, consolidation) against the global default database instead of the project-specific one. Upgrades trigger a rewrite of the plist/task with the correct path.
+- **Medium fix:** `memory.system_health` now fetches scheduler state from the running daemon's HTTP endpoint (`GET :3848/status`) instead of calling `get_scheduler().is_running()` in-process — which always returned `False` inside the MCP subprocess. Scheduler status is now accurate.
+- **New:** `POST /backup` endpoint on port 3848 lets you trigger a backup with `curl -X POST http://localhost:3848/backup`. New `memory.backup` MCP tool does the same with an HTTP-first / direct-fallback pattern.
+- **New:** Orphan episodes (sessions that ended without an explicit `memory.end_session` call) are now auto-closed during nightly consolidation. Episodes open for more than 24 hours get a synthetic `ended_at` and `is_summarized = 1`, eliminating false positives in health reports.
+
+503 tests pass (5 skipped), 0 regressions.
+
 ## 1.42.2 (2026-02-19)
 
 Refreshed README to better communicate Claudia's strengths, cognitive architecture, and real-world value. Added "How Her Mind Works" section explaining Remember/Recall/Consolidate/Vault in plain English. Expanded "See It in Action" with morning brief and pattern detection examples. Updated feature cards for PARA vault, background learning, and pattern detection. Promoted cognitive extraction from hidden details to visible paragraph. Cleaned up commands table (removed archived gateway/relay, added vault sync, brain, deep-context, and more).
