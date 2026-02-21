@@ -518,7 +518,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         <string>$VENV_DIR/bin/python</string>
         <string>-m</string>
         <string>claudia_memory</string>
-        <string>--standalone</string>
+        <string>--standalone</string>$(if [ -n "$CLAUDIA_PROJECT_PATH" ]; then printf '\n        <string>--project-dir</string>\n        <string>%s</string>' "$CLAUDIA_PROJECT_PATH"; fi)
     </array>
     <key>WorkingDirectory</key>
     <string>$DAEMON_DIR</string>

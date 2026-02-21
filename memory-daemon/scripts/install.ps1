@@ -366,9 +366,13 @@ try {
     }
 
     # Create the scheduled task action
+    $taskArgs = "-m claudia_memory --standalone"
+    if ($env:CLAUDIA_PROJECT_PATH) {
+        $taskArgs += " --project-dir `"$($env:CLAUDIA_PROJECT_PATH)`""
+    }
     $action = New-ScheduledTaskAction `
         -Execute $VENV_PYTHON `
-        -Argument "-m claudia_memory --standalone" `
+        -Argument $taskArgs `
         -WorkingDirectory $DAEMON_DIR
 
     # Trigger: at logon for current user

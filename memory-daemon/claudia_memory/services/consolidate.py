@@ -2010,6 +2010,49 @@ class ConsolidateService:
 
         logger.debug(f"Merged reflection {duplicate['id']} into {primary['id']}")
 
+    def close_stale_episodes(self) -> int:
+        """Auto-close orphan episodes that have no end_session call.
+
+        Single-turn sessions and interrupted sessions leave episodes with
+        ``ended_at IS NULL``.  After 24 hours these will never be closed
+        naturally, so this pass marks them as summarized with a synthetic
+        summary to prevent them from appearing as false positives in health
+        reports.
+
+        Returns the number of episodes closed.
+        """
+        cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        try:
+            # Find stale open episodes and close them.  ended_at is set to the
+            # timestamp of the latest buffered turn if one exists, otherwise to
+            # started_at itself (single-turn / empty sessions).
+            self.db.execute(
+                """
+                UPDATE episodes
+                SET
+                    ended_at = COALESCE(
+                        (
+                            SELECT MAX(created_at) FROM turn_buffer
+                            WHERE turn_buffer.session_id = episodes.session_id
+                        ),
+                        started_at
+                    ),
+                    is_summarized = 1,
+                    summary = 'Auto-closed: session ended without explicit end_session call'
+                WHERE ended_at IS NULL
+                  AND started_at < ?
+                """,
+                (cutoff,),
+            )
+            rows = self.db.execute("SELECT changes()", fetch=True)
+            count = rows[0][0] if rows else 0
+            if count:
+                logger.info(f"Auto-closed {count} stale open episode(s)")
+            return count
+        except Exception as e:
+            logger.warning(f"close_stale_episodes failed: {e}")
+            return 0
+
     def run_retention_cleanup(self) -> Dict[str, int]:
         """Clean up old data per retention policies.
 
@@ -2018,6 +2061,7 @@ class ConsolidateService:
         - Expired predictions past retention window
         - Archived turn_buffer from old episodes
         - Old metrics rows
+        - Auto-closes stale open episodes (no end_session after 24 h)
         """
         results = {}
         now = datetime.utcnow()
@@ -2073,6 +2117,9 @@ class ConsolidateService:
         except Exception as e:
             logger.warning(f"Metrics cleanup failed: {e}")
             results["metrics_deleted"] = 0
+
+        # Auto-close orphan episodes (no end_session after 24 h)
+        results["stale_episodes_closed"] = self.close_stale_episodes()
 
         logger.info(f"Retention cleanup: {results}")
         return results

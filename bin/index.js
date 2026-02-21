@@ -376,7 +376,7 @@ async function main() {
         stdio: 'inherit',
         env: {
           ...process.env,
-          CLAUDIA_PROJECT_PATH: isUpgrade ? targetPath : '',
+          CLAUDIA_PROJECT_PATH: targetPath,
           CLAUDIA_NONINTERACTIVE: '1'
         }
       });

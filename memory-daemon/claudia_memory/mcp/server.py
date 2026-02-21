@@ -723,6 +723,19 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
+            name="memory.backup",
+            title="Trigger Database Backup",
+            description=(
+                "Trigger an immediate backup of the memory database. Returns the path "
+                "of the newly created backup file. Backups use a timestamp suffix and "
+                "older backups are pruned automatically per the retention policy."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
             name="memory.project_health",
             title="Project Health Check",
             description=(
@@ -2587,8 +2600,14 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                 )
 
             elif name == "memory.system_health":
-                from ..daemon.health import build_status_report
-                report = build_status_report()
+                import urllib.request, urllib.error
+                report = None
+                try:
+                    with urllib.request.urlopen("http://localhost:3848/status", timeout=2) as resp:
+                        report = json.loads(resp.read().decode())
+                except (urllib.error.URLError, OSError):
+                    from ..daemon.health import build_status_report
+                    report = build_status_report()
                 embedding_svc = get_embedding_service()
                 if hasattr(embedding_svc, '_model_mismatch') and embedding_svc._model_mismatch:
                     if "components" not in report:
@@ -2599,6 +2618,28 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
                         TextContent(
                             type="text",
                             text=json.dumps(report, indent=2),
+                        )
+                    ]
+                )
+
+            elif name == "memory.backup":
+                import urllib.request, urllib.error
+                result = None
+                try:
+                    req = urllib.request.Request(
+                        "http://localhost:3848/backup", method="POST", data=b""
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        result = json.loads(resp.read().decode())
+                except (urllib.error.URLError, OSError):
+                    # Daemon not running — trigger backup directly
+                    backup_path = get_db().backup()
+                    result = {"status": "ok", "path": str(backup_path)}
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result, indent=2),
                         )
                     ]
                 )

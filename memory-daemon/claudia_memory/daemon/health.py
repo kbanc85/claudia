@@ -160,6 +160,31 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
+    def do_POST(self):
+        """Handle POST requests"""
+        if self.path == "/backup":
+            self._send_backup_response()
+        else:
+            self.send_error(405, "Method Not Allowed")
+
+    def _send_backup_response(self):
+        """Trigger a database backup and return the path."""
+        try:
+            db = get_db()
+            path = db.backup()
+            self._send_json({"status": "ok", "path": str(path)})
+        except Exception as e:
+            logger.exception("Error triggering backup")
+            self._send_json({"status": "error", "message": str(e)}, code=500)
+
+    def _send_json(self, data: dict, code: int = 200):
+        """Helper to send a JSON response."""
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _send_health_response(self):
         """Send basic health check response"""
         health = {
