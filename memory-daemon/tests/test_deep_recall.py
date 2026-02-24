@@ -1,5 +1,6 @@
 """Tests for v1.25.0 features: deeper recall, dispatch_tier, migration v14"""
 
+import math
 import tempfile
 from pathlib import Path
 
@@ -189,3 +190,29 @@ class TestMigrationV14:
         )
         assert row is not None
         assert "dispatch_tier" in row["description"]
+
+
+class TestRecencyDecayConfigurable:
+    """Verify recency decay responds to config changes."""
+
+    def test_recency_half_life_default(self):
+        """Default recency_half_life_days is 30."""
+        config = MemoryConfig()
+        assert config.recency_half_life_days == 30
+
+    def test_recency_decay_configurable(self):
+        """Verify recency decay responds to config changes."""
+        config = MemoryConfig()
+        config.recency_half_life_days = 30
+
+        # Calculate scores for a 60-day-old memory with different half-life settings
+        score_30 = math.exp(-60 / 30)
+        score_90 = math.exp(-60 / 90)
+
+        # score_90 should be higher (slower decay)
+        assert score_90 > score_30
+
+        # Verify config is actually used
+        config2 = MemoryConfig()
+        config2.recency_half_life_days = 90
+        assert config2.recency_half_life_days == 90

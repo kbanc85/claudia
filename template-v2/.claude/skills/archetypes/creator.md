@@ -2,48 +2,19 @@
 
 **Profile:** Creators who build audiences through content, manage collaborations, and monetize their platform.
 
-**Key Signals:**
-- Mentions audience, followers, or subscribers
-- Talks about content creation or publishing
-- References platforms (YouTube, LinkedIn, TikTok, Substack, etc.)
-- Uses terms like "engagement," "reach," "collaborations"
+**Key Signals:** Audience, followers, subscribers, content creation, publishing, platforms (YouTube, LinkedIn, TikTok, Substack), "engagement," "reach," "collaborations"
+
+Includes everything from `_base-structure.md`, plus the following archetype-specific structure.
 
 ---
 
-## Folder Structure
-
-Structure adapts based on `business_depth` setting from onboarding.
+## Folder Structure (Archetype-Specific Additions)
 
 ### Full Business Depth
 
+Adds to base structure:
+
 ```
-claudia/
-├── CLAUDE.md
-├── .claude/
-│   ├── commands/
-│   │   ├── morning-brief.md
-│   │   ├── meeting-prep.md
-│   │   ├── capture-meeting.md
-│   │   ├── what-am-i-missing.md
-│   │   ├── weekly-review.md
-│   │   ├── new-person.md
-│   │   ├── follow-up-draft.md
-│   │   ├── draft-reply.md
-│   │   ├── summarize-doc.md
-│   │   ├── pipeline-review.md      ← Business command
-│   │   ├── financial-snapshot.md   ← Business command
-│   │   └── accountability-check.md ← Business command
-│   ├── skills/
-│   ├── hooks/
-│   └── rules/
-├── context/
-│   ├── me.md
-│   ├── commitments.md
-│   ├── waiting.md
-│   ├── patterns.md
-│   └── learnings.md
-├── people/
-│   └── _template.md
 ├── content/
 │   ├── calendar.md
 │   ├── ideas/
@@ -87,59 +58,11 @@ claudia/
 
 ### Starter Business Depth
 
-```
-claudia/
-├── CLAUDE.md
-├── .claude/
-│   ├── commands/                   ← Base + archetype commands
-│   │   └── pipeline-review.md      ← Only business command
-│   ├── skills/
-│   ├── hooks/
-│   └── rules/
-├── context/
-├── people/
-├── content/
-│   ├── calendar.md
-│   ├── ideas/
-│   ├── drafts/
-│   └── published/
-├── audience/
-│   ├── insights.md
-│   └── feedback/
-├── collaborations/
-│   └── _template/
-│       └── overview.md
-├── revenue/
-│   └── overview.md
-├── pipeline/
-│   └── active.md
-├── finances/
-│   └── overview.md
-└── templates/
-    └── meeting-capture.md
-```
+Base + `content/` (calendar, ideas, drafts, published), `audience/` (insights, feedback), `collaborations/_template/overview.md`, `revenue/overview.md`, `pipeline/active.md`, `finances/overview.md`.
 
 ### Minimal Business Depth
 
-```
-claudia/
-├── CLAUDE.md
-├── .claude/
-│   ├── commands/                   ← Base + archetype commands only
-├── context/
-├── people/
-├── content/
-│   ├── calendar.md
-│   ├── ideas/
-│   ├── drafts/
-│   └── published/
-├── audience/
-│   ├── insights.md
-│   └── feedback/
-└── collaborations/
-    └── _template/
-        └── overview.md
-```
+Base + `content/` (calendar, ideas, drafts, published), `audience/` (insights, feedback), `collaborations/_template/overview.md`.
 
 ---
 
@@ -155,32 +78,10 @@ View and manage content calendar.
 ## What to Show
 
 From `content/calendar.md`:
-
-### Upcoming (Next 2 Weeks)
-
-| Date | Platform | Type | Topic | Status |
-|------|----------|------|-------|--------|
-| | | | | Idea / Drafted / Ready / Scheduled |
-
-### This Week's Focus
-- [Content piece with deadline]
-- [Content piece with deadline]
-
-### Content Pipeline
-
-**Ideas:** [X] in `content/ideas/`
-**Drafts:** [X] in `content/drafts/`
-**Ready to publish:** [X]
-
-### Gaps
-- [Day with nothing planned]
-- [Platform that's been neglected]
-
-## Actions
-
-- Add new content idea
-- Move item between stages
-- Suggest topics based on patterns
+- Upcoming 2 weeks (date/platform/type/topic/status)
+- This week's focus
+- Content pipeline counts (ideas/drafts/ready)
+- Gaps (empty days, neglected platforms)
 
 ## Output Format
 
@@ -188,24 +89,10 @@ From `content/calendar.md`:
 ## Content Calendar — [Date]
 
 ### Publishing This Week
-
 | Day | Platform | Content | Status |
 |-----|----------|---------|--------|
-| Mon | LinkedIn | [Topic] | 🟢 Ready |
-| Wed | YouTube | [Topic] | 🟡 Drafting |
-| Fri | Newsletter | [Topic] | 🔴 Need to start |
 
-### Coming Up
-- [Date]: [Platform] — [Topic]
-
-### Ideas Queue (Top 5)
-1. [Idea]
-2. [Idea]
-3. [Idea]
-
-### Suggestions
-- [Platform] hasn't had content in X days
-- [Topic] performed well — consider a follow-up
+### Coming Up / Ideas Queue (Top 5) / Suggestions
 ```
 ```
 
@@ -221,54 +108,20 @@ Quick social media post draft.
 
 ## Platform Guidelines
 
-### LinkedIn
-- Professional but personable
-- Hook in first line
-- Line breaks for readability
-- 1-3 hashtags max
-- CTA at end
-- Length: 150-300 words
-
-### Twitter/X
-- Punchy and direct
-- Thread for longer content
-- 1-2 hashtags
-- Length: Under 280 chars (or thread)
-
-### Instagram
-- Visual context assumed
-- Conversational tone
-- Hashtags in first comment
-- Length: 150-2200 chars
-
-### Newsletter
-- Personal and valuable
-- Clear subject line
-- One main idea
-- Length: 500-1500 words
+- **LinkedIn** — Professional but personable, hook first line, 1-3 hashtags, 150-300 words
+- **Twitter/X** — Punchy, threads for longer, 1-2 hashtags, under 280 chars
+- **Instagram** — Conversational, hashtags in first comment, 150-2200 chars
+- **Newsletter** — Personal and valuable, clear subject, one main idea, 500-1500 words
 
 ## Output Format
 
 ```
-## Draft: [Platform] Post
-### Topic: [Topic]
-
----
+## Draft: [Platform] Post — Topic: [Topic]
 
 [The drafted content]
 
----
-
-**Notes:**
-- [Suggestion for visual]
-- [Best time to post]
-- [Related idea for follow-up]
-
+**Notes:** [Visual suggestion, best time to post, follow-up idea]
 **Hashtags:** [If applicable]
-
----
-
-Ready to post? Let me know if you want adjustments.
 ```
 ```
 
@@ -281,22 +134,9 @@ Review patterns in audience engagement and feedback.
 
 ## What to Analyze
 
-From `audience/insights.md` and `audience/feedback/`:
-
-### Content Performance
-- What topics resonate
-- What formats work
-- Best times/days
-
-### Audience Patterns
-- Who engages most
-- Common questions
-- Pain points mentioned
-
-### Growth Signals
-- New follower trends
-- Engagement trends
-- Conversion patterns
+1. **Content Performance** — Topics that resonate, formats that work, best times/days
+2. **Audience Patterns** — Top engagers, common questions, pain points
+3. **Growth Signals** — Follower trends, engagement trends, conversion patterns
 
 ## Output Format
 
@@ -304,31 +144,11 @@ From `audience/insights.md` and `audience/feedback/`:
 ## Audience Insights — [Date]
 
 ### What's Working
-
-**Top Performing Content:**
 | Content | Platform | Engagement | Why It Worked |
 |---------|----------|------------|---------------|
-| | | | |
 
-**Themes That Resonate:**
-- [Theme 1]
-- [Theme 2]
-
-### What to Double Down On
-- [Recommendation based on data]
-
-### Audience Questions
-[Common questions from comments/DMs]
-- [Question] — appears X times
-
-### Growth Notes
-- Follower trend: [Up/Down/Flat]
-- Engagement trend: [Up/Down/Flat]
-- Observations: [Pattern noticed]
-
-### Suggestions
-- [Content idea based on audience interest]
-- [Format to try based on performance]
+### Themes That Resonate / What to Double Down On
+### Audience Questions / Growth Notes / Suggestions
 ```
 ```
 
@@ -354,522 +174,59 @@ Draft outreach for potential collaboration.
 ## Collab Outreach: [Name]
 
 ### About Them
-- **Platform/Presence:** [Where they create]
-- **Audience:** [Size and type]
-- **Content Style:** [What they do]
+- **Platform:** [Primary] | **Audience:** [Size] | **Style:** [What they do]
 
 ### The Pitch
+**Subject:** [Option 1] / **Alt:** [Option 2]
 
-**Subject:** [Email subject line option 1]
-**Alt Subject:** [Email subject line option 2]
-
----
-
-Hey [Name],
-
-[Opening that shows you know their work]
-
-[The collaboration idea — specific and valuable to them]
-
-[What you bring to the table]
-
+[Opening showing you know their work]
+[The collaboration idea]
+[What you bring]
 [Clear, low-friction ask]
 
-[Warm close]
-
-[Your name]
-
----
-
-### Follow-up Plan
-- If no response in [X days]: [Follow-up approach]
-- If interested: [Next steps ready]
-
-### Notes
-- [Best way to reach them]
-- [Mutual connections if any]
-- [Timing considerations]
+### Follow-up Plan / Notes
 ```
 
 ## Guidelines
 - Lead with value to them
 - Be specific about the idea
 - Make it easy to say yes
-- Short is better
 ```
 
 ---
 
 ## Content Templates
 
-`content/calendar.md`:
+`content/calendar.md`: Publishing schedule (day/platform/type/cadence), monthly calendar with weekly tables (date/platform/topic/status), themes, pipeline references, performance tracking table.
 
-```markdown
-# Content Calendar
-
-## Publishing Schedule
-
-| Day | Platform | Type | Cadence |
-|-----|----------|------|---------|
-| Mon | LinkedIn | Post | Weekly |
-| Wed | Newsletter | Email | Weekly |
-| Fri | YouTube | Video | Weekly |
-
-## This Month: [Month Year]
-
-### Week 1: [Dates]
-| Date | Platform | Topic | Status |
-|------|----------|-------|--------|
-| | | | |
-
-### Week 2: [Dates]
-| Date | Platform | Topic | Status |
-|------|----------|-------|--------|
-| | | | |
-
-[Repeat for all weeks]
-
-## Themes This Month
-- [Theme 1]
-- [Theme 2]
-
-## Content Pipeline
-
-**Ideas:** See `ideas/`
-**Drafts:** See `drafts/`
-
-## Performance Tracking
-
-| Content | Platform | Date | Engagement | Notes |
-|---------|----------|------|------------|-------|
-| | | | | |
-
----
-
-*Last updated: [Date]*
-```
-
-`content/ideas/_template.md`:
-
-```markdown
-# Content Idea: [Title]
-
-**Platform(s):** [Where this would go]
-**Type:** [Post / Video / Thread / Article]
-**Priority:** High / Medium / Low
-
-## The Idea
-
-[Core concept]
-
-## Hook
-
-[Opening line or angle]
-
-## Key Points
-
-1. [Point 1]
-2. [Point 2]
-3. [Point 3]
-
-## Call to Action
-
-[What you want audience to do]
-
-## Notes
-
-- [Research needed]
-- [Visual ideas]
-- [Related content to link]
-
----
-
-*Added: [Date]*
-```
+`content/ideas/_template.md`: Platform, type, priority, core concept, hook, key points, CTA, notes (research/visuals/related content).
 
 ---
 
 ## Audience Template
 
-`audience/insights.md`:
-
-```markdown
-# Audience Insights
-
-## Overview
-
-**Primary Platforms:**
-- [Platform 1]: [Follower count]
-- [Platform 2]: [Follower count]
-
-**Total Reach:** [Combined audience]
-
-## Demographics
-
-| Attribute | Detail |
-|-----------|--------|
-| Primary Age | |
-| Location | |
-| Profession | |
-| Interests | |
-
-## What They Care About
-
-1. [Pain point / interest 1]
-2. [Pain point / interest 2]
-3. [Pain point / interest 3]
-
-## Top Performing Content
-
-| Content | Platform | Engagement | Date |
-|---------|----------|------------|------|
-| | | | |
-
-## Common Questions
-
-[Questions that come up repeatedly]
-
-## Content Preferences
-
-**Formats they engage with:**
-- [Format 1]
-- [Format 2]
-
-**Topics that resonate:**
-- [Topic 1]
-- [Topic 2]
-
-**Posting times that work:**
-- [Time / Day]
-
-## Feedback Themes
-
-[Patterns from comments, DMs, emails]
+`audience/insights.md`: Overview (platforms with follower counts, total reach), demographics, what they care about, top performing content, common questions, content preferences (formats, topics, posting times), feedback themes.
 
 ---
 
-*Last updated: [Date]*
-```
+## Partnership Templates
 
----
+### Full Business Depth
 
-## Partnership Templates (Full Business Depth)
-
-### partnerships/[brand-name]/overview.md
-
-```markdown
-# [Brand Name] Partnership
-
-## Deal Summary
-
-| Field | Value |
-|-------|-------|
-| Status | Prospecting / Negotiating / Active / Completed |
-| Deal Type | Sponsored Post / Campaign / Ambassador / Affiliate |
-| Total Value | $X |
-| Start Date | |
-| End Date | |
-| Primary Contact | |
-
-## Deal Terms
-
-**Compensation:**
-- Base fee: $X
-- Performance bonus: [If applicable]
-- Payment terms: [Net 30, etc.]
-
-**Deliverables:**
-
-| Deliverable | Platform | Due | Status | Notes |
-|-------------|----------|-----|--------|-------|
-| | | | Draft / Review / Approved / Published | |
-
-**Usage Rights:**
-- Duration: [How long they can use content]
-- Platforms: [Where they can use it]
-- Exclusivity: [Any exclusivity clauses]
-
-## Content Requirements
-
-**Brand Guidelines:**
-- Must include: [Required elements]
-- Cannot include: [Restrictions]
-- Hashtags: [Required tags]
-- Disclosure: [FTC requirements]
-
-**Approval Process:**
-1. [Step 1]
-2. [Step 2]
-3. [Timeline for approvals]
-
-## Campaign Goals
-
-**Their Goals:**
-- [What success looks like for them]
-
-**Metrics Tracking:**
-| Metric | Target | Actual |
-|--------|--------|--------|
-| | | |
-
-## Relationship
-
-**Contact:**
-| Role | Name | Email |
-|------|------|-------|
-| Brand Contact | | |
-| Agency (if any) | | |
-
-**Communication History:**
-| Date | Topic | Outcome |
-|------|-------|---------|
-| | | |
-
-## Financial
-
-- **Invoice Status:** [Not sent / Sent / Paid]
-- **Amount Invoiced:** $X
-- **Amount Received:** $X
-- **Outstanding:** $X
-
-## Content Drafts
-
-See `content/` folder for:
-- Draft versions
-- Feedback received
-- Approved final versions
-
-## Notes
-
-[Important details, preferences, lessons learned]
-
----
-
-*Created: [Date]*
-*Last updated: [Date]*
-```
+`partnerships/[brand-name]/overview.md`: Deal summary (status, type, value, dates, contact), deal terms (compensation, payment terms), deliverables table (platform/due/status), usage rights (duration, platforms, exclusivity), content requirements (brand guidelines, must/cannot include, hashtags, FTC disclosure, approval process), campaign goals and metrics, relationship contacts and history, financial (invoice status, amounts), content drafts reference, notes.
 
 ---
 
 ## Revenue Templates (Full Business Depth)
 
-### revenue/overview.md
-
-```markdown
-# Revenue Overview
-
-## This Month: [Month Year]
-
-| Revenue Stream | Amount | vs Last Month | Notes |
-|----------------|--------|---------------|-------|
-| Sponsorships | $X | +/-X% | |
-| Products | $X | +/-X% | |
-| Affiliate | $X | +/-X% | |
-| Other | $X | +/-X% | |
-| **Total** | **$X** | **+/-X%** | |
-
-## Revenue by Stream
-
-### Sponsorships
-See `sponsorships.md` for details.
-- Active deals: X
-- Pipeline value: $X
-- Average deal size: $X
-
-### Products
-See `products.md` for details.
-- Active products: X
-- Monthly recurring: $X
-- One-time sales: $X
-
-### Affiliate
-See `affiliate.md` for details.
-- Active programs: X
-- Monthly average: $X
-
-## Year to Date
-
-| Month | Sponsorships | Products | Affiliate | Total |
-|-------|--------------|----------|-----------|-------|
-| Jan | $X | $X | $X | $X |
-| Feb | $X | $X | $X | $X |
-...
-
-**YTD Total:** $X
-
-## Trends
-
-**What's Growing:**
--
-
-**What's Declining:**
--
-
-**Seasonal Patterns:**
--
-
-## Goals
-
-| Metric | Current | Target | Gap |
-|--------|---------|--------|-----|
-| Monthly Revenue | $X | $X | |
-| Sponsorship Rate | $X | $X | |
-| Product Revenue | $X | $X | |
-
----
-
-*Last updated: [Date]*
-```
-
-### revenue/sponsorships.md
-
-```markdown
-# Sponsorship Tracking
-
-## Active Partnerships
-
-| Brand | Deal Type | Value | Start | End | Status |
-|-------|-----------|-------|-------|-----|--------|
-| | | $X | | | Active / Pending Deliverable |
-
-**Total Active Value:** $X
-
-## Pipeline
-
-| Brand | Stage | Est. Value | Next Step | Due |
-|-------|-------|------------|-----------|-----|
-| | Outreach / Negotiating / Contract | $X | | |
-
-**Pipeline Value:** $X
-
-## Completed This Year
-
-| Brand | Type | Value | Delivered | Paid |
-|-------|------|-------|-----------|------|
-| | | $X | [Date] | Yes/No |
-
-**YTD Sponsorship Revenue:** $X
-
-## Rate Card
-
-| Platform | Format | Rate | Notes |
-|----------|--------|------|-------|
-| YouTube | Integrated (60s) | $X | |
-| YouTube | Dedicated | $X | |
-| Instagram | Story (3 frames) | $X | |
-| Instagram | Post | $X | |
-| Newsletter | Dedicated | $X | |
-| Podcast | Read (60s) | $X | |
-
-## Brand Wishlist
-
-Brands I'd love to work with:
-- [Brand] - [Why, approach idea]
-
-## Learnings
-
-**What converts:**
--
-
-**What to avoid:**
--
-
----
-
-*Last updated: [Date]*
-```
-
-### revenue/products.md
-
-```markdown
-# Product Revenue
-
-## Active Products
-
-| Product | Type | Price | Monthly Revenue | Status |
-|---------|------|-------|-----------------|--------|
-| | Course / Digital / Membership / Template | $X | $X | Active / Paused |
-
-## Sales This Month
-
-| Product | Units | Revenue | Notes |
-|---------|-------|---------|-------|
-| | | $X | |
-
-**Monthly Total:** $X
-
-## Product Performance
-
-| Product | Lifetime Revenue | Units Sold | Avg. Rating |
-|---------|------------------|------------|-------------|
-| | $X | | |
-
-## Launch Calendar
-
-| Product | Launch Date | Target Revenue | Status |
-|---------|-------------|----------------|--------|
-| | | $X | Planning / Building / Pre-launch / Live |
-
-## Product Ideas
-
-| Idea | Target Audience | Est. Price | Priority |
-|------|-----------------|------------|----------|
-| | | $X | High/Med/Low |
-
----
-
-*Last updated: [Date]*
-```
+| File | Purpose | Key Fields |
+|------|---------|------------|
+| `revenue/overview.md` | Income streams | Monthly revenue by stream (sponsorships/products/affiliate/other), year-to-date table, trends (growing/declining/seasonal), goals |
+| `revenue/sponsorships.md` | Brand deals | Active partnerships table, pipeline, completed YTD, rate card (platform/format/rate), brand wishlist, learnings |
+| `revenue/products.md` | Digital products | Active products (type/price/monthly revenue), monthly sales, lifetime performance, launch calendar, product ideas |
 
 ---
 
 ## Collaboration Template (All Business Depths)
 
-`collaborations/_template/overview.md`:
-
-```markdown
-# [Person/Brand Name]
-
-## Quick Stats
-
-| Field | Value |
-|-------|-------|
-| Platform | [Their primary platform] |
-| Audience | [Size] |
-| Status | Prospect / In Discussion / Active / Completed |
-| Contact | [Email/handle] |
-
-## About Them
-
-**What they do:** [Their content focus]
-**Why collab:** [Value of working together]
-**Audience overlap:** [How audiences align]
-
-## Collaboration Ideas
-
-- [Idea 1]
-- [Idea 2]
-
-## Outreach History
-
-| Date | Channel | Content | Response |
-|------|---------|---------|----------|
-| | | | |
-
-## Current Status
-
-[Where things stand]
-
-## Next Steps
-
-- [ ] [Action item]
-
-## Notes
-
-[Observations, mutual connections, timing]
-
----
-
-*Created: [Date]*
-*Last updated: [Date]*
-```
+`collaborations/_template/overview.md`: Quick stats (platform, audience, status, contact), about them (focus, why collab, audience overlap), collaboration ideas, outreach history, current status, next steps, notes.

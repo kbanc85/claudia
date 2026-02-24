@@ -1401,7 +1401,7 @@ When generating a structure:
 3. **Copy templates** to appropriate locations
 4. **Generate archetype-specific commands** (see archetype sections)
 5. **Generate business commands** based on `business_depth`:
-   - **Full:** Add `/pipeline-review`, `/financial-snapshot`, `/client-health`, `/accountability-check`
+   - **Full:** Add `/pipeline-review`, `/financial-snapshot`, `/client-health`
    - **Starter:** Add `/pipeline-review`
    - **Minimal:** No additional business commands
 6. **Create context/me.md** with user's profile data, including business preferences:

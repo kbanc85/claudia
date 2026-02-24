@@ -11,45 +11,6 @@ effort-level: medium
 
 ---
 
-## MCP Tool Reference
-
-All available memory tools when the daemon is connected. Skills should only reference tools from this list.
-
-### Core (standalone tools)
-`memory.remember`, `memory.recall`, `memory.about`, `memory.relate`, `memory.batch`, `memory.summary`
-
-### Entities
-`memory.entities` (operations: "create", "search", "merge", "delete", "overview")
-
-### Session Lifecycle
-`memory.session` (operations: "buffer", "context", "unsummarized")
-`memory.end_session`, `memory.briefing`
-
-### Documents & Files
-`memory.document` (operations: "store", "search")
-
-### Temporal & Insights
-`memory.temporal` (operations: "upcoming", "since", "timeline", "morning")
-`memory.consolidate`, `memory.reflections`, `memory.project_health`
-
-### Corrections & Provenance
-`memory.modify` (operations: "correct", "invalidate", "invalidate_relationship")
-`memory.provenance` (operations: "trace", "audit")
-
-### Network Graph
-`memory.graph` (operations: "network", "path", "hubs", "dormant", "reconnect")
-
-### Obsidian Vault
-`memory.vault` (operations: "sync", "status", "canvas", "import")
-
-### Admin
-`memory.system_health`
-
-### Cognitive
-`cognitive.ingest`
-
----
-
 ## Hard Requirements
 
 These are non-negotiable. Violating them defeats the purpose of the memory system.
@@ -58,73 +19,16 @@ These are non-negotiable. Violating them defeats the purpose of the memory syste
 
 When processing source material (transcripts, emails, documents):
 
-**STOP. Check for duplicates, then file it FIRST.**
+1. **Check for duplicates** (by source_type + source_ref)
+2. **File it first** via `memory.document` (operation: "store") with full raw content
+3. **Ask user about extraction** (don't auto-extract)
+4. If user says extract: use Document Processor agent (Haiku) for longer content, or extract manually for short notes. Review agent output before storing via `memory.batch`.
 
-```
-User shares transcript/email/document
-         ↓
-    ┌──────────────────────────────────────────┐
-    │  1. CHECK for duplicates first           │
-    │     (by source_type + source_ref)        │
-    │  2. If new: CALL memory.document         │
-    │     (operation: "store")                 │
-    │     with the FULL raw content            │
-    │  3. ASK user about extraction            │
-    │     (don't auto-extract)                 │
-    └──────────────────────────────────────────┘
-         ↓
-    If user says "extract now":
-         ↓
-    Use agent-accelerated extraction (see below)
-         ↓
-    Review agent output, then store verified memories/entities
-```
-
-**Agent-Accelerated Extraction (Preferred for transcripts and emails)**
-
-For transcripts, emails, and longer documents, use the Document Processor agent (Haiku) instead of composing `memory.batch` operations manually. Manual composition takes 2+ minutes of thinking time; the agent returns structured operations in ~10-20 seconds.
-
-```
-Dispatch Document Processor (Haiku) with:
-├── The filed document content
-├── extraction_type: "memory_operations"
-└── Context: participant names, topic, date
-         ↓
-Agent returns memory_operations[] array
-(facts, commitments, entities, relationships)
-         ↓
-Review agent output (Claudia's judgment layer):
-├── Verify commitment wording is accurate
-├── Check importance scores
-├── Confirm entity names match existing entities
-└── Remove or adjust questionable extractions
-         ↓
-Call memory.batch with reviewed operations
-```
-
-**When to use agent extraction:** Transcripts (3+ paragraphs), emails with multiple topics, documents with commitments or relationship context.
-
-**When to extract manually:** Very short notes (1-2 sentences), single-fact corrections, quick entity creation.
-
-**If you find yourself reading multiple source documents** without calling `memory.document` (operation: "store") for each one, **STOP and fix it**. Go back and file each source before continuing.
-
-**If you find yourself auto-extracting without asking**, **STOP**. File first, then ask if the user wants extraction now or later. This keeps you responsive during long documents.
+**If you find yourself reading source documents** without calling `memory.document` (operation: "store") for each one, **STOP and fix it**. File first, then ask if extraction should happen now or later.
 
 ### 2. Verify Memory Tools at Session Start
 
-Before greeting the user:
-1. Check that `memory.*` tools are in your available tools
-2. If missing: **Do not silently fall back.** Proactively tell the user and offer to fix it:
-   - If the session-health-check hook reported the daemon is installed but stopped, offer to start it:
-     - macOS: `launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist`
-     - Linux: `systemctl --user start claudia-memory`
-   - If the daemon was never installed, offer to run the installer:
-     - `~/.claudia/daemon/scripts/install.sh` (if daemon dir exists)
-     - Or `cd [claudia-dir] && ./memory-daemon/scripts/install.sh`
-   - Briefly explain what's lost without it: "Without the daemon, I can't search memories semantically, detect patterns, track relationships across sessions, or give you proactive predictions."
-   - After starting, the user needs to restart Claude Code for MCP tools to appear
-3. Call `memory.session` (operation: "context") to load context
-4. If this fails: Warn user about degraded mode and suggest checking `~/.claudia/daemon-stderr.log`
+Before greeting, check that `memory.*` tools are in your available tools. If missing, follow the `memory-availability` rule (never silently fall back).
 
 ### 3. Buffer Turns During Sessions
 
@@ -196,109 +100,6 @@ Do NOT:
 
 ---
 
-## Memory System Detection
-
-At session start, check which memory system is available. **This is not optional.** The daemon is Claudia's brain. Without it she's operating at a fraction of her capability.
-
-1. **Enhanced Memory (Preferred):** Check if `memory.recall` MCP tool is available
-2. **If missing, diagnose and offer to fix** (don't silently degrade)
-3. **Fallback:** Use markdown files in `context/` directory only as last resort
-
-```
-Session Start:
-├── Check if memory.recall tool exists
-│   ├── YES → Use enhanced memory system
-│   └── NO → Check session-health-check hook output for diagnosis
-│       ├── Hook says "installed but stopped"
-│       │   → Offer to start: "Your memory daemon is installed but stopped.
-│       │     Want me to start it?" Then run the platform-specific command.
-│       │     After starting, user must restart Claude Code for MCP tools.
-│       ├── Hook says "not installed"
-│       │   → Offer to install: "The memory system hasn't been set up yet.
-│       │     Want me to run the installer?"
-│       ├── No hook output → Check daemon health: curl -s localhost:3848/health
-│       │   ├── Healthy but no MCP tools → User needs to restart Claude Code
-│       │   └── Not healthy → Offer to start/install (as above)
-│       └── After offering, if user declines → Fall back to markdown files
-```
-
-**The key behavior change:** Never silently fall back to markdown. Always tell the user and offer to fix it. The daemon makes Claudia dramatically more capable and users should know when they're missing out.
-
----
-
-## Troubleshooting MCP Connection
-
-When enhanced memory SHOULD be available but isn't detected:
-
-### Signs of Misconfiguration
-
-- Daemon is running (health check passes)
-- `.mcp.json` has claudia-memory entry
-- But `memory.recall` tool is not available
-
-### User Guidance
-
-If fallback to markdown occurs but the daemon appears healthy, guide the user:
-
-```
-"I notice the enhanced memory daemon is running (health check passed),
-but I can't access the memory tools. This usually means Claude Code
-needs to be restarted to pick up the MCP configuration.
-
-Try closing this terminal and running 'claude' in a new terminal.
-
-You can also run: ~/.claudia/diagnose.sh for a full diagnostic."
-```
-
-### Detection Flow
-
-Before silently falling back to markdown, if `.mcp.json` exists with claudia-memory:
-
-1. Quietly check daemon health: `curl -s localhost:3848/health`
-2. If healthy but no MCP tools available → Restart needed
-3. Surface the restart message to the user instead of silent fallback
-4. Only fall back to markdown if the daemon is genuinely not running
-
-### Why This Happens
-
-Claude Code reads `.mcp.json` at startup. If the memory system is installed while Claude Code is already running in the same terminal, the new MCP server won't be detected until Claude Code is restarted in a new terminal session.
-
----
-
-## Episodic Memory Plugin (Optional)
-
-The `episodic-memory` plugin (`episodic-memory__search`) is a separate Claude Code plugin, not part of Claudia's memory daemon. It provides cross-workspace conversation search (searching previous Claude Code sessions across all projects).
-
-### Detection
-
-At session start, check if `episodic-memory__search` tool is available alongside Claudia's own memory tools. These are independent systems:
-
-```
-Memory availability matrix:
-├── Claudia daemon + episodic plugin → Full capability
-├── Claudia daemon only → Normal operation (most common)
-├── Episodic plugin only → Cross-session search works, but no structured memory
-└── Neither → Markdown fallback only
-```
-
-### When Episodic Plugin Is Unavailable
-
-If `episodic-memory__search` is not available:
-- Cross-workspace context is limited to what Claudia's own memory has stored
-- If the user asks about something from a different project's conversation, inform them: "I don't have cross-workspace conversation search available. Can you point me to the relevant files or share the context?"
-- Do not suggest installing the plugin unprompted. Only mention it if the user is actively looking for cross-session data and hitting a wall.
-
-### When to Use Episodic Search
-
-Episodic memory is the **last resort** in the lookup order. Only reach for it when:
-- Claudia's own `memory.recall` and `memory.about` returned nothing
-- Local files (`people/`, `context/`) have no relevant data
-- The information likely exists in a prior Claude Code conversation (possibly from another workspace)
-
-Do not use episodic search for information that Claudia's own memory should have. If important context is missing from Claudia's memory, that's a signal to store it, not to search conversation logs.
-
----
-
 ## Efficiency Rules
 
 Avoid redundant memory calls within a session:
@@ -317,84 +118,20 @@ When the enhanced memory system is available:
 
 ### 0. Catch Up on Unsummarized Sessions
 
-Before anything else, check for sessions that ended without a summary:
-
-```
-Call memory.session (operation: "unsummarized"):
-├── If results returned → Previous session(s) ended without summary
-│   For each unsummarized session:
-│   ├── Review the buffered turns
-│   ├── Write a retroactive narrative summary
-│   ├── Extract structured facts, commitments, entities, relationships
-│   └── Call memory.end_session to finalize
-├── If no results → Clean slate, proceed normally
-```
-
-This handles the case where the user closed the terminal, lost connection, or simply forgot to let Claude wrap up. The raw turn data is preserved, so Claude can reconstruct what happened and generate a proper summary retroactively.
-
-**When writing a retroactive summary:**
-- Be honest that this is reconstructed from turn fragments, not live context
-- Focus on extracting the signal: what decisions were made, what was discussed, what was left unresolved
-- Still write the narrative with full context and texture, not just bullet points
-- Include a note like "Reconstructed from N buffered turns from [date]"
+Call `memory.session` (operation: "unsummarized"). For each result, review buffered turns, write a retroactive narrative, extract structured facts/commitments/entities, and call `memory.end_session` to finalize. Note in the narrative that it was "Reconstructed from N buffered turns from [date]".
 
 ### 1. Minimal Startup (2 calls max)
 
-```
-1. Read context/me.md (for greeting personalization, name, archetype)
-2. Call memory.briefing (compact counts + highlights: commitments, cooling, unread, predictions, activity)
-```
+1. Read `context/me.md` (for greeting personalization)
+2. Call `memory.briefing` (~500 tokens of aggregate context: commitments, cooling, unread, predictions)
 
-The briefing returns ~500 tokens of aggregate context. Use it to inform the greeting and surface urgent items. Pull full context on-demand via `memory.recall` / `memory.about` during conversation.
+Pull full context on-demand via `memory.recall` / `memory.about` during conversation. Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup (they duplicate the memory database).
 
-Do NOT read learnings.md, patterns.md, commitments.md, or waiting.md at startup. These duplicate what is already in the memory database. Read them on-demand only when a specific file becomes relevant during the session.
+**Fallback:** If `memory.briefing` unavailable, use `memory.temporal` (operation: "morning").
 
-**Fallback:** If `memory.briefing` is not available (older daemon), fall back to `memory.temporal` (operation: "morning").
+### 2. Session Start (Markdown Fallback)
 
-### 2. Greeting
-
-Use me.md + predictions to build the greeting. See Greeting Calibration below.
-
-### 3. On-Demand Lookup (during session)
-
-When a person, project, or topic comes up:
-```
-Call memory.about with the entity name:
-├── Returns all memories + relationships + recent session narratives in one call
-├── Surface relevant context naturally
-└── Only read people/[name].md if memory.about returns nothing
-```
-
----
-
-## Session Start (Markdown Fallback)
-
-If enhanced memory is unavailable, use traditional file loading:
-
-1. **context/me.md** - User profile and preferences
-2. **context/learnings.md** - What I've learned about working with them
-3. **context/patterns.md** - Observed patterns to keep in mind
-4. **context/commitments.md** - Active commitments (for awareness)
-5. **context/waiting.md** - What we're waiting on
-
----
-
-## Greeting Calibration
-
-**Change it up frequently.** Greetings should feel natural and personal based on context.
-
-**First session (no me.md):**
-Trigger onboarding with a warm, varied introduction. See onboarding skill for examples.
-
-**Returning user (with predictions):**
-Use their name and reference something relevant, including any predictions:
-- "Morning, Sarah. You've got that investor call at 2. Also, I noticed you haven't touched base with Mike in 45 days."
-- "Hey James. A few predictions surfaced overnight: [list top 2-3]"
-- "Back at it. The Acme proposal is due tomorrow. Want me to pull it up?"
-
-**After long absence (7+ days):**
-Acknowledge the gap warmly, surface what matters from predictions:
-- "Hey, it's been a minute. I've got 3 predictions that built up. The most important: Sarah's deadline passed while you were away."
+If enhanced memory is unavailable, read: `context/me.md`, `context/learnings.md`, `context/patterns.md`, `context/commitments.md`, `context/waiting.md`.
 
 ---
 
@@ -624,79 +361,9 @@ existing = db.get_one(
 
 If exists, surface it: "I filed this on [date]. Summary: [summary]. Want me to show what I extracted?"
 
-#### Example: Transcript Processing
-
-```
-User: "Here's the transcript from my call with Sarah Chen about the rebrand project"
-
-1. Check if this transcript was filed before (by content hash or filename)
-
-2. Call memory.document (operation: "store"):
-   - content: [full transcript text]
-   - filename: "2026-02-04-sarah-chen-rebrand.md"
-   - source_type: "transcript"
-   - summary: "Call with Sarah Chen re: rebrand project kickoff"
-   - about: ["Sarah Chen", "Rebrand Project"]
-
-3. Ask: "Filed. Want me to extract people, relationships, and commitments now?"
-
-4. If user says yes:
-   - Extract and present findings for verification
-   - Store verified info via memory.batch
-   - Update people/sarah-chen.md with new context
-
-5. Report using Session Update format
-```
-
-#### Example: Email Processing
-
-```
-User: "Here's an email from Jim about the partnership. I need to respond."
-
-1. Check if this email was filed before (by Message-ID header if available)
-
-2. Call memory.document (operation: "store"):
-   - content: [full email text]
-   - filename: "2026-02-04-jim-partnership.md"
-   - source_type: "gmail"
-   - source_ref: "<message-id@example.com>" (if available)
-   - summary: "Jim Ferry re: partnership terms"
-   - about: ["Jim Ferry"]
-
-3. Since user needs to respond, help draft the reply immediately
-   - Extraction can happen after the reply is sent
-   - Or user can say "extract this too" and we do both
-
-4. The email is now filed and searchable
-```
-
 #### Why This Matters
 
-- User can ask "where did you learn that?" and you can cite the source
-- Original context preserved for later human review
-- Facts can be verified against source material
-- Nothing important lives only in conversation context (which compresses away)
-- Long documents don't block Claudia from being responsive
-
----
-
-## During Session (Markdown Fallback)
-
-Keep a running list of changes to persist:
-
-```
-Session Changes:
-├── Learnings to add:
-│   - "Prefers bullet points over prose"
-│   - "Best focus time: mornings"
-├── Patterns observed:
-│   - "Third time mentioning capacity concerns this week"
-├── Commitments changed:
-│   - Added: "Send proposal by Friday"
-│   - Completed: "Review contract"
-├── People updated:
-│   - Sarah Chen: met today, discussed Q2 plans
-```
+Every fact traces back to its source. User can always ask "where did you learn that?" and get a citation. Nothing important lives only in conversation context.
 
 ---
 
@@ -754,37 +421,6 @@ When session ends (or at reasonable checkpoints):
 
 ---
 
-## Learnings Format (Markdown Fallback)
-
-`context/learnings.md`:
-
-```markdown
-# Claudia's Learnings
-
-## User Preferences
-- Communication: Prefers brief, direct responses
-- Detail level: Bullet points over prose
-- Timing: Best focus in mornings
-- Style: Appreciates dry humor
-
-## What Works Well
-- Direct proposals rather than options
-- Surfacing risks early
-- Keeping meeting preps to 1 page
-- Weekly review format with priorities first
-
-## What to Avoid
-- Long explanations when they're in flow
-- Too many questions at once
-- Suggesting things during busy periods
-
----
-
-*Last updated: [date]*
-```
-
----
-
 ## Reflections (Enhanced Memory)
 
 Reflections are persistent learnings about working with this user. Unlike memories (facts about the world), reflections capture communication preferences, work patterns, and how to be more helpful.
@@ -798,86 +434,19 @@ Reflections are persistent learnings about working with this user. Unlike memori
 | `learning` | How to work better | "Direct questions get better responses" |
 | `question` | Worth revisiting | "How did the Acme negotiation resolve?" |
 
-### Applying Reflections at Session Start
+### Applying Reflections
 
-When `memory.session` (operation: "context") or `memory.briefing` returns active reflections, **apply them silently**:
+When `memory.briefing` returns active reflections, **apply them silently**. Do NOT announce reflections. They inform behavior invisibly (adjust format/style, anticipate needs).
 
-| Reflection Type | How to Apply |
-|-----------------|--------------|
-| `observation` | Adjust format/style without announcing it |
-| `pattern` | Be aware of recurring themes, anticipate needs |
-| `learning` | Modify your approach based on what works |
-| `question` | Keep in mind for relevant moments |
+**Exception:** Surface reflections if the user explicitly asks ("show me your reflections" / "what have you learned?") via `memory.reflections`.
 
-**Do NOT announce reflections.** They inform behavior invisibly. For example:
-- If a reflection says "Prefers bullet points over prose," use bullet points without saying "I'm using bullets because you prefer them."
-- If a reflection says "Best focus time is mornings," don't schedule check-ins for afternoons.
+### Managing Reflections
 
-**Exception:** If the user explicitly asks "show me your reflections" or "what have you learned about me?", then surface them using `memory.reflections`.
-
-User can toggle: "be explicit about reflections" switches to explicit mode where you announce what you're applying.
-
-### Generating Reflections
-
-Reflections are typically generated via the `/meditate` skill at session end, but can be created anytime:
-
-```
-1. User says "let's wrap up" or "/meditate"
-2. Review the session and identify 1-3 insights
-3. Present to user for approval
-4. Store via memory.end_session with reflections array
-```
-
-### Retrieving Reflections
-
-When user asks about what you've learned:
-
-```
-"What have you learned about me?"
-"Show me your reflections"
-"Any observations about how I work?"
-
-→ Call memory.reflections (action: "get", limit: 20)
-→ Format nicely, grouped by type
-→ Mention timeline (first observed, times confirmed)
-```
-
-### Editing Reflections
-
-Users can modify reflections via natural language:
-
-```
-User: "That thing about me preferring bullet points - that's only for technical content."
-
-1. Call memory.reflections (action: "search", query: "bullet points")
-2. Find the relevant reflection
-3. Call memory.reflections (action: "update", reflection_id: X, content: "...")
-4. Confirm: "Updated. I'll keep that distinction in mind."
-```
-
-```
-User: "Delete the reflection about Monday mornings"
-
-1. Search for the reflection
-2. Call memory.reflections (action: "delete", reflection_id: X)
-3. Confirm: "Done, I've removed that."
-```
-
-### How Reflections Surface
-
-Reflections are loaded automatically via `memory.session` (operation: "context") or `memory.briefing` and inform:
-- Communication style (don't announce, just apply)
-- When to surface vs stay silent
-- How to format output
-- What questions to ask
-
-### Reflection Decay
-
-Reflections decay very slowly (0.999 daily, ~2 year half-life) because they're user-approved. Well-confirmed reflections (3+ times) decay even slower (0.9995).
-
-### Without Enhanced Memory
-
-When the memory daemon is unavailable, reflections are stored in `context/learnings.md` under a "Reflections" heading.
+- **Generate** via `/meditate` skill at session end, or anytime via `memory.end_session` with reflections array
+- **Retrieve** via `memory.reflections` (action: "get")
+- **Edit/Delete** via `memory.reflections` (action: "update"/"delete") when user requests changes
+- **Decay** is very slow (~2 year half-life). Well-confirmed reflections (3+) decay even slower.
+- **Without daemon** reflections go to `context/learnings.md` under a "Reflections" heading.
 
 ---
 
@@ -1006,21 +575,6 @@ User can:
 - Save before major suggestions
 - Merge changes rather than overwriting
 
-### Suggesting Migration
-
-If user is on markdown fallback and hasn't been offered enhanced memory:
-```
-"I notice you're using the markdown-based memory. There's an enhanced
-system available that never forgets and survives crashes. Want me to
-explain how to set it up?"
-```
-
 ### Health Check
 
-If enhanced memory seems slow or unavailable:
-```
-Check health endpoint: curl http://localhost:3848/health
-├── If healthy → Continue normally
-├── If unhealthy → Fall back to markdown
-└── Suggest restart if issues persist
-```
+If enhanced memory seems slow or unavailable, check `curl http://localhost:3848/health`. If unhealthy, fall back to markdown and suggest `/diagnose`.

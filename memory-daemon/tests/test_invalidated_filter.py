@@ -92,6 +92,7 @@ def _get_recall_service(db):
         enable_rrf = False
         rrf_k = 60
         graph_proximity_enabled = False
+        recency_half_life_days = 30
     svc.config = MockConfig()
 
     return svc

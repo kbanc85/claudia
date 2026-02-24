@@ -74,45 +74,46 @@ class ConsolidateService:
         two_days = (now + timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
         one_week = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
 
-        # Overdue: surge to 1.0
-        self.db.execute(
-            """
-            UPDATE memories SET importance = 1.0, updated_at = datetime('now')
-            WHERE deadline_at IS NOT NULL
-              AND deadline_at < ?
-              AND invalidated_at IS NULL
-              AND importance < 1.0
-            """,
-            (now_str,),
-        )
-        overdue_result = self.db.execute("SELECT changes()", fetch=True)
-        overdue = overdue_result[0][0] if overdue_result else 0
+        with self.db.transaction():
+            # Overdue: surge to 1.0
+            self.db.execute(
+                """
+                UPDATE memories SET importance = 1.0, updated_at = datetime('now')
+                WHERE deadline_at IS NOT NULL
+                  AND deadline_at < ?
+                  AND invalidated_at IS NULL
+                  AND importance < 1.0
+                """,
+                (now_str,),
+            )
+            overdue_result = self.db.execute("SELECT changes()", fetch=True)
+            overdue = overdue_result[0][0] if overdue_result else 0
 
-        # Due within 48 hours: surge to 0.95
-        self.db.execute(
-            """
-            UPDATE memories SET importance = MAX(importance, 0.95), updated_at = datetime('now')
-            WHERE deadline_at IS NOT NULL
-              AND deadline_at BETWEEN ? AND ?
-              AND invalidated_at IS NULL
-            """,
-            (now_str, two_days),
-        )
-        near_result = self.db.execute("SELECT changes()", fetch=True)
-        near = near_result[0][0] if near_result else 0
+            # Due within 48 hours: surge to 0.95
+            self.db.execute(
+                """
+                UPDATE memories SET importance = MAX(importance, 0.95), updated_at = datetime('now')
+                WHERE deadline_at IS NOT NULL
+                  AND deadline_at BETWEEN ? AND ?
+                  AND invalidated_at IS NULL
+                """,
+                (now_str, two_days),
+            )
+            near_result = self.db.execute("SELECT changes()", fetch=True)
+            near = near_result[0][0] if near_result else 0
 
-        # Due within 7 days: surge to 0.85
-        self.db.execute(
-            """
-            UPDATE memories SET importance = MAX(importance, 0.85), updated_at = datetime('now')
-            WHERE deadline_at IS NOT NULL
-              AND deadline_at BETWEEN ? AND ?
-              AND invalidated_at IS NULL
-            """,
-            (two_days, one_week),
-        )
-        week_result = self.db.execute("SELECT changes()", fetch=True)
-        week = week_result[0][0] if week_result else 0
+            # Due within 7 days: surge to 0.85
+            self.db.execute(
+                """
+                UPDATE memories SET importance = MAX(importance, 0.85), updated_at = datetime('now')
+                WHERE deadline_at IS NOT NULL
+                  AND deadline_at BETWEEN ? AND ?
+                  AND invalidated_at IS NULL
+                """,
+                (two_days, one_week),
+            )
+            week_result = self.db.execute("SELECT changes()", fetch=True)
+            week = week_result[0][0] if week_result else 0
 
         total = overdue + near + week
         if total > 0:

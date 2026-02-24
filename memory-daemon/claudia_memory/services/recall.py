@@ -8,6 +8,7 @@ Uses vector similarity combined with importance and recency scoring.
 import json
 import logging
 import math
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
@@ -309,10 +310,10 @@ class RecallService:
         """Convert a database row + scores into a RecallResult with combined scoring."""
         importance_score = row["importance"]
 
-        # Recency score (decay over 30 days)
+        # Recency score (configurable half-life decay)
         created = datetime.fromisoformat(row["created_at"])
         days_old = (now - created).days
-        recency_score = math.exp(-days_old / 30)
+        recency_score = math.exp(-days_old / self.config.recency_half_life_days)
 
         # Combined weighted score (vector + FTS + importance + recency)
         combined_score = (
@@ -413,7 +414,7 @@ class RecallService:
 
             for entity in entities:
                 canonical = entity["canonical_name"]
-                if canonical and canonical in text_lower:
+                if canonical and len(canonical) > 1 and re.search(r'\b' + re.escape(canonical.lower()) + r'\b', text_lower):
                     entity_ids.append(entity["id"])
 
             # Also check aliases
@@ -423,7 +424,8 @@ class RecallService:
                     fetch=True,
                 ) or []
                 for alias in aliases:
-                    if alias["canonical_alias"] and alias["canonical_alias"] in text_lower:
+                    alias_val = alias["canonical_alias"]
+                    if alias_val and len(alias_val) > 1 and re.search(r'\b' + re.escape(alias_val.lower()) + r'\b', text_lower):
                         entity_ids.append(alias["entity_id"])
 
         except Exception as e:

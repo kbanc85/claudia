@@ -145,7 +145,6 @@ argument-hint: [arg]
 | `summarize-doc/` | Executive summary | "summarize this", "main points" |
 | `research/` | Deep research with sources | "research this", "look into" |
 | `what-am-i-missing/` | Surface risks and blind spots | "what am I overlooking?" |
-| `accountability-check/` | Commitments and overdue items | "what do I owe?", "am I overdue?" |
 | `client-health/` | Client engagement health | "how are my clients?" |
 | `pipeline-review/` | Pipeline and capacity | "pipeline status" |
 | `financial-snapshot/` | Revenue and cash flow | "cash position" |
@@ -195,7 +194,7 @@ effort-level: medium
 
 | Effort | Skills |
 |--------|--------|
-| **low** | morning-brief, accountability-check, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor, inbox-check |
+| **low** | morning-brief, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor, inbox-check |
 | **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher, new-workspace |
 | **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
 | **max** | ingest-sources, pipeline-review, deep-context |

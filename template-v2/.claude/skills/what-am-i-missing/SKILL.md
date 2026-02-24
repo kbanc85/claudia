@@ -1,12 +1,13 @@
 ---
 name: what-am-i-missing
-description: Surface risks, blind spots, and overlooked items across commitments and relationships. Triggers on "what am I overlooking?", "blind spots", "what's falling through the cracks".
+description: Surface risks, blind spots, overlooked items, and accountability across commitments and relationships. Triggers on "what am I overlooking?", "blind spots", "what's falling through the cracks", "what do I owe?", "am I overdue?", "check my commitments".
+argument-hint: "[person name or 'overdue']"
 effort-level: high
 ---
 
 # What Am I Missing
 
-Surface risks, blind spots, and overlooked items across all areas.
+Surface risks, blind spots, overlooked items, and accountability across all areas.
 
 ## What to Check
 
@@ -85,6 +86,20 @@ Looking at the bigger picture:
   -> Why it matters: [impact]
   -> Suggestion: [action]
 
+### By Relationship
+
+#### [Person/Client Name]
+**I Owe:**
+- [Item] - due [Date]
+
+**They Owe:**
+- [Item] - since [Date]
+
+[Repeat for key relationships with open items]
+
+**Recovery Actions:**
+- [Overdue item]: [What to do now]
+
 ### Summary
 
 Critical: [X items need immediate attention]
@@ -107,10 +122,18 @@ Consider: [Z strategic things to think about]
 - When something feels "off" but unclear what
 - As a regular check-in (weekly or biweekly)
 
-## Depth
+## Usage Variations
 
-Can range from quick scan to deep analysis:
-- "Quick check" = Major risks only
-- "Full analysis" = Comprehensive review
+**Full analysis:**
+Comprehensive review across all risk categories and relationships.
 
-Ask: "Quick check or deep dive?"
+**For specific person:**
+`/what-am-i-missing [person name]`
+Filters to only show commitments and risks involving that person.
+
+**Quick overdue only:**
+`/what-am-i-missing overdue`
+Shows only overdue items and immediate recovery actions.
+
+**Quick check:**
+Major risks only, no deep analysis.

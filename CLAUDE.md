@@ -106,6 +106,14 @@ All 28 old tool names (e.g. `memory.entity`, `memory.search_entities`, `memory.t
 - Health check endpoint on port 3848 (includes `/flush` for WAL checkpoint)
 - Graceful shutdown with signal handling
 
+**Vault sync** uses a PARA structure (since v1.42.0): Active/, Relationships/, Reference/, Archive/, and Claudia's Desk/ (MOCs, reflections, sessions). Routing: `attention_tier=archive` or `contact_trend=dormant` goes to Archive; otherwise projects→Active, people→Relationships, concepts/locations→Reference.
+
+**Configuration** lives in `~/.claudia/config.json`. Key tunable settings:
+- `embedding_model` (default: `all-minilm:l6-v2`), `embedding_dimensions` (default: 384)
+- `language_model` (default: `qwen3:4b`, empty string disables LLM features)
+- `vault_layout` (default: `"para"`)
+- Full defaults in `config.py` MemoryConfig dataclass (~100 settings)
+
 **Dependencies:** Ollama (local embeddings via all-minilm:l6-v2 + optional LLM models), sqlite-vec, APScheduler, httpx, spaCy (optional NLP)
 
 ### Archetype System
@@ -148,8 +156,21 @@ pytest tests/test_recall.py::test_name # Single test function
 python3 -m claudia_memory              # Run daemon (MCP mode, stdio)
 python3 -m claudia_memory --consolidate # Run just consolidation
 python3 -m claudia_memory --tui        # Brain Monitor TUI dashboard
+python3 -m claudia_memory --backfill-embeddings  # Generate missing embeddings
+python3 -m claudia_memory --migrate-embeddings    # Switch embedding model/dimensions
+python3 -m claudia_memory --backup                # Create database backup
+python3 -m claudia_memory --vault-sync            # Export to Obsidian vault
 claudia-brain                          # Same TUI via entry point
 curl http://localhost:3848/health      # Health check
+```
+
+### Diagnostics
+
+```bash
+~/.claudia/diagnose.sh                # Full service check
+tail -f ~/.claudia/daemon-stderr.log  # Daemon logs
+sqlite3 ~/.claudia/memory/claudia.db  # Inspect database
+ollama list                            # Check embedding model
 ```
 
 ### Working on the Visualizer
@@ -157,7 +178,7 @@ curl http://localhost:3848/health      # Health check
 ```bash
 cd visualizer
 npm install
-npm start          # Production mode (Express serves static build on :3847)
+npm start          # Production mode (Express serves static build on :3849)
 npm run dev        # Dev mode with Vite HMR
 ```
 
@@ -224,6 +245,7 @@ npm publish   # Publish to NPM
 - **`openclaw-skills/` is repo-only** and not included in the npm package. It's for OpenClaw agent development only.
 - **`visualizer/` IS in the npm package** (`files` array in `package.json`). It ships with `get-claudia` and is installed alongside `template-v2/` and `memory-daemon/`.
 - **Obsidian vault sync** (`memory-daemon/claudia_memory/services/vault_sync.py`) is exposed via the `memory.vault` MCP tool (`sync`, `status`, `canvas`, `import` operations). The canvas generator writes `.canvas` files for Obsidian's graph view.
+- **memories uses `invalidated_at`, entities uses `deleted_at`** for soft-delete. These are different columns. Always check schema before writing queries against either table.
 - **`schema.sql` splits on `;` at line endings.** `CREATE TRIGGER` with internal semicolons must go in `database.py` instead (see inline note in Adding a Database Migration).
 
 ## Design Principles
@@ -280,7 +302,7 @@ claudia/
 │   │   └── services/        ← Remember, Recall, Consolidate, Ingest, Documents,
 │   │                           Audit, Metrics, Verify, Guards, Filestore
 │   ├── scripts/             ← Install, migrate, diagnose, seed scripts
-│   ├── tests/               ← 25+ test files, pytest (asyncio_mode = auto)
+│   ├── tests/               ← 47 test files, 503+ passing tests, pytest (asyncio_mode = auto)
 │   └── test.sh              ← One-click full test suite
 ├── docs/                    ← Design plans and internal docs
 │   └── plans/

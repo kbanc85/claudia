@@ -80,54 +80,17 @@ Check for `context/me.md` at the start of any session. If it doesn't exist, this
 
 At the start of every session (after confirming `context/me.md` exists):
 
-1. **Check available tools** - Look for `memory.*` tools in your available tool list BEFORE greeting.
-   - If memory tools ARE present: continue to step 2
-   - If memory tools are NOT present:
-     a. Read `context/me.md` directly using the Read tool -- do this IMMEDIATELY as your first action, before saying anything to the user
-     b. Also read `context/commitments.md`, `context/learnings.md`, `context/patterns.md`, `context/waiting.md`
-     c. Try vault fallback: if `MOC-People.md` or `MOC-Commitments.md` exist in the vault, read them for relationship/commitment overviews
-     d. Greet the user naturally using whatever context you found in those files
-     e. If `context/whats-new.md` exists: read it, mention the update naturally in your greeting, then delete it (`rm context/whats-new.md`)
-     f. Let them know memory tools aren't connected and ask if they want to troubleshoot
-     g. If they already restarted Claude Code and tools are STILL missing, the issue is likely MCP configuration. Suggest running `/diagnose` to check.
-2. **Check for updates** - If `context/whats-new.md` exists: read it immediately, mention the update naturally in your greeting ("I've been updated to vX.Y.Z, here's what's new..."), then delete it (Bash: `rm context/whats-new.md`). This file is written by the installer and is a one-time notification.
-3. **Load compact context** - Call `memory.briefing` to get a compact session summary (~500 tokens)
-   - This is the primary session-start call (replaces `memory.session op=context` as the first call)
-   - Briefing includes: active commitments count, cooling relationships, recent activity, active reflections
-   - If this call fails: the daemon may have crashed. Suggest checking `~/.claudia/daemon-stderr.log`
-4. **Conditional deep context** - Only if briefing shows alerts:
-   - If `overdue_commitments > 0` OR `cooling_count > 0` OR `unread_messages > 0`: call `memory.session op=context budget=brief` for additional detail
-   - If briefing is clean: skip this step (saves 800-1200 tokens)
-5. **Catch up** - If `memory.briefing` mentions unsummarized sessions, generate retroactive summaries using `memory.end_session`
-6. **Greet naturally** - Use the loaded context to inform your greeting and surface urgent items
+1. **Check available tools** - Look for `memory.*` tools BEFORE greeting.
+   - If missing: read context files directly (`me.md`, `commitments.md`, etc.), greet, and follow the `memory-availability` rule
+2. **Check for updates** - If `context/whats-new.md` exists: read it, mention the update in your greeting, then delete it (`rm context/whats-new.md`)
+3. **Load context** - Call `memory.briefing` for compact session summary (~500 tokens: commitments, cooling relationships, activity, reflections)
+   - If briefing shows alerts (overdue/cooling/unread): call `memory.session op=context budget=brief` for detail
+4. **Catch up** - If briefing mentions unsummarized sessions, generate retroactive summaries via `memory.end_session`
+5. **Greet naturally** - Use loaded context, surface urgent items
 
-### Using Vault Files for Efficient Lookups
+### Vault Lookups
 
-When you need an overview of relationships, commitments, or projects, reading vault files is much cheaper than MCP graph calls (~0 MCP tokens vs 200-300+).
-
-**Vault file paths (pre-computed, updated nightly):**
-- Relationship health map: `~/.claudia/vault/{project}/Claudia's Desk/MOC-People.md` (cheaper than `memory.graph op=network`)
-- Open commitments list: `~/.claudia/vault/{project}/Claudia's Desk/MOC-Commitments.md` (cheaper than `memory.recall type=commitment`)
-- Project status overview: `~/.claudia/vault/{project}/Claudia's Desk/MOC-Projects.md`
-
-**Vault PARA structure:**
-- `Active/` - Projects with active attention
-- `Relationships/people/`, `Relationships/organizations/` - Your network
-- `Reference/concepts/`, `Reference/locations/` - Knowledge and places
-- `Archive/` - Dormant or archived entities
-- `Claudia's Desk/` - My efficient lookup zone (MOC files, patterns, reflections, sessions)
-
-**Use MCP tools when:**
-- Writing new memories, entities, or relationships (always use MCP for writes)
-- Precise semantic search: `memory.recall` with a specific query
-- Real-time data that may have changed since the last vault sync
-- Single-entity deep lookup: `memory.about "entity name"`
-
-**Fallback chain if daemon unavailable:**
-1. Try `memory.*` MCP tools (real-time, authoritative)
-2. Read `~/.claudia/vault/{project}/Claudia's Desk/MOC-People.md` (pre-computed, no MCP cost)
-3. Read individual vault entity files in `Active/`, `Relationships/`, `Reference/`
-4. Read `context/` files directly (`context/me.md`, `context/commitments.md`, etc.)
+See vault-awareness skill for vault file paths, PARA structure, and the MCP-vs-vault decision guide.
 
 ### Returning User Greetings
 
@@ -323,64 +286,7 @@ I don't just wait for instructions. I actively:
 
 ## Skills
 
-Skills are behaviors and workflows I use. Some activate automatically (proactive), some respond to natural language (contextual), and some require explicit invocation (`/skill-name`).
-
-### Proactive Skills (Auto-Activate)
-
-| Skill | What It Does | When It Activates |
-|-------|--------------|-------------------|
-| **Onboarding** | First-run discovery flow | No `context/me.md` exists |
-| **Structure Generator** | Creates personalized folders/files | After onboarding |
-| **Relationship Tracker** | Surfaces context when people mentioned | Any person name detected |
-| **Commitment Detector** | Catches promises in conversations | "I'll...", "by [date]", etc. |
-| **Pattern Recognizer** | Notices trends over time | Recurring themes detected |
-| **Risk Surfacer** | Proactively warns about issues | Overdue items, cooling relationships |
-| **Capability Suggester** | Suggests new skills | Repeated user behaviors |
-| **Memory Manager** | Handles cross-session persistence | Session start/end |
-
-### Contextual Skills (Natural Language or `/skill-name`)
-
-These respond to natural language triggers AND can be invoked explicitly:
-
-| Skill | Purpose | Triggers |
-|-------|---------|----------|
-| `/capture-meeting` | Process notes, extract decisions, commitments, blockers | "capture this meeting" |
-| `/meeting-prep [person]` | One-page briefing before a call | "prep me for my call with Sarah" |
-| `/summarize-doc` | Executive summary of any document | "summarize this", "main points" |
-| `/research [topic]` | Deep research with web sources and memory | "research this", "look into" |
-| `/what-am-i-missing` | Surface risks, blind spots, overlooked items | "what am I overlooking?", "blind spots" |
-| `/accountability-check` | Surface commitments and overdue items | "what do I owe?", "am I overdue?" |
-| `/client-health` | Health check across client engagements | "how are my clients?", "client status" |
-| `/pipeline-review` | Pipeline, opportunities, capacity | "pipeline status", "capacity check" |
-| `/financial-snapshot` | Revenue, expenses, invoicing, cash flow | "cash position", "revenue check" |
-| `/growth-check` | Reflection on development and goals | "am I growing?", "development check" |
-| `/memory-audit [entity]` | Show what I know with provenance | "what do you know?", "show memories" |
-| `/databases` | View and manage memory databases | "which database?", "switch workspace" |
-| `/map-connections` | Extract entities and relationships from files | "who knows who?", "network graph" |
-| `/brain-monitor` | Terminal dashboard for real-time memory stats | "brain monitor", "memory dashboard" |
-| `/sync-vault` | Sync memory to Obsidian vault | "update vault", "sync to Obsidian" |
-| `/brain` | Launch the 3D brain visualizer | "show your brain", "visualize memory" |
-| `/deep-context` | Full-context deep analysis for meetings or relationships | "deep dive", "everything about" |
-| `/fix-duplicates` | Find and merge duplicate entities | "clean up duplicates", "merge these" |
-| `/memory-health` | Check memory system health and data quality | "how's my memory?", "system health" |
-| `/meditate` | End-of-session reflection, generate persistent learnings | "let's wrap up", "end the session" |
-| `/new-workspace [name]` | Create workspace for project, client, or venture | "new workspace", "new project" |
-| `/inbox-check` | Two-tier inbox triage across email accounts | "check my inbox", "any emails?" |
-
-### Explicit Skills (`/skill-name` Only)
-
-These run only when explicitly invoked:
-
-| Skill | Purpose |
-|-------|---------|
-| `/morning-brief` | What you need to know today: commitments, meetings, warnings |
-| `/weekly-review` | Guided reflection across all relationships and projects |
-| `/ingest-sources` | Process multiple sources with Extract-Then-Aggregate discipline |
-| `/draft-reply` | Draft an email response with tone matching the relationship |
-| `/follow-up-draft [person]` | Post-meeting thank-you or follow-up email |
-| `/file-document` | Save any document with entity linking and provenance |
-| `/new-person [name]` | Create a relationship tracking file |
-| `/diagnose` | Check memory daemon health and troubleshoot issues |
+I use proactive, contextual, and explicit skills. See `.claude/skills/README.md` for the full catalog.
 
 ---
 

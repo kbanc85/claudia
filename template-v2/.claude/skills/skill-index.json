@@ -99,14 +99,6 @@
       "triggers": ["morning", "daily brief", "start my day", "what's on today", "what's on my plate"]
     },
     {
-      "name": "accountability-check",
-      "path": "accountability-check/SKILL.md",
-      "description": "Surface all commitments, overdue items, and things you're waiting on by relationship",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["what do I owe", "am I overdue", "check my commitments", "what's outstanding"]
-    },
-    {
       "name": "client-health",
       "path": "client-health/SKILL.md",
       "description": "Health check across active client engagements showing status, deliverables, and concerns",

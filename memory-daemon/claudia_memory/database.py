@@ -49,7 +49,7 @@ class Database:
             conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA foreign_keys = ON")
             # Recover any uncommitted WAL writes from a previous crashed daemon
-            conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
             # Try to load sqlite-vec for vector search
             # Priority: sqlite_vec Python package first (works on Python 3.13+),

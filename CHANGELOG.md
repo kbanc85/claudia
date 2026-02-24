@@ -2,6 +2,39 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.43.0 (2026-02-24)
+
+### The Trim
+
+Claudia's template and memory daemon got a significant trim. Template files shed ~4,000 lines of redundant prose, archetypes now reference a shared base structure instead of duplicating it, and the MCP server was refactored from a monolithic handler into a clean registry pattern. Several memory-side fixes improve correctness.
+
+**Template simplification (-4,000 lines):**
+- `CLAUDE.md` condensed: session startup, vault lookups, and skill tables trimmed to essentials with pointers to dedicated skill files
+- `claudia-principles.md` cut from verbose examples to concise principles (same 10 rules, fewer words)
+- All 5 archetype files (consultant, executive, founder, solo, creator) stripped of duplicated structure definitions; now reference `_base-structure.md`
+- `memory-manager.md` streamlined to remove redundant operational detail
+- `what-am-i-missing` skill tightened
+- `accountability-check` skill removed (functionality absorbed into `what-am-i-missing`)
+- `skill-index.json` updated to reflect removals
+
+**MCP server refactor:**
+- Converted from monolithic `call_tool()` switch to `@tool_handler` decorator registry pattern
+- Each tool handler is now a self-contained function with its own schema
+- Backward-compatible aliases preserved for all 28 legacy tool names
+
+**Memory daemon fixes:**
+- WAL checkpoint upgraded from PASSIVE to TRUNCATE for more reliable crash recovery
+- Deadline surge updates (overdue/48h/7d importance bumps) now wrapped in a single transaction
+- Entity matching in recall uses word-boundary regex instead of substring containment (prevents false matches on short names)
+- Single-character entity names excluded from text matching
+- Recency decay half-life is now configurable via `recency_half_life_days` (default: 30)
+
+**Dev docs:**
+- `CLAUDE.md` updated with vault sync docs, config reference, diagnostics section, correct visualizer port, test count
+- New `docs/plans/desktop-strategy/` with 8 design documents for future desktop app exploration
+
+510 tests pass (5 skipped), 0 regressions.
+
 ## 1.42.4 (2026-02-24)
 
 Consolidated the memory daemon test suite from 47 files to 39 by merging 13 related test files into 5 well-organized modules. All 508 tests pass with zero regressions. No test logic changed, just better structure.

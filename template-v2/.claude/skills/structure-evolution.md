@@ -96,7 +96,7 @@ Watch for tasks that suggest missing commands or templates:
 **Command suggestions:**
 - User frequently asks for similar information → Suggest a command
 - User manually formats the same report type → Suggest a template
-- User asks "what did I promise [person]" → Suggest `/accountability-check` if not present
+- User asks "what did I promise [person]" → Suggest `/what-am-i-missing` if not present
 
 **Template suggestions:**
 - User creates similar documents repeatedly → Offer to templatize
@@ -260,7 +260,7 @@ When the pattern recognizer notices:
 
 When commitments pile up without a system:
 - Suggest accountability/commitments.md
-- Suggest /accountability-check command
+- Suggest /what-am-i-missing command
 
 ### Risk Surfacer
 
