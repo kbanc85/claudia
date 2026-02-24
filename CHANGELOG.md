@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.42.4 (2026-02-24)
+
+Consolidated the memory daemon test suite from 47 files to 39 by merging 13 related test files into 5 well-organized modules. All 508 tests pass with zero regressions. No test logic changed, just better structure.
+
+- **Guards:** `test_guards.py` + `test_relationship_guards.py` merged into `test_validation_guards.py`
+- **Daemon lifecycle:** `test_health.py` + `test_scheduler.py` + `test_startup.py` + `test_backup.py` merged into `test_daemon_lifecycle.py`
+- **Entity lifecycle:** `test_entity_management.py` + `test_corrections.py` merged into `test_entity_lifecycle.py`
+- **Vault sync:** `test_vault_sync.py` + `test_vault_sync_v2.py` merged into `test_vault_operations.py`
+- **Graph:** `test_graph.py` + `test_graph_retrieval.py` + `test_graph_analytics.py` merged into `test_graph_operations.py`
+
+508 tests pass (5 skipped), 0 regressions.
+
 ## 1.42.3 (2026-02-21)
 
 Four fixes from a live field report:
