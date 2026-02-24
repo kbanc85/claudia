@@ -1,4 +1,4 @@
-"""Tests for VaultSyncService - Obsidian vault export."""
+"""Tests for VaultSyncService - Obsidian vault export, edit detection, Dataview templates."""
 
 import json
 import tempfile
@@ -14,6 +14,11 @@ from claudia_memory.services.vault_sync import (
 )
 
 
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
 @pytest.fixture
 def vault_dir():
     """Create a temporary vault directory."""
@@ -25,6 +30,11 @@ def vault_dir():
 def vault_svc(db, vault_dir):
     """Create a VaultSyncService with test database and temp vault."""
     return VaultSyncService(vault_dir, db=db)
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
 
 
 def _seed_entity(db, name, entity_type="person", description="", importance=0.8,
@@ -76,7 +86,9 @@ def _seed_relationship(db, source_id, target_id, rel_type="works_with", strength
     )
 
 
-# ── Utility function tests ─────────────────────────────────────
+# =============================================================================
+# Utility function tests
+# =============================================================================
 
 
 def test_sanitize_filename_basic():
@@ -107,7 +119,9 @@ def test_compute_sync_hash():
     assert len(h1) == 12  # 12 hex chars
 
 
-# ── Entity export tests ─────────────────────────────────────────
+# =============================================================================
+# Entity export tests
+# =============================================================================
 
 
 def test_export_single_entity(db, vault_svc, vault_dir):
@@ -192,7 +206,53 @@ def test_export_entity_with_aliases(db, vault_svc, vault_dir):
     assert '  - "S. Chen"' in content
 
 
-# ── Full export tests ────────────────────────────────────────────
+# =============================================================================
+# Export by name/ID tests
+# =============================================================================
+
+
+def test_export_entity_by_name(db, vault_dir):
+    """Exporting an entity by name creates a .md file in the correct subdirectory."""
+    _seed_entity(db, "Test Person", "person", importance=1.0)
+    service = VaultSyncService(vault_dir, db=db)
+
+    result = service.export_entity_by_name("Test Person")
+
+    assert result is not None
+    assert result.exists()
+    assert result.suffix == ".md"
+    assert result.parent.name == "people"
+    content = result.read_text()
+    assert "# Test Person" in content
+    assert "type: person" in content
+
+
+def test_export_entity_by_id(db, vault_dir):
+    """Exporting an entity by ID creates a .md file."""
+    entity_id = _seed_entity(db, "Test Person", "person", importance=1.0)
+    service = VaultSyncService(vault_dir, db=db)
+
+    result = service.export_entity_by_id(entity_id)
+
+    assert result is not None
+    assert result.exists()
+    assert result.suffix == ".md"
+    content = result.read_text()
+    assert f"claudia_id: {entity_id}" in content
+
+
+def test_export_entity_by_name_not_found(db, vault_dir):
+    """Exporting a nonexistent entity by name returns None without crashing."""
+    service = VaultSyncService(vault_dir, db=db)
+
+    result = service.export_entity_by_name("Nobody Here")
+
+    assert result is None
+
+
+# =============================================================================
+# Full export tests
+# =============================================================================
 
 
 def test_export_all(db, vault_svc, vault_dir):
@@ -235,7 +295,9 @@ def test_export_all_skips_deleted_entities(db, vault_svc, vault_dir):
     assert not (vault_dir / "Relationships" / "people" / "Deleted Person.md").exists()
 
 
-# ── Incremental export tests ────────────────────────────────────
+# =============================================================================
+# Incremental export tests
+# =============================================================================
 
 
 def test_incremental_falls_back_to_full(db, vault_svc, vault_dir):
@@ -260,7 +322,9 @@ def test_incremental_after_full(db, vault_svc, vault_dir):
     assert (vault_dir / "Relationships" / "people" / "Bob.md").exists()
 
 
-# ── Sync metadata tests ─────────────────────────────────────────
+# =============================================================================
+# Sync metadata tests
+# =============================================================================
 
 
 def test_sync_metadata_written(db, vault_svc, vault_dir):
@@ -285,7 +349,9 @@ def test_sync_log_appended(db, vault_svc, vault_dir):
     assert len(lines) == 2  # Two sync entries
 
 
-# ── Status tests ─────────────────────────────────────────────────
+# =============================================================================
+# Status tests
+# =============================================================================
 
 
 def test_get_status_no_sync(db, vault_svc, vault_dir):
@@ -309,7 +375,9 @@ def test_get_status_after_sync(db, vault_svc, vault_dir):
     assert status["file_counts"]["Relationships/organizations"] >= 1
 
 
-# ── Pattern export tests ────────────────────────────────────────
+# =============================================================================
+# Pattern export tests
+# =============================================================================
 
 
 def test_export_patterns(db, vault_svc, vault_dir):
@@ -329,7 +397,9 @@ def test_export_patterns(db, vault_svc, vault_dir):
     assert "cooling_relationship" in content.lower() or "Cooling Relationship" in content
 
 
-# ── Reflection export tests ─────────────────────────────────────
+# =============================================================================
+# Reflection export tests
+# =============================================================================
 
 
 def test_export_reflections(db, vault_svc, vault_dir):
@@ -351,7 +421,9 @@ def test_export_reflections(db, vault_svc, vault_dir):
     assert "times_confirmed: 3" in content
 
 
-# ── Session export tests ────────────────────────────────────────
+# =============================================================================
+# Session export tests
+# =============================================================================
 
 
 def test_export_sessions(db, vault_svc, vault_dir):
@@ -374,7 +446,39 @@ def test_export_sessions(db, vault_svc, vault_dir):
     assert "roadmap" in content
 
 
-# ── Vault path resolution tests ─────────────────────────────────
+def test_session_hierarchical_path(db, vault_svc, vault_dir):
+    """Sessions use hierarchical YYYY/MM/date.md paths."""
+    db.execute(
+        """INSERT INTO episodes
+           (session_id, is_summarized, narrative, started_at)
+           VALUES ('s1', 1, 'Test narrative', '2026-02-10T14:00:00')""",
+    )
+    vault_svc._ensure_directories()
+    vault_svc._export_sessions()
+
+    assert (vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md").exists()
+
+
+def test_narrative_wikification(db, vault_svc, vault_dir):
+    """Entity names in session narratives are wrapped in [[wikilinks]]."""
+    _seed_entity(db, "Sarah Chen", "person")
+    db.execute(
+        """INSERT INTO episodes
+           (session_id, is_summarized, narrative, started_at)
+           VALUES ('s1', 1, 'Met with Sarah Chen about the project', '2026-02-10T14:00:00')""",
+    )
+
+    vault_svc._ensure_directories()
+    vault_svc._export_sessions()
+
+    session_file = vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md"
+    content = session_file.read_text()
+    assert "[[Sarah Chen]]" in content
+
+
+# =============================================================================
+# Vault path resolution tests
+# =============================================================================
 
 
 def test_vault_path_default():
@@ -391,7 +495,9 @@ def test_vault_path_project():
     assert "vault" in str(path)
 
 
-# ── Commitment checkbox rendering ────────────────────────────────
+# =============================================================================
+# Commitment checkbox rendering
+# =============================================================================
 
 
 def test_commitment_checkboxes(db, vault_svc, vault_dir):
@@ -407,12 +513,9 @@ def test_commitment_checkboxes(db, vault_svc, vault_dir):
     assert "- [ ] Send report by Friday" in content
 
 
-# ══════════════════════════════════════════════════════════════════
-# NEW V2 TESTS: Frontmatter, Note Body, Navigation, Config
-# ══════════════════════════════════════════════════════════════════
-
-
-# ── Frontmatter v2 tests ─────────────────────────────────────────
+# =============================================================================
+# Frontmatter v2 tests
+# =============================================================================
 
 
 def test_frontmatter_contact_fields(db, vault_svc, vault_dir):
@@ -460,7 +563,9 @@ def test_frontmatter_cssclasses(db, vault_svc, vault_dir):
     assert "  - entity-person" in content
 
 
-# ── Note body v2 tests ───────────────────────────────────────────
+# =============================================================================
+# Note body v2 tests
+# =============================================================================
 
 
 def test_status_callout_person(db, vault_svc, vault_dir):
@@ -528,7 +633,9 @@ def test_interaction_timeline(db, vault_svc, vault_dir):
     assert "Discussed roadmap" in content
 
 
-# ── Navigation tests ─────────────────────────────────────────────
+# =============================================================================
+# Navigation tests
+# =============================================================================
 
 
 def test_home_dashboard_created(db, vault_svc, vault_dir):
@@ -570,40 +677,9 @@ def test_attention_items_in_dashboard(db, vault_svc, vault_dir):
     assert "dormant" in content
 
 
-# ── Session tests ────────────────────────────────────────────────
-
-
-def test_session_hierarchical_path(db, vault_svc, vault_dir):
-    """Sessions use hierarchical YYYY/MM/date.md paths."""
-    db.execute(
-        """INSERT INTO episodes
-           (session_id, is_summarized, narrative, started_at)
-           VALUES ('s1', 1, 'Test narrative', '2026-02-10T14:00:00')""",
-    )
-    vault_svc._ensure_directories()
-    vault_svc._export_sessions()
-
-    assert (vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md").exists()
-
-
-def test_narrative_wikification(db, vault_svc, vault_dir):
-    """Entity names in session narratives are wrapped in [[wikilinks]]."""
-    _seed_entity(db, "Sarah Chen", "person")
-    db.execute(
-        """INSERT INTO episodes
-           (session_id, is_summarized, narrative, started_at)
-           VALUES ('s1', 1, 'Met with Sarah Chen about the project', '2026-02-10T14:00:00')""",
-    )
-
-    vault_svc._ensure_directories()
-    vault_svc._export_sessions()
-
-    session_file = vault_dir / "Claudia's Desk" / "sessions" / "2026" / "02" / "2026-02-10.md"
-    content = session_file.read_text()
-    assert "[[Sarah Chen]]" in content
-
-
-# ── .obsidian config tests ───────────────────────────────────────
+# =============================================================================
+# .obsidian config tests
+# =============================================================================
 
 
 def test_obsidian_config_created(db, vault_svc, vault_dir):
@@ -633,7 +709,9 @@ def test_obsidian_config_not_overwritten(db, vault_svc, vault_dir):
     assert graph_path.read_text() == custom
 
 
-# ── Format versioning tests ──────────────────────────────────────
+# =============================================================================
+# Format versioning tests
+# =============================================================================
 
 
 def test_format_version_in_metadata(db, vault_svc, vault_dir):
@@ -642,3 +720,123 @@ def test_format_version_in_metadata(db, vault_svc, vault_dir):
 
     meta = json.loads((vault_dir / "_meta" / "last-sync.json").read_text())
     assert meta["vault_format_version"] == 2
+
+
+# =============================================================================
+# User edit detection tests
+# =============================================================================
+
+
+def test_detect_unmodified_note(db, vault_dir):
+    """An exported note with unchanged content shows no edits."""
+    _seed_entity(db, "Test Person", "person", importance=1.0)
+    service = VaultSyncService(vault_dir, db=db)
+    service.export_entity_by_name("Test Person")
+
+    edits = service.detect_user_edits()
+
+    assert edits == []
+
+
+def test_detect_modified_note(db, vault_dir):
+    """Modifying an exported note's body triggers edit detection."""
+    _seed_entity(db, "Test Person", "person", importance=1.0)
+    service = VaultSyncService(vault_dir, db=db)
+    filepath = service.export_entity_by_name("Test Person")
+    assert filepath is not None
+
+    # Simulate a user edit by appending content
+    original = filepath.read_text()
+    filepath.write_text(original + "\nUser added this line.\n")
+
+    edits = service.detect_user_edits()
+
+    assert len(edits) == 1
+    assert edits[0]["file_path"] == str(filepath)
+    assert edits[0]["old_hash"] != edits[0]["new_hash"]
+
+
+# =============================================================================
+# Dataview template tests
+# =============================================================================
+
+
+def test_dataview_templates_created(db, vault_dir):
+    """Calling _export_dataview_templates creates 7 query notes in _queries/."""
+    service = VaultSyncService(vault_dir, db=db)
+
+    count = service._export_dataview_templates()
+
+    assert count == 7
+    queries_dir = vault_dir / "Claudia's Desk" / "_queries"
+    assert queries_dir.is_dir()
+    md_files = list(queries_dir.glob("*.md"))
+    assert len(md_files) == 7
+
+    expected_names = {
+        "Upcoming Deadlines.md",
+        "Cooling Relationships.md",
+        "Active Network.md",
+        "Recent Memories.md",
+        "Open Commitments.md",
+        "Entity Overview.md",
+        "Session Log.md",
+    }
+    actual_names = {f.name for f in md_files}
+    assert actual_names == expected_names
+
+
+def test_dataview_templates_not_overwritten(db, vault_dir):
+    """Once created, Dataview templates are not overwritten on subsequent calls."""
+    service = VaultSyncService(vault_dir, db=db)
+    service._export_dataview_templates()
+
+    # Modify one template
+    target = vault_dir / "Claudia's Desk" / "_queries" / "Active Network.md"
+    custom_content = "# My Custom Active Network\nI changed this."
+    target.write_text(custom_content)
+
+    # Call again -- should not overwrite
+    count = service._export_dataview_templates()
+
+    assert count == 0  # No new templates created
+    assert target.read_text() == custom_content
+
+
+# =============================================================================
+# Write-through graceful failure test
+# =============================================================================
+
+
+def test_write_through_graceful_failure(db, vault_dir):
+    """The service handles write failures gracefully without crashing."""
+    _seed_entity(db, "Test Person", "person", importance=1.0)
+
+    blocked_path = vault_dir / "blocked"
+    blocked_path.mkdir()
+
+    service = VaultSyncService(blocked_path, db=db)
+
+    # Export should succeed normally when the path exists
+    result = service.export_entity_by_name("Test Person")
+    assert result is not None
+
+    # Now make the target file read-only and try to overwrite
+    result.chmod(0o444)
+    result.parent.chmod(0o555)
+
+    try:
+        # Re-export should fail gracefully (return None), not raise
+        result2 = service.export_entity_by_id(
+            db.execute(
+                "SELECT id FROM entities WHERE canonical_name = ?",
+                ("test person",),
+                fetch=True,
+            )[0]["id"]
+        )
+        # The method returns None on IOError
+        assert result2 is None
+    finally:
+        # Restore permissions for cleanup
+        result.parent.chmod(0o755)
+        result.chmod(0o644)
