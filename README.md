@@ -47,22 +47,36 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 <p>Every person she meets gets a living profile: relationship health, contact trends, connected entities. Ask about anyone and she has the full picture.</p>
 </td>
 <td width="33%" align="center">
-<h3>⚠️ Spots Patterns You Miss</h3>
-<p>Overcommitting again? A key relationship going cold? The same mistake twice? She sees it forming and speaks up.</p>
+<h3>⚖️ Learns Your Judgment</h3>
+<p>Tell her "revenue work beats internal cleanup" once. She writes it down and applies it across sessions: briefs, triage, delegation, risk surfacing.</p>
 </td>
 </tr>
 <tr>
+<td width="33%" align="center">
+<h3>⚠️ Spots Patterns You Miss</h3>
+<p>Overcommitting again? A key relationship going cold? The same mistake twice? She sees it forming and speaks up.</p>
+</td>
+<td width="33%" align="center">
+<h3>🧠 Second Brain in Obsidian</h3>
+<p>Memory syncs to an Obsidian vault organized with PARA: Active projects, Relationships, Reference, Archive. Graph view maps your world. Plain markdown you own forever.</p>
+</td>
+<td width="33%" align="center">
+<h3>👥 Agent Team</h3>
+<p>A two-tier team works behind the scenes. Fast Haiku workers handle document processing, while a Sonnet research scout tackles deep research with full autonomy.</p>
+</td>
+</tr>
+<tr>
+<td width="33%" align="center">
+<h3>🌙 Learns in the Background</h3>
+<p>Overnight, old memories fade, near-duplicates merge, and patterns surface. Each morning she knows a little more than yesterday.</p>
+</td>
 <td width="33%" align="center">
 <h3>📄 Shows Her Sources</h3>
 <p>Every fact traces to its source. Ask "how do you know that?" and she shows the receipt.</p>
 </td>
 <td width="33%" align="center">
-<h3>🧠 Second Brain in Obsidian</h3>
-<p>Memory syncs to an Obsidian vault organized by activity: Active projects, Relationships, Reference, Archive. Graph view maps your world. Plain markdown you own forever.</p>
-</td>
-<td width="33%" align="center">
-<h3>🌙 Learns in the Background</h3>
-<p>Overnight, old memories fade, near-duplicates merge, and patterns surface. Each morning she knows a little more than yesterday.</p>
+<h3>🪞 Session Reflections</h3>
+<p>End a session with <code>/meditate</code> and she extracts what she learned: your preferences, patterns, and judgment calls. Next session, she's sharper.</p>
 </td>
 </tr>
 </table>
@@ -199,6 +213,19 @@ Claudia: ☀️ Morning Brief — Wednesday, Feb 19
          📊 Today: 3 meetings, 2 open commitments
 ```
 
+**Judgment rules shape everything she does:**
+
+```
+You:     I've got the Acme proposal and Marcus wants a catch-up.
+         Which first?
+
+Claudia: Acme proposal. Your judgment rules say revenue-generating
+         work beats relationship maintenance when there's a
+         deadline, and the Acme proposal is due Thursday.
+
+         I'll remind you about Marcus tomorrow morning.
+```
+
 **Pattern detection works across weeks, not just moments:**
 
 ```
@@ -238,28 +265,33 @@ Claudia detects your work style and generates structure that fits:
 | `/meeting-prep [person]` | One-page briefing before a call |
 | `/capture-meeting` | Process notes into decisions, commitments, action items |
 | `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
-| `/sync-vault` | Sync memory to Obsidian vault |
+| `/research [topic]` | Deep research with web sources and memory integration |
+| `/inbox-check` | Lightweight inbox triage across connected email accounts |
 | `/brain` | Launch 3D brain visualizer |
+| `/meditate` | End-of-session reflection: extracts learnings, judgment, patterns |
 | `/deep-context [topic]` | Full-context deep analysis |
 | `/memory-audit` | See everything Claudia knows, with source chains |
 
 <details>
-<summary><strong>All commands</strong></summary>
+<summary><strong>All commands (43 skills)</strong></summary>
 
 | Command | What It Does |
 |---------|--------------|
 | `/weekly-review` | Guided reflection across relationships and projects |
-| `/accountability-check` | Outstanding commitments and waiting-on items |
+| `/growth-check` | Periodic reflection on development, skills, and progress |
+| `/financial-snapshot` | Revenue, expenses, invoicing, and cash flow metrics |
 | `/draft-reply` | Email response drafts in your voice |
 | `/follow-up-draft [person]` | Post-meeting thank-you and summary |
 | `/new-person [name]` | Create a relationship file |
 | `/pipeline-review` | Active deals, capacity, pipeline health |
 | `/client-health` | Status across all client relationships |
-| `/inbox-check` | Review messages from connected channels |
-| `/meditate` | End-of-session reflection and persistent learnings |
+| `/databases` | View, switch, and manage memory databases |
+| `/brain-monitor` | Launch the Brain Monitor TUI dashboard |
 | `/fix-duplicates` | Find and merge duplicate entities |
 | `/memory-health` | Check memory system health |
 | `/diagnose` | Check memory daemon health and troubleshoot |
+
+Plus ~30 proactive skills (commitment detection, pattern recognition, judgment awareness, cognitive extraction, risk surfacing, and more) that activate automatically based on context.
 
 </details>
 
@@ -267,9 +299,11 @@ Claudia detects your work style and generates structure that fits:
 
 ## How It Works
 
+**43 skills · 21 MCP tools · 510+ tests**
+
 Claudia has two layers:
 
-**Template layer** (markdown) defines who she is. Skills, commands, rules, and identity files that Claude reads on startup. Workspace templates let you spin up new projects with `/new-workspace [name]`.
+**Template layer** (markdown) defines who she is. 43 skills, commands, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`). Workspace templates let you spin up new projects with `/new-workspace [name]`.
 
 **Memory system** (Python) defines what she remembers. SQLite + vector embeddings + three services:
 
@@ -291,22 +325,26 @@ You ──► Claude Code ──► Reads Claudia's templates ──► Becomes 
                           +vectors         (PARA structure)
 ```
 
-**Local extraction, zero API calls.** Paste a meeting transcript or email thread. A local language model (Qwen3, SmolLM3, or Llama 3.2 via Ollama) extracts entities, commitments, and decisions in seconds. Claude reviews the extractions and applies judgment. No data leaves your machine.
+**Local cognitive extraction, zero API calls.** Paste a meeting transcript or email thread. A local language model (Qwen3, SmolLM3, or Llama 3.2 via Ollama) extracts entities, commitments, and decisions in seconds. Claude reviews the extractions and applies judgment. No data leaves your machine.
+
+**Agent team for speed.** Claudia delegates structured work to a two-tier team. Tier 1 (Haiku): fast workers for document archiving, processing, and schedule analysis. Tier 2 (Sonnet): a research scout with independent context for multi-turn web research. Claudia keeps relationship judgment and strategy decisions for herself.
 
 <details>
 <summary><strong>Technical deep dive</strong></summary>
 
 **Semantic search** uses hybrid ranking: 50% vector similarity, 25% importance, 10% recency, 15% full-text. Accessing a memory boosts it (rehearsal effect).
 
+**Judgment layer** stores user-defined decision rules in `context/judgment.yaml`. Rules are extracted during `/meditate` reflections and applied by morning briefs, commitment detection, and risk surfacing. Claudia learns your priorities once and applies them consistently.
+
 **Document storage** keeps files, transcripts, emails on disk, linked to people and memories. Content-hash deduplication. Automatic lifecycle management.
 
 **Provenance chains** trace any fact to its source email, transcript, or conversation.
 
-**Graph traversal** connects dots across your network. Ask about one person, see related entities with top memories.
+**Graph traversal** connects dots across your network. Ask about one person, see related entities with top memories. The 3D brain visualizer (`/brain`) renders the graph in real-time.
 
 **Per-project isolation** keeps work memories separate from personal. Each workspace gets its own database.
 
-**Session narratives** capture tone and emotional context, not just facts.
+**Session reflections** (`/meditate`) extract learnings about your preferences, communication patterns, and judgment calls. These persist across sessions and make Claudia progressively sharper.
 
 For full architecture diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
