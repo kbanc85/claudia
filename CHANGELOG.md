@@ -2,6 +2,37 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.44.0 (2026-02-25)
+
+### The Judgment Layer
+
+Claudia can now learn your business trade-offs and apply them automatically. A new Judgment Architecture lets her understand which tasks matter most, when to escalate, and what to always surface, based on rules that evolve from your actual behavior during session reflections.
+
+**New: Judgment Awareness skill**
+- Loads user-defined rules from `context/judgment.yaml` silently at session start
+- Rules use natural language conditions (not code), matching how `claudia-principles.md` works
+- Five rule categories: priorities, escalation, overrides, surfacing, delegation
+- Strict hierarchy: principles > trust north star > judgment rules > reflections
+- Graceful degradation: Claudia works fine without any judgment file
+
+**Extended: Meditate skill**
+- New reflection question: "Did any judgment-relevant decisions happen this session?"
+- Proposes judgment rules when session behavior reveals repeatable business trade-offs
+- User approves, edits, or rejects proposed rules before they're saved
+- Rules written to `context/judgment.yaml` with provenance tracking (`meditate/YYYY-MM-DD`)
+
+**Integrations:**
+- Morning Brief checks judgment rules for surfacing triggers and priority ordering
+- Commitment Detector boosts importance for entity-linked escalation rules
+- Risk Surfacer raises severity by one level when escalation rules match
+
+**Archetype starter templates:**
+- Optional priority frameworks for all 5 archetypes (Consultant, Founder, Executive, Solo, Creator)
+- Only created when user explicitly requests them during onboarding or later sessions
+
+**Invocation consistency fix:**
+- Added explicit `invocation: proactive` to 5 skills that only had legacy `user-invocable: false`
+
 ## 1.43.0 (2026-02-24)
 
 ### The Trim
