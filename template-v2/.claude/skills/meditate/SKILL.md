@@ -69,6 +69,15 @@ Review the session and identify 1-3 reflections. Ask yourself:
    - Things the user mentioned but didn't pursue
    - Context that would be helpful to have
 
+5. **Did any judgment-relevant decisions happen this session?**
+   - Did the user override a default behavior? (e.g., "Actually, always put investor stuff first")
+   - Did the user establish a priority? (e.g., "Client work always comes before internal ops")
+   - Did the user correct my escalation behavior? (e.g., "You should have flagged that sooner")
+   - Did the user set a delegation preference? (e.g., "Just auto-process meeting transcripts")
+   - Did the user reveal a surfacing preference? (e.g., "Always remind me about stale proposals")
+
+   If yes, draft a judgment rule for each (see Step 3). Not every session produces judgment rules. Most won't. Only propose rules when behavior clearly indicates a repeatable business trade-off.
+
 **Quality over quantity.** One genuine insight beats three generic observations.
 
 ### Step 3: Present for Approval
@@ -92,17 +101,52 @@ Today we [brief 1-2 sentence summary of what happened].
 ---
 ```
 
+If judgment-relevant decisions were identified in question 5, append proposed rules after the reflections:
+
+```
+**Proposed Judgment Rules:**
+
+4. **Rule (escalation):** Always surface commitments to Sarah Chen within 72h of deadline
+   - *Based on:* You checked on the Sarah proposal three times this session
+   - *Category:* escalation
+
+5. **Rule (priorities):** Client deliverables always take precedence over internal ops
+   - *Based on:* You explicitly said "client work first, always"
+   - *Category:* priorities
+
+*These would be saved to your judgment rules file so I apply them in future sessions.*
+*Say "looks good" to save everything, or tell me what to adjust.*
+
+---
+```
+
+Only propose rules when the evidence is clear. A single offhand comment is not enough. Look for:
+- Explicit statements of priority or preference
+- Repeated behavior (checked something 3+ times)
+- Direct corrections of my default behavior
+- Clear delegation instructions
+
 ### Step 4: Handle Edits
 
 User responses:
 
 | Response | Action |
 |----------|--------|
-| "Looks good" / "Save it" | Store all reflections |
+| "Looks good" / "Save it" | Store all reflections and approved judgment rules |
 | "Remove the second one" | Delete that reflection, store others |
 | "That's not quite right about X" | Edit that reflection, then confirm |
 | "Skip" / "Don't save anything" | End without storing |
 | User provides correction | Update the reflection content |
+
+**Judgment rule responses:**
+
+| Response | Action |
+|----------|--------|
+| "Remove the rule" | Store reflections only, skip the judgment rule |
+| "Make it broader" | Generalize the rule (e.g., "Sarah" -> "all key clients"), re-confirm |
+| "That should apply to all clients" | Widen scope of the rule, re-confirm |
+| "Make it narrower" | Restrict the rule scope, re-confirm |
+| "Save the reflections but not the rules" | Store reflections, skip all judgment rules |
 
 ### Step 5: Store and Close
 
@@ -111,7 +155,28 @@ Call `memory.end_session` with:
 - `reflections`: Array of approved reflections with type, content, and optional about fields
 - Other structured extractions (facts, commitments, entities) as needed
 
-Confirm storage: "Got it, I'll keep that in mind. See you next time."
+**If judgment rules were approved**, also write them to `context/judgment.yaml`:
+
+1. Read `context/judgment.yaml` (if it exists)
+2. If the file doesn't exist, create it with the initial structure:
+   ```yaml
+   version: 1
+
+   priorities: []
+   escalation: []
+   overrides: []
+   surfacing: []
+   delegation: []
+   ```
+3. Append each approved rule to the appropriate category
+4. Assign a sequential ID within its category (e.g., `esc-001`, `esc-002`)
+5. Set `source` to `meditate/YYYY-MM-DD` (today's date)
+6. Write the updated file
+
+Confirm storage with both reflections and rules:
+"Got it. I've saved [N] reflection(s) and added [M] judgment rule(s) to your judgment file. I'll apply them going forward. See you next time."
+
+If only reflections (no rules): "Got it, I'll keep that in mind. See you next time."
 
 ---
 
@@ -199,6 +264,10 @@ Claudia:
 ---
 
 ## Integration with Other Skills
+
+### Judgment Rules
+
+The meditate skill is the primary mechanism for creating judgment rules. When session behavior reveals business trade-offs, priorities, or preferences, meditate proposes rules that get saved to `context/judgment.yaml`. See the `judgment-awareness` skill for how rules are loaded and applied.
 
 ### Morning Brief
 
@@ -302,6 +371,35 @@ Quick session today. Reviewed the proposal draft and made some edits.
 1. **Observation:** For document reviews, you prefer me to make edits directly rather than suggest them. "Just fix it" mode.
 
 *Sound right?*
+
+---
+```
+
+### Example 4: Session with judgment-relevant behavior
+
+```
+---
+**Session Reflection**
+
+Today we triaged a busy week and you reorganized your priorities after that unexpected investor call.
+
+**What I'm taking away:**
+
+1. **Learning:** When investor communications arrive, you drop everything else to respond. Speed matters more than polish for these.
+2. **Observation:** You checked on the Acme proposal status three times unprompted. That one's weighing on you.
+
+**Proposed Judgment Rules:**
+
+3. **Rule (priorities):** Investor communications take precedence over all other tasks
+   - *Based on:* You explicitly said "investors always come first" and reorganized your entire day around the call
+   - *Category:* priorities
+
+4. **Rule (escalation):** Surface Acme proposal status in every session until it's resolved
+   - *Based on:* You checked on it three times without me prompting
+   - *Category:* surfacing
+
+*These would be saved to your judgment rules file so I apply them in future sessions.*
+*Do these feel accurate? Say "looks good" to save, or tell me what to adjust.*
 
 ---
 ```

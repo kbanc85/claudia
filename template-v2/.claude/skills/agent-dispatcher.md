@@ -2,6 +2,7 @@
 name: agent-dispatcher
 description: Detects when to delegate tasks to specialized agents. Core dispatch logic with two-tier dispatch.
 user-invocable: false
+invocation: proactive
 effort-level: medium
 ---
 

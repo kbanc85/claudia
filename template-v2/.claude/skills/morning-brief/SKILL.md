@@ -22,6 +22,14 @@ Provide a concise morning brief to start the day with clarity. Surface what matt
 
 2. **Call `memory.recall`** for specific follow-up queries as needed
 
+### Judgment Rules (if available)
+
+3. **Check `context/judgment.yaml`** for surfacing rules with `trigger: "morning_brief"`
+   - Add matching items to the appropriate brief section
+   - Use `priorities` rules to order items when there are conflicts
+   - Check `overrides` rules for items that should jump to the top regardless of standard ordering
+   - Check `escalation` rules to boost severity of entity-linked items
+
 ### Markdown Fallback
 
 Use `context/commitments.md`, `context/waiting.md`, and `people/` files.

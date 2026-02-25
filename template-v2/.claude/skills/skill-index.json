@@ -35,6 +35,14 @@
       "triggers": ["delegate task", "use agent team", "process document", "research task"]
     },
     {
+      "name": "judgment-awareness",
+      "path": "judgment-awareness.md",
+      "description": "Load and apply user-defined judgment rules from context/judgment.yaml to inform priority conflicts, escalation decisions, surfacing, and delegation",
+      "invocation": "proactive",
+      "effort_level": "low",
+      "triggers": ["priority conflict", "which task matters more", "escalation decision", "what to surface first"]
+    },
+    {
       "name": "commitment-detector",
       "path": "commitment-detector.md",
       "description": "Automatically detect promises and commitments in conversation and offer to track them",

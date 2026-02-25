@@ -2,6 +2,7 @@
 name: structure-generator
 description: Create personalized folder structures and files based on user archetype, business depth preferences, and workflow needs.
 user-invocable: false
+invocation: proactive
 effort-level: medium
 ---
 
@@ -1424,6 +1425,139 @@ When generating a structure:
     - Business modules (if applicable)
     - Archetype-specific structure
     - Commands generated
+
+---
+
+## Optional Judgment Rule Templates
+
+During onboarding or later sessions, if the user wants help setting up initial judgment rules, offer archetype-specific starter priorities. These are created in `context/judgment.yaml` only when explicitly requested.
+
+**When to offer:** After structure setup is complete, if the user asks about priorities, or if during `/meditate` the user wants a starting framework. Never create this file automatically.
+
+### Consultant/Advisor Starter Rules
+
+```yaml
+version: 1
+
+priorities:
+  - label: "Client deliverables"
+    rank: 1
+    note: "Active client work always comes first"
+  - label: "Prospect follow-ups"
+    rank: 2
+    note: "Pipeline health depends on timely responses"
+  - label: "Internal operations"
+    rank: 3
+    note: "Invoicing, admin, process improvement"
+  - label: "Business development content"
+    rank: 4
+    note: "Thought leadership, networking, speaking"
+
+escalation: []
+overrides: []
+surfacing: []
+delegation: []
+```
+
+### Founder/Entrepreneur Starter Rules
+
+```yaml
+version: 1
+
+priorities:
+  - label: "Investor communications"
+    rank: 1
+    note: "Speed and responsiveness signal competence to investors"
+  - label: "Product-blocking decisions"
+    rank: 2
+    note: "Unblock the team before anything else"
+  - label: "Team management"
+    rank: 3
+    note: "1:1s, hiring, culture"
+  - label: "Operational tasks"
+    rank: 4
+    note: "Admin, legal, finance"
+
+escalation: []
+overrides: []
+surfacing: []
+delegation: []
+```
+
+### Executive/Manager Starter Rules
+
+```yaml
+version: 1
+
+priorities:
+  - label: "Board and leadership commitments"
+    rank: 1
+    note: "Upward obligations have the least flexibility"
+  - label: "Direct report 1:1s and development"
+    rank: 2
+    note: "People management is the multiplier"
+  - label: "Cross-functional initiatives"
+    rank: 3
+    note: "Strategic projects and collaboration"
+  - label: "Administrative tasks"
+    rank: 4
+    note: "Expense reports, scheduling, documentation"
+
+escalation: []
+overrides: []
+surfacing: []
+delegation: []
+```
+
+### Solo Professional Starter Rules
+
+```yaml
+version: 1
+
+priorities:
+  - label: "Client deliverables"
+    rank: 1
+    note: "Reputation is everything when you're solo"
+  - label: "Overdue invoices"
+    rank: 2
+    note: "Cash flow is survival"
+  - label: "New client onboarding"
+    rank: 3
+    note: "First impressions set the relationship"
+  - label: "Professional development"
+    rank: 4
+    note: "Skills keep you competitive"
+
+escalation: []
+overrides: []
+surfacing: []
+delegation: []
+```
+
+### Content Creator Starter Rules
+
+```yaml
+version: 1
+
+priorities:
+  - label: "Sponsored content deadlines"
+    rank: 1
+    note: "Paid commitments with contractual obligations"
+  - label: "Content calendar"
+    rank: 2
+    note: "Consistency builds audience trust"
+  - label: "Collaboration responses"
+    rank: 3
+    note: "Relationships with other creators open doors"
+  - label: "Audience engagement"
+    rank: 4
+    note: "Comments, DMs, community management"
+
+escalation: []
+overrides: []
+surfacing: []
+delegation: []
+```
 
 ---
 

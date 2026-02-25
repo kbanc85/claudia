@@ -133,6 +133,7 @@ argument-hint: [arg]
 | `commitment-detector.md` | Catches promises | "I'll...", deadlines |
 | `pattern-recognizer.md` | Notices trends | Recurring themes |
 | `risk-surfacer.md` | Warns about issues | Overdue, cooling |
+| `judgment-awareness.md` | Applies business judgment rules | Priority conflicts, escalation |
 | `capability-suggester.md` | Suggests new skills | Repeated behaviors |
 | `memory-manager.md` | Session persistence | Session start/end |
 
@@ -194,7 +195,7 @@ effort-level: medium
 
 | Effort | Skills |
 |--------|--------|
-| **low** | morning-brief, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor, inbox-check |
+| **low** | morning-brief, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor, inbox-check, judgment-awareness |
 | **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher, new-workspace |
 | **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
 | **max** | ingest-sources, pipeline-review, deep-context |

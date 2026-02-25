@@ -2,6 +2,7 @@
 name: onboarding
 description: Guide new users through a conversational discovery flow to create a personalized Claudia setup.
 user-invocable: false
+invocation: proactive
 effort-level: medium
 ---
 

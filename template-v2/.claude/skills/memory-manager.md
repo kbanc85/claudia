@@ -2,6 +2,7 @@
 name: memory-manager
 description: Handle cross-session persistence using the enhanced memory system (MCP) with fallback to markdown files.
 user-invocable: false
+invocation: proactive
 effort-level: medium
 ---
 

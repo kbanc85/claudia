@@ -96,6 +96,12 @@ outputs:
 
    This ensures the commitment survives context compaction and can be recalled semantically. Do not skip this step.
 
+3b. **Check judgment rules** - If `context/judgment.yaml` exists and has `escalation` rules matching this entity or commitment type, boost importance accordingly:
+   - Matching escalation rule: boost importance to 0.95
+   - Matching escalation rule with "immediate" or "critical" language: boost to 1.0
+   - Matching priority rank 1: boost to 0.95
+   - Never reduce importance below the standard 0.9 for commitments
+
 4. **Add to context/commitments.md**
 
 5. **Link to person file if relevant**

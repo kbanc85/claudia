@@ -166,6 +166,19 @@ End each alert block (or group of alerts) with a trailing horizontal rule to vis
 
 ---
 
+## Judgment-Informed Severity
+
+When `context/judgment.yaml` exists and has relevant rules:
+
+- **Escalation rules** matching an entity or condition boost severity by one level (Watch -> Warning -> Critical)
+- **Override rules** can adjust thresholds for specific entities (e.g., "always treat investor items as Warning or above")
+- **Priority rules** influence which risks get surfaced first when multiple are active
+- **Never reduce severity** below what standard logic determines. Judgment rules are additive only.
+
+When a judgment rule influences severity, note it internally for provenance but don't narrate it unless the user asks why something was escalated.
+
+---
+
 ## Risk Detection Logic
 
 ### Commitment Analysis
