@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.45.1 (2026-02-26)
+
+### Open Source & Polish
+
+Claudia is now Apache 2.0 licensed, with installer polish and creator attribution.
+
+- **Apache 2.0 license** -- Replaces PolyForm Noncommercial for proper open-source status, wider adoption, and required attribution via NOTICE file
+- **Logo alignment** -- Hair centered over face in both the installer banner and session greeting
+- **Creator attribution** -- "by Kamil Banc" with GitHub link and research tagline in Claudia blue/white below the installer logo
+- **Non-TTY fallback** -- Piped output now includes attribution and tagline
+
 ## 1.45.0 (2026-02-26)
 
 ### Ultra-Compact Installer
