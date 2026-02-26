@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.45.0 (2026-02-26)
+
+### Ultra-Compact Installer
+
+The installer output drops from ~80-100 lines to ~15 lines with a unified progress display, real-time status updates, and zero redundancy.
+
+- **Progress bar** -- 5 unified steps (Environment, AI Models, Memory System, Obsidian Vault, Health Check) replace the old Phase 1/2 + Step 1-8 hierarchy
+- **STATUS protocol** -- `install.sh` and `install.ps1` now support `CLAUDIA_EMBEDDED=1` mode, emitting machine-parseable `STATUS:step:state:detail` lines for programmatic consumers
+- **In-place rendering** -- TTY-aware display with spinner animation and `[████░░░░] 3/5` progress bar that updates in place
+- **Non-TTY fallback** -- Clean append-mode output without ANSI codes for CI/piped environments
+- **Compact banner** -- Portrait-only art (7 rows instead of 12), no typewriter animation
+- **Backward compatible** -- Running `install.sh` standalone produces identical output to before
+
 ## 1.44.0 (2026-02-25)
 
 ### The Judgment Layer
