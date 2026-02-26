@@ -1,7 +1,6 @@
 ---
 name: follow-up-draft
 description: Create a post-meeting thank-you or follow-up email with key points and next steps.
-disable-model-invocation: true
 argument-hint: "[person name]"
 effort-level: medium
 ---
