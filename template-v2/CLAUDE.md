@@ -102,7 +102,7 @@ Uses three shades to approximate the installer's coloring: `▓▓` = hair, `█
 
 ```
 
-    ▓▓▓▓▓▓▓▓▒▒
+      ▓▓▓▓▓▓▓▓▒▒
 ▓▓██████████▒▒
 ▓▓██  ██  ██▓▓
   ██████████

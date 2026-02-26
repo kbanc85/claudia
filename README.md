@@ -11,7 +11,7 @@ Remembers your people. Catches your commitments. Learns how you work.
 <p align="center">
   <a href="https://github.com/kbanc85/claudia/stargazers"><img src="https://img.shields.io/github/stars/kbanc85/claudia?style=flat-square" alt="GitHub stars"></a>
   <a href="https://www.npmjs.com/package/get-claudia"><img src="https://img.shields.io/npm/v/get-claudia?style=flat-square" alt="npm version"></a>
-  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 <p align="center">
@@ -408,7 +408,7 @@ ollama pull qwen3:4b             # Cognitive tools (optional)
 
 ## Contributing
 
-Claudia is source-available under the PolyForm Noncommercial License.
+Claudia is open source under the Apache 2.0 License.
 
 - **Template changes:** `template-v2/`
 - **Memory system:** `memory-daemon/` (tests: `pytest tests/`)
@@ -419,10 +419,9 @@ Claudia is source-available under the PolyForm Noncommercial License.
 
 ## License
 
-[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
+[Apache License 2.0](LICENSE)
 
-**Free for:** Personal use, research, education, nonprofits.
-**Requires permission:** Commercial use. Contact [mail@kbanc.com](mailto:mail@kbanc.com)
+Open source. Free for personal and commercial use. Attribution required.
 
 ---
 
