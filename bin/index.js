@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { homedir } from 'os';
+import { createInterface } from 'readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,6 +17,10 @@ const powershellPath = isWindows
   ? join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
   : null;
 
+// TTY detection
+const isTTY = process.stdout.isTTY === true;
+const supportsInPlace = isTTY && !process.env.NO_COLOR && process.env.TERM !== 'dumb';
+
 // ANSI color codes
 const colors = {
   reset: '\x1b[0m',
@@ -24,11 +29,17 @@ const colors = {
   yellow: '\x1b[33m',
   magenta: '\x1b[35m',
   white: '\x1b[97m',
+  red: '\x1b[31m',
   dim: '\x1b[2m',
   bold: '\x1b[1m',
   boldYellow: '\x1b[1;33m',
   boldCyan: '\x1b[1;36m',
 };
+
+// Disable colors when not TTY
+if (!isTTY || process.env.NO_COLOR) {
+  Object.keys(colors).forEach(k => { colors[k] = ''; });
+}
 
 // Read version from package.json
 function getVersion() {
@@ -40,64 +51,185 @@ function getVersion() {
   }
 }
 
-// Typewriter effect - writes text char by char
-function typewriter(text, color = '') {
-  return new Promise((resolve) => {
-    const reset = color ? colors.reset : '';
-    let i = 0;
-    process.stdout.write(color);
-    const interval = setInterval(() => {
-      if (i < text.length) {
-        process.stdout.write(text[i]);
-        i++;
-      } else {
-        process.stdout.write(reset + '\n');
-        clearInterval(interval);
-        resolve();
-      }
-    }, 25);
-  });
+// Compact portrait-only banner
+function getBanner(version) {
+  if (!isTTY) {
+    return `\n CLAUDIA v${version}\n`;
+  }
+  const b = colors.cyan;
+  const y = colors.yellow;
+  const w = colors.white;
+  const r = colors.reset;
+  return `
+    ${y}████████${b}██${r}
+${y}██${w}██████████${b}██${r}
+${y}██${w}██${r}  ${w}██${r}  ${w}██${y}██${r}
+  ${w}██████████${r}
+    ${b}██████${r}
+  ${b}██████████${r}
+    ${w}██${r}  ${w}██${r}
+
+ ${colors.boldYellow}CLAUDIA${colors.reset} ${colors.yellow}v${version}${colors.reset}
+`;
 }
 
-// Pixel art banner - "CLAUDIA" text + portrait (double-width for square pixels)
-const b = colors.cyan;    // blue pixels
-const y = colors.yellow;  // yellow pixels (hair)
-const w = colors.white;   // white pixels (face)
-const r = colors.reset;
-const px = '██';          // double-width block for square pixels
-const _ = '  ';           // double-width space
+// ─── 5 Unified Steps ────────────────────────────────────────────────────
 
-const bannerArt = `
-${b}${px}${px}${r}${_}${b}${px}${r}${_}${_}${_}${b}${px}${r}${_}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${px}${r}${_}${_}${b}${px}${r}${_}${_}${b}${px}${r}
-${b}${px}${r}${_}${_}${b}${px}${r}${_}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}
-${b}${px}${px}${r}${_}${b}${px}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}${_}${_}${b}${px}${r}${_}${_}${b}${px}${px}${r}${_}${_}${b}${px}${r}${_}${b}${px}${r}${_}${b}${px}${r}
+const STEPS = [
+  { id: 'environment', label: 'Environment' },
+  { id: 'models',      label: 'AI Models' },
+  { id: 'memory',      label: 'Memory System' },
+  { id: 'vault',       label: 'Obsidian Vault' },
+  { id: 'health',      label: 'Health Check' },
+];
 
-                ${y}${px}${px}${px}${px}${b}${px}${r}
-              ${y}${px}${w}${px}${px}${px}${px}${px}${b}${px}${r}
-              ${y}${px}${w}${px}${r}${_}${w}${px}${r}${_}${w}${px}${y}${px}${r}
-                ${w}${px}${px}${px}${px}${px}${r}
-                  ${b}${px}${px}${px}${r}
-                ${b}${px}${px}${px}${px}${px}${r}
-                  ${w}${px}${r}${_}${w}${px}${r}
-`;
+// ─── Progress Renderer ──────────────────────────────────────────────────
+
+class ProgressRenderer {
+  constructor() {
+    this.states = {};      // id → { state, detail }
+    this.lastLineCount = 0;
+    this.spinnerFrame = 0;
+    this.spinnerChars = ['◐', '◓', '◑', '◒'];
+    this.spinnerTimer = null;
+
+    for (const step of STEPS) {
+      this.states[step.id] = { state: 'pending', detail: '' };
+    }
+  }
+
+  update(stepId, state, detail = '') {
+    if (this.states[stepId]) {
+      this.states[stepId] = { state, detail };
+    }
+    this.render();
+  }
+
+  skip(stepId, detail = 'skipped') {
+    this.update(stepId, 'skipped', detail);
+  }
+
+  startSpinner() {
+    if (!supportsInPlace) return;
+    this.spinnerTimer = setInterval(() => {
+      this.spinnerFrame = (this.spinnerFrame + 1) % this.spinnerChars.length;
+      this.render();
+    }, 200);
+  }
+
+  stopSpinner() {
+    if (this.spinnerTimer) {
+      clearInterval(this.spinnerTimer);
+      this.spinnerTimer = null;
+    }
+  }
+
+  getIcon(state) {
+    switch (state) {
+      case 'done':    return `${colors.green}✓${colors.reset}`;
+      case 'warn':    return `${colors.yellow}○${colors.reset}`;
+      case 'error':   return `${colors.red}!${colors.reset}`;
+      case 'active':  return `${colors.cyan}${this.spinnerChars[this.spinnerFrame]}${colors.reset}`;
+      case 'skipped': return `${colors.dim}○${colors.reset}`;
+      default:        return `${colors.dim}░${colors.reset}`;
+    }
+  }
+
+  getCompletedCount() {
+    return STEPS.filter(s => {
+      const st = this.states[s.id].state;
+      return st === 'done' || st === 'warn' || st === 'skipped';
+    }).length;
+  }
+
+  getProgressBar() {
+    const total = STEPS.length;
+    const done = this.getCompletedCount();
+    const barWidth = 20;
+    const filled = Math.round((done / total) * barWidth);
+    const empty = barWidth - filled;
+    return ` [${colors.green}${'█'.repeat(filled)}${colors.reset}${'░'.repeat(empty)}] ${done}/${total}`;
+  }
+
+  render() {
+    const lines = [];
+
+    for (const step of STEPS) {
+      const { state, detail } = this.states[step.id];
+      const icon = this.getIcon(state);
+      const label = state === 'skipped'
+        ? `${colors.dim}${step.label}${colors.reset}`
+        : step.label;
+      const detailStr = detail
+        ? `${colors.dim}${detail}${colors.reset}`
+        : '';
+      // Pad label to 20 chars for alignment
+      const paddedLabel = step.label.padEnd(20);
+      lines.push(` ${icon} ${state === 'skipped' ? colors.dim + paddedLabel + colors.reset : paddedLabel}${detailStr}`);
+    }
+
+    lines.push('');
+    lines.push(this.getProgressBar());
+
+    if (supportsInPlace) {
+      // Move cursor up and clear previous render
+      if (this.lastLineCount > 0) {
+        process.stdout.write(`\x1b[${this.lastLineCount}A`);
+      }
+      for (const line of lines) {
+        process.stdout.write(`\x1b[2K${line}\n`);
+      }
+      this.lastLineCount = lines.length;
+    } else {
+      // Non-TTY: only print when a step changes to done/warn/error
+      // (handled in update via appendLine)
+    }
+  }
+
+  // Non-TTY fallback: append a single line
+  appendLine(stepId, state, detail) {
+    if (supportsInPlace) return; // handled by render()
+    const step = STEPS.find(s => s.id === stepId);
+    if (!step) return;
+    if (state === 'done' || state === 'warn' || state === 'error' || state === 'skipped') {
+      const icon = state === 'done' ? '✓' :
+                   state === 'warn' ? '○' :
+                   state === 'error' ? '!' : '-';
+      console.log(` ${icon} ${step.label}${detail ? '  ' + detail : ''}`);
+    }
+  }
+}
+
+// ─── STATUS Line Parser ─────────────────────────────────────────────────
+
+function parseStatusLine(line) {
+  // STATUS:step:state:detail (4+ parts, detail may contain colons)
+  // ERROR:step:detail (3+ parts, detail may contain colons)
+  if (line.startsWith('STATUS:')) {
+    const parts = line.slice(7).split(':');
+    if (parts.length >= 2) {
+      return { type: 'status', step: parts[0], state: parts[1], detail: parts.slice(2).join(':') };
+    }
+  } else if (line.startsWith('ERROR:')) {
+    const parts = line.slice(6).split(':');
+    if (parts.length >= 1) {
+      return { type: 'error', step: parts[0], state: '', detail: parts.slice(1).join(':') };
+    }
+  }
+  return null;
+}
+
+// ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
   const version = getVersion();
 
-  // Print pixel art
-  console.log(bannerArt);
-
-  // Version badge + tagline + attribution (all yellow)
-  console.log(`   ${colors.boldYellow}CLAUDIA${colors.reset} ${colors.yellow}v${version}${colors.reset}`);
-  await typewriter('   Agentic executive assistant. Learns and adapts to how you work.', colors.yellow);
-  console.log(`   ${colors.yellow}by Kamil Banc${colors.reset}`);
-  console.log(`   ${colors.yellow}${'─'.repeat(40)}${colors.reset}`);
-  console.log();
+  // Print compact banner
+  process.stdout.write(getBanner(version));
 
   // Determine target directory and flags
   const args = process.argv.slice(2);
 
-  // Check for --demo and --no-memory flags
   const isDemoMode = args.includes('--demo');
   const skipMemory = args.includes('--no-memory');
   const filteredArgs = args.filter(a => a !== '--demo' && a !== '--no-memory');
@@ -107,14 +239,6 @@ async function main() {
   const isCurrentDir = arg === '.' || arg === 'upgrade';
   const targetDir = isCurrentDir ? '.' : (arg || 'claudia');
   const targetPath = isCurrentDir ? process.cwd() : join(process.cwd(), targetDir);
-  const displayDir = isCurrentDir ? 'current directory' : targetDir;
-
-  if (isDemoMode) {
-    console.log(`${colors.yellow}Demo mode${colors.reset} - Will seed with example data after install`);
-  }
-  if (skipMemory) {
-    console.log(`${colors.yellow}Template-only${colors.reset} - Skipping memory daemon installation`);
-  }
 
   // Check if directory already exists with Claudia files
   let isUpgrade = false;
@@ -122,10 +246,8 @@ async function main() {
   if (existsSync(targetPath)) {
     const contents = readdirSync(targetPath);
     const hasClaudioFiles = contents.some(f => f === 'CLAUDE.md' || f === '.claude');
-
     if (hasClaudioFiles) {
       isUpgrade = true;
-      console.log(`${colors.cyan}✓${colors.reset} Found existing Claudia instance. Upgrading framework files...`);
     }
   }
 
@@ -140,18 +262,13 @@ async function main() {
     // Fresh install: copy everything
     try {
       cpSync(templatePath, targetPath, { recursive: true });
-      console.log(`${colors.green}✓${colors.reset} Installed in ${displayDir}`);
     } catch (error) {
-      console.error(`\n${colors.yellow}!${colors.reset}  Error copying files: ${error.message}`);
+      console.error(`\n${colors.red}!${colors.reset}  Error copying files: ${error.message}`);
       process.exit(1);
     }
   } else {
     // Upgrade: copy framework files, preserve user data
-    // Framework = .claude/ (skills, commands, rules, hooks), CLAUDE.md, .gitignore,
-    //             .mcp.json.example, LICENSE, NOTICE
-    // User data = context/, people/, projects/, .mcp.json (has user's config)
     const frameworkPaths = ['.claude', 'CLAUDE.md', '.gitignore', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
-    let upgraded = 0;
 
     try {
       for (const item of frameworkPaths) {
@@ -165,122 +282,217 @@ async function main() {
         } else {
           cpSync(src, dest, { force: true });
         }
-        upgraded++;
       }
-      console.log(`${colors.green}✓${colors.reset} Updated ${upgraded} framework components (skills, commands, rules, identity)`);
-      console.log(`${colors.dim}  Your data (context/, people/, projects/) was preserved.${colors.reset}`);
     } catch (error) {
-      console.error(`\n${colors.yellow}!${colors.reset}  Error upgrading files: ${error.message}`);
+      console.error(`\n${colors.red}!${colors.reset}  Error upgrading files: ${error.message}`);
       process.exit(1);
     }
+
+    console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
   }
 
-  // Show what's new in this release
-  showWhatsNew(isUpgrade);
-
-  // Write context/whats-new.md for Claudia's self-awareness
+  // Write context/whats-new.md for Claudia's self-awareness (silent)
   writeWhatsNewFile(targetPath, version);
 
-  // Install brain visualizer to ~/.claudia/visualizer/
+  // Install brain visualizer to ~/.claudia/visualizer/ (silent)
   installVisualizer();
 
-  // Helper: seed demo database using spawn (safe, no shell injection)
-  function seedDemoDatabase(targetPath, mcpPath, callback) {
-    console.log(`\n${colors.cyan}Seeding demo database...${colors.reset}`);
-    const seedScript = join(__dirname, '..', 'memory-daemon', 'scripts', 'seed_demo.py');
-    const pythonPath = isWindows
-      ? join(homedir(), '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
-      : join(homedir(), '.claudia', 'daemon', 'venv', 'bin', 'python');
+  // Create and render progress display
+  const renderer = new ProgressRenderer();
 
-    const seedProc = spawn(pythonPath, [seedScript, '--workspace', targetPath, '--force'], {
-      stdio: 'inherit'
-    });
+  if (skipMemory) {
+    renderer.skip('environment');
+    renderer.skip('models');
+    renderer.skip('memory');
+    renderer.skip('health');
 
-    seedProc.on('close', (seedCode) => {
-      if (seedCode === 0) {
-        console.log(`${colors.green}✓${colors.reset} Demo data seeded (isolated in ~/.claudia/demo/)`);
-        console.log(`${colors.dim}  Your real data directory (~/.claudia/memory/) is untouched.${colors.reset}`);
-
-        // Add CLAUDIA_DEMO_MODE to .mcp.json env
-        if (existsSync(mcpPath)) {
-          try {
-            let mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
-            if (mcpConfig.mcpServers && mcpConfig.mcpServers['claudia-memory']) {
-              mcpConfig.mcpServers['claudia-memory'].env = mcpConfig.mcpServers['claudia-memory'].env || {};
-              mcpConfig.mcpServers['claudia-memory'].env.CLAUDIA_DEMO_MODE = '1';
-              writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
-              console.log(`${colors.green}✓${colors.reset} Configured to use demo database`);
-            }
-          } catch (e) {
-            console.log(`${colors.yellow}!${colors.reset} Could not update .mcp.json for demo mode`);
-          }
-        }
-      } else {
-        console.log(`${colors.yellow}!${colors.reset} Could not seed demo data`);
-        console.log(`  You can seed manually: python ~/.claudia/daemon/venv/bin/python ~/.claudia/daemon/memory-daemon/scripts/seed_demo.py`);
+    if (!supportsInPlace) {
+      for (const id of ['environment', 'models', 'memory', 'health']) {
+        renderer.appendLine(id, 'skipped', 'skipped');
       }
-      callback();
-    });
+    }
+    renderer.render();
 
-    seedProc.on('error', (err) => {
-      console.log(`${colors.yellow}!${colors.reset} Could not seed demo data: ${err.message}`);
-      callback();
+    // Only run vault step
+    runVaultStep(renderer, () => {
+      renderer.stopSpinner();
+      renderer.render();
+      showCompletion(targetDir, isCurrentDir, false);
     });
+    return;
   }
 
-  // Helper: set up Obsidian vault and detect Obsidian installation
-  function runObsidianSetup(callback) {
-    console.log(`\n${colors.boldYellow}━━━ Phase 2/2: Obsidian Vault ━━━${colors.reset}\n`);
+  // Start the 5-step progress display
+  renderer.startSpinner();
+  console.log('');
+  renderer.render();
+
+  // Run install.sh/ps1 in embedded mode, piping STATUS lines
+  const memoryDaemonPath = isWindows
+    ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
+    : join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
+
+  if (!existsSync(memoryDaemonPath)) {
+    renderer.update('environment', 'error', 'installer not found');
+    renderer.update('models', 'skipped');
+    renderer.update('memory', 'skipped');
+    renderer.update('health', 'skipped');
+    renderer.stopSpinner();
+    renderer.render();
+    runVaultStep(renderer, () => {
+      renderer.render();
+      showCompletion(targetDir, isCurrentDir, false);
+    });
+    return;
+  }
+
+  const spawnCmd = isWindows ? powershellPath : 'bash';
+  const spawnArgs = isWindows
+    ? ['-ExecutionPolicy', 'Bypass', '-File', memoryDaemonPath]
+    : [memoryDaemonPath];
+
+  let stderrBuf = '';
+  let memoryOk = false;
+
+  const installProc = spawn(spawnCmd, spawnArgs, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      CLAUDIA_PROJECT_PATH: targetPath,
+      CLAUDIA_NONINTERACTIVE: '1',
+      CLAUDIA_EMBEDDED: '1'
+    }
+  });
+
+  // Parse stdout for STATUS/ERROR lines
+  const rl = createInterface({ input: installProc.stdout });
+  rl.on('line', (line) => {
+    const parsed = parseStatusLine(line);
+    if (!parsed) return;
+
+    if (parsed.type === 'error') {
+      // ERROR:step:detail
+      const stepId = parsed.step;
+      renderer.update(stepId, 'error', parsed.detail);
+      if (!supportsInPlace) renderer.appendLine(stepId, 'error', parsed.detail);
+    } else {
+      // STATUS:step:state:detail
+      const { step: stepId, state, detail } = parsed;
+      if (state === 'ok') {
+        renderer.update(stepId, 'done', detail);
+        if (!supportsInPlace) renderer.appendLine(stepId, 'done', detail);
+      } else if (state === 'warn') {
+        renderer.update(stepId, 'warn', detail);
+        if (!supportsInPlace) renderer.appendLine(stepId, 'warn', detail);
+      } else if (state === 'progress') {
+        renderer.update(stepId, 'active', detail);
+      }
+    }
+  });
+
+  // Capture stderr for error dump
+  installProc.stderr.on('data', (chunk) => {
+    stderrBuf += chunk.toString();
+  });
+
+  installProc.on('close', (code) => {
+    memoryOk = code === 0;
+
+    // Fill in any steps that didn't get a final STATUS
+    for (const step of ['environment', 'models', 'memory', 'health']) {
+      const st = renderer.states[step].state;
+      if (st === 'active' || st === 'pending') {
+        if (code === 0) {
+          renderer.update(step, 'done');
+          if (!supportsInPlace) renderer.appendLine(step, 'done', '');
+        } else {
+          renderer.update(step, 'error', 'failed');
+          if (!supportsInPlace) renderer.appendLine(step, 'error', 'failed');
+        }
+      }
+    }
+
+    renderer.stopSpinner();
+
+    if (memoryOk) {
+      // Set up .mcp.json
+      setupMcpJson(targetPath);
+
+      // Seed demo database if --demo flag
+      if (isDemoMode) {
+        const mcpPath = join(targetPath, '.mcp.json');
+        seedDemoDatabase(targetPath, mcpPath, () => {
+          runVaultStep(renderer, () => {
+            renderer.render();
+            showCompletion(targetDir, isCurrentDir, true);
+          });
+        });
+        return;
+      }
+    } else {
+      // Dump stderr on failure
+      if (stderrBuf.trim()) {
+        console.log(`\n${colors.dim}${stderrBuf.trim()}${colors.reset}`);
+      }
+      console.log(`${colors.dim} Full log: ~/.claudia/install.log${colors.reset}`);
+    }
+
+    // Vault step, then completion
+    runVaultStep(renderer, () => {
+      renderer.render();
+      showCompletion(targetDir, isCurrentDir, memoryOk);
+    });
+  });
+
+  installProc.on('error', (err) => {
+    renderer.update('environment', 'error', err.message);
+    renderer.update('models', 'skipped');
+    renderer.update('memory', 'skipped');
+    renderer.update('health', 'skipped');
+    renderer.stopSpinner();
+    renderer.render();
+
+    runVaultStep(renderer, () => {
+      renderer.render();
+      showCompletion(targetDir, isCurrentDir, false);
+    });
+  });
+
+  // ── Vault step (runs in index.js, not in install.sh) ──
+
+  function runVaultStep(renderer, callback) {
+    renderer.update('vault', 'active', 'detecting Obsidian...');
 
     let obsidianDetected = false;
 
-    // Platform-specific Obsidian detection
     if (process.platform === 'darwin') {
       obsidianDetected = existsSync('/Applications/Obsidian.app');
+      finishVault(obsidianDetected, renderer, callback);
     } else if (isWindows) {
       const localAppData = process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local');
       obsidianDetected = existsSync(join(localAppData, 'Obsidian', 'Obsidian.exe'));
+      finishVault(obsidianDetected, renderer, callback);
     } else {
-      // Linux: check if obsidian is on PATH
+      // Linux: async detection
       try {
         const which = spawn('which', ['obsidian'], { stdio: 'pipe' });
         which.on('close', (code) => {
-          obsidianDetected = code === 0;
-          finishObsidianSetup(obsidianDetected, callback);
+          finishVault(code === 0, renderer, callback);
         });
         which.on('error', () => {
-          finishObsidianSetup(false, callback);
+          finishVault(false, renderer, callback);
         });
-        return; // Wait for async which to complete on Linux
       } catch {
-        obsidianDetected = false;
+        finishVault(false, renderer, callback);
       }
     }
-
-    finishObsidianSetup(obsidianDetected, callback);
   }
 
-  function finishObsidianSetup(obsidianDetected, callback) {
-    if (obsidianDetected) {
-      console.log(`${colors.green}✓${colors.reset} Obsidian detected`);
-    } else {
-      console.log(`${colors.yellow}○${colors.reset} Obsidian not found (optional, recommended)`);
-      console.log(`  ${colors.dim}Obsidian is a free app that lets you browse Claudia's knowledge as a visual graph.${colors.reset}`);
-      if (process.platform === 'darwin') {
-        console.log(`  Install: ${colors.cyan}brew install --cask obsidian${colors.reset} or download from ${colors.cyan}https://obsidian.md${colors.reset}`);
-      } else if (isWindows) {
-        console.log(`  Install: ${colors.cyan}winget install Obsidian.Obsidian${colors.reset} or download from ${colors.cyan}https://obsidian.md${colors.reset}`);
-      } else {
-        console.log(`  Install: ${colors.cyan}snap install obsidian --classic${colors.reset} or download AppImage from ${colors.cyan}https://obsidian.md${colors.reset}`);
-      }
-    }
-
-    // Create vault directory
+  function finishVault(obsidianDetected, renderer, callback) {
+    // Create vault directory and config (silent)
     const vaultPath = join(homedir(), '.claudia', 'vault');
     mkdirSync(vaultPath, { recursive: true });
-    console.log(`${colors.green}✓${colors.reset} Vault directory ready at ~/.claudia/vault/`);
 
-    // Create minimal .obsidian config inside vault
     const obsidianDir = join(vaultPath, '.obsidian');
     mkdirSync(obsidianDir, { recursive: true });
 
@@ -299,215 +511,122 @@ async function main() {
 
     writeFileSync(join(obsidianDir, 'community-plugins.json'), JSON.stringify([], null, 2));
 
-    console.log(`${colors.green}✓${colors.reset} Obsidian config created`);
-    console.log(`${colors.dim}  Recommended plugin: Dataview (for dynamic queries)${colors.reset}`);
+    if (obsidianDetected) {
+      renderer.update('vault', 'done', 'configured');
+      if (!supportsInPlace) renderer.appendLine('vault', 'done', 'configured');
+    } else {
+      renderer.update('vault', 'warn', 'Obsidian not found (optional)');
+      if (!supportsInPlace) renderer.appendLine('vault', 'warn', 'Obsidian not found (optional)');
+    }
 
     callback(obsidianDetected);
   }
 
-  // Helper: run system health check after install
-  function runSystemHealthCheck(callback) {
-    const diagnoseScript = isWindows
-      ? join(homedir(), '.claudia', 'diagnose.ps1')
-      : join(homedir(), '.claudia', 'diagnose.sh');
+  // ── .mcp.json setup (silent) ──
 
-    if (!existsSync(diagnoseScript)) {
-      // Diagnose script not installed yet - skip check
-      callback(true);
-      return;
-    }
+  function setupMcpJson(targetPath) {
+    const mcpPath = join(targetPath, '.mcp.json');
+    const mcpExamplePath = join(targetPath, '.mcp.json.example');
 
-    console.log(`\n${colors.cyan}Running system health check...${colors.reset}`);
+    if (existsSync(mcpExamplePath) && !existsSync(mcpPath)) {
+      try {
+        let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
+        mcpConfig.mcpServers = mcpConfig.mcpServers || {};
 
-    const spawnCmd = isWindows ? powershellPath : 'bash';
-    const spawnArgs = isWindows
-      ? ['-ExecutionPolicy', 'Bypass', '-File', diagnoseScript]
-      : [diagnoseScript];
+        const home = homedir();
+        const pythonCmd = isWindows
+          ? join(home, '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
+          : `${process.env.HOME}/.claudia/daemon/venv/bin/python`;
 
-    const healthCheck = spawn(spawnCmd, spawnArgs, {
-      stdio: 'inherit'
-    });
-
-    healthCheck.on('close', (code) => {
-      callback(code === 0);
-    });
-
-    healthCheck.on('error', () => {
-      // If health check fails to run, continue anyway
-      callback(true);
-    });
-  }
-
-  // Helper: finish install after optional components
-  function finishInstall(memoryInstalled, obsidianDetected) {
-    if (memoryInstalled) {
-      // Run health check when memory system was installed
-      runSystemHealthCheck((healthy) => {
-        showNextSteps(memoryInstalled, obsidianDetected, healthy);
-      });
-    } else {
-      showNextSteps(memoryInstalled, obsidianDetected, true);
+        mcpConfig.mcpServers['claudia-memory'] = {
+          command: pythonCmd,
+          args: ['-m', 'claudia_memory', '--project-dir', '${workspaceFolder}'],
+          _description: 'Claudia memory system with vector search'
+        };
+        writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
+      } catch {
+        // Non-fatal
+      }
     }
   }
 
-  // Memory system installation (skip with --no-memory)
-  if (skipMemory) {
-    console.log(`\n${colors.dim}Skipping memory daemon (--no-memory flag).${colors.reset}`);
-    console.log(`${colors.dim}You can install it later by running the installer again without --no-memory.${colors.reset}\n`);
-    // Skip to Phase 2 (Obsidian detection)
-    finishInstall(false, false);
-    return;
-  }
+  // ── Demo database seeder (silent spawn) ──
 
-  console.log(`\n${colors.boldYellow}━━━ Phase 1/2: Memory System ━━━${colors.reset}\n`);
+  function seedDemoDatabase(targetPath, mcpPath, callback) {
+    const seedScript = join(__dirname, '..', 'memory-daemon', 'scripts', 'seed_demo.py');
+    const pythonPath = isWindows
+      ? join(homedir(), '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
+      : join(homedir(), '.claudia', 'daemon', 'venv', 'bin', 'python');
 
-  const memoryDaemonPath = isWindows
-    ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
-    : join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
+    const seedProc = spawn(pythonPath, [seedScript, '--workspace', targetPath, '--force'], {
+      stdio: 'pipe'
+    });
 
-  if (existsSync(memoryDaemonPath)) {
-    try {
-      // Run the install script, passing project path for upgrades
-      const spawnCmd = isWindows ? powershellPath : 'bash';
-      const spawnArgs = isWindows
-        ? ['-ExecutionPolicy', 'Bypass', '-File', memoryDaemonPath]
-        : [memoryDaemonPath];
-      const result = spawn(spawnCmd, spawnArgs, {
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          CLAUDIA_PROJECT_PATH: targetPath,
-          CLAUDIA_NONINTERACTIVE: '1'
+    seedProc.on('close', (seedCode) => {
+      if (seedCode === 0) {
+        // Add CLAUDIA_DEMO_MODE to .mcp.json env
+        if (existsSync(mcpPath)) {
+          try {
+            let mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
+            if (mcpConfig.mcpServers && mcpConfig.mcpServers['claudia-memory']) {
+              mcpConfig.mcpServers['claudia-memory'].env = mcpConfig.mcpServers['claudia-memory'].env || {};
+              mcpConfig.mcpServers['claudia-memory'].env.CLAUDIA_DEMO_MODE = '1';
+              writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
+            }
+          } catch {
+            // Non-fatal
+          }
         }
-      });
+      }
+      callback();
+    });
 
-      result.on('close', (code) => {
-        let memoryOk = false;
-        if (code === 0) {
-          console.log(`${colors.green}✓${colors.reset} Memory system installed`);
-          memoryOk = true;
-
-          // Update .mcp.json if it exists
-          const mcpPath = join(targetPath, '.mcp.json');
-          const mcpExamplePath = join(targetPath, '.mcp.json.example');
-
-          if (existsSync(mcpExamplePath) && !existsSync(mcpPath)) {
-            // Read example and add memory server
-            let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
-            mcpConfig.mcpServers = mcpConfig.mcpServers || {};
-
-            const home = homedir();
-            const pythonCmd = isWindows
-              ? join(home, '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
-              : `${process.env.HOME}/.claudia/daemon/venv/bin/python`;
-
-            mcpConfig.mcpServers['claudia-memory'] = {
-              command: pythonCmd,
-              args: ['-m', 'claudia_memory', '--project-dir', '${workspaceFolder}'],
-              _description: 'Claudia memory system with vector search'
-            };
-            writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
-            console.log(`${colors.green}✓${colors.reset} Created .mcp.json with memory server`);
-          }
-
-          // Seed demo database if --demo flag was passed
-          if (isDemoMode) {
-            const mcpPathForDemo = join(targetPath, '.mcp.json');
-            seedDemoDatabase(targetPath, mcpPathForDemo, () => runObsidianSetup((obsidianOk) => finishInstall(memoryOk, obsidianOk)));
-            return; // Wait for demo seed to complete
-          }
-        } else {
-          console.log(`${colors.yellow}!${colors.reset} Memory setup failed (see details above). You can retry with:`);
-          if (isWindows) {
-            console.log(`  ${colors.cyan}powershell.exe -ExecutionPolicy Bypass -File "${memoryDaemonPath}"${colors.reset}`);
-          } else {
-            console.log(`  ${colors.cyan}bash ${memoryDaemonPath}${colors.reset}`);
-          }
-          console.log(`${colors.dim}  Run diagnostics: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}`);
-        }
-
-        // Chain Obsidian vault setup, then finish
-        runObsidianSetup((obsidianOk) => finishInstall(memoryOk, obsidianOk));
-      });
-
-      return; // Wait for spawn to complete
-    } catch (error) {
-      console.log(`${colors.yellow}!${colors.reset} Could not set up memory system: ${error.message}`);
-      console.log(`  You can set it up later manually.`);
-    }
-  } else {
-    console.log(`${colors.yellow}!${colors.reset} Memory daemon files not found. Skipping.`);
+    seedProc.on('error', () => {
+      callback();
+    });
   }
 
-  // Memory failed to spawn -- continue with Obsidian setup
-  runObsidianSetup((obsidianOk) => finishInstall(false, obsidianOk));
+  // ── Completion block ──
 
-  function showNextSteps(memoryInstalled, obsidianDetected, systemHealthy = true) {
-    const cdStep = isCurrentDir ? '' : `  ${colors.cyan}cd ${targetDir}${colors.reset}\n`;
+  function showCompletion(targetDir, isCurrentDir, memoryInstalled) {
+    const cdCmd = isCurrentDir ? '' : `cd ${targetDir} && `;
 
-    // Installation summary
-    console.log(`\n${colors.boldYellow}━━━ Installation Complete ━━━${colors.reset}\n`);
-
-    const check = `${colors.green}✓${colors.reset}`;
-    const warn = `${colors.yellow}○${colors.reset}`;
-
-    console.log(`${memoryInstalled ? check : warn} Memory system    ${memoryInstalled ? 'Active' : 'Skipped'}`);
-    console.log(`${obsidianDetected ? check : warn} Obsidian vault    ${obsidianDetected ? 'Detected' : 'Not found (optional)'}`);
-
-    if (!systemHealthy) {
-      console.log(`\n${colors.yellow}Some issues were detected above.${colors.reset}`);
-      console.log(`${colors.dim}You can fix them now, or Claudia will work in fallback mode until they're resolved.${colors.reset}`);
-      console.log(`${colors.dim}Re-run diagnostics anytime: ${isWindows ? '%USERPROFILE%\\.claudia\\diagnose.ps1' : '~/.claudia/diagnose.sh'}${colors.reset}`);
-    }
-
-    console.log(`
-${colors.bold}Next:${colors.reset}
-${cdStep}  ${colors.cyan}claude${colors.reset}
-`);
+    console.log('');
+    console.log(`${colors.dim}${'━'.repeat(46)}${colors.reset}`);
+    console.log(` ${colors.bold}Done!${colors.reset} Next:`);
+    console.log(`   ${colors.cyan}${cdCmd}claude${colors.reset}`);
 
     if (memoryInstalled) {
-      console.log(`\n${colors.boldYellow}⚡ IMPORTANT: If Claude Code is already running, you MUST restart it for memory to work.${colors.reset}`);
-      console.log(`${colors.bold}   Close Claude Code and re-open it with: ${colors.cyan}claude${colors.reset}\n`);
+      console.log('');
+      console.log(` ${colors.boldYellow}⚡${colors.reset} Restart Claude Code if it's already open.`);
     }
+    console.log('');
   }
 }
 
 function installVisualizer() {
   const vizSrc = join(__dirname, '..', 'visualizer');
-  if (!existsSync(vizSrc)) return; // not bundled in this release
+  if (!existsSync(vizSrc)) return;
 
   const vizDest = join(homedir(), '.claudia', 'visualizer');
   try {
     mkdirSync(vizDest, { recursive: true });
     cpSync(vizSrc, vizDest, { recursive: true, force: true });
-    console.log(`${colors.green}✓${colors.reset} Brain visualizer installed at ~/.claudia/visualizer/`);
 
-    // Run npm install --production in background (non-blocking)
+    // Run npm install --production in background (non-blocking, silent)
     const npmCmd = isWindows ? 'npm.cmd' : 'npm';
     const npmProc = spawn(npmCmd, ['install', '--production'], {
       cwd: vizDest,
       stdio: 'pipe',
     });
-    npmProc.on('close', (code) => {
-      if (code !== 0) {
-        // Non-fatal: user can run npm install manually
-        process.stderr.write(`${colors.yellow}!${colors.reset} Visualizer npm install failed (run "npm install" in ~/.claudia/visualizer/ to fix)\n`);
-      }
-    });
-    npmProc.on('error', () => {
-      // npm not found or spawn failed — non-fatal
-    });
-  } catch (err) {
+    npmProc.on('close', () => {});
+    npmProc.on('error', () => {});
+  } catch {
     // Non-fatal: visualizer is optional
-    console.log(`${colors.dim}  Brain visualizer install skipped: ${err.message}${colors.reset}`);
   }
 }
 
 function extractChangelog(version) {
-  /**
-   * Extract the CHANGELOG section for a specific version.
-   * Returns the text between ## {version} and the next ## heading.
-   */
   try {
     const changelogPath = join(__dirname, '..', 'CHANGELOG.md');
     const changelog = readFileSync(changelogPath, 'utf8');
@@ -516,7 +635,6 @@ function extractChangelog(version) {
     if (startIdx === -1) return null;
 
     const afterHeader = startIdx + versionHeader.length;
-    // Find the next ## heading
     const nextHeader = changelog.indexOf('\n## ', afterHeader);
     const section = nextHeader === -1
       ? changelog.slice(afterHeader)
@@ -528,76 +646,14 @@ function extractChangelog(version) {
   }
 }
 
-function showWhatsNew(isUpgrade) {
-  const by = colors.boldYellow;
-  const bc = colors.boldCyan;
-  const d = colors.dim;
-  const y = colors.yellow;
-  const r = colors.reset;
-  const version = getVersion();
-
-  const header = isUpgrade ? `${by}What's New${r}` : `${by}What You're Getting${r}`;
-  const line = `${y}${'─'.repeat(48)}${r}`;
-
-  // Try to extract highlights from CHANGELOG
-  const changelog = extractChangelog(version);
-  if (changelog) {
-    // Extract the first heading (### ...) as the highlight
-    const headingMatch = changelog.match(/^###\s+(.+)$/m);
-    const highlight = headingMatch ? headingMatch[1] : 'Latest improvements';
-
-    // Extract bullet points (lines starting with - **...)
-    const bullets = [];
-    for (const line of changelog.split('\n')) {
-      const m = line.match(/^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)/);
-      if (m && bullets.length < 4) {
-        bullets.push({ title: m[1], desc: m[2] || '' });
-      }
-    }
-
-    console.log(`\n${line}\n  ${header}\n${line}\n`);
-    if (bullets.length > 0) {
-      for (const b of bullets) {
-        const desc = b.desc ? `  ${d}${b.desc}${r}` : '';
-        console.log(`  ${bc}${b.title}${r}${desc}`);
-      }
-    } else {
-      console.log(`  ${bc}${highlight}${r}`);
-    }
-    console.log(`\n${line}\n`);
-  } else {
-    // Fallback: static content
-    console.log(`
-${line}
-  ${header}
-${line}
-
-  ${bc}Zero-Prompt Install${r}  ${d}Everything installs automatically.${r}
-  ${bc}Obsidian Vault${r}       ${d}Memory syncs to ~/.claudia/vault/ as markdown.${r}
-  ${bc}Document Storage${r}     ${d}Files stored and linked to people and memories.${r}
-  ${bc}Provenance${r}           ${d}Every fact traces back to its source.${r}
-
-${line}
-`);
-  }
-}
-
 function writeWhatsNewFile(targetPath, version) {
-  /**
-   * Write context/whats-new.md so Claudia knows about her own capabilities
-   * after install/upgrade. She reads it at session start, mentions the update,
-   * then deletes it.
-   */
   try {
     const contextDir = join(targetPath, 'context');
     mkdirSync(contextDir, { recursive: true });
 
     const date = new Date().toISOString().slice(0, 10);
-
-    // Extract changelog for this version
     const changelogSection = extractChangelog(version) || 'No changelog available for this version.';
 
-    // Read skill-index.json for capabilities list
     let skillSections = '';
     try {
       const skillIndexPath = join(__dirname, '..', 'template-v2', '.claude', 'skills', 'skill-index.json');
@@ -640,7 +696,7 @@ _Surface this update in your first greeting, then delete this file._
 
     writeFileSync(join(contextDir, 'whats-new.md'), content);
   } catch (err) {
-    // Non-fatal: whats-new is a nice-to-have
+    // Non-fatal
     process.stderr.write(`${colors.dim}  Could not write whats-new.md: ${err.message}${colors.reset}\n`);
   }
 }

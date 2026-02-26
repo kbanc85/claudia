@@ -1,10 +1,13 @@
-﻿# Claudia Memory System Installer (Windows)
+# Claudia Memory System Installer (Windows)
 # Sets up the memory daemon with all dependencies
 
 $ErrorActionPreference = "Continue"
 
 # Non-interactive mode (set by parent installer)
 $NonInteractive = $env:CLAUDIA_NONINTERACTIVE
+
+# Embedded mode: only emit STATUS:/ERROR: lines (for programmatic consumers)
+$Embedded = $env:CLAUDIA_EMBEDDED
 
 # Colors via ANSI escape sequences (Windows Terminal / PowerShell 7+ support)
 $ESC = [char]27
@@ -30,16 +33,18 @@ $VENV_PIP = Join-Path $VENV_SCRIPTS "pip.exe"
 if ($NonInteractive -ne "1") {
     Clear-Host
 }
-Write-Host ""
-Write-Host "${CYAN}████${NC}  ${CYAN}██${NC}      ${CYAN}██${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}████${NC}    ${CYAN}██${NC}    ${CYAN}██${NC}"
-Write-Host "${CYAN}██${NC}    ${CYAN}██${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}"
-Write-Host "${CYAN}████${NC}  ${CYAN}████${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}    ${CYAN}██${NC}    ${CYAN}████${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}"
-Write-Host ""
-Write-Host "${DIM}Memory System Installer (Windows)${NC}"
-Write-Host "${DIM}Teaching Claudia to never forget${NC}"
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${CYAN}████${NC}  ${CYAN}██${NC}      ${CYAN}██${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}████${NC}    ${CYAN}██${NC}    ${CYAN}██${NC}"
+    Write-Host "${CYAN}██${NC}    ${CYAN}██${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}"
+    Write-Host "${CYAN}████${NC}  ${CYAN}████${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}    ${CYAN}██${NC}    ${CYAN}████${NC}    ${CYAN}██${NC}  ${CYAN}██${NC}  ${CYAN}██${NC}"
+    Write-Host ""
+    Write-Host "${DIM}Memory System Installer (Windows)${NC}"
+    Write-Host "${DIM}Teaching Claudia to never forget${NC}"
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # Fun messages
 $MESSAGES = @(
@@ -55,11 +60,29 @@ function Get-RandomMessage {
     $MESSAGES | Get-Random
 }
 
+# Embedded mode emitters
+function Emit-Status {
+    param([string]$Step, [string]$State, [string]$Detail)
+    if ($Embedded -eq "1") {
+        Write-Output "STATUS:${Step}:${State}:${Detail}"
+    }
+}
+
+function Emit-Error {
+    param([string]$Step, [string]$Detail)
+    if ($Embedded -eq "1") {
+        Write-Output "ERROR:${Step}:${Detail}"
+    }
+}
+
 # ============================================================
 # Step 1: Environment Check
 # ============================================================
-Write-Host "${BOLD}Step 1/8: Environment Check${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 1/8: Environment Check${NC}"
+    Write-Host ""
+}
+Emit-Status "environment" "progress" "Checking environment..."
 
 $PYTHON = $null
 $PYTHON_FALLBACK = $null
@@ -82,7 +105,9 @@ foreach ($candidate in $pythonCandidates) {
                 if ($minor -lt 14) {
                     # Preferred: 3.10-3.13
                     $PYTHON = $candidate
-                    Write-Host "  ${GREEN}✓${NC} $version ($candidate)"
+                    if ($Embedded -ne "1") {
+                        Write-Host "  ${GREEN}✓${NC} $version ($candidate)"
+                    }
                     break
                 } elseif (-not $PYTHON_FALLBACK) {
                     # 3.14+: usable but spaCy won't work
@@ -99,13 +124,18 @@ foreach ($candidate in $pythonCandidates) {
 if (-not $PYTHON -and $PYTHON_FALLBACK) {
     $PYTHON = $PYTHON_FALLBACK
     $version = & $PYTHON --version 2>&1
-    Write-Host "  ${YELLOW}○${NC} $version ($PYTHON) -- spaCy may not work, entity extraction will use regex"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}○${NC} $version ($PYTHON) -- spaCy may not work, entity extraction will use regex"
+    }
 }
 
 if (-not $PYTHON) {
-    Write-Host "  ${RED}✗${NC} Python 3.10+ not found"
-    Write-Host "    Please install Python 3.10 or later from https://www.python.org/downloads/"
-    Write-Host "    Make sure to check 'Add Python to PATH' during installation."
+    if ($Embedded -ne "1") {
+        Write-Host "  ${RED}✗${NC} Python 3.10+ not found"
+        Write-Host "    Please install Python 3.10 or later from https://www.python.org/downloads/"
+        Write-Host "    Make sure to check 'Add Python to PATH' during installation."
+    }
+    Emit-Error "environment" "Python 3.10+ required"
     exit 1
 }
 
@@ -113,14 +143,20 @@ if (-not $PYTHON) {
 $OLLAMA_AVAILABLE = $false
 try {
     $null = & ollama --version 2>&1
-    Write-Host "  ${GREEN}✓${NC} Ollama installed"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} Ollama installed"
+    }
     $OLLAMA_AVAILABLE = $true
 } catch {
-    Write-Host "  ${YELLOW}○${NC} Ollama not found"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}○${NC} Ollama not found"
+    }
 
-    if ($NonInteractive -eq "1") {
-        # Auto-install Ollama in non-interactive mode
-        Write-Host "  ${CYAN}Installing Ollama automatically...${NC}"
+    if ($NonInteractive -eq "1" -or $Embedded -eq "1") {
+        # Auto-install Ollama in non-interactive/embedded mode
+        if ($Embedded -ne "1") {
+            Write-Host "  ${CYAN}Installing Ollama automatically...${NC}"
+        }
         $wingetInstalled = $false
         try {
             $null = & winget --version 2>&1
@@ -128,32 +164,46 @@ try {
         } catch {}
 
         if ($wingetInstalled) {
-            Write-Host "  ${CYAN}Installing Ollama via winget...${NC}"
+            if ($Embedded -ne "1") {
+                Write-Host "  ${CYAN}Installing Ollama via winget...${NC}"
+            }
             try {
                 & winget install Ollama.Ollama --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
                 $null = & ollama --version 2>&1
-                Write-Host "  ${GREEN}✓${NC} Ollama installed via winget"
+                if ($Embedded -ne "1") {
+                    Write-Host "  ${GREEN}✓${NC} Ollama installed via winget"
+                }
                 $OLLAMA_AVAILABLE = $true
             } catch {
-                Write-Host "  ${YELLOW}!${NC} winget install failed"
+                if ($Embedded -ne "1") {
+                    Write-Host "  ${YELLOW}!${NC} winget install failed"
+                }
             }
         }
 
         if (-not $OLLAMA_AVAILABLE) {
-            Write-Host "  ${CYAN}Downloading Ollama installer...${NC}"
+            if ($Embedded -ne "1") {
+                Write-Host "  ${CYAN}Downloading Ollama installer...${NC}"
+            }
             $ollamaInstaller = "$env:TEMP\OllamaSetup.exe"
             try {
                 Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" -OutFile $ollamaInstaller -UseBasicParsing
-                Write-Host "  ${CYAN}Installing Ollama...${NC}"
+                if ($Embedded -ne "1") {
+                    Write-Host "  ${CYAN}Installing Ollama...${NC}"
+                }
                 Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
                 $null = & ollama --version 2>&1
-                Write-Host "  ${GREEN}✓${NC} Ollama installed"
+                if ($Embedded -ne "1") {
+                    Write-Host "  ${GREEN}✓${NC} Ollama installed"
+                }
                 $OLLAMA_AVAILABLE = $true
             } catch {
-                Write-Host "  ${YELLOW}!${NC} Ollama auto-install failed, continuing without"
-                Write-Host "  ${DIM}Install manually: https://ollama.com/download/windows${NC}"
+                if ($Embedded -ne "1") {
+                    Write-Host "  ${YELLOW}!${NC} Ollama auto-install failed, continuing without"
+                    Write-Host "  ${DIM}Install manually: https://ollama.com/download/windows${NC}"
+                }
             } finally {
                 Remove-Item -Path $ollamaInstaller -ErrorAction SilentlyContinue
             }
@@ -207,15 +257,29 @@ try {
     }
 }
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+# Capture Python version for status emission
+$pythonVer = & $PYTHON --version 2>&1
+$pythonVerStr = "$pythonVer"
+if ($OLLAMA_AVAILABLE) {
+    Emit-Status "environment" "ok" "$pythonVerStr, Ollama"
+} else {
+    Emit-Status "environment" "ok" "$pythonVerStr, no Ollama"
+}
+
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 2: AI Models
 # ============================================================
-Write-Host "${BOLD}Step 2/8: AI Models${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 2/8: AI Models${NC}"
+    Write-Host ""
+}
+Emit-Status "models" "progress" "Checking AI models..."
 
 if ($OLLAMA_AVAILABLE) {
     # Check if Ollama is running
@@ -223,70 +287,107 @@ if ($OLLAMA_AVAILABLE) {
     try {
         $response = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -UseBasicParsing -TimeoutSec 3 -ErrorAction SilentlyContinue
         $ollamaRunning = $true
-        Write-Host "  ${GREEN}✓${NC} Ollama server already running"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${GREEN}✓${NC} Ollama server already running"
+        }
     } catch {
-        Write-Host "  ${CYAN}◐${NC} Starting Ollama server..."
+        if ($Embedded -ne "1") {
+            Write-Host "  ${CYAN}◐${NC} Starting Ollama server..."
+        }
         Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden
         Start-Sleep -Seconds 5
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -UseBasicParsing -TimeoutSec 3 -ErrorAction SilentlyContinue
             $ollamaRunning = $true
-            Write-Host "  ${GREEN}✓${NC} Ollama server running"
+            if ($Embedded -ne "1") {
+                Write-Host "  ${GREEN}✓${NC} Ollama server running"
+            }
         } catch {
-            Write-Host "  ${YELLOW}!${NC} Could not start Ollama (will retry on boot)"
+            if ($Embedded -ne "1") {
+                Write-Host "  ${YELLOW}!${NC} Could not start Ollama (will retry on boot)"
+            }
         }
     }
 
     # Pull embedding model
     $modelList = & ollama list 2>&1
     if ($modelList -match "all-minilm") {
-        Write-Host "  ${GREEN}✓${NC} Embedding model ready"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${GREEN}✓${NC} Embedding model ready"
+        }
+        Emit-Status "models" "ok" "all-minilm"
     } else {
-        Write-Host "  ${CYAN}◐${NC} Downloading embedding model (45MB)..."
-        Write-Host "    ${DIM}This gives Claudia semantic understanding${NC}"
-        Write-Host ""
+        if ($Embedded -ne "1") {
+            Write-Host "  ${CYAN}◐${NC} Downloading embedding model (45MB)..."
+            Write-Host "    ${DIM}This gives Claudia semantic understanding${NC}"
+            Write-Host ""
+        }
+        Emit-Status "models" "progress" "Downloading embedding model..."
         try {
             & ollama pull "all-minilm:l6-v2" 2>&1 | Out-Null
-            Write-Host "  ${GREEN}✓${NC} Model downloaded"
+            if ($Embedded -ne "1") {
+                Write-Host "  ${GREEN}✓${NC} Model downloaded"
+            }
+            Emit-Status "models" "ok" "all-minilm"
         } catch {
-            Write-Host "  ${YELLOW}!${NC} Model pull failed (will retry when Ollama runs)"
+            if ($Embedded -ne "1") {
+                Write-Host "  ${YELLOW}!${NC} Model pull failed (will retry when Ollama runs)"
+            }
+            Emit-Status "models" "warn" "Model pull failed"
         }
     }
 } else {
-    Write-Host "  ${YELLOW}○${NC} Skipping (Ollama not available)"
-    Write-Host "    ${DIM}Claudia will use keyword search instead${NC}"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}○${NC} Skipping (Ollama not available)"
+        Write-Host "    ${DIM}Claudia will use keyword search instead${NC}"
+    }
+    Emit-Status "models" "warn" "Ollama not available"
 }
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 3: Creating Home
 # ============================================================
-Write-Host "${BOLD}Step 3/8: Creating Home${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 3/8: Creating Home${NC}"
+    Write-Host ""
+}
+Emit-Status "memory" "progress" "Creating directories..."
 
 New-Item -ItemType Directory -Force -Path $DAEMON_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $MEMORY_DIR | Out-Null
-Write-Host "  ${GREEN}✓${NC} Created $CLAUDIA_DIR"
-Write-Host "    ${DIM}├── daemon\   (brain)${NC}"
-Write-Host "    ${DIM}└── memory\   (memories)${NC}"
+if ($Embedded -ne "1") {
+    Write-Host "  ${GREEN}✓${NC} Created $CLAUDIA_DIR"
+    Write-Host "    ${DIM}├── daemon\   (brain)${NC}"
+    Write-Host "    ${DIM}└── memory\   (memories)${NC}"
+}
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 4: Installing Core
 # ============================================================
-Write-Host "${BOLD}Step 4/8: Installing Core${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 4/8: Installing Core${NC}"
+    Write-Host ""
+}
+Emit-Status "memory" "progress" "Installing core files..."
 
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SOURCE_DIR = Split-Path -Parent $SCRIPT_DIR
 
-Write-Host "  ${CYAN}◐${NC} Copying memory system files..."
+if ($Embedded -ne "1") {
+    Write-Host "  ${CYAN}◐${NC} Copying memory system files..."
+}
 $srcMemory = Join-Path $SOURCE_DIR "claudia_memory"
 $srcScripts = Join-Path $SOURCE_DIR "scripts"
 $srcPyproject = Join-Path $SOURCE_DIR "pyproject.toml"
@@ -295,42 +396,61 @@ Copy-Item -Recurse -Force $srcMemory $DAEMON_DIR
 Copy-Item -Recurse -Force $srcScripts $DAEMON_DIR
 Copy-Item -Force $srcPyproject $DAEMON_DIR
 Copy-Item -Force $srcRequirements $DAEMON_DIR
-Write-Host "  ${GREEN}✓${NC} Core files installed"
+if ($Embedded -ne "1") {
+    Write-Host "  ${GREEN}✓${NC} Core files installed"
+}
 
 # Copy diagnostic script
 $srcDiagnose = Join-Path (Join-Path $SOURCE_DIR "scripts") "diagnose.ps1"
 Copy-Item -Force $srcDiagnose $CLAUDIA_DIR
-Write-Host "  ${GREEN}✓${NC} Diagnostic script installed"
+if ($Embedded -ne "1") {
+    Write-Host "  ${GREEN}✓${NC} Diagnostic script installed"
+}
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 5: Python Environment
 # ============================================================
-Write-Host "${BOLD}Step 5/8: Python Environment${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 5/8: Python Environment${NC}"
+    Write-Host ""
+}
+Emit-Status "memory" "progress" "Installing dependencies..."
 
-Write-Host "  ${CYAN}◐${NC} Creating isolated environment..."
+if ($Embedded -ne "1") {
+    Write-Host "  ${CYAN}◐${NC} Creating isolated environment..."
+}
 & $PYTHON -m venv $VENV_DIR
-Write-Host "  ${GREEN}✓${NC} Virtual environment created"
+if ($Embedded -ne "1") {
+    Write-Host "  ${GREEN}✓${NC} Virtual environment created"
+}
 
-Write-Host "  ${CYAN}◐${NC} Installing dependencies..."
-$msg = Get-RandomMessage
-Write-Host "    ${DIM}$msg${NC}"
+if ($Embedded -ne "1") {
+    Write-Host "  ${CYAN}◐${NC} Installing dependencies..."
+    $msg = Get-RandomMessage
+    Write-Host "    ${DIM}$msg${NC}"
+}
 $reqFile = Join-Path $DAEMON_DIR "requirements.txt"
 $ErrorActionPreference = "SilentlyContinue"
 & $VENV_PIP install --upgrade pip 2>&1 | Out-Null
 & $VENV_PIP install -r $reqFile 2>&1 | Out-Null
 & $VENV_PIP install -e "$DAEMON_DIR[tui]" 2>&1 | Out-Null
 $ErrorActionPreference = "Continue"
-Write-Host "  ${GREEN}✓${NC} Dependencies installed"
+if ($Embedded -ne "1") {
+    Write-Host "  ${GREEN}✓${NC} Dependencies installed"
+}
 
 # Install spaCy (optional, degrades gracefully)
-Write-Host "  ${CYAN}◐${NC} Installing NLP engine..."
-$msg = Get-RandomMessage
-Write-Host "    ${DIM}$msg${NC}"
+if ($Embedded -ne "1") {
+    Write-Host "  ${CYAN}◐${NC} Installing NLP engine..."
+    $msg = Get-RandomMessage
+    Write-Host "    ${DIM}$msg${NC}"
+}
 $ErrorActionPreference = "SilentlyContinue"
 & $VENV_PIP install spacy 2>&1 | Out-Null
 $spacyInstalled = $LASTEXITCODE -eq 0
@@ -339,24 +459,34 @@ if ($spacyInstalled) {
     $ErrorActionPreference = "SilentlyContinue"
     & $VENV_PYTHON -m spacy download en_core_web_sm 2>&1 | Out-Null
     $ErrorActionPreference = "Continue"
-    Write-Host "  ${GREEN}✓${NC} NLP ready"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} NLP ready"
+    }
 } else {
-    Write-Host "  ${YELLOW}!${NC} spaCy could not be installed (this is non-critical)"
-    Write-Host "    Entity extraction will use pattern matching instead of NLP."
-    Write-Host "    ${DIM}This is common on Python 3.14+. For full NLP support, use Python 3.13.${NC}"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}!${NC} spaCy could not be installed (this is non-critical)"
+        Write-Host "    Entity extraction will use pattern matching instead of NLP."
+        Write-Host "    ${DIM}This is common on Python 3.14+. For full NLP support, use Python 3.13.${NC}"
+    }
 }
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 6: Auto-Start Setup (Windows Task Scheduler)
 # ============================================================
-Write-Host "${BOLD}Step 6/8: Auto-Start Setup${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 6/8: Auto-Start Setup${NC}"
+    Write-Host ""
+}
+Emit-Status "memory" "progress" "Starting daemon..."
 
 $taskName = "ClaudiaMemoryDaemon"
+$daemonLaunched = $false
 
 try {
     # Remove existing task if present
@@ -397,157 +527,230 @@ try {
         -RunLevel Limited `
         -Force | Out-Null
 
-    Write-Host "  ${GREEN}✓${NC} Configured Windows Task Scheduler"
-    Write-Host "    ${DIM}Will start on login${NC}"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} Configured Windows Task Scheduler"
+        Write-Host "    ${DIM}Will start on login${NC}"
+    }
 
     # Start the task now
     Start-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    Write-Host "  ${GREEN}✓${NC} Daemon launched"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} Daemon launched"
+    }
+    $daemonLaunched = $true
 } catch {
-    Write-Host "  ${YELLOW}!${NC} Could not configure auto-start: $_"
-    Write-Host "    ${DIM}You can start the daemon manually:${NC}"
-    Write-Host "    ${DIM}$VENV_PYTHON -m claudia_memory --standalone${NC}"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}!${NC} Could not configure auto-start: $_"
+        Write-Host "    ${DIM}You can start the daemon manually:${NC}"
+        Write-Host "    ${DIM}$VENV_PYTHON -m claudia_memory --standalone${NC}"
+    }
 }
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($daemonLaunched) {
+    Emit-Status "memory" "ok" "daemon running"
+} else {
+    Emit-Status "memory" "warn" "daemon may not have started"
+}
+
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 7: Memory Migration
 # ============================================================
-Write-Host "${BOLD}Step 7/8: Memory Migration${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 7/8: Memory Migration${NC}"
+    Write-Host ""
+}
 
 $projectPath = $env:CLAUDIA_PROJECT_PATH
 
 if ($projectPath -and (Test-Path (Join-Path $projectPath "context") -ErrorAction SilentlyContinue)) {
-    Write-Host "  ${CYAN}◐${NC} Found existing memories to migrate..."
+    if ($Embedded -ne "1") {
+        Write-Host "  ${CYAN}◐${NC} Found existing memories to migrate..."
+    }
     Start-Sleep -Seconds 2
 
     try {
         $migrationScript = Join-Path (Join-Path $DAEMON_DIR "scripts") "migrate_markdown.py"
         & $VENV_PYTHON $migrationScript --quiet $projectPath
-        Write-Host "  ${GREEN}✓${NC} Memories migrated to database"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${GREEN}✓${NC} Memories migrated to database"
+        }
     } catch {
-        Write-Host "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
-        Write-Host "    ${DIM}You can retry manually: $VENV_PYTHON -m claudia_memory.scripts.migrate_markdown $projectPath${NC}"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
+            Write-Host "    ${DIM}You can retry manually: $VENV_PYTHON -m claudia_memory.scripts.migrate_markdown $projectPath${NC}"
+        }
     }
 } elseif ($projectPath -and (Test-Path (Join-Path $projectPath "people") -ErrorAction SilentlyContinue)) {
-    Write-Host "  ${CYAN}◐${NC} Found existing memories to migrate..."
+    if ($Embedded -ne "1") {
+        Write-Host "  ${CYAN}◐${NC} Found existing memories to migrate..."
+    }
     Start-Sleep -Seconds 2
 
     try {
         $migrationScript = Join-Path (Join-Path $DAEMON_DIR "scripts") "migrate_markdown.py"
         & $VENV_PYTHON $migrationScript --quiet $projectPath
-        Write-Host "  ${GREEN}✓${NC} Memories migrated to database"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${GREEN}✓${NC} Memories migrated to database"
+        }
     } catch {
-        Write-Host "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${YELLOW}!${NC} Migration had issues (memories still in markdown)"
+        }
     }
 } else {
-    Write-Host "  ${DIM}Fresh install - no migration needed${NC}"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${DIM}Fresh install - no migration needed${NC}"
+    }
 }
 
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+}
 
 # ============================================================
 # Step 8: Verification
 # ============================================================
-Write-Host "${BOLD}Step 8/8: Verification${NC}"
-Write-Host ""
-Write-Host "  ${CYAN}◐${NC} Checking all services..."
+if ($Embedded -ne "1") {
+    Write-Host "${BOLD}Step 8/8: Verification${NC}"
+    Write-Host ""
+    Write-Host "  ${CYAN}◐${NC} Checking all services..."
+}
+Emit-Status "health" "progress" "Verifying services..."
 Start-Sleep -Seconds 3
+
+$healthIssues = 0
 
 # Check 1: Ollama running
 try {
     $null = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
-    Write-Host "  ${GREEN}✓${NC} Ollama running"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} Ollama running"
+    }
 } catch {
-    Write-Host "  ${YELLOW}○${NC} Ollama not running (will start on next boot)"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}○${NC} Ollama not running (will start on next boot)"
+    }
+    $healthIssues++
 }
 
 # Check 2: Embedding model
 if ($OLLAMA_AVAILABLE) {
     $modelList = & ollama list 2>&1
     if ($modelList -match "minilm") {
-        Write-Host "  ${GREEN}✓${NC} Embedding model ready"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${GREEN}✓${NC} Embedding model ready"
+        }
     } else {
-        Write-Host "  ${YELLOW}○${NC} Embedding model pending"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${YELLOW}○${NC} Embedding model pending"
+        }
+        $healthIssues++
     }
 }
 
 # Check 3: sqlite-vec
 try {
     & $VENV_PYTHON -c "import sqlite_vec" 2>&1 | Out-Null
-    Write-Host "  ${GREEN}✓${NC} Vector search available (sqlite-vec)"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} Vector search available (sqlite-vec)"
+    }
 } catch {
-    Write-Host "  ${YELLOW}○${NC} Vector search unavailable (keyword search only)"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}○${NC} Vector search unavailable (keyword search only)"
+    }
+    $healthIssues++
 }
 
 # Check 4: Memory daemon health
 try {
     $health = Invoke-WebRequest -Uri "http://localhost:3848/health" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
     if ($health.Content -match "healthy") {
-        Write-Host "  ${GREEN}✓${NC} Memory daemon running"
+        if ($Embedded -ne "1") {
+            Write-Host "  ${GREEN}✓${NC} Memory daemon running"
+        }
     } else {
-        Write-Host "  ${YELLOW}○${NC} Memory daemon starting..."
+        if ($Embedded -ne "1") {
+            Write-Host "  ${YELLOW}○${NC} Memory daemon starting..."
+        }
+        $healthIssues++
     }
 } catch {
-    Write-Host "  ${YELLOW}○${NC} Memory daemon starting..."
+    if ($Embedded -ne "1") {
+        Write-Host "  ${YELLOW}○${NC} Memory daemon starting..."
+    }
+    $healthIssues++
 }
 
 # Check 5: Task Scheduler
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($task) {
-    Write-Host "  ${GREEN}✓${NC} Auto-start configured (Task Scheduler)"
-}
-
-Write-Host ""
-Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-Write-Host ""
-
-# Success banner
-Write-Host "${GREEN}"
-Write-Host "  ╔═══════════════════════════════════════════════════════════╗"
-Write-Host "  ║                                                           ║"
-Write-Host "  ║   ✨ Memory system installed successfully! ✨             ║"
-Write-Host "  ║                                                           ║"
-Write-Host "  ╚═══════════════════════════════════════════════════════════╝"
-Write-Host "${NC}"
-
-Write-Host "${CYAN}${BOLD}"
-Write-Host "  ┌─────────────────────────────────────────────────────────────┐"
-Write-Host "  │                                                             │"
-Write-Host "  │   Ready! Run 'claude' in a new terminal to start.          │"
-Write-Host "  │                                                             │"
-Write-Host "  │   If Claude was already running, restart it to activate    │"
-Write-Host "  │   the memory tools.                                         │"
-Write-Host "  │                                                             │"
-Write-Host "  └─────────────────────────────────────────────────────────────┘"
-Write-Host "${NC}"
-
-# Summary
-Write-Host "${BOLD}What's installed:${NC}"
-Write-Host ""
-Write-Host "  ${CYAN}◆${NC} Memory daemon      ${DIM}$DAEMON_DIR${NC}"
-Write-Host "  ${CYAN}◆${NC} SQLite database    ${DIM}$MEMORY_DIR\claudia.db${NC}"
-Write-Host "  ${CYAN}◆${NC} Health endpoint    ${DIM}http://localhost:3848${NC}"
-if ($OLLAMA_AVAILABLE) {
-    Write-Host "  ${CYAN}◆${NC} Vector search      ${DIM}Enabled (Ollama)${NC}"
+    if ($Embedded -ne "1") {
+        Write-Host "  ${GREEN}✓${NC} Auto-start configured (Task Scheduler)"
+    }
 } else {
-    Write-Host "  ${YELLOW}○${NC} Vector search      ${DIM}Disabled (install Ollama to enable)${NC}"
+    $healthIssues++
 }
-Write-Host ""
 
-Write-Host "${BOLD}Troubleshooting:${NC}"
-Write-Host ""
-Write-Host "  ${DIM}Run diagnostics:${NC}  powershell -File $CLAUDIA_DIR\diagnose.ps1"
-Write-Host "  ${DIM}Check health:${NC}     Invoke-WebRequest http://localhost:3848/health"
-Write-Host "  ${DIM}View task:${NC}        Get-ScheduledTask -TaskName ClaudiaMemoryDaemon"
-Write-Host ""
+if ($healthIssues -eq 0) {
+    Emit-Status "health" "ok" "All services verified"
+} else {
+    Emit-Status "health" "warn" "$healthIssues issues detected"
+}
 
-# Claudia says goodbye
-Write-Host "${MAGENTA}${DIM}$([char]34)I learn how you work. Let's get started.$([char]34) -- Claudia${NC}"
-Write-Host ""
+if ($Embedded -ne "1") {
+    Write-Host ""
+    Write-Host "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    Write-Host ""
+
+    # Success banner
+    Write-Host "${GREEN}"
+    Write-Host "  ╔═══════════════════════════════════════════════════════════╗"
+    Write-Host "  ║                                                           ║"
+    Write-Host "  ║   ✨ Memory system installed successfully! ✨             ║"
+    Write-Host "  ║                                                           ║"
+    Write-Host "  ╚═══════════════════════════════════════════════════════════╝"
+    Write-Host "${NC}"
+
+    Write-Host "${CYAN}${BOLD}"
+    Write-Host "  ┌─────────────────────────────────────────────────────────────┐"
+    Write-Host "  │                                                             │"
+    Write-Host "  │   Ready! Run 'claude' in a new terminal to start.          │"
+    Write-Host "  │                                                             │"
+    Write-Host "  │   If Claude was already running, restart it to activate    │"
+    Write-Host "  │   the memory tools.                                         │"
+    Write-Host "  │                                                             │"
+    Write-Host "  └─────────────────────────────────────────────────────────────┘"
+    Write-Host "${NC}"
+
+    # Summary
+    Write-Host "${BOLD}What's installed:${NC}"
+    Write-Host ""
+    Write-Host "  ${CYAN}◆${NC} Memory daemon      ${DIM}$DAEMON_DIR${NC}"
+    Write-Host "  ${CYAN}◆${NC} SQLite database    ${DIM}$MEMORY_DIR\claudia.db${NC}"
+    Write-Host "  ${CYAN}◆${NC} Health endpoint    ${DIM}http://localhost:3848${NC}"
+    if ($OLLAMA_AVAILABLE) {
+        Write-Host "  ${CYAN}◆${NC} Vector search      ${DIM}Enabled (Ollama)${NC}"
+    } else {
+        Write-Host "  ${YELLOW}○${NC} Vector search      ${DIM}Disabled (install Ollama to enable)${NC}"
+    }
+    Write-Host ""
+
+    Write-Host "${BOLD}Troubleshooting:${NC}"
+    Write-Host ""
+    Write-Host "  ${DIM}Run diagnostics:${NC}  powershell -File $CLAUDIA_DIR\diagnose.ps1"
+    Write-Host "  ${DIM}Check health:${NC}     Invoke-WebRequest http://localhost:3848/health"
+    Write-Host "  ${DIM}View task:${NC}        Get-ScheduledTask -TaskName ClaudiaMemoryDaemon"
+    Write-Host ""
+
+    # Claudia says goodbye
+    Write-Host "${MAGENTA}${DIM}$([char]34)I learn how you work. Let's get started.$([char]34) -- Claudia${NC}"
+    Write-Host ""
+}
