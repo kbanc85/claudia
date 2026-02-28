@@ -2,24 +2,36 @@
   "name": "claudia-brain-visualizer",
   "version": "3.0.0",
   "private": true,
-  "description": "Real-time 3D visualization of Claudia's memory system (3d-force-graph)",
+  "description": "Technical relationship-first knowledge graph explorer for Claudia local memory",
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node --watch server.js"
+    "server": "node --watch server.js",
+    "test:smoke": "playwright test playwright-smoke.spec.js --reporter=line"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@react-three/postprocessing": "^3.0.4",
+    "@vitejs/plugin-react": "^5.1.4",
     "3d-force-graph": "^1.73.0",
     "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
+    "d3-force-3d": "^3.0.6",
     "express": "^4.21.0",
+    "graphology": "^0.26.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "sigma": "^3.0.2",
     "three": "^0.172.0",
-    "umap-js": "^1.4.0"
+    "umap-js": "^1.4.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "vite": "^6.0.0"
   }
 }

@@ -15,8 +15,14 @@ import { dirname, join } from 'path';
 import { execFile } from 'child_process';
 import { openDatabase, findDbPath, closeDatabase, getDb, listDatabases, getProjectHash } from './lib/database.js';
 import { buildGraph } from './lib/graph.js';
-import { getProjectedPositions } from './lib/projection.js';
+import { buildInsights } from './lib/insights.js';
+import { getProjectedPositions, invalidateProjectionCache } from './lib/projection.js';
 import { createEventStream, stopPolling } from './lib/events.js';
+import { buildOverviewGraph } from './lib/overview.js';
+import { buildNeighborhoodGraph } from './lib/neighborhood.js';
+import { buildTraceGraph } from './lib/trace.js';
+import { searchGraph } from './lib/search.js';
+import { getActiveCommitments } from './lib/commitments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -116,6 +122,66 @@ app.get('/api/graph', async (req, res) => {
   }
 });
 
+app.get('/api/graph/overview', async (req, res) => {
+  try {
+    const includeMemories = ['1', 'true', 'all', 'yes'].includes(String(req.query.includeMemories || '').toLowerCase());
+    const graph = await buildOverviewGraph({ includeMemories });
+    res.json(graph);
+  } catch (err) {
+    console.error('Overview graph error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/graph/neighborhood/:graphId', async (req, res) => {
+  try {
+    const graph = await buildNeighborhoodGraph(req.params.graphId, req.query.depth);
+    res.json(graph);
+  } catch (err) {
+    console.error('Neighborhood graph error:', err);
+    const status = /not found|invalid/i.test(err.message) ? 404 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/graph/trace', async (req, res) => {
+  try {
+    const { from, to, maxDepth } = req.query;
+    if (!from || !to) {
+      return res.status(400).json({ error: 'Provide both from and to graph ids' });
+    }
+    const trace = await buildTraceGraph({ from, to, maxDepth });
+    res.json(trace);
+  } catch (err) {
+    console.error('Trace graph error:', err);
+    const status = /must be entity graph ids/i.test(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/search', async (req, res) => {
+  try {
+    const result = await searchGraph(req.query.q || '', req.query.limit);
+    res.json(result);
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/commitments/active', async (req, res) => {
+  try {
+    const result = await getActiveCommitments({
+      entityId: req.query.entityId || null,
+      limit: req.query.limit
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('Commitments error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Stats ───────────────────────────────────────────────────────────
 
 app.get('/api/stats', (req, res) => {
@@ -126,8 +192,15 @@ app.get('/api/stats', (req, res) => {
       memories: db.prepare('SELECT COUNT(*) as c FROM memories').get().c,
       relationships: safeCount(db, 'SELECT COUNT(*) as c FROM relationships WHERE invalid_at IS NULL',
                           'SELECT COUNT(*) as c FROM relationships'),
-      patterns: db.prepare('SELECT COUNT(*) as c FROM patterns WHERE is_active = 1').get().c,
-      predictions: db.prepare('SELECT COUNT(*) as c FROM predictions WHERE is_shown = 0').get().c,
+      patterns: safeCount(db, 'SELECT COUNT(*) as c FROM patterns WHERE is_active = 1',
+                        'SELECT COUNT(*) as c FROM patterns'),
+      predictions: safeCount(db, 'SELECT COUNT(*) as c FROM predictions WHERE is_shown = 0',
+                           'SELECT 0 as c'),
+      commitments: safeCount(
+        db,
+        "SELECT COUNT(*) as c FROM memories WHERE type = 'commitment' AND invalidated_at IS NULL",
+        "SELECT COUNT(*) as c FROM memories WHERE type = 'commitment'"
+      ),
       recentActivity: db.prepare(
         `SELECT COUNT(*) as c FROM memories WHERE created_at > datetime('now', '-24 hours')`
       ).get().c,
@@ -139,6 +212,17 @@ app.get('/api/stats', (req, res) => {
       ).all()
     };
     res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Exploration insights ───────────────────────────────────────────────
+
+app.get('/api/insights', (req, res) => {
+  try {
+    const insights = buildInsights();
+    res.json(insights);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -316,6 +400,7 @@ app.post('/api/database/switch', (req, res) => {
     // Close current and open new
     closeDatabase();
     openDatabase(targetPath);
+    invalidateProjectionCache();
     currentDbPath = targetPath;
     currentProjectDir = projectDir || null;
 
@@ -346,6 +431,7 @@ function start() {
 
   console.log(`Opening database: ${dbPath}`);
   openDatabase(dbPath);
+  invalidateProjectionCache();
   currentDbPath = dbPath;
   currentProjectDir = config.projectDir || null;
 

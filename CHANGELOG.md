@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## Unreleased
+
+### Visualizer
+
+- **Primary `/brain` explorer rebuild** -- Replaces the old browser visualizer path with a technical React + `react-three-fiber` knowledge graph explorer designed for local memory browsing, relationship tracing, evidence reveal, database switching, and live scene tuning.
+- **Entity-first overview graph** -- Overview mode now stays readable by default, with optional full memory overlays, memory-type filtering, and commitment/pattern controls instead of flooding the initial scene.
+- **Non-destructive rollout** -- The visualizer work stays scoped to `visualizer/` and related `/brain` documentation. Core installer, template, and memory-daemon paths are not reworked as part of this visualizer replacement. Legacy visualizer assets are deprecated rather than used as the default runtime path.
+
 ## 1.45.1 (2026-02-26)
 
 ### Open Source & Polish

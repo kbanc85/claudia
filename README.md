@@ -267,7 +267,7 @@ Claudia detects your work style and generates structure that fits:
 | `/what-am-i-missing` | Surface risks, overdue items, cooling relationships |
 | `/research [topic]` | Deep research with web sources and memory integration |
 | `/inbox-check` | Lightweight inbox triage across connected email accounts |
-| `/brain` | Launch 3D brain visualizer |
+| `/brain` | Launch Claudia's primary 3D knowledge graph explorer |
 | `/meditate` | End-of-session reflection: extracts learnings, judgment, patterns |
 | `/deep-context [topic]` | Full-context deep analysis |
 | `/memory-audit` | See everything Claudia knows, with source chains |
@@ -340,7 +340,7 @@ You ──► Claude Code ──► Reads Claudia's templates ──► Becomes 
 
 **Provenance chains** trace any fact to its source email, transcript, or conversation.
 
-**Graph traversal** connects dots across your network. Ask about one person, see related entities with top memories. The 3D brain visualizer (`/brain`) renders the graph in real-time.
+**Graph traversal** connects dots across your network. Ask about one person, see related entities with top memories. The `/brain` explorer is Claudia's primary visual knowledge graph: relationship-first, evidence-aware, and tuned for browsing the local memory database without touching the rest of the core system.
 
 **Per-project isolation** keeps work memories separate from personal. Each workspace gets its own database.
 
