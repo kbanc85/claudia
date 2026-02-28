@@ -8,7 +8,9 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 dist/
+!visualizer/dist/
 build/
+visualizer/src-legacy/
 
 # Local
 .claude/settings.local.json

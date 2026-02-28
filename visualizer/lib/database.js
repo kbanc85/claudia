@@ -44,19 +44,45 @@ export function findDbPath(projectDir) {
 
 /**
  * List all available database files with their project hashes.
+ * Excludes backup files, WAL artifacts, and journal files.
  */
 export function listDatabases() {
   const memoryDir = join(homedir(), '.claudia', 'memory');
   try {
     return readdirSync(memoryDir)
-      .filter(f => f.endsWith('.db') && !f.endsWith('-journal') && !f.endsWith('-wal') && !f.endsWith('-shm'))
-      .map(f => ({
-        filename: f,
-        path: join(memoryDir, f),
-        hash: f.replace('.db', '')
-      }));
+      .filter(f =>
+        f.endsWith('.db') &&
+        !f.endsWith('-journal') &&
+        !f.endsWith('-wal') &&
+        !f.endsWith('-shm') &&
+        !f.includes('.backup-')  // Exclude backup files
+      )
+      .map(f => {
+        const hash = f.replace('.db', '');
+        return {
+          filename: f,
+          path: join(memoryDir, f),
+          hash,
+          // Try to get entity count for richer display
+          entityCount: getEntityCount(join(memoryDir, f)),
+        };
+      });
   } catch {
     return [];
+  }
+}
+
+/**
+ * Safely read entity count from a database file (for listing).
+ */
+function getEntityCount(dbPath) {
+  try {
+    const tempDb = new Database(dbPath, { readonly: true });
+    const row = tempDb.prepare('SELECT COUNT(*) as c FROM entities').get();
+    tempDb.close();
+    return row.c;
+  } catch {
+    return null;
   }
 }
 

@@ -2,6 +2,39 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.46.0 (2026-02-28)
+
+### Brain Visualizer v4.2
+
+Complete rebuild of the 3D Brain Visualizer with a modular architecture, GPU-accelerated rendering, and rich exploration APIs.
+
+**Frontend (v4.0-v4.2):**
+- Modular architecture -- monolithic files split into 26 focused modules (data/, effects/, graph/, materials/, ui/)
+- GPU memory particles -- 900+ memory nodes rendered in a single `THREE.Points` draw call with custom ShaderMaterial
+- Luminance-gated chromatic aberration -- post-processing bloom + CA that only applies to bright pixels, keeping text sharp
+- 10 visual themes -- Cosmos, Deep Ocean, Midnight, Aurora, Solar, Nebula, Forest, Sunset, Crystal, Neon
+- Quality presets -- LOW/MEDIUM/HIGH/ULTRA with runtime switching (no reload needed)
+- Connection view presets -- All Connections, Strong Bonds, People Map, Projects, Concepts
+- Sidebar insights -- Memory Breakdown and Insights panels with live data
+- Dramatic node selection -- highlighted neighborhood pops at full brightness while background softens to 35% opacity
+- Async particle flow -- memory-to-entity particles with per-link speed variation via deterministic hash
+- Midnight theme subtle color -- desaturated hues for entity type distinction while maintaining elegant aesthetic
+
+**Backend (8 new API endpoints):**
+- `/api/graph/overview` -- entity-first overview with inferred relationships and commitment overlays
+- `/api/graph/neighborhood/:graphId` -- ego-graph exploration with configurable depth
+- `/api/graph/trace` -- BFS shortest-path tracing between entities with shared memory evidence
+- `/api/search` -- text search across entities, memories, and patterns with relevance scoring
+- `/api/commitments/active` -- active commitment tracking with deadline and priority sorting
+- `/api/insights` -- exploration signals: top entities, urgent commitments, cooling relationships, active patterns
+- Enhanced `/api/graph` with signal scoring, entity stats, overdue detection, and richer metadata
+- Enhanced `/api/stats` with safe fallbacks for optional schema columns and commitment counts
+
+**Backend architecture:**
+- `graph-contract.js` -- normalized node/edge types, utility functions, schema-adaptive queries
+- `graph-data.js` -- central data loading layer with entity stats, commitment inference, inferred relationships
+- Schema-adaptive SQL -- conditional column selection for backward compatibility across database versions
+
 ## 1.45.1 (2026-02-26)
 
 ### Open Source & Polish

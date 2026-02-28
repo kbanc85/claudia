@@ -1,129 +1,34 @@
 /**
- * Claudia Brain -- Theme system
+ * Claudia Brain v4 -- Theme system
  *
- * 10 color themes with live switching. Each theme defines CSS variables,
- * 3D node colors, bloom parameters, emissive intensities, and link styling.
+ * 10 deeply crafted themes, each embodying a distinct aesthetic pillar.
+ * Themes control colors, bloom, atmosphere, particles, and UI styling.
  *
- * Selective bloom: entity emissiveIntensity (0.3-0.5) sits ABOVE the bloom
- * threshold (0.08-0.20), so entities glow. Memory emissiveIntensity (0.02-0.06)
- * sits BELOW the threshold, so they stay subdued. No Three.js Layers needed.
+ * Selective bloom: entity emissiveIntensity sits ABOVE bloom threshold (glow).
+ * Memory emissiveIntensity sits BELOW threshold (subdued). No Layers needed.
  */
 
 const listeners = [];
+let activeThemeId = 'deep-ocean';
 
-let activeThemeId = 'deep-space';
-
-// ── Theme definitions ─────────────────────────────────────
+// ── Theme definitions ────────────────────────────────────
 
 const THEMES = {
-  'deep-space': {
-    id: 'deep-space',
-    name: 'Deep Space',
-    swatch: '#818cf8',
-    background: '#000008',
-    defaultCamera: 'slowOrbit',
-    css: {
-      '--bg': '#050510',
-      '--surface': 'rgba(8, 8, 20, 0.88)',
-      '--surface-hover': 'rgba(12, 12, 30, 0.92)',
-      '--border': 'rgba(100, 110, 240, 0.08)',
-      '--border-bright': 'rgba(100, 110, 240, 0.15)',
-      '--text': '#c8c8e0',
-      '--text-bright': '#e8e8f8',
-      '--text-dim': '#606080',
-      '--accent': '#818cf8',
-      '--accent-glow': 'rgba(129, 140, 248, 0.2)',
-    },
-    entities: {
-      person: '#fbbf24',
-      organization: '#60a5fa',
-      project: '#34d399',
-      concept: '#c084fc',
-      location: '#fb923c',
-    },
-    memories: {
-      fact: '#e2e8f0',
-      commitment: '#f87171',
-      learning: '#4ade80',
-      observation: '#93c5fd',
-      preference: '#fbbf24',
-      pattern: '#a78bfa',
-    },
-    pattern: { color: '#a78bfa', emissive: '#7c3aed' },
-    links: {
-      relationship: 'rgba(130, 140, 248, 0.4)',
-      memoryEntity: 'rgba(120, 140, 255, 0.08)',
-      highlight: 'rgba(125, 211, 252, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(140, 150, 255, 0.12)',
-    },
-    particles: {
-      strong: '#00ffaa',
-      normal: '#818cf8',
-    },
-    bloom: { strength: 1.4, radius: 0.75, threshold: 0.12 },
-    emissive: { entity: 0.35, memory: 0.04, pattern: 0.5 },
-  },
 
-  'nebula': {
-    id: 'nebula',
-    name: 'Nebula',
-    swatch: '#d946ef',
-    background: '#0a0012',
-    defaultCamera: 'cinematic',
-    css: {
-      '--bg': '#08000f',
-      '--surface': 'rgba(16, 4, 24, 0.90)',
-      '--surface-hover': 'rgba(24, 8, 36, 0.92)',
-      '--border': 'rgba(180, 60, 220, 0.08)',
-      '--border-bright': 'rgba(180, 60, 220, 0.18)',
-      '--text': '#dcc8e8',
-      '--text-bright': '#f0e0ff',
-      '--text-dim': '#705880',
-      '--accent': '#d946ef',
-      '--accent-glow': 'rgba(217, 70, 239, 0.2)',
-    },
-    entities: {
-      person: '#fbbf24',
-      organization: '#2dd4bf',
-      project: '#34d399',
-      concept: '#e879f9',
-      location: '#fb7185',
-    },
-    memories: {
-      fact: '#f5e6d3',
-      commitment: '#fb7185',
-      learning: '#86efac',
-      observation: '#c4b5fd',
-      preference: '#fbbf24',
-      pattern: '#e879f9',
-    },
-    pattern: { color: '#e879f9', emissive: '#a21caf' },
-    links: {
-      relationship: 'rgba(217, 70, 239, 0.35)',
-      memoryEntity: 'rgba(160, 80, 200, 0.08)',
-      highlight: 'rgba(240, 171, 252, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(180, 100, 220, 0.12)',
-    },
-    particles: {
-      strong: '#f0abfc',
-      normal: '#d946ef',
-    },
-    bloom: { strength: 1.55, radius: 0.8, threshold: 0.10 },
-    emissive: { entity: 0.40, memory: 0.04, pattern: 0.55 },
-  },
-
-  'bioluminescent': {
-    id: 'bioluminescent',
-    name: 'Bioluminescent',
+  // ─── 1. DEEP OCEAN ──────────────────────────────────────
+  // Bioluminescent jellyfish drifting through midnight water.
+  // Cyan/teal dominant with warm gold accents.
+  'deep-ocean': {
+    id: 'deep-ocean',
+    name: 'Deep Ocean',
+    description: 'Bioluminescent creatures in dark water',
     swatch: '#06b6d4',
     background: '#000a0d',
     defaultCamera: 'gentleDrift',
     css: {
       '--bg': '#000809',
-      '--surface': 'rgba(2, 14, 18, 0.90)',
-      '--surface-hover': 'rgba(4, 20, 26, 0.92)',
+      '--surface': 'rgba(2, 14, 18, 0.85)',
+      '--surface-hover': 'rgba(4, 20, 26, 0.90)',
       '--border': 'rgba(6, 182, 212, 0.08)',
       '--border-bright': 'rgba(6, 182, 212, 0.18)',
       '--text': '#b8dce8',
@@ -149,381 +54,544 @@ const THEMES = {
     },
     pattern: { color: '#2dd4bf', emissive: '#0d9488' },
     links: {
-      relationship: 'rgba(6, 182, 212, 0.35)',
-      memoryEntity: 'rgba(6, 182, 212, 0.06)',
+      relationship: 'rgba(6, 182, 212, 0.50)',
+      memoryEntity: 'rgba(6, 182, 212, 0.15)',
       highlight: 'rgba(103, 232, 249, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(6, 182, 212, 0.10)',
+      historical: 'rgba(255, 255, 255, 0.06)',
+      default: 'rgba(6, 182, 212, 0.18)',
     },
-    particles: {
-      strong: '#4ade80',
-      normal: '#06b6d4',
-    },
+    particles: { strong: '#4ade80', normal: '#06b6d4' },
     bloom: { strength: 1.4, radius: 0.75, threshold: 0.10 },
     emissive: { entity: 0.38, memory: 0.04, pattern: 0.5 },
+    atmosphere: {
+      fogColor: '#000a0e',
+      fogNear: 300, fogFar: 1800, fogDensity: 0.0004,
+      ambientColor: '#06b6d4', ambientCount: 400,
+      ambientSize: 0.15, ambientSpeed: 0.08,
+    },
+    noise: { vertexDisplacement: 0.06, vertexFrequency: 2.0, vertexSpeed: 0.3 },
   },
 
-  'ember': {
-    id: 'ember',
-    name: 'Ember',
-    swatch: '#f97316',
-    background: '#0a0400',
+  // ─── 2. NEURAL ──────────────────────────────────────────
+  // Living brain tissue under fluorescence microscopy.
+  // Warm pinks, coral membranes, electrical impulse bursts.
+  'neural': {
+    id: 'neural',
+    name: 'Neural',
+    description: 'Living brain tissue under a microscope',
+    swatch: '#f472b6',
+    background: '#0a0406',
     defaultCamera: 'slowOrbit',
     css: {
-      '--bg': '#080400',
-      '--surface': 'rgba(18, 10, 4, 0.90)',
-      '--surface-hover': 'rgba(26, 16, 6, 0.92)',
-      '--border': 'rgba(249, 115, 22, 0.08)',
-      '--border-bright': 'rgba(249, 115, 22, 0.18)',
-      '--text': '#e8d0b8',
-      '--text-bright': '#f8e8d4',
-      '--text-dim': '#806850',
-      '--accent': '#f97316',
-      '--accent-glow': 'rgba(249, 115, 22, 0.2)',
+      '--bg': '#080305',
+      '--surface': 'rgba(18, 8, 12, 0.85)',
+      '--surface-hover': 'rgba(26, 12, 18, 0.90)',
+      '--border': 'rgba(244, 114, 182, 0.08)',
+      '--border-bright': 'rgba(244, 114, 182, 0.18)',
+      '--text': '#e8c8d8',
+      '--text-bright': '#f8e0ec',
+      '--text-dim': '#806068',
+      '--accent': '#f472b6',
+      '--accent-glow': 'rgba(244, 114, 182, 0.2)',
     },
     entities: {
       person: '#fbbf24',
-      organization: '#f97316',
-      project: '#2dd4bf',
-      concept: '#fb7185',
-      location: '#fde68a',
+      organization: '#f472b6',
+      project: '#34d399',
+      concept: '#e879f9',
+      location: '#fb923c',
     },
     memories: {
-      fact: '#d4c0a0',
-      commitment: '#fb7185',
-      learning: '#a3e635',
-      observation: '#fdba74',
+      fact: '#e2d8e0',
+      commitment: '#f87171',
+      learning: '#86efac',
+      observation: '#f9a8d4',
       preference: '#fde68a',
       pattern: '#c084fc',
     },
-    pattern: { color: '#f97316', emissive: '#c2410c' },
+    pattern: { color: '#e879f9', emissive: '#a21caf' },
     links: {
-      relationship: 'rgba(249, 115, 22, 0.35)',
-      memoryEntity: 'rgba(249, 115, 22, 0.06)',
-      highlight: 'rgba(251, 191, 36, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(249, 115, 22, 0.10)',
+      relationship: 'rgba(244, 114, 182, 0.50)',
+      memoryEntity: 'rgba(244, 114, 182, 0.15)',
+      highlight: 'rgba(252, 231, 243, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.06)',
+      default: 'rgba(244, 114, 182, 0.18)',
     },
-    particles: {
-      strong: '#fbbf24',
-      normal: '#f97316',
+    particles: { strong: '#fbcfe8', normal: '#f472b6' },
+    bloom: { strength: 1.3, radius: 0.7, threshold: 0.12 },
+    emissive: { entity: 0.40, memory: 0.05, pattern: 0.55 },
+    atmosphere: {
+      fogColor: '#100408',
+      fogNear: 250, fogFar: 1000, fogDensity: 0.001,
+      ambientColor: '#f472b6', ambientCount: 600,
+      ambientSize: 0.12, ambientSpeed: 0.06,
     },
-    bloom: { strength: 1.55, radius: 0.75, threshold: 0.12 },
-    emissive: { entity: 0.40, memory: 0.05, pattern: 0.5 },
+    noise: { vertexDisplacement: 0.08, vertexFrequency: 1.8, vertexSpeed: 0.25 },
   },
 
-  'arctic': {
-    id: 'arctic',
-    name: 'Arctic',
-    swatch: '#38bdf8',
-    background: '#020810',
+  // ─── 3. COSMOS ──────────────────────────────────────────
+  // Deep space nebulae, gravitational lensing, star nurseries.
+  // Rich indigo/violet palette with emerald accents.
+  'cosmos': {
+    id: 'cosmos',
+    name: 'Cosmos',
+    description: 'Nebula gas clouds and star clusters',
+    swatch: '#818cf8',
+    background: '#000008',
     defaultCamera: 'cinematic',
     css: {
-      '--bg': '#020610',
-      '--surface': 'rgba(4, 10, 24, 0.90)',
-      '--surface-hover': 'rgba(8, 16, 32, 0.92)',
-      '--border': 'rgba(56, 189, 248, 0.08)',
-      '--border-bright': 'rgba(56, 189, 248, 0.18)',
-      '--text': '#c8dce8',
-      '--text-bright': '#e0f0f8',
-      '--text-dim': '#506878',
-      '--accent': '#38bdf8',
-      '--accent-glow': 'rgba(56, 189, 248, 0.2)',
+      '--bg': '#050510',
+      '--surface': 'rgba(8, 8, 20, 0.85)',
+      '--surface-hover': 'rgba(12, 12, 30, 0.90)',
+      '--border': 'rgba(100, 110, 240, 0.08)',
+      '--border-bright': 'rgba(100, 110, 240, 0.15)',
+      '--text': '#c8c8e0',
+      '--text-bright': '#e8e8f8',
+      '--text-dim': '#606080',
+      '--accent': '#818cf8',
+      '--accent-glow': 'rgba(129, 140, 248, 0.2)',
     },
     entities: {
-      person: '#fde68a',
-      organization: '#7dd3fc',
-      project: '#86efac',
-      concept: '#c4b5fd',
-      location: '#fdba74',
+      person: '#fbbf24',
+      organization: '#60a5fa',
+      project: '#34d399',
+      concept: '#c084fc',
+      location: '#fb923c',
     },
     memories: {
       fact: '#e2e8f0',
-      commitment: '#fb7185',
-      learning: '#86efac',
-      observation: '#bae6fd',
+      commitment: '#f87171',
+      learning: '#4ade80',
+      observation: '#93c5fd',
       preference: '#fbbf24',
-      pattern: '#c4b5fd',
+      pattern: '#a78bfa',
     },
-    pattern: { color: '#7dd3fc', emissive: '#0284c7' },
+    pattern: { color: '#a78bfa', emissive: '#7c3aed' },
     links: {
-      relationship: 'rgba(56, 189, 248, 0.30)',
-      memoryEntity: 'rgba(56, 189, 248, 0.06)',
-      highlight: 'rgba(224, 242, 254, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(56, 189, 248, 0.10)',
+      relationship: 'rgba(130, 140, 248, 0.50)',
+      memoryEntity: 'rgba(120, 140, 255, 0.15)',
+      highlight: 'rgba(125, 211, 252, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.06)',
+      default: 'rgba(140, 150, 255, 0.18)',
     },
-    particles: {
-      strong: '#e0f2fe',
-      normal: '#38bdf8',
+    particles: { strong: '#00ffaa', normal: '#818cf8' },
+    bloom: { strength: 1.6, radius: 0.8, threshold: 0.10 },
+    emissive: { entity: 0.38, memory: 0.04, pattern: 0.5 },
+    atmosphere: {
+      fogColor: '#000010',
+      fogNear: 150, fogFar: 1500, fogDensity: 0.0006,
+      ambientColor: '#818cf8', ambientCount: 500,
+      ambientSize: 0.08, ambientSpeed: 0.04,
     },
-    bloom: { strength: 1.25, radius: 0.7, threshold: 0.14 },
-    emissive: { entity: 0.35, memory: 0.04, pattern: 0.45 },
+    noise: { vertexDisplacement: 0.05, vertexFrequency: 2.2, vertexSpeed: 0.35 },
   },
 
-  'matrix': {
-    id: 'matrix',
-    name: 'Matrix',
-    swatch: '#22c55e',
-    background: '#000200',
-    defaultCamera: 'pulse',
+  // ─── 4. AURORA ──────────────────────────────────────────
+  // Northern lights rippling across an arctic sky.
+  // Green/teal curtains with magenta and violet fringe.
+  'aurora': {
+    id: 'aurora',
+    name: 'Aurora',
+    description: 'Northern lights dancing across the arctic sky',
+    swatch: '#34d399',
+    background: '#020a08',
+    defaultCamera: 'gentleDrift',
     css: {
-      '--bg': '#000200',
-      '--surface': 'rgba(0, 6, 2, 0.92)',
-      '--surface-hover': 'rgba(0, 12, 4, 0.94)',
+      '--bg': '#010806',
+      '--surface': 'rgba(4, 18, 14, 0.85)',
+      '--surface-hover': 'rgba(6, 26, 20, 0.90)',
+      '--border': 'rgba(52, 211, 153, 0.08)',
+      '--border-bright': 'rgba(52, 211, 153, 0.18)',
+      '--text': '#b8e8d8',
+      '--text-bright': '#d4f8ec',
+      '--text-dim': '#4a8070',
+      '--accent': '#34d399',
+      '--accent-glow': 'rgba(52, 211, 153, 0.2)',
+    },
+    entities: {
+      person: '#a78bfa',
+      organization: '#34d399',
+      project: '#2dd4bf',
+      concept: '#c084fc',
+      location: '#fbbf24',
+    },
+    memories: {
+      fact: '#d0f0e0',
+      commitment: '#fb7185',
+      learning: '#6ee7b7',
+      observation: '#7dd3fc',
+      preference: '#fde68a',
+      pattern: '#a78bfa',
+    },
+    pattern: { color: '#a78bfa', emissive: '#6d28d9' },
+    links: {
+      relationship: 'rgba(52, 211, 153, 0.50)',
+      memoryEntity: 'rgba(52, 211, 153, 0.15)',
+      highlight: 'rgba(167, 243, 208, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.06)',
+      default: 'rgba(52, 211, 153, 0.18)',
+    },
+    particles: { strong: '#c084fc', normal: '#34d399' },
+    bloom: { strength: 1.5, radius: 0.85, threshold: 0.08 },
+    emissive: { entity: 0.42, memory: 0.05, pattern: 0.55 },
+    atmosphere: {
+      fogColor: '#020a08',
+      fogNear: 200, fogFar: 2000, fogDensity: 0.0003,
+      ambientColor: '#34d399', ambientCount: 500,
+      ambientSize: 0.18, ambientSpeed: 0.05,
+    },
+    noise: { vertexDisplacement: 0.07, vertexFrequency: 1.6, vertexSpeed: 0.4 },
+  },
+
+  // ─── 5. VOLCANIC ────────────────────────────────────────
+  // Magma rivers through obsidian rock, ember sparks rising.
+  // Deep reds, ember oranges, glowing fissure yellows.
+  'volcanic': {
+    id: 'volcanic',
+    name: 'Volcanic',
+    description: 'Magma flows through obsidian caverns',
+    swatch: '#ef4444',
+    background: '#0a0200',
+    defaultCamera: 'slowOrbit',
+    css: {
+      '--bg': '#080100',
+      '--surface': 'rgba(18, 6, 2, 0.88)',
+      '--surface-hover': 'rgba(28, 10, 4, 0.92)',
+      '--border': 'rgba(239, 68, 68, 0.08)',
+      '--border-bright': 'rgba(239, 68, 68, 0.18)',
+      '--text': '#e8c8b8',
+      '--text-bright': '#f8e0d0',
+      '--text-dim': '#806050',
+      '--accent': '#ef4444',
+      '--accent-glow': 'rgba(239, 68, 68, 0.2)',
+    },
+    entities: {
+      person: '#fbbf24',
+      organization: '#ef4444',
+      project: '#f97316',
+      concept: '#fb923c',
+      location: '#fcd34d',
+    },
+    memories: {
+      fact: '#e8d0c0',
+      commitment: '#ef4444',
+      learning: '#f97316',
+      observation: '#fbbf24',
+      preference: '#fde68a',
+      pattern: '#dc2626',
+    },
+    pattern: { color: '#f97316', emissive: '#c2410c' },
+    links: {
+      relationship: 'rgba(239, 68, 68, 0.55)',
+      memoryEntity: 'rgba(239, 68, 68, 0.15)',
+      highlight: 'rgba(252, 211, 77, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.05)',
+      default: 'rgba(239, 68, 68, 0.20)',
+    },
+    particles: { strong: '#fbbf24', normal: '#ef4444' },
+    bloom: { strength: 1.8, radius: 0.9, threshold: 0.08 },
+    emissive: { entity: 0.45, memory: 0.06, pattern: 0.6 },
+    atmosphere: {
+      fogColor: '#0a0200',
+      fogNear: 180, fogFar: 900, fogDensity: 0.001,
+      ambientColor: '#ef4444', ambientCount: 350,
+      ambientSize: 0.10, ambientSpeed: 0.12,
+    },
+    noise: { vertexDisplacement: 0.10, vertexFrequency: 1.5, vertexSpeed: 0.5 },
+  },
+
+  // ─── 6. SYNTHWAVE ───────────────────────────────────────
+  // Retro-futuristic neon grid, chrome reflections, 80s vibes.
+  // Hot pink, electric blue, chrome purple.
+  'synthwave': {
+    id: 'synthwave',
+    name: 'Synthwave',
+    description: 'Retro-futuristic neon grid, 80s vibes',
+    swatch: '#e879f9',
+    background: '#0a0010',
+    defaultCamera: 'cinematic',
+    css: {
+      '--bg': '#080010',
+      '--surface': 'rgba(14, 4, 22, 0.88)',
+      '--surface-hover': 'rgba(22, 6, 34, 0.92)',
+      '--border': 'rgba(232, 121, 249, 0.08)',
+      '--border-bright': 'rgba(232, 121, 249, 0.18)',
+      '--text': '#e0c0f0',
+      '--text-bright': '#f0d8ff',
+      '--text-dim': '#705880',
+      '--accent': '#e879f9',
+      '--accent-glow': 'rgba(232, 121, 249, 0.2)',
+    },
+    entities: {
+      person: '#38bdf8',
+      organization: '#e879f9',
+      project: '#f472b6',
+      concept: '#818cf8',
+      location: '#22d3ee',
+    },
+    memories: {
+      fact: '#d8c0f0',
+      commitment: '#f472b6',
+      learning: '#38bdf8',
+      observation: '#c084fc',
+      preference: '#e879f9',
+      pattern: '#818cf8',
+    },
+    pattern: { color: '#818cf8', emissive: '#4f46e5' },
+    links: {
+      relationship: 'rgba(232, 121, 249, 0.55)',
+      memoryEntity: 'rgba(232, 121, 249, 0.15)',
+      highlight: 'rgba(56, 189, 248, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.06)',
+      default: 'rgba(232, 121, 249, 0.20)',
+    },
+    particles: { strong: '#38bdf8', normal: '#e879f9' },
+    bloom: { strength: 2.0, radius: 0.9, threshold: 0.06 },
+    emissive: { entity: 0.50, memory: 0.06, pattern: 0.6 },
+    atmosphere: {
+      fogColor: '#0a0018',
+      fogNear: 200, fogFar: 1200, fogDensity: 0.0008,
+      ambientColor: '#e879f9', ambientCount: 450,
+      ambientSize: 0.08, ambientSpeed: 0.07,
+    },
+    noise: { vertexDisplacement: 0.04, vertexFrequency: 2.8, vertexSpeed: 0.4 },
+  },
+
+  // ─── 7. FROST ───────────────────────────────────────────
+  // Ice crystals refracting pale light, frozen breath.
+  // Pale blues, silver whites, crisp crystal edges.
+  'frost': {
+    id: 'frost',
+    name: 'Frost',
+    description: 'Ice crystals and frozen starlight',
+    swatch: '#7dd3fc',
+    background: '#020810',
+    defaultCamera: 'gentleDrift',
+    css: {
+      '--bg': '#020610',
+      '--surface': 'rgba(6, 14, 28, 0.85)',
+      '--surface-hover': 'rgba(10, 20, 38, 0.90)',
+      '--border': 'rgba(125, 211, 252, 0.08)',
+      '--border-bright': 'rgba(125, 211, 252, 0.18)',
+      '--text': '#c0d8f0',
+      '--text-bright': '#e0f0ff',
+      '--text-dim': '#506880',
+      '--accent': '#7dd3fc',
+      '--accent-glow': 'rgba(125, 211, 252, 0.2)',
+    },
+    entities: {
+      person: '#e0f2fe',
+      organization: '#7dd3fc',
+      project: '#a5f3fc',
+      concept: '#bae6fd',
+      location: '#67e8f9',
+    },
+    memories: {
+      fact: '#c8e0f0',
+      commitment: '#f0abfc',
+      learning: '#a5f3fc',
+      observation: '#bae6fd',
+      preference: '#e0f2fe',
+      pattern: '#67e8f9',
+    },
+    pattern: { color: '#67e8f9', emissive: '#0891b2' },
+    links: {
+      relationship: 'rgba(125, 211, 252, 0.45)',
+      memoryEntity: 'rgba(125, 211, 252, 0.12)',
+      highlight: 'rgba(224, 242, 254, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.06)',
+      default: 'rgba(125, 211, 252, 0.15)',
+    },
+    particles: { strong: '#e0f2fe', normal: '#7dd3fc' },
+    bloom: { strength: 1.2, radius: 0.6, threshold: 0.14 },
+    emissive: { entity: 0.35, memory: 0.04, pattern: 0.45 },
+    atmosphere: {
+      fogColor: '#020810',
+      fogNear: 250, fogFar: 1600, fogDensity: 0.0005,
+      ambientColor: '#bae6fd', ambientCount: 500,
+      ambientSize: 0.06, ambientSpeed: 0.03,
+    },
+    noise: { vertexDisplacement: 0.03, vertexFrequency: 3.0, vertexSpeed: 0.15 },
+  },
+
+  // ─── 8. AMBER ───────────────────────────────────────────
+  // Warm sunset glow, honey-gold, prehistoric resin.
+  // Rich golds, burnt sienna, warm earth tones.
+  'amber': {
+    id: 'amber',
+    name: 'Amber',
+    description: 'Warm sunset glow preserved in golden resin',
+    swatch: '#f59e0b',
+    background: '#0a0600',
+    defaultCamera: 'slowOrbit',
+    css: {
+      '--bg': '#080500',
+      '--surface': 'rgba(18, 12, 2, 0.88)',
+      '--surface-hover': 'rgba(26, 18, 4, 0.92)',
+      '--border': 'rgba(245, 158, 11, 0.08)',
+      '--border-bright': 'rgba(245, 158, 11, 0.18)',
+      '--text': '#e8d8b8',
+      '--text-bright': '#f8ecd0',
+      '--text-dim': '#806840',
+      '--accent': '#f59e0b',
+      '--accent-glow': 'rgba(245, 158, 11, 0.2)',
+    },
+    entities: {
+      person: '#fde68a',
+      organization: '#f59e0b',
+      project: '#d97706',
+      concept: '#fbbf24',
+      location: '#92400e',
+    },
+    memories: {
+      fact: '#e0d0b0',
+      commitment: '#f87171',
+      learning: '#fde68a',
+      observation: '#fbbf24',
+      preference: '#f59e0b',
+      pattern: '#d97706',
+    },
+    pattern: { color: '#d97706', emissive: '#92400e' },
+    links: {
+      relationship: 'rgba(245, 158, 11, 0.50)',
+      memoryEntity: 'rgba(245, 158, 11, 0.15)',
+      highlight: 'rgba(253, 230, 138, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.05)',
+      default: 'rgba(245, 158, 11, 0.18)',
+    },
+    particles: { strong: '#fde68a', normal: '#f59e0b' },
+    bloom: { strength: 1.3, radius: 0.7, threshold: 0.12 },
+    emissive: { entity: 0.38, memory: 0.05, pattern: 0.5 },
+    atmosphere: {
+      fogColor: '#0a0600',
+      fogNear: 200, fogFar: 1100, fogDensity: 0.0006,
+      ambientColor: '#f59e0b', ambientCount: 350,
+      ambientSize: 0.10, ambientSpeed: 0.05,
+    },
+    noise: { vertexDisplacement: 0.05, vertexFrequency: 2.0, vertexSpeed: 0.25 },
+  },
+
+  // ─── 9. RAINFOREST ──────────────────────────────────────
+  // Dense tropical canopy, bioluminescent fungi, dewy mist.
+  // Emerald greens, warm wood browns, bright life accents.
+  'rainforest': {
+    id: 'rainforest',
+    name: 'Rainforest',
+    description: 'Bioluminescent fungi in a tropical canopy',
+    swatch: '#22c55e',
+    background: '#020a02',
+    defaultCamera: 'gentleDrift',
+    css: {
+      '--bg': '#010800',
+      '--surface': 'rgba(4, 16, 6, 0.88)',
+      '--surface-hover': 'rgba(8, 24, 10, 0.92)',
       '--border': 'rgba(34, 197, 94, 0.08)',
       '--border-bright': 'rgba(34, 197, 94, 0.18)',
-      '--text': '#a8d8b8',
-      '--text-bright': '#c8f0d4',
-      '--text-dim': '#406848',
+      '--text': '#b8e0c0',
+      '--text-bright': '#d0f0d8',
+      '--text-dim': '#4a7050',
       '--accent': '#22c55e',
       '--accent-glow': 'rgba(34, 197, 94, 0.2)',
     },
     entities: {
       person: '#fbbf24',
       organization: '#22c55e',
-      project: '#60a5fa',
-      concept: '#ef4444',
-      location: '#fb923c',
+      project: '#86efac',
+      concept: '#a3e635',
+      location: '#84cc16',
     },
     memories: {
-      fact: '#8a9a8e',
-      commitment: '#fb7185',
-      learning: '#a3e635',
-      observation: '#2dd4bf',
-      preference: '#fde68a',
-      pattern: '#22c55e',
-    },
-    pattern: { color: '#22c55e', emissive: '#15803d' },
-    links: {
-      relationship: 'rgba(34, 197, 94, 0.35)',
-      memoryEntity: 'rgba(34, 197, 94, 0.06)',
-      highlight: 'rgba(134, 239, 172, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.03)',
-      default: 'rgba(34, 197, 94, 0.10)',
-    },
-    particles: {
-      strong: '#86efac',
-      normal: '#22c55e',
-    },
-    bloom: { strength: 1.75, radius: 0.6, threshold: 0.08 },
-    emissive: { entity: 0.45, memory: 0.03, pattern: 0.55 },
-  },
-
-  'sunset': {
-    id: 'sunset',
-    name: 'Sunset',
-    swatch: '#f43f5e',
-    background: '#080206',
-    defaultCamera: 'gentleDrift',
-    css: {
-      '--bg': '#060204',
-      '--surface': 'rgba(16, 6, 12, 0.90)',
-      '--surface-hover': 'rgba(24, 10, 18, 0.92)',
-      '--border': 'rgba(244, 63, 94, 0.08)',
-      '--border-bright': 'rgba(244, 63, 94, 0.18)',
-      '--text': '#e8c8d4',
-      '--text-bright': '#f8e0e8',
-      '--text-dim': '#805868',
-      '--accent': '#f43f5e',
-      '--accent-glow': 'rgba(244, 63, 94, 0.2)',
-    },
-    entities: {
-      person: '#fb923c',
-      organization: '#f43f5e',
-      project: '#a78bfa',
-      concept: '#f472b6',
-      location: '#fbbf24',
-    },
-    memories: {
-      fact: '#d4b8c4',
-      commitment: '#f43f5e',
+      fact: '#c0e0c8',
+      commitment: '#fb923c',
       learning: '#86efac',
-      observation: '#c4b5fd',
-      preference: '#fdba74',
-      pattern: '#a78bfa',
+      observation: '#a3e635',
+      preference: '#fde68a',
+      pattern: '#4ade80',
     },
-    pattern: { color: '#c084fc', emissive: '#7c3aed' },
+    pattern: { color: '#4ade80', emissive: '#15803d' },
     links: {
-      relationship: 'rgba(244, 63, 94, 0.35)',
-      memoryEntity: 'rgba(244, 63, 94, 0.06)',
-      highlight: 'rgba(251, 146, 60, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(244, 63, 94, 0.10)',
+      relationship: 'rgba(34, 197, 94, 0.50)',
+      memoryEntity: 'rgba(34, 197, 94, 0.15)',
+      highlight: 'rgba(134, 239, 172, 0.9)',
+      historical: 'rgba(255, 255, 255, 0.05)',
+      default: 'rgba(34, 197, 94, 0.18)',
     },
-    particles: {
-      strong: '#fb923c',
-      normal: '#f43f5e',
+    particles: { strong: '#fbbf24', normal: '#22c55e' },
+    bloom: { strength: 1.2, radius: 0.65, threshold: 0.12 },
+    emissive: { entity: 0.36, memory: 0.04, pattern: 0.48 },
+    atmosphere: {
+      fogColor: '#020a02',
+      fogNear: 150, fogFar: 800, fogDensity: 0.0012,
+      ambientColor: '#22c55e', ambientCount: 600,
+      ambientSize: 0.14, ambientSpeed: 0.04,
     },
-    bloom: { strength: 1.4, radius: 0.75, threshold: 0.12 },
-    emissive: { entity: 0.38, memory: 0.05, pattern: 0.50 },
+    noise: { vertexDisplacement: 0.07, vertexFrequency: 1.8, vertexSpeed: 0.2 },
   },
 
-  'monochrome': {
-    id: 'monochrome',
-    name: 'Monochrome',
-    swatch: '#a1a1aa',
+  // ─── 10. MIDNIGHT ───────────────────────────────────────
+  // Monochrome elegance. Pure black canvas, silver filigree.
+  // Professional, minimal, the data speaks for itself.
+  'midnight': {
+    id: 'midnight',
+    name: 'Midnight',
+    description: 'Minimal, elegant, professional',
+    swatch: '#8898a8',
     background: '#000000',
     defaultCamera: 'slowOrbit',
     css: {
       '--bg': '#000000',
-      '--surface': 'rgba(10, 10, 10, 0.92)',
-      '--surface-hover': 'rgba(18, 18, 18, 0.94)',
-      '--border': 'rgba(161, 161, 170, 0.08)',
-      '--border-bright': 'rgba(161, 161, 170, 0.18)',
+      '--surface': 'rgba(10, 10, 12, 0.88)',
+      '--surface-hover': 'rgba(18, 18, 22, 0.92)',
+      '--border': 'rgba(136, 152, 168, 0.08)',
+      '--border-bright': 'rgba(136, 152, 168, 0.18)',
       '--text': '#b8b8c0',
       '--text-bright': '#e0e0e4',
       '--text-dim': '#585860',
-      '--accent': '#a1a1aa',
-      '--accent-glow': 'rgba(161, 161, 170, 0.2)',
+      '--accent': '#8898a8',
+      '--accent-glow': 'rgba(136, 152, 168, 0.15)',
     },
     entities: {
-      person: '#e4e4e7',
-      organization: '#a1a1aa',
-      project: '#d4d4d8',
-      concept: '#f4f4f5',
-      location: '#71717a',
+      person: '#c8d6e5',       // moonlit steel blue
+      organization: '#a8c4d4', // dusty teal
+      project: '#b8d4c8',     // sage frost
+      concept: '#c8b8d8',     // lavender mist
+      location: '#d4c4b4',    // warm sandstone
     },
     memories: {
-      fact: '#8a8a90',
-      commitment: '#d4d4d8',
-      learning: '#a1a1aa',
-      observation: '#b8b8c0',
-      preference: '#e4e4e7',
-      pattern: '#71717a',
+      fact: '#9098a0',         // cool slate
+      commitment: '#c0a8a8',  // dusty rose
+      learning: '#98b0a0',    // muted sage
+      observation: '#a0a8b8', // steel blue
+      preference: '#b8b0a8',  // warm taupe
+      pattern: '#8890a0',     // blue-gray
     },
-    pattern: { color: '#a1a1aa', emissive: '#52525b' },
+    pattern: { color: '#8890a0', emissive: '#484860' },
     links: {
-      relationship: 'rgba(161, 161, 170, 0.30)',
-      memoryEntity: 'rgba(161, 161, 170, 0.06)',
+      relationship: 'rgba(136, 152, 168, 0.45)',
+      memoryEntity: 'rgba(136, 152, 168, 0.12)',
       highlight: 'rgba(244, 244, 245, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.03)',
-      default: 'rgba(161, 161, 170, 0.10)',
+      historical: 'rgba(255, 255, 255, 0.05)',
+      default: 'rgba(136, 152, 168, 0.15)',
     },
-    particles: {
-      strong: '#e4e4e7',
-      normal: '#a1a1aa',
+    particles: { strong: '#c8d6e5', normal: '#8890a0' },
+    bloom: { strength: 1.0, radius: 0.5, threshold: 0.18 },
+    emissive: { entity: 0.30, memory: 0.03, pattern: 0.40 },
+    atmosphere: {
+      fogColor: '#000000',
+      fogNear: 300, fogFar: 900, fogDensity: 0.0005,
+      ambientColor: '#a1a1aa', ambientCount: 300,
+      ambientSize: 0.06, ambientSpeed: 0.03,
     },
-    bloom: { strength: 1.25, radius: 0.6, threshold: 0.15 },
-    emissive: { entity: 0.32, memory: 0.04, pattern: 0.40 },
-  },
-
-  'sakura': {
-    id: 'sakura',
-    name: 'Sakura',
-    swatch: '#f9a8d4',
-    background: '#060408',
-    defaultCamera: 'gentleDrift',
-    css: {
-      '--bg': '#040308',
-      '--surface': 'rgba(12, 8, 16, 0.90)',
-      '--surface-hover': 'rgba(20, 12, 24, 0.92)',
-      '--border': 'rgba(249, 168, 212, 0.08)',
-      '--border-bright': 'rgba(249, 168, 212, 0.18)',
-      '--text': '#e0c8d8',
-      '--text-bright': '#f4e0ec',
-      '--text-dim': '#705868',
-      '--accent': '#f9a8d4',
-      '--accent-glow': 'rgba(249, 168, 212, 0.2)',
-    },
-    entities: {
-      person: '#fbbf24',
-      organization: '#f9a8d4',
-      project: '#2dd4bf',
-      concept: '#fbcfe8',
-      location: '#c4b5fd',
-    },
-    memories: {
-      fact: '#c8b0b8',
-      commitment: '#fb7185',
-      learning: '#86efac',
-      observation: '#f9a8d4',
-      preference: '#fde68a',
-      pattern: '#c4b5fd',
-    },
-    pattern: { color: '#f0abfc', emissive: '#a21caf' },
-    links: {
-      relationship: 'rgba(249, 168, 212, 0.30)',
-      memoryEntity: 'rgba(249, 168, 212, 0.06)',
-      highlight: 'rgba(252, 231, 243, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.04)',
-      default: 'rgba(249, 168, 212, 0.10)',
-    },
-    particles: {
-      strong: '#fbcfe8',
-      normal: '#f9a8d4',
-    },
-    bloom: { strength: 1.25, radius: 0.75, threshold: 0.14 },
-    emissive: { entity: 0.35, memory: 0.05, pattern: 0.45 },
-  },
-
-  'void': {
-    id: 'void',
-    name: 'Void',
-    swatch: '#6366f1',
-    background: '#000000',
-    defaultCamera: 'pulse',
-    css: {
-      '--bg': '#000000',
-      '--surface': 'rgba(4, 4, 8, 0.94)',
-      '--surface-hover': 'rgba(8, 8, 16, 0.96)',
-      '--border': 'rgba(99, 102, 241, 0.06)',
-      '--border-bright': 'rgba(99, 102, 241, 0.14)',
-      '--text': '#9898b8',
-      '--text-bright': '#c0c0d8',
-      '--text-dim': '#404058',
-      '--accent': '#6366f1',
-      '--accent-glow': 'rgba(99, 102, 241, 0.15)',
-    },
-    entities: {
-      person: '#7dd3fc',
-      organization: '#818cf8',
-      project: '#2dd4bf',
-      concept: '#c4b5fd',
-      location: '#8b5cf6',
-    },
-    memories: {
-      fact: '#7080a0',
-      commitment: '#fb7185',
-      learning: '#e2e8f0',
-      observation: '#a5b4fc',
-      preference: '#fbbf24',
-      pattern: '#818cf8',
-    },
-    pattern: { color: '#6366f1', emissive: '#4338ca' },
-    links: {
-      relationship: 'rgba(99, 102, 241, 0.25)',
-      memoryEntity: 'rgba(99, 102, 241, 0.04)',
-      highlight: 'rgba(165, 180, 252, 0.9)',
-      historical: 'rgba(255, 255, 255, 0.02)',
-      default: 'rgba(99, 102, 241, 0.08)',
-    },
-    particles: {
-      strong: '#a5b4fc',
-      normal: '#6366f1',
-    },
-    bloom: { strength: 2.1, radius: 0.9, threshold: 0.08 },
-    emissive: { entity: 0.50, memory: 0.02, pattern: 0.60 },
+    noise: { vertexDisplacement: 0.03, vertexFrequency: 2.5, vertexSpeed: 0.2 },
   },
 };
 
 // ── Public API ───────────────────────────────────────────
 
-export function getThemes() {
-  return THEMES;
-}
-
-export function getTheme(id) {
-  return THEMES[id] || THEMES['deep-space'];
-}
-
-export function getActiveTheme() {
-  return THEMES[activeThemeId] || THEMES['deep-space'];
-}
-
-export function getActiveThemeId() {
-  return activeThemeId;
-}
+export function getThemes() { return THEMES; }
+export function getTheme(id) { return THEMES[id] || THEMES['deep-ocean']; }
+export function getActiveTheme() { return THEMES[activeThemeId] || THEMES['deep-ocean']; }
+export function getActiveThemeId() { return activeThemeId; }
 
 export function setActiveTheme(id) {
   if (!THEMES[id]) return;

@@ -1,6 +1,6 @@
 {
   "name": "claudia-brain-visualizer",
-  "version": "3.0.0",
+  "version": "4.2.0",
   "private": true,
   "description": "Real-time 3D visualization of Claudia's memory system (3d-force-graph)",
   "type": "module",

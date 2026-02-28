@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <!-- 3d-force-graph mounts here (creates its own canvas) -->
+  <!-- 3d-force-graph mounts here -->
   <div id="graph-container"></div>
 
   <!-- Top HUD bar -->
@@ -16,6 +16,18 @@
       <img src="/claudia-logo.png" alt="Claudia" class="hud-logo-img">
       <span>Claudia Brain</span>
       <span id="activity-pulse" class="pulse"></span>
+      <div id="db-selector-container">
+        <button id="db-selector-btn" title="Switch database">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          <span id="db-selector-label">Loading...</span>
+          <svg class="db-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div id="db-dropdown" class="hidden"></div>
+      </div>
     </div>
     <div id="hud-stats">
       <div class="stat"><span id="stat-entities">0</span> entities</div>
@@ -29,7 +41,7 @@
       <div id="settings-container">
         <button id="settings-btn" title="Settings">&#x2699;</button>
         <div id="settings-panel" class="hidden">
-          <!-- Tabs and content built dynamically by ui.js -->
+          <!-- Tabs and content built dynamically by controls.js -->
         </div>
       </div>
     </div>
@@ -41,6 +53,49 @@
       <input type="text" id="search-input" placeholder="Search entities & memories..." autocomplete="off">
       <div id="search-results"></div>
     </div>
+
+    <!-- Graph info card -->
+    <div id="sidebar-info">
+      <h3>Graph Overview</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-value" id="sidebar-entities">--</span>
+          <span class="info-label">entities</span>
+        </div>
+        <div class="info-item">
+          <span class="info-value" id="sidebar-memories">--</span>
+          <span class="info-label">memories</span>
+        </div>
+        <div class="info-item">
+          <span class="info-value" id="sidebar-relationships">--</span>
+          <span class="info-label">links</span>
+        </div>
+        <div class="info-item">
+          <span class="info-value" id="sidebar-patterns">--</span>
+          <span class="info-label">patterns</span>
+        </div>
+      </div>
+      <div class="info-meta" id="sidebar-activity"></div>
+    </div>
+
+    <!-- Entity type breakdown -->
+    <div id="sidebar-breakdown">
+      <h3>Entity Breakdown</h3>
+      <div id="entity-breakdown-chart"></div>
+    </div>
+
+    <!-- Memory type breakdown -->
+    <div id="sidebar-memory-breakdown">
+      <h3>Memory Breakdown</h3>
+      <div id="memory-breakdown-chart"></div>
+    </div>
+
+    <!-- Graph insights -->
+    <div id="sidebar-insights">
+      <h3>Insights</h3>
+      <div id="insights-content"></div>
+    </div>
+
     <div id="filters">
       <h3>Node Types</h3>
       <div id="type-filters"></div>

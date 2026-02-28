@@ -1,17 +1,16 @@
 /**
- * Claudia Brain -- Unified settings persistence
+ * Claudia Brain v4 -- Settings persistence
  *
- * Single localStorage key for all settings. Migrates old per-slider
- * keys on first load. Supports named presets, export/import.
- * Null visual values mean "use theme defaults".
+ * Single localStorage key with dot-path access, presets, export/import.
+ * Null visual values = "use theme defaults".
  */
 
 const STORAGE_KEY = 'claudia-brain-settings';
-const VERSION = 1;
+const VERSION = 2;
 
 const DEFAULTS = {
   version: VERSION,
-  theme: 'deep-space',
+  theme: 'deep-ocean',
   cameraMode: 'slowOrbit',
   performance: {
     quality: 'high',
@@ -20,21 +19,26 @@ const DEFAULTS = {
     memoriesVisible: true,
     showHistorical: true,
     maxParticles: 2,
+    memoryImportanceThreshold: 0.15,
   },
   simulation: {
     chargeStrength: -180,
     linkDistance: 80,
     linkStrength: 0.3,
     velocityDecay: 0.4,
-    alphaDecay: 0.008,
+    alphaDecay: 0.02,
   },
   visuals: {
     bloomStrength: null,
     bloomRadius: null,
     bloomThreshold: null,
+    chromaticAberration: null,
+    nodeScale: 1.0,
     linkCurvature: 0.25,
     particleSpeed: 0.004,
     particleWidth: 1.5,
+    fogDensity: null,
+    ambientParticles: true,
   },
   presets: {},
 };
@@ -54,7 +58,7 @@ export function loadSettings() {
         saveSettings();
       }
     } else {
-      settings = migrateOldKeys();
+      settings = structuredClone(DEFAULTS);
       saveSettings();
     }
   } catch {
@@ -160,49 +164,6 @@ export function deletePreset(name) {
 export function listPresets() {
   if (!settings) loadSettings();
   return Object.keys(settings.presets || {});
-}
-
-// ── Migration from old localStorage keys ─────────────────
-
-const OLD_KEY_MAP = {
-  'claudia-brain-sim-chargeStrength': 'simulation.chargeStrength',
-  'claudia-brain-sim-linkDistance': 'simulation.linkDistance',
-  'claudia-brain-sim-linkStrength': 'simulation.linkStrength',
-  'claudia-brain-sim-velocityDecay': 'simulation.velocityDecay',
-  'claudia-brain-sim-alphaDecay': 'simulation.alphaDecay',
-  'claudia-brain-sim-bloomStrength': 'visuals.bloomStrength',
-  'claudia-brain-sim-bloomRadius': 'visuals.bloomRadius',
-  'claudia-brain-sim-bloomThreshold': 'visuals.bloomThreshold',
-  'claudia-brain-sim-linkCurvature': 'visuals.linkCurvature',
-  'claudia-brain-sim-particleSpeed': 'visuals.particleSpeed',
-  'claudia-brain-sim-particleWidth': 'visuals.particleWidth',
-};
-
-function migrateOldKeys() {
-  const migrated = structuredClone(DEFAULTS);
-
-  try {
-    const quality = localStorage.getItem('claudia-brain-quality');
-    if (quality) {
-      migrated.performance.quality = quality;
-      localStorage.removeItem('claudia-brain-quality');
-    }
-
-    for (const [oldKey, dotPath] of Object.entries(OLD_KEY_MAP)) {
-      const val = localStorage.getItem(oldKey);
-      if (val !== null) {
-        const parts = dotPath.split('.');
-        let obj = migrated;
-        for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
-        obj[parts[parts.length - 1]] = parseFloat(val);
-        localStorage.removeItem(oldKey);
-      }
-    }
-
-    localStorage.removeItem('claudia-brain-sim-collapsed');
-  } catch {}
-
-  return migrated;
 }
 
 // ── Helpers ──────────────────────────────────────────────

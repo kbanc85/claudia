@@ -1,434 +1,326 @@
 /**
- * Claudia Brain Visualizer -- Main entry point (3d-force-graph)
+ * Claudia Brain v4 -- Main bootstrap
  *
- * Initializes ForceGraph3D, configures node/link rendering,
- * connects SSE for live updates, and wires the UI overlays.
- * Theme, settings, and camera modules provide live switching.
+ * Initializes settings, themes, renderer, data, SSE, effects, UI, and render loop.
+ * Everything wires through here.
  */
 
-import ForceGraph3D from '3d-force-graph';
-
-import {
-  setGraphInstance,
-  getGraphInstance,
-  setGraphData,
-  getGraphData,
-  addNode,
-  addLink,
-  setSelectedNode,
-  highlightNeighborhood,
-  clearSelection,
-  filterNodes,
-  resetFilter,
-  focusNode
-} from './graph.js';
-
-import { createNodeObject, ENTITY_COLORS, MEMORY_COLORS } from './nodes.js';
-import { configureLinks, fireSynapse, fireSynapseBurst, fireNodeSynapses } from './links.js';
-import { initEffects, animateNodes, updateFps } from './effects.js';
-import { getActiveTheme, setActiveTheme } from './themes.js';
 import { loadSettings, getSetting } from './settings.js';
-import { tickCamera, setCameraMode, getCameraMode, getCameraModes, pauseCamera } from './camera.js';
+import { getActiveTheme, setActiveTheme } from './themes.js';
+import { createGraph, getGraph, isWebGPU } from './renderer.js';
+import { fetchGraph, fetchStats, fetchTimeline } from './data/api.js';
+import { setGraphInstance, setGraphData, getGraphData, addNode, addLink, updateNode, findNode, setSelectedNode, highlightNeighborhood, clearSelection, focusNode } from './data/store.js';
+import { connect as sseConnect, on as sseOn } from './data/sse.js';
+import { createNodeObject } from './graph/nodes.js';
+import { configureLinks, fireNodeSynapses } from './graph/links.js';
+import { initBloom } from './effects/bloom.js';
+import { initAtmosphere } from './effects/atmosphere.js';
+import { animateNodes, updateFps } from './effects/animations.js';
+import { animateAmbientParticles } from './materials/ambient.js';
+import { setCameraMode, pauseCamera, tickCamera } from './camera.js';
+import { createMemoryParticles, updateMemoryParticles, addMemoryParticle } from './graph/memoryParticles.js';
 
-import {
-  initUI,
-  updateStats,
-  showDetail,
-  updateTimeline
-} from './ui.js';
+// UI modules
+import { initHUD, updateStats, updateFpsDisplay, flashPulse } from './ui/hud.js';
+import { initSearch } from './ui/spotlight.js';
+import { initDetailPanel, showDetail } from './ui/panel.js';
+import { initControls } from './ui/controls.js';
+import { initTimeline, updateTimeline } from './ui/timeline.js';
+import { initDbSelector } from './ui/dbSelector.js';
 
-let eventSource = null;
-let startTime = performance.now();
+// ── Node interaction ──────────────────────────────────────
 
-// ── Bootstrap ───────────────────────────────────────────
-
-async function init() {
-  const container = document.getElementById('graph-container');
-
-  // Load persisted settings + apply saved theme
-  const settings = loadSettings();
-  setActiveTheme(settings.theme || 'deep-space');
-  setCameraMode(settings.cameraMode || 'slowOrbit');
-
-  const theme = getActiveTheme();
-
-  try {
-    // Fetch graph data
-    const res = await fetch('/api/graph');
-    const data = await res.json();
-    console.log(`Loaded ${data.nodes.length} nodes, ${data.links.length} links`);
-    console.log(`UMAP: ${data.meta?.umapEnabled ? 'enabled' : 'disabled (force layout)'}`);
-
-    // Store data
-    setGraphData(data);
-
-    // Apply UMAP positions as initial coordinates
-    for (const node of data.nodes) {
-      if (node.fx !== undefined) {
-        node.x = node.fx * 50;
-        node.y = node.fy * 50;
-        node.z = node.fz * 50;
-        delete node.fx;
-        delete node.fy;
-        delete node.fz;
-      }
-    }
-
-    // Read antialias setting
-    const antialias = getSetting('performance.antialias') !== false;
-
-    // Create 3d-force-graph instance (prefer high-performance GPU)
-    const Graph = ForceGraph3D({
-      rendererConfig: {
-        powerPreference: 'high-performance',
-        antialias,
-        alpha: false
-      }
-    })(container)
-      .graphData(data)
-      .backgroundColor(theme.background)
-
-      // Force simulation tuning
-      .d3AlphaDecay(getSetting('simulation.alphaDecay') ?? 0.02)
-      .d3VelocityDecay(getSetting('simulation.velocityDecay') ?? 0.4)
-
-      // Node rendering
-      .nodeThreeObject(node => createNodeObject(node))
-      .nodeThreeObjectExtend(false)
-
-      // Interaction
-      .onNodeClick(node => handleNodeClick(node))
-      .onBackgroundClick(() => clearSelection())
-      .onNodeHover(node => {
-        container.style.cursor = node ? 'pointer' : 'default';
-      })
-
-      // Engine tick (animations + FPS + camera)
-      .onEngineTick(() => {
-        const elapsed = (performance.now() - startTime) / 1000;
-        const delta = 1 / 60;
-
-        animateNodes(Graph, elapsed, delta);
-        updateFps();
-        tickCamera(Graph, elapsed);
-      });
-
-    // Store graph instance
-    setGraphInstance(Graph);
-
-    // Configure force strengths (must be done after graph creation)
-    const chargeStrength = getSetting('simulation.chargeStrength') ?? -180;
-    Graph.d3Force('charge')
-      .strength(node => {
-        if (node.nodeType === 'entity') return chargeStrength;
-        if (node.nodeType === 'pattern') return chargeStrength * 0.55;
-        return chargeStrength * 0.08;
-      })
-      .distanceMax(300);
-
-    const linkDist = getSetting('simulation.linkDistance') ?? 80;
-    const linkStr = getSetting('simulation.linkStrength') ?? 0.3;
-    Graph.d3Force('link')
-      .distance(link => {
-        if (link.linkType === 'relationship') return linkDist + (1 - (link.strength || 0.5)) * 40;
-        return linkDist * 0.22;
-      })
-      .strength(link => {
-        if (link.linkType === 'relationship') return (link.strength || 0.5) * linkStr;
-        return linkStr * 1.33;
-      });
-
-    // Configure link appearance (curves, particles, colors)
-    configureLinks(Graph);
-
-    // Add bloom post-processing
-    initEffects(Graph);
-
-    // Engine info display
-    const engineInfo = document.getElementById('engine-info');
-    if (engineInfo) {
-      engineInfo.textContent = 'Three.js';
-      engineInfo.style.fontSize = '10px';
-      engineInfo.style.color = '#34d399';
-    }
-
-    // Initialize UI (pass graph getter for simulation controls)
-    initUI(data, {
-      focusNode: handleFocusNode,
-      filterNodes: filterNodes,
-      resetFilter: resetFilter,
-      getGraph: () => Graph
-    });
-
-    // Setup camera pause on interaction
-    setupInteractionPause(container);
-
-    // Warm up: let simulation settle, then kick off camera rotation
-    Graph.d3Force('center', null);
-    setTimeout(() => {
-      Graph.zoomToFit(1000, 50);
-      // Ensure autoRotate starts after camera settles
-      setTimeout(() => {
-        const controls = Graph.controls();
-        const mode = getCameraMode();
-        const modes = getCameraModes();
-        if (controls && mode !== 'static' && modes[mode]) {
-          controls.autoRotate = true;
-          controls.autoRotateSpeed = modes[mode].autoRotateSpeed;
-        }
-      }, 1200);
-    }, 2000);
-
-    // Fetch stats and timeline
-    refreshStats();
-    refreshTimeline();
-
-    // Connect SSE
-    connectSSE();
-
-  } catch (err) {
-    console.error('Failed to initialize:', err);
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = 'color:#ef4444;padding:40px;font-size:16px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;';
-    const msg = document.createElement('span');
-    msg.textContent = 'Failed to connect to Claudia Brain. ';
-    const detail = document.createElement('small');
-    detail.style.color = '#808098';
-    detail.textContent = err.message;
-    errorDiv.appendChild(msg);
-    errorDiv.appendChild(detail);
-    document.body.appendChild(errorDiv);
+function onNodeClick(node) {
+  if (!node) {
+    clearSelection();
+    document.getElementById('detail-panel')?.classList.add('hidden');
+    return;
   }
-}
-
-// ── Node click handling ─────────────────────────────────
-
-function handleNodeClick(node) {
   setSelectedNode(node);
-  highlightNeighborhood(node);
-  handleFocusNode(node);
+  highlightNeighborhood(node, getActiveTheme);
+  focusNode(node);
 
+  // Pulse effect
+  node.__pulse = true;
+  setTimeout(() => { node.__pulse = false; }, 600);
+
+  // Fire synapses from clicked node
+  fireNodeSynapses(node.id, getGraphData());
+
+  // Show detail panel
   if (node.nodeType === 'entity') {
     fetch(`/api/entity/${node.dbId}`)
       .then(r => r.json())
       .then(detail => showDetail(node, detail))
-      .catch(() => {});
+      .catch(() => showDetail(node, null));
   } else {
     showDetail(node, null);
   }
-
-  pauseCamera();
 }
 
-// ── Camera focus ────────────────────────────────────────
-
-function handleFocusNode(node, duration) {
-  if (!node) return;
-  focusNode(node);
+function onBackgroundClick() {
+  clearSelection();
+  document.getElementById('detail-panel')?.classList.add('hidden');
 }
 
-// ── Interaction pause (replaces old auto-orbit) ─────────
+// ── SSE event handlers ────────────────────────────────────
 
-function setupInteractionPause(container) {
-  container.addEventListener('pointerdown', pauseCamera);
-  container.addEventListener('wheel', pauseCamera);
+function handleSSE(data) {
+  if (!data?.type) return;
+  flashPulse();
+
+  switch (data.type) {
+    case 'new_memory': {
+      const node = {
+        id: `memory-${data.memory_id}`,
+        dbId: data.memory_id,
+        nodeType: 'memory',
+        memoryType: data.memory_type || 'fact',
+        name: data.content?.substring(0, 40) || '',
+        importance: data.importance || 0.5,
+        __spawn: true,
+      };
+      addNode(node);
+      addMemoryParticle(node); // Add to GPU particle system
+
+      if (data.entity_ids) {
+        for (const eid of data.entity_ids) {
+          addLink({
+            source: node.id,
+            target: `entity-${eid}`,
+            linkType: 'memory_entity',
+          });
+        }
+      }
+      break;
+    }
+
+    case 'new_entity': {
+      const node = {
+        id: `entity-${data.entity_id}`,
+        dbId: data.entity_id,
+        nodeType: 'entity',
+        entityType: data.entity_type || 'concept',
+        name: data.name || '',
+        importance: data.importance || 0.5,
+        __spawn: true,
+      };
+      addNode(node);
+      break;
+    }
+
+    case 'new_relationship': {
+      addLink({
+        source: `entity-${data.source_id}`,
+        target: `entity-${data.target_id}`,
+        linkType: 'relationship',
+        relationType: data.relation_type || '',
+        strength: data.strength || 0.5,
+      });
+      break;
+    }
+
+    case 'entity_updated': {
+      const existing = findNode(`entity-${data.entity_id}`);
+      if (existing) {
+        updateNode(existing.id, {
+          importance: data.importance ?? existing.importance,
+        });
+        existing.__shimmer = true;
+        setTimeout(() => { existing.__shimmer = false; }, 2000);
+      }
+      break;
+    }
+
+    case 'memory_importance_changed': {
+      const existing = findNode(`memory-${data.memory_id}`);
+      if (existing) {
+        updateNode(existing.id, { importance: data.importance });
+        existing.__pulse = true;
+        setTimeout(() => { existing.__pulse = false; }, 400);
+      }
+      break;
+    }
+
+    case 'consolidation_complete':
+    case 'full_refresh': {
+      loadGraphData();
+      break;
+    }
+  }
+
+  // Refresh stats on any event
+  refreshStats();
 }
 
-// ── Stats refresh ───────────────────────────────────────
+// ── Data loading ──────────────────────────────────────────
+
+async function loadGraphData() {
+  try {
+    const showHistorical = getSetting('performance.showHistorical') !== false;
+    const data = await fetchGraph({ historical: showHistorical });
+    setGraphData(data);
+
+    const Graph = getGraph();
+    if (Graph) {
+      Graph.graphData({ nodes: data.nodes, links: data.links });
+
+      // Build GPU particle system for memory nodes (replaces 901 individual meshes
+      // with a single Points draw call -- the key FPS optimization)
+      const scene = Graph.scene();
+      if (scene) {
+        const memoryNodes = data.nodes.filter(n => n.nodeType === 'memory');
+        createMemoryParticles(scene, memoryNodes);
+      }
+    }
+  } catch (e) {
+    console.error('[Main] Failed to load graph:', e);
+  }
+}
 
 async function refreshStats() {
   try {
-    const res = await fetch('/api/stats');
-    const stats = await res.json();
-    updateStats(stats);
+    const stats = await fetchStats();
+    updateStats(stats, getGraphData());
   } catch {}
 }
 
 async function refreshTimeline() {
   try {
-    const res = await fetch('/api/timeline');
-    const events = await res.json();
+    const events = await fetchTimeline();
     updateTimeline(events);
   } catch {}
 }
 
-// ── SSE connection ──────────────────────────────────────
+// ── Simulation tuning ─────────────────────────────────────
 
-function connectSSE() {
-  eventSource = new EventSource('/api/events');
+function tuneSimulation(Graph) {
+  const sim = Graph.d3Force;
+  if (!sim) return;
 
-  eventSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      handleEvent(data);
-    } catch {}
-  };
+  const charge = getSetting('simulation.chargeStrength') ?? -180;
+  const linkDist = getSetting('simulation.linkDistance') ?? 80;
+  const linkStr = getSetting('simulation.linkStrength') ?? 0.3;
+  const velDecay = getSetting('simulation.velocityDecay') ?? 0.4;
+  // Higher alphaDecay = faster settling = less CPU on force simulation
+  const alphaDecay = getSetting('simulation.alphaDecay') ?? 0.028;
 
-  eventSource.onerror = () => {
-    console.warn('SSE connection lost, reconnecting...');
-  };
+  try {
+    sim('charge')?.strength(charge);
+    sim('link')?.distance(linkDist)?.strength(linkStr);
+    Graph.d3VelocityDecay(velDecay);
+    Graph.d3AlphaDecay(alphaDecay);
+
+    // Disable center force for large graphs (reduces jitter)
+    const nodeCount = Graph.graphData()?.nodes?.length || 0;
+    if (nodeCount > 500) {
+      sim('center')?.strength(0.3); // Weaker centering
+    }
+  } catch (e) {
+    console.warn('[Main] Simulation tuning error:', e);
+  }
 }
 
-// ── Event handlers ──────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────
 
-function handleEvent(event) {
-  // Pulse activity indicator
-  const pulse = document.getElementById('activity-pulse');
-  if (pulse) {
-    pulse.style.background = '#6366f1';
-    setTimeout(() => { pulse.style.background = '#10b981'; }, 1000);
+async function boot() {
+  // 1. Settings + theme
+  loadSettings();
+  const themeId = getSetting('theme') || 'deep-ocean';
+  setActiveTheme(themeId);
+  const theme = getActiveTheme();
+
+  // 2. Camera mode from settings
+  setCameraMode(getSetting('cameraMode') || theme.defaultCamera || 'slowOrbit');
+
+  // 3. Create graph renderer
+  const container = document.getElementById('graph-container');
+  if (!container) {
+    console.error('[Main] #graph-container not found');
+    return;
   }
 
-  switch (event.type) {
-    case 'memory_created':            handleMemoryCreated(event.data); break;
-    case 'memory_accessed':           handleMemoryAccessed(event.data); break;
-    case 'memory_improved':           handleMemoryImproved(event.data); break;
-    case 'entity_created':            handleEntityCreated(event.data); break;
-    case 'relationship_created':      handleRelationshipCreated(event.data); break;
-    case 'relationship_superseded':   handleRelationshipSuperseded(event.data); break;
-    case 'pattern_detected':          handlePatternDetected(event.data); break;
-    case 'prediction_created':        handlePredictionCreated(event.data); break;
-    case 'importance_decay':          handleImportanceDecay(event.data); break;
+  const Graph = createGraph(container, theme);
+  setGraphInstance(Graph);
+  window.__graph = Graph; // Expose for diagnostics
+
+  // 4. Configure node objects and links
+  Graph.nodeThreeObject(createNodeObject);
+  Graph.nodeThreeObjectExtend(false);
+  configureLinks(Graph);
+
+  // 5. Interactions
+  Graph.onNodeClick(onNodeClick);
+  Graph.onBackgroundClick(onBackgroundClick);
+
+  // Pause camera on user interaction
+  const controls = Graph.controls();
+  if (controls) {
+    controls.addEventListener('start', pauseCamera);
   }
 
+  // 6. Tune simulation
+  tuneSimulation(Graph);
+
+  // 7. Bloom post-processing
+  initBloom(Graph);
+
+  // 7b. Atmosphere (fog + ambient particles)
+  initAtmosphere(Graph);
+
+  // 8. Initialize all UI
+  initHUD();
+  initDetailPanel();
+  initSearch({ showDetail });
+  initControls({ getGraph: () => Graph });
+  initTimeline();
+  initDbSelector({
+    onSwitch: async () => {
+      await loadGraphData();
+      refreshStats();
+      refreshTimeline();
+    }
+  });
+
+  // 9. Render loop
+  let lastHudUpdate = 0;
+  Graph.onEngineTick(() => {
+    updateFps();
+    const now = performance.now();
+    const elapsed = now / 1000;
+
+    tickCamera(Graph, elapsed);
+    animateNodes(Graph, elapsed, 1 / 60);
+    animateAmbientParticles(elapsed);
+    updateMemoryParticles(); // Sync particle positions from force sim
+
+    // Update HUD FPS every 500ms
+    if (now - lastHudUpdate > 500) {
+      lastHudUpdate = now;
+      updateFpsDisplay();
+    }
+  });
+
+  // 10. Load initial data
+  await loadGraphData();
+
+  // 11. Connect SSE for real-time updates
+  sseConnect();
+  sseOn('new_memory', handleSSE);
+  sseOn('new_entity', handleSSE);
+  sseOn('new_relationship', handleSSE);
+  sseOn('entity_updated', handleSSE);
+  sseOn('memory_importance_changed', handleSSE);
+  sseOn('consolidation_complete', handleSSE);
+  sseOn('full_refresh', handleSSE);
+
+  // 12. Load stats + timeline
   refreshStats();
+  refreshTimeline();
+
+  console.log(`[Claudia Brain v4] Ready -- ${isWebGPU() ? 'WebGPU' : 'WebGL'} -- theme: ${themeId}`);
 }
 
-function handleMemoryCreated(data) {
-  const theme = getActiveTheme();
-  const node = {
-    id: `memory-${data.id}`,
-    dbId: data.id,
-    nodeType: 'memory',
-    memoryType: data.type,
-    name: data.content?.slice(0, 60) || '',
-    content: data.content,
-    importance: data.importance,
-    color: theme.memories[data.type] || '#888',
-    size: Math.max(1.5, data.importance * 3),
-    opacity: 1,
-    createdAt: data.created_at,
-    __spawn: true
-  };
+// ── Start ─────────────────────────────────────────────────
 
-  addNode(node);
-
-  setTimeout(() => {
-    fireNodeSynapses(node.id, getGraphData());
-    handleFocusNode(node);
-  }, 500);
-}
-
-function handleMemoryAccessed(data) {
-  const gd = getGraphData();
-  const node = gd.nodes.find(n => n.id === `memory-${data.id}`);
-  if (node) {
-    node.__pulse = true;
-    node.importance = data.importance;
-    fireNodeSynapses(node.id, gd);
-    setTimeout(() => { node.__pulse = false; }, 2000);
-  }
-}
-
-function handleMemoryImproved(data) {
-  const gd = getGraphData();
-  const node = gd.nodes.find(n => n.id === `memory-${data.id}`);
-  if (node) {
-    node.__shimmer = true;
-    node.llmImproved = true;
-    node.content = data.content;
-    setTimeout(() => { node.__shimmer = false; }, 3000);
-  }
-}
-
-function handleEntityCreated(data) {
-  const theme = getActiveTheme();
-  const node = {
-    id: `entity-${data.id}`,
-    dbId: data.id,
-    nodeType: 'entity',
-    entityType: data.type,
-    name: data.name,
-    importance: data.importance,
-    color: theme.entities[data.type] || '#888',
-    size: Math.max(3, Math.sqrt(data.importance) * 8),
-    opacity: 1,
-    __spawn: true
-  };
-
-  addNode(node);
-  setTimeout(() => handleFocusNode(node), 500);
-}
-
-function handleRelationshipCreated(data) {
-  const link = {
-    id: `rel-${data.id}`,
-    source: `entity-${data.source_entity_id}`,
-    target: `entity-${data.target_entity_id}`,
-    linkType: 'relationship',
-    label: data.relationship_type,
-    strength: data.strength,
-    width: Math.max(0.5, data.strength * 3)
-  };
-
-  addLink(link);
-
-  setTimeout(() => {
-    const gd = getGraphData();
-    const createdLink = gd.links.find(l => l.id === link.id);
-    if (createdLink) fireSynapseBurst(createdLink);
-  }, 300);
-}
-
-function handleRelationshipSuperseded(data) {
-  const gd = getGraphData();
-  const link = gd.links.find(l => l.id === `rel-${data.id}`);
-  if (link) {
-    link.dashed = true;
-    link.historical = true;
-    link.color = getActiveTheme().links.historical;
-    link.invalidAt = data.invalid_at;
-    const Graph = getGraphInstance();
-    if (Graph) Graph.linkColor(Graph.linkColor());
-  }
-}
-
-function handlePatternDetected(data) {
-  const theme = getActiveTheme();
-  const node = {
-    id: `pattern-${data.id}`,
-    dbId: data.id,
-    nodeType: 'pattern',
-    patternType: data.pattern_type,
-    name: data.name,
-    confidence: data.confidence,
-    color: theme.pattern.color,
-    size: Math.max(4, data.confidence * 10),
-    opacity: Math.max(0.4, data.confidence),
-    __spawn: true
-  };
-
-  addNode(node);
-}
-
-function handlePredictionCreated(data) {
-  const statEl = document.getElementById('stat-patterns');
-  if (statEl) {
-    statEl.style.color = '#38bdf8';
-    setTimeout(() => { statEl.style.color = ''; }, 2000);
-  }
-}
-
-function handleImportanceDecay(data) {
-  const gd = getGraphData();
-  const node = gd.nodes.find(n => n.id === `memory-${data.id}`);
-  if (node) {
-    node.importance = data.importance;
-    node.size = Math.max(1.5, data.importance * 3);
-    node.opacity = Math.max(0.15, data.importance);
-  }
-}
-
-// ── Start ───────────────────────────────────────────────
-
-init();
+boot().catch(e => console.error('[Claudia Brain v4] Boot failed:', e));
