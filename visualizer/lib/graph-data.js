@@ -287,8 +287,9 @@ export async function loadGraphDataset({ includeHistorical = false } = {}) {
     `SELECT ${buildEntitySelect(schema.entityColumns)} FROM entities ORDER BY importance DESC, name ASC`
   ).all().filter((entity) => !entity.deleted_at);
 
+  const hasInvalidatedAt = schema.memoryColumns.has('invalidated_at');
   const memories = db.prepare(
-    `SELECT ${buildMemorySelect(schema.memoryColumns)} FROM memories ORDER BY importance DESC, created_at DESC`
+    `SELECT ${buildMemorySelect(schema.memoryColumns)} FROM memories${hasInvalidatedAt ? ' WHERE invalidated_at IS NULL' : ''} ORDER BY importance DESC, created_at DESC`
   ).all();
 
   const relationships = db.prepare(
@@ -527,9 +528,9 @@ function sharedMemoryCount(dataset, leftEntityId, rightEntityId) {
 }
 
 export function findHubEntityId(dataset) {
-  const explicit = dataset.entityNodes.find((node) => /kamil banc/i.test(node.label));
-  if (explicit) return Number(explicit.id.replace('entity-', ''));
-  const strongest = [...dataset.entityNodes].sort((left, right) => (right.relationshipCount || 0) - (left.relationshipCount || 0))[0];
+  // Hub = the entity with the most relationships (typically the database owner)
+  const strongest = [...dataset.entityNodes]
+    .sort((left, right) => (right.relationshipCount || 0) - (left.relationshipCount || 0))[0];
   return strongest ? Number(strongest.id.replace('entity-', '')) : null;
 }
 

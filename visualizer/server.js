@@ -244,7 +244,7 @@ app.get('/api/entity/:id', (req, res) => {
       SELECT m.*, me.relationship
       FROM memories m
       JOIN memory_entities me ON me.memory_id = m.id
-      WHERE me.entity_id = ?
+      WHERE me.entity_id = ? AND m.invalidated_at IS NULL
       ORDER BY m.importance DESC
       LIMIT 50
     `).all(id);
@@ -313,7 +313,7 @@ app.get('/api/timeline', (req, res) => {
       SELECT 'memory' as event_type, id, content as label, type as subtype,
              importance, created_at as timestamp
       FROM memories
-      WHERE created_at BETWEEN ? AND ?
+      WHERE created_at BETWEEN ? AND ? AND invalidated_at IS NULL
       UNION ALL
       SELECT 'entity' as event_type, id, name as label, type as subtype,
              importance, created_at as timestamp

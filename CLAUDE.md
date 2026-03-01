@@ -14,7 +14,7 @@ Both layers are core to how Claudia works. The template layer defines *who* Clau
 This repository also contains:
 - `docs/` - Design plans and internal docs
 - `openclaw-skills/` - Standalone skills for OpenClaw agents (repo-only, not in npm package, no tests -- pure markdown)
-- `visualizer/` - 3D brain graph (Express + Vite + 3d-force-graph; included in npm package)
+- `visualizer/` - 3D brain graph explorer (Express + Vite + React + react-three-fiber; included in npm package)
 - `template/` - Legacy template (deprecated)
 
 Previously included gateway and relay directories were archived to the `archive/pre-obsidian` branch. The visualizer was retained and ships with the npm package.
@@ -307,6 +307,6 @@ claudia/
 ├── docs/                    ← Design plans and internal docs
 │   └── plans/
 ├── openclaw-skills/          ← Standalone OpenClaw skills (not in npm package)
-├── visualizer/               ← 3D brain graph (Express + Vite; ships with npm)
+├── visualizer/               ← 3D brain graph explorer (Express + React + R3F; ships with npm)
 └── template/                 ← Legacy template (deprecated)
 ```
