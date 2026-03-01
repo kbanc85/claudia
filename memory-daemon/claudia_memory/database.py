@@ -254,6 +254,9 @@ class Database:
             # Store workspace path in _meta for database identification
             self._store_workspace_path(conn)
 
+            # Register database in central registry
+            self._register_database()
+
             self._initialized = True
 
     # All vec0 virtual tables and their primary key columns
@@ -1133,6 +1136,49 @@ class Database:
             conn.commit()
             logger.debug(f"Stored workspace path in _meta: {workspace_path}")
 
+    def _register_database(self) -> None:
+        """Register this database in the central registry.
+
+        Maintains ~/.claudia/memory/registry.json with all known databases,
+        their workspace paths, and last-seen timestamps. Used by the visualizer
+        and /databases command to enumerate databases.
+        """
+        registry_path = Path.home() / ".claudia" / "memory" / "registry.json"
+
+        try:
+            if registry_path.exists():
+                with open(registry_path) as f:
+                    registry = json.load(f)
+            else:
+                registry = {"databases": []}
+
+            # Find or create entry for this database path
+            db_str = str(self.db_path)
+            entry = next(
+                (d for d in registry["databases"] if d["path"] == db_str), None
+            )
+
+            workspace = os.environ.get("CLAUDIA_WORKSPACE_PATH", "")
+            name = self.db_path.stem  # e.g., "6af67351bcfa" or "claudia"
+
+            if entry:
+                entry["workspace"] = workspace or entry.get("workspace", "")
+                entry["last_seen"] = datetime.now().isoformat()
+            else:
+                registry["databases"].append({
+                    "path": db_str,
+                    "workspace": workspace,
+                    "name": name,
+                    "registered_at": datetime.now().isoformat(),
+                    "last_seen": datetime.now().isoformat(),
+                })
+
+            registry_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(registry_path, "w") as f:
+                json.dump(registry, f, indent=2)
+        except Exception as e:
+            logger.debug(f"Registry update failed (non-fatal): {e}")
+
     def execute(
         self, sql: str, params: Tuple = (), fetch: bool = False
     ) -> Optional[List[sqlite3.Row]]:
@@ -1213,8 +1259,12 @@ class Database:
         rows = self.query(table, columns, where, where_params, limit=1)
         return rows[0] if rows else None
 
-    def backup(self) -> Path:
+    def backup(self, label: str = None) -> Path:
         """Create a backup of the database using SQLite's online backup API.
+
+        Args:
+            label: Optional label for categorized backups (e.g., "daily", "weekly",
+                   "pre-migration"). Labeled backups have independent retention counts.
 
         Returns:
             Path to the created backup file
@@ -1223,7 +1273,10 @@ class Database:
 
         config = get_config()
         timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        backup_path = Path(f"{self.db_path}.backup-{timestamp}.db")
+        if label:
+            backup_path = Path(f"{self.db_path}.backup-{label}-{timestamp}.db")
+        else:
+            backup_path = Path(f"{self.db_path}.backup-{timestamp}.db")
 
         # Create backup using SQLite's built-in backup API
         backup_conn = sqlite3.connect(str(backup_path))
@@ -1232,12 +1285,30 @@ class Database:
         finally:
             backup_conn.close()
 
+        # Verify backup integrity
+        try:
+            verify_conn = sqlite3.connect(str(backup_path), timeout=5)
+            result = verify_conn.execute("PRAGMA integrity_check").fetchone()
+            verify_conn.close()
+            if result and result[0] != "ok":
+                logger.error(f"Backup verification FAILED: {result}")
+                backup_path.unlink(missing_ok=True)
+                raise RuntimeError(f"Backup integrity check failed: {result}")
+        except sqlite3.Error as e:
+            logger.warning(f"Backup verification could not run: {e}")
+
         logger.info(f"Database backed up to {backup_path}")
 
-        # Rolling retention: delete oldest backups beyond retention count
-        pattern = f"{self.db_path}.backup-*.db"
-        backups = sorted(glob.glob(pattern))
-        while len(backups) > config.backup_retention_count:
+        # Rolling retention (per-label if labeled)
+        if label:
+            pattern = f"{self.db_path}.backup-{label}-*.db"
+            retention = self._get_label_retention(label)
+        else:
+            pattern = f"{self.db_path}.backup-*.db"
+            retention = config.backup_retention_count
+
+        backups = sorted(glob.glob(pattern), key=os.path.getmtime)
+        while len(backups) > retention:
             oldest = backups.pop(0)
             try:
                 Path(oldest).unlink()
@@ -1246,6 +1317,15 @@ class Database:
                 logger.warning(f"Failed to delete old backup {oldest}: {e}")
 
         return backup_path
+
+    def _get_label_retention(self, label: str) -> int:
+        """Get retention count for a labeled backup category."""
+        config = get_config()
+        retention_map = {
+            "daily": config.backup_daily_retention,
+            "weekly": config.backup_weekly_retention,
+        }
+        return retention_map.get(label, config.backup_retention_count)
 
     def close(self) -> None:
         """Close the thread-local connection"""

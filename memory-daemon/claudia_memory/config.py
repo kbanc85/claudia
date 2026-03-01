@@ -80,6 +80,8 @@ class MemoryConfig:
     # Backup settings
     backup_retention_count: int = 3  # Number of rolling backups to keep
     enable_pre_consolidation_backup: bool = True  # Auto-backup before consolidation
+    backup_daily_retention: int = 7   # Keep 7 daily labeled backups (1 week)
+    backup_weekly_retention: int = 4  # Keep 4 weekly labeled backups (1 month)
 
     # Retention settings (data cleanup during consolidation)
     audit_log_retention_days: int = 90
@@ -154,6 +156,10 @@ class MemoryConfig:
                     config.backup_retention_count = data["backup_retention_count"]
                 if "enable_pre_consolidation_backup" in data:
                     config.enable_pre_consolidation_backup = data["enable_pre_consolidation_backup"]
+                if "backup_daily_retention" in data:
+                    config.backup_daily_retention = data["backup_daily_retention"]
+                if "backup_weekly_retention" in data:
+                    config.backup_weekly_retention = data["backup_weekly_retention"]
                 if "audit_log_retention_days" in data:
                     config.audit_log_retention_days = data["audit_log_retention_days"]
                 if "prediction_retention_days" in data:
@@ -241,6 +247,12 @@ class MemoryConfig:
         if self.backup_retention_count < 1:
             logger.warning(f"backup_retention_count={self.backup_retention_count} below minimum, using 1")
             self.backup_retention_count = 1
+        if self.backup_daily_retention < 1:
+            logger.warning(f"backup_daily_retention={self.backup_daily_retention} below minimum, using 1")
+            self.backup_daily_retention = 1
+        if self.backup_weekly_retention < 1:
+            logger.warning(f"backup_weekly_retention={self.backup_weekly_retention} below minimum, using 1")
+            self.backup_weekly_retention = 1
         for attr in ("audit_log_retention_days", "prediction_retention_days", "turn_buffer_retention_days", "metrics_retention_days"):
             val = getattr(self, attr)
             if val < 1:
@@ -305,6 +317,8 @@ class MemoryConfig:
             "enable_auto_dedupe": self.enable_auto_dedupe,
             "auto_dedupe_threshold": self.auto_dedupe_threshold,
             "graph_proximity_weight": self.graph_proximity_weight,
+            "backup_daily_retention": self.backup_daily_retention,
+            "backup_weekly_retention": self.backup_weekly_retention,
         }
 
         with open(config_path, "w") as f:

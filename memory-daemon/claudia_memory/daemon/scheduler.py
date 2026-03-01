@@ -64,6 +64,24 @@ class MemoryScheduler:
             replace_existing=True,
         )
 
+        # Daily at 2:30am: Labeled daily backup (7-day retention)
+        self.scheduler.add_job(
+            self._run_daily_backup,
+            CronTrigger(hour=2, minute=30),
+            id="daily_backup",
+            name="Daily backup",
+            replace_existing=True,
+        )
+
+        # Weekly on Sunday at 2:45am: Labeled weekly backup (4-week retention)
+        self.scheduler.add_job(
+            self._run_weekly_backup,
+            CronTrigger(day_of_week="sun", hour=2, minute=45),
+            id="weekly_backup",
+            name="Weekly backup",
+            replace_existing=True,
+        )
+
         # Daily at 3:15am: Vault sync (after consolidation)
         if self.config.vault_sync_enabled:
             self.scheduler.add_job(
@@ -127,6 +145,24 @@ class MemoryScheduler:
             logger.info(f"Full consolidation complete: {result}")
         except Exception as e:
             logger.exception("Error in full consolidation")
+
+    def _run_daily_backup(self) -> None:
+        """Create a labeled daily backup with 7-day retention."""
+        try:
+            from ..database import get_db
+            backup_path = get_db().backup(label="daily")
+            logger.info(f"Daily backup created: {backup_path}")
+        except Exception as e:
+            logger.exception("Error in daily backup")
+
+    def _run_weekly_backup(self) -> None:
+        """Create a labeled weekly backup with 4-week retention."""
+        try:
+            from ..database import get_db
+            backup_path = get_db().backup(label="weekly")
+            logger.info(f"Weekly backup created: {backup_path}")
+        except Exception as e:
+            logger.exception("Error in weekly backup")
 
     def _run_vault_sync(self) -> None:
         """Run Obsidian vault sync + canvas regeneration"""

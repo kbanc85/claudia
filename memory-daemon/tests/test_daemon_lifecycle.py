@@ -59,7 +59,7 @@ class TestSchedulerConfiguration:
     """Tests for the memory scheduler configuration."""
 
     def test_registers_expected_jobs(self):
-        """Scheduler should register decay, pattern detection, consolidation, and vault sync."""
+        """Scheduler should register decay, pattern detection, consolidation, backups, and vault sync."""
         scheduler = MemoryScheduler()
 
         with patch.object(scheduler.scheduler, "start"):
@@ -68,7 +68,10 @@ class TestSchedulerConfiguration:
         jobs = scheduler.scheduler.get_jobs()
         job_ids = {job.id for job in jobs}
 
-        expected = {"daily_decay", "pattern_detection", "full_consolidation", "vault_sync"}
+        expected = {
+            "daily_decay", "pattern_detection", "full_consolidation",
+            "daily_backup", "weekly_backup", "vault_sync",
+        }
         assert job_ids == expected, (
             f"Expected jobs {expected}, got: {job_ids}"
         )

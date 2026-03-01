@@ -143,13 +143,14 @@ def _check_and_repair_database(db_path: Path) -> None:
         return
 
     backup_pattern = str(db_path) + ".backup-*.db"
-    backups = sorted(glob.glob(backup_pattern))
+    backups = sorted(glob.glob(backup_pattern), key=os.path.getmtime)
     if backups:
         latest = backups[-1]
         logger.warning(f"Restoring database from backup: {latest}")
         shutil.copy2(latest, db_path)
-        for suffix in (".db-shm", ".db-wal"):
-            stale = Path(str(db_path).replace(".db", "") + suffix)
+        # Clean up stale WAL files using direct path concatenation
+        for suffix in ("-shm", "-wal"):
+            stale = Path(str(db_path) + suffix)
             if stale.exists():
                 stale.unlink()
                 logger.info(f"Removed stale WAL file: {stale}")
@@ -160,6 +161,104 @@ def _check_and_repair_database(db_path: Path) -> None:
             "Memory system will attempt to start but may have errors. "
             f"Manual recovery: sqlite3 {db_path} '.dump' | sqlite3 repaired.db"
         )
+
+
+def _auto_migrate_legacy() -> None:
+    """Auto-migrate data from legacy claudia.db if it exists.
+
+    When Claudia switched from a single claudia.db to project-hash naming
+    ({sha256[:12]}.db), no data migration was performed. This function
+    detects the orphaned legacy database and migrates its data into the
+    active project-specific database.
+
+    Properties:
+    - Idempotent: checks _meta flag, won't run twice
+    - Safe: backs up before touching anything, preserves original
+    - Non-fatal: catches all exceptions, logs, continues
+    """
+    from .migration import (
+        check_legacy_database,
+        is_migration_completed,
+        mark_migration_completed,
+        migrate_legacy_database,
+    )
+
+    try:
+        config = get_config()
+        legacy_path = Path.home() / ".claudia" / "memory" / "claudia.db"
+        active_path = Path(config.db_path)
+
+        # Skip if active db IS the legacy db (no project isolation active)
+        try:
+            if legacy_path.resolve() == active_path.resolve():
+                return
+        except OSError:
+            if str(legacy_path) == str(active_path):
+                return
+
+        # Skip if legacy database doesn't exist
+        if not legacy_path.exists():
+            return
+
+        # Skip if migration already completed (idempotent)
+        db = get_db()
+        if is_migration_completed(db):
+            return
+
+        # Check if legacy database has meaningful data
+        legacy_stats = check_legacy_database(legacy_path)
+        if not legacy_stats:
+            # Empty or unreadable legacy db -- mark complete so we don't check again
+            mark_migration_completed(db, {"skipped": "no_data"})
+            logger.info("Legacy claudia.db exists but has no data worth migrating")
+            return
+
+        logger.info(
+            f"Found legacy claudia.db with {legacy_stats.get('entities', 0)} entities "
+            f"and {legacy_stats.get('memories', 0)} memories"
+        )
+
+        # Create pre-migration backup of active database (if it has data)
+        if active_path.exists():
+            try:
+                backup_path = db.backup(label="pre-migration")
+                logger.info(f"Pre-migration backup created: {backup_path}")
+            except Exception as e:
+                logger.warning(f"Pre-migration backup failed: {e}")
+                # Continue anyway -- the migration is additive, not destructive
+
+        # Run the migration
+        logger.info(f"Starting legacy database migration: {legacy_path} -> {active_path}")
+        results = migrate_legacy_database(legacy_path, active_path)
+
+        # Mark migration as completed
+        mark_migration_completed(db, results)
+
+        # Rename the legacy database (preserve, don't delete)
+        from datetime import datetime as dt
+        date_suffix = dt.now().strftime("%Y-%m-%d")
+        migrated_path = legacy_path.with_suffix(f".db.migrated-{date_suffix}")
+        try:
+            legacy_path.rename(migrated_path)
+            logger.info(f"Renamed legacy database: {legacy_path} -> {migrated_path}")
+        except OSError as e:
+            logger.warning(f"Could not rename legacy database: {e}")
+
+        # Log summary
+        logger.info(
+            f"Legacy migration complete: "
+            f"{results.get('entities_created', 0)} entities created, "
+            f"{results.get('entities_mapped', 0)} mapped, "
+            f"{results.get('memories_migrated', 0)} memories migrated, "
+            f"{results.get('links_migrated', 0)} links migrated, "
+            f"{results.get('relationships_migrated', 0)} relationships migrated"
+        )
+
+    except Exception as e:
+        # Non-fatal: log error and continue with whatever data we have
+        logger.error(f"Legacy migration failed (non-fatal): {e}")
+        logger.info("Daemon will continue with current database. "
+                     "Run --migrate-legacy manually to retry.")
 
 
 def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = None) -> None:
@@ -206,6 +305,9 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
         db = get_db()
         db.initialize()
         logger.info(f"Database initialized at {get_config().db_path}")
+
+        # Auto-migrate legacy claudia.db if it exists
+        _auto_migrate_legacy()
 
         # Start health server and scheduler - ONLY in standalone mode.
         # MCP server processes are ephemeral and session-bound; the standalone
@@ -323,6 +425,21 @@ def main():
         "--preview",
         action="store_true",
         help="Preview mode for --migrate-vault-para: show routing plan without making changes",
+    )
+    parser.add_argument(
+        "--migrate-legacy",
+        action="store_true",
+        help="Manually migrate data from legacy claudia.db to project-specific database",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview migration without making changes (use with --migrate-legacy)",
+    )
+    parser.add_argument(
+        "--legacy-db",
+        type=str,
+        help="Path to legacy database (default: ~/.claudia/memory/claudia.db)",
     )
 
     args = parser.parse_args()
@@ -855,6 +972,87 @@ def main():
             sys.exit(1)
 
         run_para_migration(vault_path, db=db, preview=args.preview)
+        return
+
+    if args.migrate_legacy:
+        # Manual legacy database migration
+        setup_logging(debug=args.debug)
+        from .migration import (
+            check_legacy_database,
+            is_migration_completed,
+            mark_migration_completed,
+            migrate_legacy_database,
+        )
+
+        db = get_db()
+        db.initialize()
+        config = get_config()
+
+        # Resolve paths
+        legacy_path = Path(args.legacy_db) if args.legacy_db else (
+            Path.home() / ".claudia" / "memory" / "claudia.db"
+        )
+        active_path = Path(config.db_path)
+
+        if not legacy_path.exists():
+            print(f"Legacy database not found: {legacy_path}")
+            sys.exit(1)
+
+        if str(legacy_path.resolve()) == str(active_path.resolve()):
+            print("Error: Legacy and active databases are the same file.")
+            print("Use --project-dir to specify a project for isolation.")
+            sys.exit(1)
+
+        # Check legacy data
+        legacy_stats = check_legacy_database(legacy_path)
+        if not legacy_stats:
+            print(f"Legacy database at {legacy_path} has no data to migrate.")
+            return
+
+        print(f"\nLegacy database: {legacy_path}")
+        print(f"Active database: {active_path}")
+        print(f"  Entities:      {legacy_stats.get('entities', 0)}")
+        print(f"  Memories:      {legacy_stats.get('memories', 0)}")
+        print(f"  Links:         {legacy_stats.get('links', 0)}")
+        print(f"  Relationships: {legacy_stats.get('relationships', 0)}")
+        if legacy_stats.get("earliest"):
+            print(f"  Date range:    {legacy_stats['earliest']} to {legacy_stats['latest']}")
+
+        if is_migration_completed(db):
+            print("\nNote: Migration was already completed previously.")
+            if not args.dry_run:
+                confirm = input("Run again? (y/N): ").strip().lower()
+                if confirm != "y":
+                    print("Cancelled.")
+                    return
+
+        if args.dry_run:
+            print("\nDry run mode -- no changes will be made.\n")
+            results = migrate_legacy_database(legacy_path, active_path, dry_run=True)
+        else:
+            # Backup active database before migration
+            if active_path.exists():
+                backup_path = db.backup(label="pre-migration")
+                print(f"\nBackup created: {backup_path}")
+
+            print("\nMigrating...")
+            results = migrate_legacy_database(legacy_path, active_path)
+            mark_migration_completed(db, results)
+
+            # Rename legacy database
+            from datetime import datetime as dt
+            date_suffix = dt.now().strftime("%Y-%m-%d")
+            migrated_path = legacy_path.with_suffix(f".db.migrated-{date_suffix}")
+            try:
+                legacy_path.rename(migrated_path)
+                print(f"Renamed: {legacy_path.name} -> {migrated_path.name}")
+            except OSError as e:
+                print(f"Warning: Could not rename legacy database: {e}")
+
+        print(f"\nResults:")
+        for key, value in results.items():
+            if value > 0:
+                print(f"  {key}: {value}")
         return
 
     # Run the daemon
