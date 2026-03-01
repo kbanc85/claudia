@@ -13,12 +13,20 @@ function stableHash(value) {
   return Math.abs(hash);
 }
 
+function radialBasis(direction, seed) {
+  const forward = direction.clone().normalize();
+  const up = Math.abs(forward.y) > 0.92 ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0);
+  const tangent = new Vector3().crossVectors(forward, up).normalize();
+  const bitangent = new Vector3().crossVectors(forward, tangent).normalize();
+  const angle = ((stableHash(seed) % 360) * Math.PI) / 180;
+  return tangent.multiplyScalar(Math.cos(angle)).add(bitangent.multiplyScalar(Math.sin(angle))).normalize();
+}
+
 function bendNormal(start, end, seed) {
   const direction = end.clone().sub(start).normalize();
-  const up = Math.abs(direction.y) > 0.92 ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0);
-  const normal = new Vector3().crossVectors(direction, up).normalize();
+  const bend = radialBasis(direction, `${seed}:bend`);
   const sign = stableHash(seed) % 2 === 0 ? 1 : -1;
-  return normal.multiplyScalar(sign || 1);
+  return bend.multiplyScalar(sign || 1);
 }
 
 function anchoredEndpoints(edge, positions) {
@@ -35,35 +43,47 @@ function anchoredEndpoints(edge, positions) {
   direction.normalize();
   const sourceRadius = Math.max(3.2, Number(edge.sourceNode?.size || 0) * 0.92);
   const targetRadius = Math.max(3.2, Number(edge.targetNode?.size || 0) * 0.92);
-  const start = sourceCenter.clone().add(direction.clone().multiplyScalar(sourceRadius));
-  const end = targetCenter.clone().add(direction.clone().multiplyScalar(-targetRadius));
+  const entrySpread = Math.max(0, Math.min(0.68, Number(edge.renderSettings?.lineEntrySpread ?? 0.42)));
+  const sourceOrbit = radialBasis(direction, `${edge.id}:source`);
+  const targetOrbit = radialBasis(direction.clone().negate(), `${edge.id}:target`);
+  const start = sourceCenter.clone()
+    .add(direction.clone().multiplyScalar(sourceRadius * (1 - entrySpread * 0.18)))
+    .add(sourceOrbit.multiplyScalar(sourceRadius * entrySpread));
+  const end = targetCenter.clone()
+    .add(direction.clone().multiplyScalar(-targetRadius * (1 - entrySpread * 0.18)))
+    .add(targetOrbit.multiplyScalar(targetRadius * entrySpread));
 
   if (start.distanceTo(end) <= 0.001) return null;
   return { start, end };
 }
 
 function buildCurve(edge, positions, renderSettings) {
-  const endpoints = anchoredEndpoints(edge, positions);
+  const endpoints = anchoredEndpoints({ ...edge, renderSettings }, positions);
   if (!endpoints) return null;
 
   const { start, end } = endpoints;
   const span = start.distanceTo(end);
   const bend = bendNormal(start, end, edge.id);
   const curveStrength = Number(renderSettings.lineCurvature || 1);
-  const lift = (edge.channel === 'relationship' ? 0.16 : edge.channel === 'trace' ? 0.22 : 0.11) * span * curveStrength;
+  const sourceSkew = radialBasis(end.clone().sub(start).normalize(), `${edge.id}:source-skew`);
+  const targetSkew = radialBasis(start.clone().sub(end).normalize(), `${edge.id}:target-skew`);
+  const lift = (edge.channel === 'relationship' ? 0.16 : edge.channel === 'trace' ? 0.22 : edge.lineFamily === 'pattern' ? 0.15 : 0.11) * span * curveStrength;
 
   const controlA = start.clone()
     .lerp(end, 0.26)
     .add(bend.clone().multiplyScalar(lift))
+    .add(sourceSkew.clone().multiplyScalar(lift * 0.18))
     .add(new Vector3(0, lift * 0.22, 0));
   const controlB = start.clone()
     .lerp(end, 0.74)
     .add(bend.clone().multiplyScalar(lift))
+    .add(targetSkew.clone().multiplyScalar(lift * 0.18))
     .add(new Vector3(0, lift * 0.22, 0));
 
   const curve = new CubicBezierCurve3(start, controlA, controlB, end);
-  const segmentCount = edge.channel === 'trace' ? 20 : edge.channel === 'relationship' ? 14 : 10;
-  const points = curve.getPoints(segmentCount).map((point) => [point.x, point.y, point.z]);
+  const baseSegments = edge.channel === 'trace' ? 56 : edge.channel === 'relationship' ? 42 : edge.lineFamily === 'pattern' ? 34 : 28;
+  const segmentCount = Math.max(baseSegments, Math.min(72, Math.round(span / 7.5)));
+  const points = curve.getSpacedPoints(segmentCount).map((point) => [point.x, point.y, point.z]);
   return { curve, points };
 }
 
@@ -94,6 +114,13 @@ function edgeOpacity(edge, interactionContext, renderSettings) {
   return base * opacityScale;
 }
 
+function particleColor(edge, renderSettings) {
+  if (edge.channel === 'trace') return edge.color;
+  if (edge.lineFamily === 'pattern') return renderSettings.patternParticleColor || edge.targetNode?.accent || edge.color;
+  if (edge.lineFamily === 'memory') return renderSettings.memoryParticleColor || edge.targetNode?.accent || edge.color;
+  return renderSettings.relationshipParticleColor || edge.sourceNode?.accent || edge.color;
+}
+
 function EdgeParticle({ edge, curve, highlighted, renderSettings }) {
   const particleRef = useRef(null);
   const offset = useMemo(() => (stableHash(edge.id) % 1000) / 1000, [edge.id]);
@@ -110,7 +137,7 @@ function EdgeParticle({ edge, curve, highlighted, renderSettings }) {
   const radius = 1.4 * Number(renderSettings.particleSize || 1) * (highlighted ? 1.16 : 1);
   return (
     <Sphere ref={particleRef} args={[radius, 10, 10]}>
-      <meshBasicMaterial color={edge.color} transparent opacity={highlighted ? 0.88 : 0.58} />
+      <meshBasicMaterial color={particleColor(edge, renderSettings)} transparent opacity={highlighted ? 0.88 : 0.58} />
     </Sphere>
   );
 }

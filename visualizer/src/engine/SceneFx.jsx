@@ -39,13 +39,14 @@ export function SceneFx({ themeId, sceneQuality, renderSettings, focusTarget, fo
   const fogFar = Math.max(fogNear + 1200, 4200 * fogFarScale);
   const gridOpacity = Number(renderSettings.gridOpacity || 0.34);
   const gridDensity = Number(renderSettings.gridDensity || 1.15);
+  const gridBase = renderSettings.gridColor || theme.scene.grid;
   const cellSize = 32 / gridDensity;
   const sectionSize = 160 / gridDensity;
-  const desaturatedGrid = mixHex(theme.scene.grid, theme.scene.fog, 0.7);
-  const softSection = mixHex(theme.css['--border-strong'], theme.scene.fog, 0.58);
-  const cellThickness = 0.34 + gridOpacity * 0.7;
-  const sectionThickness = 0.8 + gridOpacity * 1.1;
-  const gridKey = `${themeId}:${gridDensity.toFixed(2)}:${gridOpacity.toFixed(2)}`;
+  const desaturatedGrid = mixHex(gridBase, theme.scene.fog, Math.max(0.18, 0.74 - gridOpacity * 0.42));
+  const softSection = mixHex(gridBase, theme.css['--border-strong'], 0.36);
+  const cellThickness = 0.28 + gridOpacity * 1.25;
+  const sectionThickness = 0.68 + gridOpacity * 1.95;
+  const gridKey = `${themeId}:${gridDensity.toFixed(2)}:${gridOpacity.toFixed(2)}:${gridBase}`;
   const chromaticAttenuation = focusLocked ? 0.42 : 0.72;
   const dofTarget = focusTarget ? [focusTarget.x, focusTarget.y, focusTarget.z] : [0, 0, 0];
   const dofBokeh = focusLocked ? 0.46 : 0.18;
@@ -67,7 +68,7 @@ export function SceneFx({ themeId, sceneQuality, renderSettings, focusTarget, fo
         cellThickness={cellThickness}
         sectionThickness={sectionThickness}
         fadeDistance={2600}
-        fadeStrength={0.95 - Math.min(gridOpacity * 0.4, 0.28)}
+        fadeStrength={0.9 - Math.min(gridOpacity * 0.3, 0.2)}
         infiniteGrid
         cellSize={Math.max(10, cellSize)}
         sectionSize={Math.max(56, sectionSize)}

@@ -22,6 +22,10 @@ const defaultRenderSettings = {
   edgeIntensity: 1,
   lineThickness: 1.25,
   selectedLineThickness: 3,
+  relationshipLineLength: 1,
+  memoryLineLength: 1,
+  patternLineLength: 1.06,
+  lineEntrySpread: 0.42,
   edgeOpacity: 1,
   lineCurvature: 1,
   nodeOpacity: 1,
@@ -43,10 +47,14 @@ const defaultRenderSettings = {
   particleSpeed: 1.8,
   particleSize: 0.65,
   showOverviewMemories: true,
-  gridOpacity: 0.34,
+  gridOpacity: 0.44,
   gridDensity: 1.15,
   fogNear: 1,
   fogFar: 1,
+  gridColor: null,
+  relationshipParticleColor: null,
+  memoryParticleColor: null,
+  patternParticleColor: null,
   memoryColor: '#8aa3b8',
   commitmentColor: '#ff956f',
   memoryStyle: 'shard',
@@ -62,7 +70,7 @@ const STORAGE_KEYS = {
   renderSettings: 'claudia-render-settings',
   sceneQuality: 'claudia-scene-quality'
 };
-const DEFAULTS_REVISION = '2026-02-28-claudia-preset-3';
+const DEFAULTS_REVISION = '2026-02-28-grid-lines-themes-4';
 
 function readStoredJson(key, fallback) {
   if (typeof window === 'undefined') return fallback;

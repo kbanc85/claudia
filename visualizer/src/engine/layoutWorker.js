@@ -65,11 +65,22 @@ function collisionFor(node) {
   return Math.max(16, Number(node.size || 5) * (node.kind === 'entity' ? 3.2 : 2.4));
 }
 
-function linkDistance(edge) {
-  if (edge.channel === 'trace') return 54;
-  if (edge.channel === 'relationship') return 84 - Math.min(Number(edge.strength || 0) * 22, 22);
-  if (edge.channel === 'commitment') return 40;
-  return 34;
+function familyLength(lineLengths = {}, family = 'entity') {
+  if (family === 'pattern') return Number(lineLengths.pattern || 1);
+  if (family === 'memory') return Number(lineLengths.memory || 1);
+  return Number(lineLengths.entity || 1);
+}
+
+function linkDistance(edge, lineLengths) {
+  const familyScale = familyLength(lineLengths, edge.lineFamily);
+  const base = edge.channel === 'trace'
+    ? 54
+    : edge.channel === 'relationship'
+      ? 84 - Math.min(Number(edge.strength || 0) * 22, 22)
+      : edge.channel === 'commitment'
+        ? 40
+        : 34;
+  return base * familyScale;
 }
 
 function linkStrength(edge) {
@@ -90,7 +101,15 @@ function toSnapshot(nodes) {
 }
 
 self.onmessage = (event) => {
-  const { type, jobId, nodes = [], edges = [], previousPositions = {}, motionLevel = 'full' } = event.data || {};
+  const {
+    type,
+    jobId,
+    nodes = [],
+    edges = [],
+    previousPositions = {},
+    motionLevel = 'full',
+    lineLengths = {}
+  } = event.data || {};
   if (type !== 'layout') return;
 
   const nodeMap = new Map(nodes.map((node) => [node.id, {
@@ -124,7 +143,7 @@ self.onmessage = (event) => {
     .velocityDecay(motionLevel === 'full' ? 0.22 : 0.3)
     .force('charge', forceManyBody().strength(chargeFor).distanceMax(520))
     .force('collide', forceCollide().radius(collisionFor).strength(0.85))
-    .force('link', forceLink(simEdges).id((node) => node.id).distance(linkDistance).strength(linkStrength))
+    .force('link', forceLink(simEdges).id((node) => node.id).distance((edge) => linkDistance(edge, lineLengths)).strength(linkStrength))
     .force('homeX', forceX((node) => homeFor(node, nodeMap).x).strength(positionalStrength))
     .force('homeY', forceY((node) => homeFor(node, nodeMap).y).strength(positionalStrength))
     .force('homeZ', forceZ((node) => homeFor(node, nodeMap).z).strength(positionalStrength));
