@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.47.0 (2026-02-28)
+
+### The Safety Net
+
+Fixes silent data loss when upgrading from single-database to project-isolated databases, and adds a labeled backup infrastructure to prevent future data loss.
+
+- **Legacy database migration** -- Auto-detects stranded `claudia.db` data and migrates it into the active project database on daemon startup. Schema-adaptive reads handle databases from any schema version. Entity matching by `(canonical_name, type)` with content-hash deduplication prevents duplicates.
+- **`--migrate-legacy` CLI** -- Manual migration with `--dry-run` preview, `--legacy-db` custom path, and detailed stats output. Standalone `scripts/migrate-legacy-db.py` for recovery without daemon.
+- **Labeled backups** -- Daily (2:30 AM, 7-day retention) and weekly (Sunday 2:45 AM, 4-week retention) scheduled backups with independent retention tracking. Pre-migration backups created automatically.
+- **Backup verification** -- Every backup validated with `PRAGMA integrity_check`. Corrupt backups are deleted immediately.
+- **Database registry** -- Central `~/.claudia/memory/registry.json` enumerates all known project databases with workspace paths and timestamps.
+- **Integrity fixes** -- WAL cleanup uses direct path concatenation (was fragile `.replace`), backup sorting by `mtime` (was alphabetical, broke with mixed labels).
+- **24 new tests** -- Full migration coverage: entity mapping, dedup, pattern merging, schema gaps, dry-run, rollback on failure, idempotency. 532 total tests, 0 regressions.
+
 ## 1.46.0 (2026-02-28)
 
 ### Brain Visualizer v4.2
