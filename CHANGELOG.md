@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.48.0 (2026-02-28)
+
+### The React Brain
+
+Claudia's Brain Visualizer is rebuilt from the ground up on React and react-three-fiber, replacing the vanilla JS + 3d-force-graph frontend entirely. Integrates and closes PR #4.
+
+- **React + react-three-fiber frontend** -- Component-based 3D graph explorer with AppShell, BrainScene, NodeGlyphs, EdgeLayer, LabelLayer, SceneFx engine. Zustand store for state management. d3-force-3d layout runs in a dedicated web worker.
+- **10 UI components** -- TopHudBar, LeftSidebar, RightInspector, BottomTimeline, SearchPalette, FilterDrawer, SettingsPanel, DatabaseSwitcher, GraphViewport, and 10 visual themes with live switching.
+- **Old frontend removed** -- Deleted vanilla JS modules (main.js, renderer.js, camera.js, settings.js, themes.js), modular directories (data/, effects/, graph/, materials/, ui/), public-legacy/, and src-legacy/.
+- **Unused dependencies cleaned** -- Removed 3d-force-graph, sigma, and graphology. Added React 19, react-three-fiber, drei, postprocessing, d3-force-3d, zustand.
+- **Bug fix: invalidated_at filter** -- Added `WHERE invalidated_at IS NULL` to `loadGraphDataset()`, `/api/entity/:id`, and `/api/timeline` endpoints. Soft-deleted memories no longer appear in the graph.
+- **Bug fix: hardcoded personal name removed** -- `findHubEntityId()` now uses a pure highest-relationship heuristic instead of a hardcoded regex.
+
 ## 1.47.0 (2026-02-28)
 
 ### The Safety Net
