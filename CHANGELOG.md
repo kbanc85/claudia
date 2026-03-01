@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.49.0 (2026-03-01)
+
+### Visual Polish
+
+Edge rendering and environment controls tuned for the React brain explorer. Integrates and closes PR #5.
+
+- **Smoother edge curves** -- Radial-basis orbital spread at node surfaces replaces flat normal offsets. Uniform arc-length sampling (`getSpacedPoints`) and higher segment counts (28-72) eliminate visible faceting on curved connections.
+- **Family-aware line lengths** -- Edges classified into entity, memory, and pattern families. Each family has an independent line-length slider that reheats the d3-force layout to spread clusters differently.
+- **Grid color picker** -- Live environment control for grid tint, plus adjusted opacity/thickness curves for stronger visual feedback.
+- **Per-family particle colors** -- Entity, memory, and pattern particles can now be colored independently from node colors via Settings.
+- **Theme refresh** -- Matrix Rain, TRON Arena, and Neo Tokyo redesigned with punchier palettes, stronger glow values, and tighter contrast ratios.
+
 ## 1.48.0 (2026-02-28)
 
 ### The React Brain
