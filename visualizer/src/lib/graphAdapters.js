@@ -96,6 +96,12 @@ function computeEdgeSize(edge, settings) {
   return base * Number(settings.edgeIntensity || 1) * Number(settings.lineThickness || 1);
 }
 
+function classifyEdgeFamily(edge, sourceNode, targetNode) {
+  if (edge.channel === 'relationship' || edge.channel === 'trace') return 'entity';
+  if (sourceNode?.kind === 'pattern' || targetNode?.kind === 'pattern') return 'pattern';
+  return 'memory';
+}
+
 function computeLabelBase(node, settings) {
   const mode = settings.labelMode || 'balanced';
   if (mode === 'dense') return true;
@@ -180,6 +186,7 @@ export function buildVisibleGraphData(graphData, state, themeId = 'claudia') {
     const sourceNode = visibleNodes.get(edge.source);
     const targetNode = visibleNodes.get(edge.target);
     const baseColor = edgeTone(edge, themeId);
+    const lineFamily = classifyEdgeFamily(edge, sourceNode, targetNode);
     const faded = (state.selectedNodeId || state.hoveredNodeId || state.graphMode === 'trace')
       && edge.status !== 'trace'
       && edge.source !== state.selectedNodeId
@@ -191,6 +198,7 @@ export function buildVisibleGraphData(graphData, state, themeId = 'claudia') {
       ...edge,
       sourceNode,
       targetNode,
+      lineFamily,
       size: computeEdgeSize(edge, state.renderSettings),
       color: faded ? alpha(theme.css['--text-muted'], 0.14 * Number(state.renderSettings.edgeOpacity || 1)) : baseColor
     });

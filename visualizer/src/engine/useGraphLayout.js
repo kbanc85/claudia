@@ -26,7 +26,7 @@ export function useGraphLayout(graph, reheatToken, renderSettings) {
       node.layout?.seedY ?? node.y ?? 0,
       node.layout?.seedZ ?? node.z ?? 0
     ]),
-    edges: graph.edges.map((edge) => [edge.id, edge.source, edge.target, edge.channel])
+    edges: graph.edges.map((edge) => [edge.id, edge.source, edge.target, edge.channel, edge.lineFamily])
   }), [graph.edges, graph.nodes]);
   const initialPositions = useMemo(() => seedPositions(graph.nodes), [structureKey]);
   const [positions, setPositions] = useState(initialPositions);
@@ -87,13 +87,27 @@ export function useGraphLayout(graph, reheatToken, renderSettings) {
         target: edge.target,
         strength: edge.strength,
         channel: edge.channel,
+        lineFamily: edge.lineFamily,
         status: edge.status
       })),
       previousPositions,
       motionLevel: renderSettings.motionLevel,
+      lineLengths: {
+        entity: Number(renderSettings.relationshipLineLength || 1),
+        memory: Number(renderSettings.memoryLineLength || 1),
+        pattern: Number(renderSettings.patternLineLength || 1)
+      },
       reheatToken
     });
-  }, [previousPositions, reheatToken, renderSettings.motionLevel, structureKey]);
+  }, [
+    previousPositions,
+    reheatToken,
+    renderSettings.memoryLineLength,
+    renderSettings.motionLevel,
+    renderSettings.patternLineLength,
+    renderSettings.relationshipLineLength,
+    structureKey
+  ]);
 
   useEffect(() => {
     const smoothing = renderSettings.motionLevel === 'reduced'

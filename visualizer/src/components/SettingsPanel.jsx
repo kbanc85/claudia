@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { APP_THEMES } from '../lib/theme.js';
+import { APP_THEMES, getTheme } from '../lib/theme.js';
 import { useGraphStore } from '../store/useGraphStore.js';
 
 function Slider({ label, value, min, max, step = 0.05, onChange }) {
@@ -55,6 +55,7 @@ function Note({ children }) {
 export function SettingsContent() {
   const fileInputRef = useRef(null);
   const themeId = useGraphStore((state) => state.themeId);
+  const theme = getTheme(themeId);
   const renderSettings = useGraphStore((state) => state.renderSettings);
   const sceneQuality = useGraphStore((state) => state.sceneQuality);
   const setRenderSetting = useGraphStore((state) => state.setRenderSetting);
@@ -164,20 +165,27 @@ export function SettingsContent() {
       </Group>
 
       <Group eyebrow="Lines" title="Connections and emphasis">
-        <Note>Use these for relationship readability. Changes should apply live to the graph without reload.</Note>
+        <Note>Use these for relationship readability. Thickness affects rendering, while the family length controls reheat the layout to spread clusters differently.</Note>
         <Slider label="Line thickness" value={renderSettings.lineThickness} min={0.6} max={2.4} onChange={(event) => setRenderSetting('lineThickness', Number(event.target.value))} />
         <Slider label="Selected thickness" value={renderSettings.selectedLineThickness} min={1} max={3} onChange={(event) => setRenderSetting('selectedLineThickness', Number(event.target.value))} />
         <Slider label="Line opacity" value={renderSettings.edgeOpacity} min={0.35} max={1.35} onChange={(event) => setRenderSetting('edgeOpacity', Number(event.target.value))} />
         <Slider label="Curve amount" value={renderSettings.lineCurvature} min={0} max={1.8} onChange={(event) => setRenderSetting('lineCurvature', Number(event.target.value))} />
+        <Slider label="Entry spread" value={renderSettings.lineEntrySpread} min={0} max={0.65} onChange={(event) => setRenderSetting('lineEntrySpread', Number(event.target.value))} />
         <Slider label="Line intensity" value={renderSettings.edgeIntensity} min={0.4} max={2.2} onChange={(event) => setRenderSetting('edgeIntensity', Number(event.target.value))} />
+        <Slider label="Entity line length" value={renderSettings.relationshipLineLength} min={0.65} max={1.8} onChange={(event) => setRenderSetting('relationshipLineLength', Number(event.target.value))} />
+        <Slider label="Memory line length" value={renderSettings.memoryLineLength} min={0.55} max={1.8} onChange={(event) => setRenderSetting('memoryLineLength', Number(event.target.value))} />
+        <Slider label="Pattern line length" value={renderSettings.patternLineLength} min={0.55} max={2.1} onChange={(event) => setRenderSetting('patternLineLength', Number(event.target.value))} />
       </Group>
 
       <Group eyebrow="Environment" title="Fog and grid">
-        <Note>These affect the floor reference plane and background atmosphere. They now remount live so changes are visible immediately.</Note>
+        <Note>These affect the floor reference plane and background atmosphere. Grid color, opacity, and density now remount live so the change is obvious immediately.</Note>
         <Slider label="Fog near" value={renderSettings.fogNear} min={0.35} max={1.8} onChange={(event) => setRenderSetting('fogNear', Number(event.target.value))} />
         <Slider label="Fog far" value={renderSettings.fogFar} min={0.5} max={2.4} onChange={(event) => setRenderSetting('fogFar', Number(event.target.value))} />
         <Slider label="Grid opacity" value={renderSettings.gridOpacity} min={0.08} max={0.8} onChange={(event) => setRenderSetting('gridOpacity', Number(event.target.value))} />
         <Slider label="Grid density" value={renderSettings.gridDensity} min={0.55} max={2.4} onChange={(event) => setRenderSetting('gridDensity', Number(event.target.value))} />
+        <div className="settings-colors settings-colors-stack">
+          <ColorField label="Grid color" value={renderSettings.gridColor || theme.scene.grid} onChange={(event) => setRenderSetting('gridColor', event.target.value)} />
+        </div>
       </Group>
 
       <Group eyebrow="Camera" title="Focus and motion">
@@ -202,11 +210,16 @@ export function SettingsContent() {
       </Group>
 
       <Group eyebrow="Post FX" title="Bloom, chromatic, particles">
-        <Note>These are the cinematic accents. Reduce them if you want a sharper analytical look.</Note>
+        <Note>These are the cinematic accents. Particle colors are separate from node colors so you can tune the motion language without changing the graph families.</Note>
         <Slider label="Bloom" value={renderSettings.bloomStrength} min={0} max={2.2} onChange={(event) => setRenderSetting('bloomStrength', Number(event.target.value))} />
         <Slider label="Chromatic" value={renderSettings.chromaticStrength} min={0} max={2.2} onChange={(event) => setRenderSetting('chromaticStrength', Number(event.target.value))} />
         <Slider label="Particle speed" value={renderSettings.particleSpeed} min={0.2} max={2.4} onChange={(event) => setRenderSetting('particleSpeed', Number(event.target.value))} />
         <Slider label="Particle size" value={renderSettings.particleSize} min={0.4} max={2} onChange={(event) => setRenderSetting('particleSize', Number(event.target.value))} />
+        <div className="settings-colors settings-colors-stack">
+          <ColorField label="Entity particles" value={renderSettings.relationshipParticleColor || theme.colors.entity} onChange={(event) => setRenderSetting('relationshipParticleColor', event.target.value)} />
+          <ColorField label="Memory particles" value={renderSettings.memoryParticleColor || theme.colors.memory} onChange={(event) => setRenderSetting('memoryParticleColor', event.target.value)} />
+          <ColorField label="Pattern particles" value={renderSettings.patternParticleColor || theme.colors.pattern} onChange={(event) => setRenderSetting('patternParticleColor', event.target.value)} />
+        </div>
         <div className="settings-row">
           <span className="hud-meta-label">Visibility</span>
           <div className="filter-list compact-list">
