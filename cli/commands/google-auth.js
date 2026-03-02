@@ -2,15 +2,20 @@
  * Google integration CLI commands.
  *
  * Provides:
- *   claudia gmail login      - Sign in with Google (Gmail)
- *   claudia gmail status     - Check connection status
+ *   claudia google login     - Sign in once for Gmail + Calendar
+ *   claudia google status    - Check connection status for all services
+ *   claudia google logout    - Sign out of all Google services
+ *   claudia gmail login      - Sign in with Google (Gmail only)
+ *   claudia gmail status     - Check Gmail connection status
  *   claudia gmail search     - Search emails
  *   claudia gmail read       - Read a specific email
- *   claudia gmail logout     - Sign out (remove stored tokens)
- *   claudia calendar login   - Sign in with Google (Calendar)
- *   claudia calendar status  - Check connection status
+ *   claudia gmail logout     - Sign out of Gmail
+ *   claudia calendar login   - Sign in with Google (Calendar only)
+ *   claudia calendar status  - Check Calendar connection status
  *   claudia calendar list    - List upcoming events
- *   claudia calendar logout  - Sign out (remove stored tokens)
+ *   claudia calendar search  - Search events by text
+ *   claudia calendar read    - Read a specific event by ID
+ *   claudia calendar logout  - Sign out of Calendar
  */
 
 import { authenticate, getAccessToken, isAuthenticated, revokeTokens, authStatus } from '../core/google-oauth.js';
@@ -218,12 +223,134 @@ export async function calendarListCommand(opts) {
   output({ events, timeRange: { from: now.toISOString(), to: timeMax.toISOString() }, total: events.length });
 }
 
+export async function calendarSearchCommand(query, opts) {
+  const token = await getAccessToken('calendar');
+  if (!token) {
+    console.error('Not authenticated. Run: claudia calendar login');
+    process.exitCode = 1;
+    return;
+  }
+
+  const now = new Date();
+  const maxDays = opts.days || 90;
+  const timeMin = opts.past
+    ? new Date(now.getTime() - maxDays * 24 * 60 * 60 * 1000)
+    : now;
+  const timeMax = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
+  const maxResults = opts.limit || 25;
+
+  const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+  url.searchParams.set('q', query);
+  url.searchParams.set('timeMin', timeMin.toISOString());
+  url.searchParams.set('timeMax', timeMax.toISOString());
+  url.searchParams.set('maxResults', String(maxResults));
+  url.searchParams.set('singleEvents', 'true');
+  url.searchParams.set('orderBy', 'startTime');
+
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error(`Calendar API error (${resp.status}): ${err}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const data = await resp.json();
+  const events = (data.items || []).map(e => ({
+    id: e.id,
+    summary: e.summary || '(no title)',
+    start: e.start?.dateTime || e.start?.date || '',
+    end: e.end?.dateTime || e.end?.date || '',
+    location: e.location || '',
+    attendees: (e.attendees || []).map(a => a.email),
+    status: e.status,
+    htmlLink: e.htmlLink,
+  }));
+
+  output({ events, query, total: events.length });
+}
+
+export async function calendarReadCommand(eventId) {
+  const token = await getAccessToken('calendar');
+  if (!token) {
+    console.error('Not authenticated. Run: claudia calendar login');
+    process.exitCode = 1;
+    return;
+  }
+
+  const resp = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error(`Calendar API error (${resp.status}): ${err}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const e = await resp.json();
+  output({
+    id: e.id,
+    summary: e.summary || '(no title)',
+    description: e.description || '',
+    start: e.start?.dateTime || e.start?.date || '',
+    end: e.end?.dateTime || e.end?.date || '',
+    location: e.location || '',
+    attendees: (e.attendees || []).map(a => ({
+      email: a.email,
+      displayName: a.displayName || '',
+      responseStatus: a.responseStatus || '',
+      organizer: a.organizer || false,
+    })),
+    organizer: e.organizer?.email || '',
+    status: e.status,
+    htmlLink: e.htmlLink,
+    created: e.created,
+    updated: e.updated,
+    recurringEventId: e.recurringEventId || null,
+    conferenceData: e.conferenceData?.entryPoints?.map(ep => ({
+      type: ep.entryPointType,
+      uri: ep.uri,
+    })) || [],
+  });
+}
+
 export async function calendarLogoutCommand() {
   const removed = revokeTokens('calendar');
   if (removed) {
     console.log('\u2713 Signed out of Calendar. Run "claudia calendar login" to reconnect.');
   } else {
     console.log('Not signed in to Calendar.');
+  }
+}
+
+// ── Unified Google Commands ──
+
+export async function googleLoginCommand() {
+  try {
+    await authenticate('google');
+    console.log('\n\u2713 Google connected! Claudia can now access Gmail and Calendar.');
+    console.log('  Try: claudia gmail search "is:unread"');
+    console.log('  Try: claudia calendar list');
+  } catch (err) {
+    console.error(`\n\u2717 ${err.message}`);
+    process.exitCode = 1;
+  }
+}
+
+export async function googleLogoutCommand() {
+  const gmailRemoved = revokeTokens('gmail');
+  const calendarRemoved = revokeTokens('calendar');
+  if (gmailRemoved || calendarRemoved) {
+    const services = [gmailRemoved && 'Gmail', calendarRemoved && 'Calendar'].filter(Boolean).join(' and ');
+    console.log(`\u2713 Signed out of ${services}. Run "claudia google login" to reconnect.`);
+  } else {
+    console.log('Not signed in to any Google services.');
   }
 }
 
@@ -234,6 +361,7 @@ export async function googleStatusCommand() {
   output({
     gmail: { connected: status.gmail, login_command: 'claudia gmail login' },
     calendar: { connected: status.calendar, login_command: 'claudia calendar login' },
+    unified_login: 'claudia google login',
     tokens_dir: '~/.claudia/tokens/',
   });
 }

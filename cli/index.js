@@ -570,7 +570,7 @@ gmail
 // ── Calendar subcommand group ──
 const calendar = program
   .command('calendar')
-  .description('Google Calendar integration (login, list events)');
+  .description('Google Calendar integration (login, list, search, read)');
 
 calendar
   .command('login')
@@ -599,6 +599,27 @@ calendar
   });
 
 calendar
+  .command('search')
+  .description('Search calendar events by text')
+  .argument('<query>', 'Search query, e.g. "meeting" or "lunch"')
+  .option('--days <n>', 'Days ahead to search', parseInt, 90)
+  .option('--limit <n>', 'Max results', parseInt, 25)
+  .option('--past', 'Also search past events within range')
+  .action(async (query, opts) => {
+    const { calendarSearchCommand } = await import('./commands/google-auth.js');
+    await calendarSearchCommand(query, opts);
+  });
+
+calendar
+  .command('read')
+  .description('Read a specific calendar event by ID')
+  .argument('<eventId>', 'Calendar event ID')
+  .action(async (eventId) => {
+    const { calendarReadCommand } = await import('./commands/google-auth.js');
+    await calendarReadCommand(eventId);
+  });
+
+calendar
   .command('logout')
   .description('Sign out of Calendar (remove stored tokens)')
   .action(async () => {
@@ -606,13 +627,33 @@ calendar
     await calendarLogoutCommand();
   });
 
-// ── Google status (combined) ──
-program
-  .command('google-status')
+// ── Unified Google command group ──
+const google = program
+  .command('google')
+  .description('Google services (login, status, logout for Gmail + Calendar)');
+
+google
+  .command('login')
+  .description('Sign in once for both Gmail and Calendar')
+  .action(async () => {
+    const { googleLoginCommand } = await import('./commands/google-auth.js');
+    await googleLoginCommand();
+  });
+
+google
+  .command('status')
   .description('Show connection status for all Google services')
   .action(async () => {
     const { googleStatusCommand } = await import('./commands/google-auth.js');
     await googleStatusCommand();
+  });
+
+google
+  .command('logout')
+  .description('Sign out of all Google services')
+  .action(async () => {
+    const { googleLogoutCommand } = await import('./commands/google-auth.js');
+    await googleLogoutCommand();
   });
 
 // Parse and execute

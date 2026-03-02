@@ -321,16 +321,20 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 
 | Command | What it does |
 |---------|-------------|
-| `claudia gmail login` | Opens browser for Google OAuth sign-in |
+| `claudia google login` | Sign in once for both Gmail + Calendar |
+| `claudia google status` | Show connection status for all services |
+| `claudia google logout` | Disconnect all Google services |
+| `claudia gmail login` | Opens browser for Gmail-only OAuth |
 | `claudia gmail status` | Check if Gmail is connected |
 | `claudia gmail search "<query>"` | Search emails (Gmail search syntax) |
 | `claudia gmail read <messageId>` | Read a specific email |
 | `claudia gmail logout` | Disconnect Gmail, remove tokens |
-| `claudia calendar login` | Opens browser for Google Calendar OAuth |
+| `claudia calendar login` | Opens browser for Calendar-only OAuth |
 | `claudia calendar status` | Check if Calendar is connected |
 | `claudia calendar list` | Show upcoming events |
+| `claudia calendar search "<query>"` | Search events by text |
+| `claudia calendar read <eventId>` | Read a specific event by ID |
 | `claudia calendar logout` | Disconnect Calendar, remove tokens |
-| `claudia google-status` | Show status of all Google connections |
 
 These are **real CLI commands**, not questions. Always run them via the Bash tool. Tokens are stored locally at `~/.claudia/tokens/`.
 

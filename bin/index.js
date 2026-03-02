@@ -811,8 +811,7 @@ async function main() {
 
     console.log('');
     console.log(` ${colors.dim}Optional: connect Google services${colors.reset}`);
-    console.log(`   ${colors.cyan}claudia gmail login${colors.reset}      ${colors.dim}Read & send email${colors.reset}`);
-    console.log(`   ${colors.cyan}claudia calendar login${colors.reset}   ${colors.dim}View & create events${colors.reset}`);
+    console.log(`   ${colors.cyan}claudia google login${colors.reset}     ${colors.dim}Gmail + Calendar in one step${colors.reset}`);
     console.log('');
   }
 }

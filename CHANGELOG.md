@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.3 (2026-03-02)
+
+### Google Polish
+
+- **Unified login** -- `claudia google login` connects both Gmail and Calendar in a single OAuth flow. All 5 scopes requested at once, tokens saved for both services. `claudia google status` and `claudia google logout` manage both.
+- **Calendar search & read** -- `claudia calendar search "meeting"` searches events by text. `claudia calendar read <eventId>` shows full event details including attendees, conference links, and description. Calendar now has full parity with Gmail commands.
+- **OAuth callback page reworked** -- Light theme with Claudia's color palette (cyan/teal accents on white). Removed broken base64 image. Single "Connected" heading (no more duplicate badge). Service-aware: shows Gmail features, Calendar features, or both for unified login.
+- **Faster terminal recognition** -- Added progress messages ("Waiting for browser authorization...", "Token received, finishing setup...") and a 10-second fetch timeout on the token exchange to prevent hanging.
+- **Installer updated** -- Completion message now shows `claudia google login` (unified) instead of separate Gmail/Calendar commands.
+- **CLAUDE.md command table expanded** -- Added `claudia google login/status/logout`, `claudia calendar search`, `claudia calendar read` to the CLI reference.
+- **Landing page** -- `site/index.html` with Claudia branding, feature cards, install command with copy button.
+- **Privacy policy page** -- `site/privacy.html`, styled HTML version of PRIVACY.md.
+- **Terms of service page** -- `site/tos.html`, Apache 2.0, as-is, no liability, no accounts.
+
 ## 1.51.2 (2026-03-02)
 
 ### Gmail/Calendar CLI Discoverability

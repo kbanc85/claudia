@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claudia - An AI assistant who learns how you work</title>
+<meta name="description" content="Claudia is an open-source, locally-run AI assistant that remembers across conversations, tracks your relationships, and helps you think strategically.">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --gold: #FFD700;
+    --sky: #87CEEB;
+    --cyan: #00CED1;
+    --bg: #F0F0F0;
+    --white: #FFFFFF;
+    --dark: #1d1d1f;
+    --gray: #6e6e73;
+    --light-gray: #e8e8ed;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--dark); line-height: 1.6;
+  }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Nav ── */
+  nav {
+    display: flex; justify-content: space-between; align-items: center;
+    max-width: 960px; margin: 0 auto; padding: 1.5rem 2rem;
+  }
+  nav .brand { font-weight: 700; font-size: 1.2rem; color: var(--dark); }
+  nav .brand span { color: var(--cyan); }
+  nav .links { display: flex; gap: 1.5rem; font-size: 0.9rem; }
+  nav .links a { color: var(--gray); }
+  nav .links a:hover { color: var(--cyan); }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center; padding: 4rem 2rem 3rem;
+    background: linear-gradient(180deg, var(--white) 0%, var(--bg) 100%);
+  }
+  .pixel-art {
+    font-family: monospace; font-size: 0.85rem; line-height: 1.15;
+    display: inline-block; margin-bottom: 1.5rem;
+    background: var(--white); padding: 1rem 1.5rem; border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .hero h1 {
+    font-size: 2.4rem; font-weight: 700; margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+  .hero h1 span { color: var(--cyan); }
+  .hero .tagline {
+    font-size: 1.15rem; color: var(--gray); max-width: 540px;
+    margin: 0 auto 2rem;
+  }
+
+  /* ── Install ── */
+  .install-box {
+    display: inline-flex; align-items: center; gap: 0.75rem;
+    background: var(--dark); color: #e0e0e0; padding: 0.75rem 1.25rem;
+    border-radius: 10px; font-family: monospace; font-size: 0.95rem;
+    cursor: pointer; transition: transform 0.15s;
+  }
+  .install-box:hover { transform: translateY(-1px); }
+  .install-box .prompt { color: var(--cyan); }
+  .install-box .copy-hint {
+    font-size: 0.7rem; color: #888; font-family: sans-serif;
+    border-left: 1px solid #444; padding-left: 0.75rem;
+  }
+  .install-box.copied .copy-hint { color: var(--gold); }
+
+  /* ── Features ── */
+  .features {
+    max-width: 960px; margin: 0 auto; padding: 3rem 2rem;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+  .feature-card {
+    background: var(--white); border-radius: 12px; padding: 1.5rem;
+    border: 1px solid var(--light-gray);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .feature-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+  }
+  .feature-card .icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(0,206,209,0.1); display: flex;
+    align-items: center; justify-content: center;
+    font-size: 1.1rem; margin-bottom: 0.75rem;
+  }
+  .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.35rem; }
+  .feature-card p { font-size: 0.85rem; color: var(--gray); }
+
+  /* ── Open Source Banner ── */
+  .oss-banner {
+    text-align: center; padding: 2.5rem 2rem;
+    background: var(--white); border-top: 1px solid var(--light-gray);
+    border-bottom: 1px solid var(--light-gray);
+  }
+  .oss-banner h2 { font-size: 1.3rem; margin-bottom: 0.5rem; }
+  .oss-banner p { color: var(--gray); font-size: 0.9rem; max-width: 480px; margin: 0 auto 1rem; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.4rem 1rem; border-radius: 99px; font-size: 0.8rem;
+    background: rgba(0,206,209,0.08); color: var(--cyan); font-weight: 500;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center; padding: 2rem; font-size: 0.8rem; color: var(--gray);
+  }
+  footer .links { display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 0.5rem; }
+  footer .links a { color: var(--gray); }
+  footer .links a:hover { color: var(--cyan); }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 1.8rem; }
+    .hero .tagline { font-size: 1rem; }
+    .features { grid-template-columns: 1fr; }
+    nav { padding: 1rem; }
+    nav .links { gap: 1rem; font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span>C</span>laudia</div>
+  <div class="links">
+    <a href="https://github.com/kbanc85/claudia">GitHub</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="tos.html">Terms</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="pixel-art">
+<pre style="color:var(--dark)">      <span style="color:var(--gold)">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span style="color:var(--sky)">&#9608;&#9608;</span>
+<span style="color:var(--gold)">&#9608;&#9608;</span><span style="color:var(--white)">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span><span style="color:var(--sky)">&#9608;&#9608;</span>
+<span style="color:var(--gold)">&#9608;&#9608;</span><span style="color:var(--white)">&#9608;&#9608;</span>  <span style="color:var(--white)">&#9608;&#9608;</span>  <span style="color:var(--white)">&#9608;&#9608;</span><span style="color:var(--gold)">&#9608;&#9608;</span>
+  <span style="color:var(--white)">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span>
+    <span style="color:var(--sky)">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span>
+  <span style="color:var(--sky)">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span>
+    <span style="color:var(--dark)">&#9608;&#9608;</span>  <span style="color:var(--dark)">&#9608;&#9608;</span></pre>
+  </div>
+  <h1>Meet <span>Claudia</span></h1>
+  <p class="tagline">An open-source AI assistant who remembers across conversations, tracks your relationships, and helps you think strategically. Runs locally. No servers.</p>
+  <div class="install-box" onclick="copyInstall(this)">
+    <span class="prompt">$</span> npx get-claudia
+    <span class="copy-hint">click to copy</span>
+  </div>
+</section>
+
+<section class="features">
+  <div class="feature-card">
+    <div class="icon">&#129504;</div>
+    <h3>Persistent Memory</h3>
+    <p>Claudia remembers facts, preferences, and context across every conversation using a local SQLite database with vector embeddings.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">&#128101;</div>
+    <h3>Relationship Tracking</h3>
+    <p>People are the primary organizing unit. Track communication style, history, what matters to them, and your current context together.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">&#128203;</div>
+    <h3>Commitment Tracking</h3>
+    <p>Never drop a ball. Claudia tracks what you promised, what you're waiting on, and surfaces deadlines before they hit.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">&#128200;</div>
+    <h3>Pattern Recognition</h3>
+    <p>Notices recurring themes across conversations you might miss, like overcommitting or avoiding difficult decisions.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">&#128233;</div>
+    <h3>Gmail Integration</h3>
+    <p>Search, read, and draft emails. Get morning inbox briefs. All through simple CLI commands with local-only token storage.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">&#128197;</div>
+    <h3>Google Calendar</h3>
+    <p>View your schedule, search events, and create meetings through natural conversation. Claudia knows when you're busy or free.</p>
+  </div>
+</section>
+
+<section class="oss-banner">
+  <h2>100% Open Source</h2>
+  <p>Every line of code is public. No servers, no analytics, no tracking. Your data stays on your machine.</p>
+  <a href="https://github.com/kbanc85/claudia" class="badge">&#11088; Apache 2.0 on GitHub</a>
+</section>
+
+<footer>
+  <div class="links">
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="tos.html">Terms of Service</a>
+    <a href="https://github.com/kbanc85/claudia">GitHub</a>
+  </div>
+  <p>&copy; 2026 Claudia. Built by humans, for humans.</p>
+</footer>
+
+<script>
+function copyInstall(el) {
+  navigator.clipboard.writeText('npx get-claudia').then(() => {
+    el.classList.add('copied');
+    el.querySelector('.copy-hint').textContent = 'copied!';
+    setTimeout(() => {
+      el.classList.remove('copied');
+      el.querySelector('.copy-hint').textContent = 'click to copy';
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>
