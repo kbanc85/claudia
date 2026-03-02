@@ -464,6 +464,31 @@ async function main() {
 
     memoryOk = nativeDepsOk;
 
+    // Auto-install CLI globally so `claudia` is on PATH
+    if (nativeDepsOk) {
+      let cliOnPath = false;
+      try {
+        cliOnPath = await new Promise((resolve) => {
+          const whichCmd = isWindows ? 'where' : 'which';
+          const proc = spawn(whichCmd, ['claudia'], { stdio: 'pipe' });
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        });
+      } catch { /* ignore */ }
+
+      if (!cliOnPath) {
+        // Silently install globally so hooks can find `claudia`
+        await new Promise((resolve) => {
+          const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+          const proc = spawn(npmCmd, ['install', '-g', 'get-claudia@' + version], {
+            stdio: 'pipe'
+          });
+          proc.on('close', () => resolve());
+          proc.on('error', () => resolve());
+        });
+      }
+    }
+
     // Seed demo database if --demo flag
     if (isDemoMode && nativeDepsOk) {
       seedDemoDatabase(targetPath, cliEntryPoint);
@@ -595,12 +620,15 @@ async function main() {
 
     console.log('');
     console.log(`${colors.dim}${'━'.repeat(46)}${colors.reset}`);
-    console.log(` ${colors.bold}Done!${colors.reset} Next:`);
+    console.log(` ${colors.bold}Done!${colors.reset} Open Claude Code:`);
     console.log(`   ${colors.cyan}${cdCmd}claude${colors.reset}`);
 
     if (!memoryInstalled) {
       console.log('');
       console.log(` ${colors.dim}Memory requires Ollama. Install from ollama.com${colors.reset}`);
+    } else {
+      console.log('');
+      console.log(` ${colors.dim}Memory is ready. Claudia will remember across sessions.${colors.reset}`);
     }
     console.log('');
   }

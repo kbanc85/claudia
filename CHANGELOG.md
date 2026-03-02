@@ -2,6 +2,13 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.50.2 (2026-03-02)
+
+### Auto Global Install
+
+- **`claudia` auto-installed on PATH** -- After a successful install, `npx get-claudia .` now checks if `claudia` is on PATH. If not, silently runs `npm install -g get-claudia` so hooks and Claude Code can find the CLI immediately.
+- **Completion message improved** -- Shows "Memory is ready" confirmation and simplified next steps.
+
 ## 1.50.1 (2026-03-02)
 
 ### Installer Fix
