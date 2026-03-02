@@ -940,6 +940,82 @@ class Database:
             conn.commit()
             logger.info("Applied migration 19: entity_summaries for graph-aware retrieval")
 
+        if current_version < 20:
+            # Migration 20: Lifecycle tiers, sacred memories, close-circle entities,
+            # fact_id for human-friendly reference, SHA-256 chain hashing
+            migration_stmts = [
+                # Memories: lifecycle tier + sacred + archive + fact_id + chain
+                "ALTER TABLE memories ADD COLUMN lifecycle_tier TEXT DEFAULT 'active'",
+                "ALTER TABLE memories ADD COLUMN sacred_reason TEXT",
+                "ALTER TABLE memories ADD COLUMN archived_at TEXT",
+                "ALTER TABLE memories ADD COLUMN fact_id TEXT UNIQUE",
+                "ALTER TABLE memories ADD COLUMN hash TEXT",
+                "ALTER TABLE memories ADD COLUMN prev_hash TEXT",
+                # Entities: close-circle
+                "ALTER TABLE entities ADD COLUMN close_circle BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE entities ADD COLUMN close_circle_reason TEXT",
+                # Relationships: lifecycle tier
+                "ALTER TABLE relationships ADD COLUMN lifecycle_tier TEXT DEFAULT 'active'",
+            ]
+            for stmt in migration_stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    err_str = str(e).lower()
+                    if "duplicate column" not in err_str and "already exists" not in err_str:
+                        logger.warning(f"Migration 20 statement failed: {e}")
+
+            # Indexes
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memories_lifecycle ON memories(lifecycle_tier)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memories_fact_id ON memories(fact_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_entities_close_circle ON entities(close_circle) WHERE close_circle = 1"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 20 index failed: {e}")
+
+            # Backfill: generate fact_id for existing memories that lack one
+            import uuid as _uuid_mod
+            try:
+                rows = conn.execute(
+                    "SELECT id FROM memories WHERE fact_id IS NULL"
+                ).fetchall()
+                for i, row in enumerate(rows):
+                    conn.execute(
+                        "UPDATE memories SET fact_id = ? WHERE id = ?",
+                        (str(_uuid_mod.uuid4()), row[0]),
+                    )
+                    if i > 0 and i % 1000 == 0:
+                        conn.commit()
+                if rows:
+                    logger.info(f"Migration 20: generated fact_id for {len(rows)} existing memories")
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 20 fact_id backfill failed: {e}")
+
+            # Initialize chain_head and view_as_of in _meta
+            try:
+                conn.execute(
+                    """INSERT OR IGNORE INTO _meta (key, value, updated_at)
+                       VALUES ('chain_head', NULL, datetime('now'))"""
+                )
+                conn.execute(
+                    """INSERT OR IGNORE INTO _meta (key, value, updated_at)
+                       VALUES ('view_as_of', NULL, datetime('now'))"""
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 20 _meta init failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (20, 'Add lifecycle tiers, sacred memories, close-circle entities, fact_id, SHA-256 chain')"
+            )
+            conn.commit()
+            logger.info("Applied migration 20: lifecycle tiers, sacred, close-circle, fact_id, chain")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -1092,6 +1168,15 @@ class Database:
         if "entity_summaries" not in tables:
             logger.warning("Migration 19 incomplete: entity_summaries table missing")
             return 18
+
+        # Migration 20 added lifecycle_tier, fact_id to memories; close_circle to entities
+        if "lifecycle_tier" not in memory_cols or "fact_id" not in memory_cols:
+            logger.warning("Migration 20 incomplete: memories missing lifecycle/fact_id columns")
+            return 19
+
+        if "close_circle" not in entity_cols:
+            logger.warning("Migration 20 incomplete: entities missing close_circle column")
+            return 19
 
         return None  # All good
 

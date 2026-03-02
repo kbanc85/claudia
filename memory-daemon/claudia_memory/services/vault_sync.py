@@ -378,6 +378,13 @@ class VaultSyncService:
         if attention_tier:
             lines.append(f"attention_tier: {attention_tier}")
 
+        close_circle = _row_get(entity, "close_circle")
+        if close_circle:
+            lines.append("close_circle: true")
+            close_reason = _row_get(entity, "close_circle_reason")
+            if close_reason:
+                lines.append(f'close_circle_reason: "{close_reason}"')
+
         contact_trend = _row_get(entity, "contact_trend")
         if contact_trend:
             lines.append(f"contact_trend: {contact_trend}")
@@ -406,6 +413,8 @@ class VaultSyncService:
             tags.append(attention_tier)
         if contact_trend:
             tags.append(contact_trend)
+        if close_circle:
+            tags.append("close-circle")
         lines.append(f"tags:")
         for tag in tags:
             lines.append(f"  - {tag}")
@@ -565,13 +574,16 @@ class VaultSyncService:
                 origin = m["origin_type"] if "origin_type" in row_keys and m["origin_type"] else ""
                 confidence = m["confidence"] if "confidence" in row_keys else 1.0
 
+                lifecycle = _row_get(m, "lifecycle_tier") if hasattr(m, 'keys') else None
+                prefix = "[sacred] " if lifecycle == "sacred" else ""
+
                 detail_parts = []
                 if origin:
                     detail_parts.append(f"source: {origin}")
                 if confidence is not None and confidence < 1.0:
                     detail_parts.append(f"confidence: {confidence}")
                 detail = f" ({', '.join(detail_parts)})" if detail_parts else ""
-                entry = f"- {m['content']}{detail}"
+                entry = f"- {prefix}{m['content']}{detail}"
 
                 if vstatus == "verified" or origin == "user_stated":
                     verified.append(entry)

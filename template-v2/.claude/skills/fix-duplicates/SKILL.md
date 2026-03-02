@@ -19,10 +19,10 @@ Find and merge duplicate entities in the memory system. Duplicates happen when t
 
 ### Step 1: Find Potential Duplicates
 
-Search for entities with similar names using `memory.entities`:
+Search for entities with similar names using `claudia memory entities`:
 
 ```
-memory.entities(operation: "search", query="*", limit=100)
+claudia memory entities search --query "*" --limit 100 --project-dir "$PWD"
 ```
 
 Then compare names using these heuristics:
@@ -56,10 +56,10 @@ Which would you like to merge? (e.g., "merge 1" or "merge all people")
 
 ### Step 3: Execute Merge
 
-When user confirms, call `memory.entities` to merge:
+When user confirms, call `claudia memory entities` to merge:
 
 ```
-memory.entities(operation: "merge", source_id=87, target_id=42, reason="Duplicate detected - same person with name variant")
+claudia memory entities merge --source-id 87 --target-id 42 --reason "Duplicate detected - same person with name variant" --project-dir "$PWD"
 ```
 
 **Important:** Always merge the entity with fewer memories INTO the one with more memories. The target entity keeps its name and attributes; the source's name becomes an alias.

@@ -54,7 +54,7 @@ Before reaching for the web, check what Claudia already knows:
 
 ```
 Research request received:
-├── memory.recall(topic) - Do we already have relevant facts?
+├── claudia memory recall "[topic]" --project-dir "$PWD" - Do we already have relevant facts?
 │   ├── Fresh results (< 7 days) → Use them, offer to refresh
 │   ├── Stale results (> 7 days) → Mention staleness, offer to update
 │   └── No results → Proceed to web research
@@ -106,15 +106,14 @@ After completing research, do two things:
 
 **Report findings** using the format below.
 
-**Store key facts** in memory (if memory tools are available):
+**Store key facts** in memory (if the Claudia CLI is available):
 ```
-memory.remember({
-  content: "[key finding]",
-  type: "fact",
-  source: "web:[URL]",
-  about: ["[relevant entities]"],
-  importance: [0.5-0.8 based on relevance]
-})
+claudia memory save "[key finding]" \
+  --type "fact" \
+  --source "web:[URL]" \
+  --about "[relevant entities]" \
+  --importance 0.7 \
+  --project-dir "$PWD"
 ```
 
 Store facts, not entire pages. Focus on:
@@ -230,7 +229,7 @@ Never silently fail. Never guess what a page says. If the fetch didn't work, say
 ## Integration with Other Skills
 
 ### With Memory Manager
-- Research findings stored via `memory.remember` with `source:web:` prefix
+- Research findings stored via `claudia memory save` with `source:web:` prefix
 - Entity information updated when research reveals new details about known people/companies
 - Relationships updated when research reveals organizational changes
 

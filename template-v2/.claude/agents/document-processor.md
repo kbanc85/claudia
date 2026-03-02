@@ -133,7 +133,7 @@ Return this exact JSON structure:
 
 ### Memory Operations (for batch storage pipeline)
 
-When Claudia dispatches you with `extraction_type: "memory_operations"`, return ready-to-store operations matching the `memory.batch` input format. This lets Claudia pipe your output directly into `memory.batch` after review, skipping manual composition.
+When Claudia dispatches you with `extraction_type: "memory_operations"`, return ready-to-store operations matching the `claudia memory batch` input format. This lets Claudia pipe your output directly into `claudia memory batch` after review, skipping manual composition.
 
 ```json
 {

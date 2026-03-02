@@ -44,6 +44,9 @@ class RecallResult:
     origin_type: str = "inferred"  # user_stated, extracted, inferred, corrected
     # Channel tracking
     source_channel: Optional[str] = None  # Origin channel: claude_code, telegram, slack
+    # Lifecycle fields
+    lifecycle_tier: Optional[str] = None  # sacred/active/cooling/archived
+    fact_id: Optional[str] = None  # UUID for human-friendly reference
 
 
 @dataclass
@@ -98,6 +101,7 @@ class RecallService:
         include_low_importance: bool = False,
         date_after: Optional[datetime] = None,
         date_before: Optional[datetime] = None,
+        include_archived: bool = False,
     ) -> List[RecallResult]:
         """
         Search memories using hybrid vector + FTS5 similarity and filters.
@@ -111,6 +115,7 @@ class RecallService:
             include_low_importance: Include memories below default threshold
             date_after: Only memories after this date
             date_before: Only memories before this date
+            include_archived: Include archived memories (default False)
 
         Returns:
             List of RecallResult ordered by relevance
@@ -142,7 +147,7 @@ class RecallService:
             )
             params.append(json.dumps(query_embedding))
 
-            self._apply_filters(sql_parts, params, memory_types, min_importance, date_after, date_before, about_entity)
+            self._apply_filters(sql_parts, params, memory_types, min_importance, date_after, date_before, about_entity, include_archived)
             sql_parts.append("GROUP BY m.id ORDER BY vector_score DESC LIMIT ?")
             params.append(limit * 2)
 
@@ -285,9 +290,22 @@ class RecallService:
         date_after: Optional[datetime],
         date_before: Optional[datetime],
         about_entity: Optional[str] = None,
+        include_archived: bool = False,
     ) -> None:
         """Apply common filters to SQL query parts."""
         sql_parts.append("AND m.invalidated_at IS NULL")
+        if not include_archived:
+            # Exclude archived memories by default (lifecycle tier filtering)
+            # Pre-migration memories have lifecycle_tier IS NULL and are treated as active
+            sql_parts.append("AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')")
+        # View-as-of temporal filter for rollback support
+        try:
+            view_row = self.db.execute("SELECT value FROM _meta WHERE key = 'view_as_of'", fetch=True)
+            if view_row and view_row[0]["value"]:
+                sql_parts.append("AND m.created_at <= ?")
+                params.append(view_row[0]["value"])
+        except Exception:
+            pass  # _meta table may not exist on very old schemas
         if memory_types:
             placeholders = ", ".join(["?" for _ in memory_types])
             sql_parts.append(f"AND m.type IN ({placeholders})")
@@ -323,6 +341,12 @@ class RecallService:
             + self.config.recency_weight * recency_score
         )
 
+        # Sacred memory boost: +50% importance weight component
+        row_keys_early = row.keys()
+        lifecycle_val = row["lifecycle_tier"] if "lifecycle_tier" in row_keys_early else None
+        if lifecycle_val == "sacred":
+            combined_score += self.config.importance_weight * 0.5
+
         # Parse entity names
         entity_names = []
         entity_names_val = row["entity_names"] if "entity_names" in row.keys() else None
@@ -346,6 +370,10 @@ class RecallService:
         # Channel tracking (may not exist in older DBs)
         source_channel_val = row["source_channel"] if "source_channel" in row_keys else None
 
+        # Lifecycle fields (may not exist in older DBs)
+        lifecycle_tier_val = row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None
+        fact_id_val = row["fact_id"] if "fact_id" in row_keys else None
+
         return RecallResult(
             id=row["id"],
             content=row["content"],
@@ -362,6 +390,8 @@ class RecallService:
             verification_status=verification_status_val,
             origin_type=origin_type_val,
             source_channel=source_channel_val,
+            lifecycle_tier=lifecycle_tier_val,
+            fact_id=fact_id_val,
         )
 
     def _rrf_score(
@@ -678,6 +708,7 @@ class RecallService:
                 JOIN memories m ON m.id = fts.rowid
                 WHERE memories_fts MATCH ?
                 AND m.invalidated_at IS NULL
+                AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')
             """
             params: list = [query]
 
@@ -827,6 +858,8 @@ class RecallService:
                     source=row["source"] if "source" in row_keys else None,
                     source_id=row["source_id"] if "source_id" in row_keys else None,
                     source_context=row["source_context"] if "source_context" in row_keys else None,
+                    lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
+                    fact_id=row["fact_id"] if "fact_id" in row_keys else None,
                 )
             )
 
@@ -1259,6 +1292,7 @@ class RecallService:
             LEFT JOIN entities e ON me.entity_id = e.id
             WHERE m.created_at >= ?
             AND m.invalidated_at IS NULL
+            AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')
         """
         params = [cutoff.isoformat()]
 
@@ -1292,6 +1326,8 @@ class RecallService:
                     source=row["source"] if "source" in row_keys else None,
                     source_id=row["source_id"] if "source_id" in row_keys else None,
                     source_context=row["source_context"] if "source_context" in row_keys else None,
+                    lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
+                    fact_id=row["fact_id"] if "fact_id" in row_keys else None,
                 )
             )
         return results
@@ -2366,6 +2402,7 @@ class RecallService:
                 LEFT JOIN entities e ON me.entity_id = e.id
                 WHERE memories_fts MATCH ?
                 AND m.invalidated_at IS NULL
+                AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')
             """
             params: list = [query]
 
@@ -2395,6 +2432,7 @@ class RecallService:
             LEFT JOIN entities e ON me.entity_id = e.id
             WHERE m.content LIKE ?
             AND m.invalidated_at IS NULL
+            AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')
         """
         params = [f"%{query}%"]
 
@@ -2426,7 +2464,7 @@ class RecallService:
         now = datetime.utcnow()
         future = now + timedelta(days=days_ahead)
 
-        conditions = ["m.deadline_at IS NOT NULL", "m.invalidated_at IS NULL"]
+        conditions = ["m.deadline_at IS NOT NULL", "m.invalidated_at IS NULL", "(m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')"]
         params: list = []
 
         if include_overdue:
@@ -2473,7 +2511,8 @@ class RecallService:
                 except (ValueError, TypeError):
                     pass
 
-            entity_str = row["entity_names"] if "entity_names" in row.keys() and row["entity_names"] else ""
+            row_keys = row.keys()
+            entity_str = row["entity_names"] if "entity_names" in row_keys and row["entity_names"] else ""
             results.append(RecallResult(
                 id=row["id"],
                 content=row["content"],
@@ -2483,6 +2522,8 @@ class RecallService:
                 created_at=row["created_at"],
                 entities=entity_str.split(",") if entity_str else [],
                 metadata={"urgency": urgency, "deadline_at": deadline_str},
+                lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
+                fact_id=row["fact_id"] if "fact_id" in row_keys else None,
             ))
 
         return results
@@ -2503,6 +2544,7 @@ class RecallService:
         conditions = [
             "(m.created_at >= ? OR m.updated_at >= ?)",
             "m.invalidated_at IS NULL",
+            "(m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')",
         ]
         params: list = [since, since]
 
@@ -2584,6 +2626,7 @@ class RecallService:
             LEFT JOIN entities e2 ON me2.entity_id = e2.id
             WHERE (e.canonical_name = ? OR e.name = ?)
               AND m.invalidated_at IS NULL
+              AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'archived')
             GROUP BY m.id
             ORDER BY COALESCE(m.deadline_at, m.created_at) ASC
             LIMIT ?
@@ -2748,6 +2791,8 @@ class RecallService:
             origin_type=row["origin_type"] if "origin_type" in row_keys else "inferred",
             confidence=row["confidence"] if "confidence" in row_keys else 1.0,
             source_channel=row["source_channel"] if "source_channel" in row_keys else None,
+            lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
+            fact_id=row["fact_id"] if "fact_id" in row_keys else None,
         )
 
 

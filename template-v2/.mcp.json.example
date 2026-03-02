@@ -1,14 +1,6 @@
 {
   "mcpServers": {
 
-    "claudia-memory": {
-      "_disabled": true,
-      "command": "~/.claudia/daemon/venv/bin/python",
-      "args": ["-m", "claudia_memory", "--project-dir", "${workspaceFolder}"],
-      "_setup": "Run: ~/.claudia/daemon/scripts/install.sh",
-      "_windows": "On Windows, change command to: %USERPROFILE%\\.claudia\\daemon\\venv\\Scripts\\python.exe"
-    },
-
     "gmail": {
       "_disabled": true,
       "command": "npx",
@@ -32,6 +24,7 @@
       "3. Restart Claude Code",
       "4. Gmail/Calendar will open a browser for you to authenticate with YOUR Google account"
     ],
+    "memory": "Claudia's memory system now uses the `claudia` CLI (via Bash tool), not MCP. No MCP server needed for memory.",
     "security": "Each user authenticates with their own accounts. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",

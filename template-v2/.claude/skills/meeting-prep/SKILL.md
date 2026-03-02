@@ -36,9 +36,9 @@ From `people/[person].md`:
 
 Query for documents linked to this person:
 ```
-Call memory.document with operation="search", entity=[person name]
+claudia memory document search --entity "[person name]" --project-dir "$PWD"
 ```
-This returns recent transcripts, emails, and files involving the person. Include the most relevant (up to 3) in the briefing with their summaries.
+This returns recent transcripts, emails, and files involving the person (JSON output). Include the most relevant (up to 3) in the briefing with their summaries.
 
 Also check:
 - Last meeting notes (if any)

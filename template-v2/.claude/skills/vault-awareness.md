@@ -125,12 +125,10 @@ view is color-coded by entity type, and Home.md surfaces what needs attention."
 ```
 
 ### User asks about sync status
-Use the MCP tool:
-```
-Call memory.vault(operation: "status") to check:
-- When the last sync happened
-- How many notes exist in each category
-- The vault path
+Use the CLI command:
+```bash
+claudia vault status --project-dir "$PWD"
+# Returns: when the last sync happened, how many notes exist in each category, the vault path
 ```
 
 ---
@@ -142,8 +140,9 @@ The vault syncs nightly at 3:15 AM (after consolidation), catching all changes f
 
 ### On-Demand
 When the user wants fresh data:
-```
-Call memory.vault(operation: "sync", full: false for incremental, full: true for complete rebuild)
+```bash
+claudia vault sync --project-dir "$PWD"           # incremental sync
+claudia vault sync --full --project-dir "$PWD"     # complete rebuild
 ```
 
 Trigger a sync when:
@@ -163,11 +162,11 @@ Users can request visual dashboards:
 
 | Request | Action |
 |---------|--------|
-| "Show me my relationship map" | `memory.vault(operation: "canvas", canvas_type: "relationship_map")` |
-| "Generate a morning brief canvas" | `memory.vault(operation: "canvas", canvas_type: "morning_brief")` |
-| "Show people connections" | `memory.vault(operation: "canvas", canvas_type: "people_overview")` |
-| "Make a project board for [name]" | `memory.vault(operation: "canvas", canvas_type: "project_board", project_name: "[name]")` |
-| "Update all canvases" | `memory.vault(operation: "canvas", canvas_type: "all")` |
+| "Show me my relationship map" | `claudia vault canvas --type relationship_map --project-dir "$PWD"` |
+| "Generate a morning brief canvas" | `claudia vault canvas --type morning_brief --project-dir "$PWD"` |
+| "Show people connections" | `claudia vault canvas --type people_overview --project-dir "$PWD"` |
+| "Make a project board for [name]" | `claudia vault canvas --type project_board --project-name "[name]" --project-dir "$PWD"` |
+| "Update all canvases" | `claudia vault canvas --type all --project-dir "$PWD"` |
 
 After generating, tell the user where to find it:
 ```
@@ -239,8 +238,8 @@ All imported changes use `origin_type='user_stated'` and `confidence=1.0`. If th
 
 ### Running Import
 
-- **MCP tool:** `memory.vault(operation: "import")` scans for changes and applies them
-- **CLI:** `python3 -m claudia_memory --import-vault`
+- **CLI command:** `claudia vault import --project-dir "$PWD"` scans for changes and applies them
+- **Alternative:** `claudia vault import --project-dir "$PWD"` (same command, explicit path)
 - **Nightly sync** continues as a safety net for anything missed
 
 ### User Guidance
@@ -267,10 +266,10 @@ The `project_hash` is the same 12-char SHA256 used for database paths (`~/.claud
 
 | Issue | Solution |
 |-------|----------|
-| Vault folder empty | Run `memory.vault(operation: "sync", full: true)` or `python3 -m claudia_memory --vault-sync` |
+| Vault folder empty | Run `claudia vault sync --full --project-dir "$PWD"` |
 | Stale data in Obsidian | Trigger an on-demand sync |
-| Graph view shows no connections | Ensure entities have relationships (use `memory.relate`) |
+| Graph view shows no connections | Ensure entities have relationships (use `claudia memory relate`) |
 | Graph all one color | Check `.obsidian/graph.json` exists (created on first sync) |
-| Canvas won't open | Verify `.canvas` is valid JSON, regenerate with `memory.vault(operation: "canvas")` |
-| Vault not updating overnight | Check scheduler is running via `memory.system_health` |
+| Canvas won't open | Verify `.canvas` is valid JSON, regenerate with `claudia vault canvas --project-dir "$PWD"` |
+| Vault not updating overnight | Check scheduler is running via `claudia system-health --project-dir "$PWD"` |
 | Old format after upgrade | Sync will auto-rebuild when format version < 2 |

@@ -61,7 +61,7 @@ Show inventory to user before proceeding. This prevents partial processing.
 ```
 For each source in inventory:
     1. READ the full content
-    2. CALL memory.document with operation="store" immediately (do not skip!)
+    2. CALL `claudia memory document store --project-dir "$PWD"` immediately (do not skip!)
     3. THEN extract entities/facts/commitments
 ```
 
@@ -181,22 +181,24 @@ Files are auto-routed to entity folders:
 - `projects/alpha/emails/...`
 
 **2. Create/update entities:**
-```
-Call memory.batch with entity operations:
+```bash
+claudia memory batch --project-dir "$PWD" <<'EOF'
 [
   { "op": "entity", "name": "Sarah Chen", "type": "person", "description": "Product lead at Acme Corp" },
   { "op": "entity", "name": "Jim Ferry", "type": "person", "description": "Partnership contact" },
   { "op": "entity", "name": "Acme Corp", "type": "organization", "description": "Client company" }
 ]
+EOF
 ```
 
 **3. Store facts and relationships:**
-```
-Call memory.batch with remember and relate operations:
+```bash
+claudia memory batch --project-dir "$PWD" <<'EOF'
 [
   { "op": "remember", "content": "Sarah prefers async communication", "about": ["Sarah Chen"], "importance": 0.7 },
   { "op": "relate", "source": "Sarah Chen", "target": "Acme Corp", "relationship": "works_at", "strength": 0.9 }
 ]
+EOF
 ```
 
 **4. Link provenance:**
@@ -283,7 +285,7 @@ Ask for confirmation on:
 - [ ] **`dedicated_to` field populated** for sources primarily about an entity
 - [ ] **Verification phase completed** with user confirmation
 - [ ] **Dedicated source rule enforced** (2+ dedicated = must appear proportionally)
-- [ ] **All sources filed** via memory.document
+- [ ] **All sources filed** via `claudia memory document store`
 - [ ] **Provenance chain complete** (memories link to documents)
 - [ ] **No entity lost** that had dedicated sources
 

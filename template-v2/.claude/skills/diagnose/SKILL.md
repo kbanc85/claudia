@@ -1,56 +1,43 @@
 ---
 name: diagnose
-description: Check memory daemon health and troubleshoot connectivity issues. Use when memory tools aren't working, at session start if something seems wrong, or when user asks about memory status.
+description: Check memory system health and troubleshoot connectivity issues. Use when memory commands aren't working, at session start if something seems wrong, or when user asks about memory status.
 effort-level: low
 ---
 
 # Diagnose
 
 System health check for Claudia's memory infrastructure. Run this when:
-- Memory tools seem unavailable
+- Memory commands seem unavailable
 - Session context isn't loading
 - User asks "is my memory working?"
 - Something feels off with persistence
 
 ## Process
 
-### Step 1: Check MCP Tool Availability
+### Step 1: Check CLI Availability
 
-First, verify what memory tools are available:
+First, verify the `claudia` CLI is available:
 
+```bash
+which claudia 2>/dev/null || echo "claudia CLI not found on PATH"
+claudia --version 2>/dev/null || echo "claudia CLI not responding"
 ```
-List your available tools that start with "memory."
-```
 
-**Expected tools:**
-- `memory.session`
-- `memory.remember`
-- `memory.recall`
-- `memory.about`
-- `memory.entities`
-- `memory.relate`
-- `memory.document`
-- `memory.batch`
-- `memory.end_session`
-- `memory.reflections`
-- `memory.consolidate`
-- `memory.system_health`
-
-If NO memory tools appear, the daemon isn't connected via MCP.
+If the `claudia` command is not found, the CLI is not installed or not on PATH.
 
 ### Step 2: Test Memory Connection
 
-If tools are available, try a simple operation:
+If the CLI is available, try a simple operation:
 
-```
-Call memory.session with operation="context" and no other arguments
+```bash
+claudia system-health --project-dir "$PWD"
 ```
 
 **Possible outcomes:**
-- Success with context: Memory system fully operational
+- Success with health data: Memory system fully operational
 - Success but empty: Working but no data yet (new install)
-- Error/timeout: Daemon running but unhealthy
-- Tool not found: MCP connection broken
+- Error/timeout: CLI installed but database or system unhealthy
+- Command not found: CLI not installed
 
 ### Step 2.5: Detect Platform
 
@@ -58,50 +45,39 @@ Run: `uname -s 2>/dev/null || echo Windows`
 
 Use the appropriate command set below (macOS/Linux or Windows).
 
-### Step 3: Check Daemon Process
+### Step 3: Check System Components
 
 **macOS/Linux:**
 
 ```bash
-# Check if daemon process is running (and whether in standalone mode)
-ps aux | grep claudia_memory | grep -v grep
+# Check if claudia CLI is on PATH
+which claudia
 
-# Check health endpoint
-curl -s http://localhost:3848/health || echo "Health endpoint not responding"
-
-# Check recent daemon logs
-tail -20 ~/.claudia/daemon-stderr.log 2>/dev/null || echo "No daemon log found"
+# Check system health
+claudia system-health --project-dir "$PWD"
 
 # Check database exists and has data
 ls -la ~/.claudia/memory/*.db 2>/dev/null || echo "No database found"
 sqlite3 ~/.claudia/memory/claudia.db "SELECT COUNT(*) as memories FROM memories; SELECT COUNT(*) as entities FROM entities;" 2>/dev/null || echo "Cannot query database"
 
-# Check for standalone/MCP conflict (pre-v1.36 issue)
-# If you see a process with --standalone AND no MCP tools, this is the cause
-STANDALONE_RUNNING=$(ps aux | grep "claudia_memory.*standalone" | grep -v grep | wc -l | tr -d ' ')
-echo "Standalone daemon processes: $STANDALONE_RUNNING"
+# Check for embedding model
+ollama list 2>/dev/null | grep minilm || echo "Embedding model not found"
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-# Check if daemon process is running
-Get-Process python* | Where-Object { $_.CommandLine -like '*claudia_memory*' } 2>$null
-# Fallback if CommandLine isn't available:
-tasklist /FI "IMAGENAME eq python.exe" /V 2>$null | findstr claudia
+# Check if claudia CLI is available
+Get-Command claudia -ErrorAction SilentlyContinue
 
-# Check health endpoint
-try { (Invoke-WebRequest -Uri 'http://localhost:3848/health' -UseBasicParsing -TimeoutSec 5).Content } catch { "Health endpoint not responding" }
-
-# Check recent daemon logs
-Get-Content -Tail 20 "$env:USERPROFILE\.claudia\daemon-stderr.log" 2>$null
+# Check system health
+claudia system-health --project-dir "$PWD"
 
 # Check database exists and has data
 dir "$env:USERPROFILE\.claudia\memory\*.db" 2>$null
-& "$env:USERPROFILE\.claudia\daemon\venv\Scripts\python.exe" -c "import sqlite3; conn = sqlite3.connect('$env:USERPROFILE\.claudia\memory\claudia.db'); print('memories:', conn.execute('SELECT COUNT(*) FROM memories').fetchone()[0]); print('entities:', conn.execute('SELECT COUNT(*) FROM entities').fetchone()[0])"
 
-# Check Task Scheduler status
-Get-ScheduledTask -TaskName 'ClaudiaMemoryDaemon' -ErrorAction SilentlyContinue | Select-Object State
+# Check for embedding model
+ollama list 2>$null | Select-String minilm
 ```
 
 ### Step 4: Report Results
@@ -114,11 +90,10 @@ Format the diagnosis as:
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| MCP Tools | ✅/❌ | [count] tools available |
-| Daemon Process | ✅/❌ | [PID or "not running"] |
-| Health Endpoint | ✅/❌ | [response or error] |
+| Claudia CLI | ✅/❌ | [version or "not found"] |
 | Database | ✅/❌ | [path, size, record counts] |
-| Session Context | ✅/❌ | [loaded or error] |
+| System Health | ✅/❌ | [response or error] |
+| Embedding Model | ✅/❌ | [model name or "not found"] |
 
 **Overall:** [Healthy / Degraded / Not Connected]
 
@@ -128,48 +103,17 @@ Format the diagnosis as:
 
 ## Common Issues and Fixes
 
-### Issue: No memory tools available
+### Issue: Claudia CLI not found
 
-**Cause:** MCP server not configured or not started
+**Cause:** CLI not installed or not on PATH
 
 **Fix:**
-1. Check `.mcp.json` exists and has claudia_memory configured
-2. Restart Claude Code to reload MCP configuration
-3. Check `~/.claudia/daemon-stderr.log` for startup errors
-
-### Issue: Daemon not running
-
-**Cause:** Daemon crashed or was never started
-
-**Fix (macOS/Linux):**
 ```bash
-# Start the daemon manually
-cd ~/.claudia/daemon && source venv/bin/activate
-python -m claudia_memory &
-
-# Or reinstall
-cd [claudia-install-dir] && ./memory-daemon/scripts/install.sh
+npm install -g get-claudia
+claudia setup
 ```
 
-**Fix (Windows PowerShell):**
-```powershell
-# Start the daemon manually
-& "$env:USERPROFILE\.claudia\daemon\venv\Scripts\Activate.ps1"
-python -m claudia_memory
-
-# Or reinstall
-cd [claudia-install-dir]
-powershell -ExecutionPolicy Bypass -File memory-daemon\scripts\install.ps1
-```
-
-### Issue: Health endpoint not responding
-
-**Cause:** Python 3.14 compatibility issue (fixed in v1.21.1+) or daemon crashed after startup
-
-**Fix:**
-1. Check daemon logs: `tail -50 ~/.claudia/daemon-stderr.log`
-2. Look for "RuntimeError" or "event loop" errors
-3. Update to latest Claudia version: `npx get-claudia .`
+If installed via npx but not globally, the binary may not be on PATH. Either install globally or use the full path.
 
 ### Issue: Database empty or missing
 
@@ -179,74 +123,38 @@ powershell -ExecutionPolicy Bypass -File memory-daemon\scripts\install.ps1
 1. If fresh install: Normal, database populates as you use Claudia
 2. If was working before: Check for database file, may need to restore from backup
 
-### Issue: MCP tools available but calls fail
+### Issue: CLI installed but commands fail
 
-**Cause:** Daemon process exists but is unhealthy
+**Cause:** Database corruption, missing dependencies, or version mismatch
 
-**Fix (macOS/Linux):**
-1. Kill the old process: `pkill -f claudia_memory`
-2. Restart Claude Code (this restarts the MCP server)
-3. Check logs for specific errors
+**Fix:**
+1. Update to latest Claudia version: `npm install -g get-claudia`
+2. Run setup again: `claudia setup`
+3. Check Node.js version is 18+: `node --version`
 
-**Fix (Windows):**
-1. Kill the old process: `taskkill /F /FI "IMAGENAME eq python.exe"` (or use Task Manager)
-2. Restart Claude Code (this restarts the MCP server)
-3. Check logs: `Get-Content -Tail 50 "$env:USERPROFILE\.claudia\daemon-stderr.log"`
+### Issue: Embedding model not available
 
-### Issue: Standalone daemon running but MCP tools not registered (pre-v1.36)
+**Cause:** Ollama not installed or model not pulled
 
-**Symptoms:** Daemon process running with `--standalone`, health endpoint healthy, 0 memory tools in Claude Code
-
-**Cause (pre-v1.36):** The LaunchAgent/systemd service starts the daemon with `--standalone`, which acquires a singleton lock. When Claude Code spawns the MCP server, it hits the same lock, sees another daemon running, and exits immediately (exit code 0). Claude Code sees the clean exit and thinks the MCP server started, but no tools register.
-
-**Fix:** Upgrade Claudia to v1.36+ where this conflict is resolved:
+**Fix:**
 ```bash
-npx get-claudia .
-```
-After upgrading, restart Claude Code. The MCP server no longer competes with the standalone daemon's lock.
+# Install Ollama (if not installed)
+# See https://ollama.ai for installation
 
-**If upgrade isn't possible:** Restart Claude Code. If tools still don't register, stop the standalone daemon temporarily:
+# Pull the embedding model
+ollama pull all-minilm:l6-v2
+```
+
+Note: Memory still works without Ollama, but semantic search and vector-based recall will be unavailable. Basic keyword search and explicit lookups still function.
+
+### Issue: Wrong project directory
+
+**Cause:** CLI is using a different project hash than expected
+
+**Fix:**
+Ensure you're passing the correct project directory:
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.claudia.memory.plist
-```
-Then restart Claude Code (which will spawn the MCP server cleanly). Note: background jobs won't run until you reload the LaunchAgent.
-
-### Issue: .mcp.json uses wrong entry point
-
-**Detection:** Check the `args` array in `.mcp.json` for the `claudia-memory` server. If it says `claudia_memory.mcp.server` instead of `claudia_memory`, it bypasses project isolation, the health server, and background scheduling.
-
-**Fix:** Update the args in `.mcp.json` to:
-```json
-"args": ["-m", "claudia_memory", "--project-dir", "${workspaceFolder}"]
-```
-Then restart Claude Code.
-
-## Automatic Recovery
-
-If the daemon needs restart and user confirms:
-
-**macOS/Linux:**
-```bash
-# Kill any existing daemon
-pkill -f claudia_memory 2>/dev/null
-
-# Wait for cleanup
-sleep 2
-
-# Verify it's stopped
-ps aux | grep claudia_memory | grep -v grep && echo "Still running, may need manual kill"
+claudia system-health --project-dir "$PWD"
 ```
 
-**Windows (PowerShell):**
-```powershell
-# Kill any existing daemon
-Get-Process python* -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*claudia_memory*' } | Stop-Process -Force
-
-# Wait for cleanup
-Start-Sleep -Seconds 2
-
-# Verify it's stopped
-Get-Process python* -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*claudia_memory*' }
-```
-
-Then instruct user to restart Claude Code, which will spawn a fresh daemon via MCP.
+The CLI uses the project directory to determine which database to use. Each project gets its own isolated database based on a hash of the directory path.

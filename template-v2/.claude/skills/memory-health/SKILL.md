@@ -19,10 +19,10 @@ Provide a dashboard view of the memory system's health, including entity counts,
 
 ### Step 1: Gather Statistics
 
-Use `memory.session` to get current system state:
+Use the Claudia CLI to get current system state:
 
-```
-memory.session(operation="context", scope="full")
+```bash
+claudia memory session context --scope full --project-dir "$PWD"
 ```
 
 This returns entity counts, memory counts, relationship counts, and predictions.

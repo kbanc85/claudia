@@ -705,6 +705,32 @@ async def _handle_provenance(arguments, db, config, logger, **ctx):
                 "history": history, "count": len(history),
             }))]
         )
+    elif op == "verify_chain":
+        from ..services.remember import _compute_chain_hash
+        rows = db.execute(
+            "SELECT id, content, metadata, hash, prev_hash FROM memories ORDER BY id ASC",
+            fetch=True,
+        ) or []
+        chain_length = 0
+        is_valid = True
+        first_break_at = None
+        for row in rows:
+            if row["hash"] is None:
+                continue
+            chain_length += 1
+            meta = json.loads(row["metadata"]) if row["metadata"] else None
+            expected = _compute_chain_hash(row["content"], meta, row["prev_hash"])
+            if expected != row["hash"]:
+                is_valid = False
+                if first_break_at is None:
+                    first_break_at = row["id"]
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({
+                "chain_length": chain_length,
+                "is_valid": is_valid,
+                "first_break_at": first_break_at,
+            }))]
+        )
     else:
         return CallToolResult(
             content=[TextContent(type="text", text=json.dumps({"error": f"Unknown provenance operation: {op}"}))],
@@ -723,6 +749,8 @@ async def _handle_remember(arguments, db, config, logger, **ctx):
         source=arguments.get("source"),
         source_context=arguments.get("source_context"),
         source_channel=arguments.get("source_channel"),
+        critical=arguments.get("critical", False),
+        fact_id=arguments.get("fact_id"),
     )
     # Save source material to disk if provided
     if memory_id and arguments.get("source_material"):
@@ -796,6 +824,7 @@ async def _handle_recall(arguments, db, config, logger, **ctx):
         limit=arguments.get("limit", 10),
         memory_types=arguments.get("types"),
         about_entity=arguments.get("about"),
+        include_archived=arguments.get("include_archived", False),
     )
 
     compact = arguments.get("compact", False)
@@ -1365,6 +1394,199 @@ async def _handle_project_health(arguments, db, config, logger, **ctx):
     )
 
 
+@_handler("memory.lifecycle")
+async def _handle_lifecycle(arguments, db, config, logger, **ctx):
+    op = _require(arguments, "operation", "memory.lifecycle")
+
+    if op == "set":
+        fact_id = _require(arguments, "fact_id", "memory.lifecycle")
+        tier = _require(arguments, "tier", "memory.lifecycle")
+        reason = arguments.get("reason", "manual")
+        if tier == "sacred":
+            db.execute(
+                "UPDATE memories SET lifecycle_tier = 'sacred', sacred_reason = ?, updated_at = datetime('now') WHERE fact_id = ?",
+                (reason, fact_id),
+            )
+        elif tier == "archived":
+            db.execute(
+                "UPDATE memories SET lifecycle_tier = 'archived', archived_at = datetime('now'), updated_at = datetime('now') WHERE fact_id = ?",
+                (fact_id,),
+            )
+        else:
+            db.execute(
+                "UPDATE memories SET lifecycle_tier = ?, updated_at = datetime('now') WHERE fact_id = ?",
+                (tier, fact_id),
+            )
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"success": True, "fact_id": fact_id, "tier": tier}))]
+        )
+
+    elif op == "protect":
+        entity_name = _require(arguments, "entity", "memory.lifecycle")
+        reason = arguments.get("reason", "user-designated")
+        canonical = entity_name.strip().lower()
+        row = db.execute(
+            "SELECT id FROM entities WHERE canonical_name = ? AND deleted_at IS NULL",
+            (canonical,),
+            fetch=True,
+        )
+        if not row:
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps({"error": f"Entity not found: {entity_name}"}))],
+                isError=True,
+            )
+        result = set_close_circle(row[0]["id"], reason=reason)
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(result))]
+        )
+
+    elif op == "archive":
+        fact_id = _require(arguments, "fact_id", "memory.lifecycle")
+        db.execute(
+            "UPDATE memories SET lifecycle_tier = 'archived', archived_at = datetime('now'), updated_at = datetime('now') WHERE fact_id = ?",
+            (fact_id,),
+        )
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"success": True, "fact_id": fact_id, "tier": "archived"}))]
+        )
+
+    elif op == "restore":
+        fact_id = _require(arguments, "fact_id", "memory.lifecycle")
+        db.execute(
+            "UPDATE memories SET lifecycle_tier = 'active', archived_at = NULL, updated_at = datetime('now') WHERE fact_id = ?",
+            (fact_id,),
+        )
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"success": True, "fact_id": fact_id, "tier": "active"}))]
+        )
+
+    elif op == "status":
+        stats = {}
+        for tier in ("sacred", "active", "cooling", "archived"):
+            row = db.execute(
+                "SELECT COUNT(*) as cnt FROM memories WHERE lifecycle_tier = ? AND invalidated_at IS NULL",
+                (tier,),
+                fetch=True,
+            )
+            stats[tier] = row[0]["cnt"] if row else 0
+        null_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM memories WHERE lifecycle_tier IS NULL AND invalidated_at IS NULL",
+            fetch=True,
+        )
+        stats["legacy_active"] = null_row[0]["cnt"] if null_row else 0
+        cc_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM entities WHERE close_circle = 1 AND deleted_at IS NULL",
+            fetch=True,
+        )
+        stats["close_circle_entities"] = cc_row[0]["cnt"] if cc_row else 0
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(stats, indent=2))]
+        )
+
+    else:
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"error": f"Unknown lifecycle operation: {op}"}))],
+            isError=True,
+        )
+
+
+@_handler("memory.context")
+async def _handle_context(arguments, db, config, logger, **ctx):
+    from ..services.context_builder import build_context
+    _coerce_int(arguments, "token_budget")
+    result = build_context(
+        query=_require(arguments, "query", "memory.context"),
+        token_budget=arguments.get("token_budget", 8000),
+        include_sacred=arguments.get("include_sacred", True),
+        entity=arguments.get("entity"),
+    )
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(result, default=str))]
+    )
+
+
+@_handler("memory.checkpoint")
+async def _handle_checkpoint(arguments, db, config, logger, **ctx):
+    op = _require(arguments, "operation", "memory.checkpoint")
+
+    if op == "save":
+        name = arguments.get("name", "manual")
+        backup_path = db.backup(label=name)
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"success": True, "path": str(backup_path), "label": name}))]
+        )
+
+    elif op == "list":
+        import glob as glob_mod
+        from pathlib import Path
+        pattern = f"{db.db_path}.backup-*.db"
+        backups = sorted(glob_mod.glob(pattern), key=lambda p: Path(p).stat().st_mtime, reverse=True)
+        items = []
+        for b in backups[:20]:
+            p = Path(b)
+            items.append({
+                "path": str(p),
+                "name": p.name,
+                "size_mb": round(p.stat().st_size / 1024 / 1024, 2),
+                "modified": datetime.fromtimestamp(p.stat().st_mtime).isoformat(),
+            })
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(items, indent=2))]
+        )
+
+    elif op == "load":
+        name = arguments.get("name", "")
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({
+                "warning": "Checkpoint restore requires daemon restart.",
+                "instruction": "Stop daemon, copy backup over DB, restart.",
+                "backup_pattern": f"{db.db_path}.backup-{name}-*.db",
+            }))]
+        )
+
+    else:
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"error": f"Unknown checkpoint operation: {op}"}))],
+            isError=True,
+        )
+
+
+@_handler("memory.rollback")
+async def _handle_rollback(arguments, db, config, logger, **ctx):
+    op = _require(arguments, "operation", "memory.rollback")
+
+    if op == "set":
+        ts = _require(arguments, "timestamp", "memory.rollback")
+        db.execute(
+            "INSERT INTO _meta (key, value, updated_at) VALUES ('view_as_of', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')",
+            (ts,),
+        )
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"success": True, "view_as_of": ts}))]
+        )
+
+    elif op == "clear":
+        db.execute(
+            "INSERT INTO _meta (key, value, updated_at) VALUES ('view_as_of', NULL, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = NULL, updated_at = datetime('now')",
+        )
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"success": True, "view_as_of": None}))]
+        )
+
+    elif op == "status":
+        row = db.execute("SELECT value FROM _meta WHERE key = 'view_as_of'", fetch=True)
+        val = row[0]["value"] if row and row[0]["value"] else None
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"view_as_of": val, "mode": "historical" if val else "current"}))]
+        )
+
+    else:
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"error": f"Unknown rollback operation: {op}"}))],
+            isError=True,
+        )
+
+
 # Initialize the MCP server
 server = Server("claudia-memory")
 
@@ -1417,6 +1639,14 @@ async def list_tools() -> ListToolsResult:
                         "type": "string",
                         "description": "Origin channel: claude_code, telegram, slack",
                     },
+                    "critical": {
+                        "type": "boolean",
+                        "description": "Mark this memory as sacred (never decays, always included in context). Use for critical personal facts.",
+                    },
+                    "fact_id": {
+                        "type": "string",
+                        "description": "Explicit UUID for this memory. Auto-generated if not provided.",
+                    },
                 },
                 "required": ["content"],
             },
@@ -1460,6 +1690,10 @@ async def list_tools() -> ListToolsResult:
                         "type": ["array", "string"],
                         "items": {"type": "integer"},
                         "description": "Fetch specific memories by ID (skips search). Use after a compact search to get full content.",
+                    },
+                    "include_archived": {
+                        "type": "boolean",
+                        "description": "Include archived memories in results (default: false)",
                     },
                 },
             },
@@ -2398,9 +2632,10 @@ async def list_tools() -> ListToolsResult:
             name="memory.provenance",
             title="Provenance & Audit",
             description=(
-                "Trace memory origins or get full audit trails. "
+                "Trace memory origins, get full audit trails, or verify hash chain integrity. "
                 "Use operation='trace' to reconstruct a memory's full provenance chain, "
-                "'audit' to get the audit history for an entity or memory."
+                "'audit' to get the audit history for an entity or memory, "
+                "'verify_chain' to check SHA-256 hash chain integrity across all memories."
             ),
             annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
@@ -2408,7 +2643,7 @@ async def list_tools() -> ListToolsResult:
                 "properties": {
                     "operation": {
                         "type": "string",
-                        "enum": ["trace", "audit"],
+                        "enum": ["trace", "audit", "verify_chain"],
                         "description": "Which provenance operation to perform",
                     },
                     "memory_id": {
@@ -2423,6 +2658,110 @@ async def list_tools() -> ListToolsResult:
                         "type": ["integer", "string"],
                         "description": "Maximum audit entries (default 20)",
                         "default": 20,
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        # ── Lifecycle / Sacred memory tools ──
+        Tool(
+            name="memory.lifecycle",
+            title="Memory Lifecycle",
+            description="Manage memory lifecycle tiers (sacred/active/cooling/archived) and entity close-circle status.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["set", "protect", "archive", "restore", "status"],
+                        "description": (
+                            "set: change tier by fact_id. protect: mark entity close-circle. "
+                            "archive/restore: archive or restore memory. status: show lifecycle stats."
+                        ),
+                    },
+                    "fact_id": {
+                        "type": "string",
+                        "description": "Memory fact_id UUID. Required for set/archive/restore.",
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Entity name. Required for protect.",
+                    },
+                    "tier": {
+                        "type": "string",
+                        "enum": ["sacred", "active", "cooling", "archived"],
+                        "description": "Target tier. Required for set.",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for the operation.",
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.context",
+            title="Build Context Window",
+            description="Build a token-budgeted context window with sacred facts always included. Uses the Context Relevance Engine (CRE).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "What context to build for",
+                    },
+                    "token_budget": {
+                        "type": ["integer", "string"],
+                        "description": "Maximum tokens (default: 8000)",
+                    },
+                    "include_sacred": {
+                        "type": "boolean",
+                        "description": "Include sacred facts (default: true)",
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Scope sacred facts to this entity",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="memory.checkpoint",
+            title="Database Checkpoints",
+            description="Save, list, or restore database checkpoints (labeled backups).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["save", "list", "load"],
+                        "description": "save: create checkpoint. list: show available. load: returns restore instructions.",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Checkpoint name/label. Required for save/load.",
+                    },
+                },
+                "required": ["operation"],
+            },
+        ),
+        Tool(
+            name="memory.rollback",
+            title="Temporal Rollback",
+            description="Set a temporal view filter so recall only returns memories created before a given timestamp. Non-destructive.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["set", "clear", "status"],
+                        "description": "set: set view_as_of timestamp. clear: reset to current. status: show current.",
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "description": "ISO timestamp for view_as_of. Required for set.",
                     },
                 },
                 "required": ["operation"],

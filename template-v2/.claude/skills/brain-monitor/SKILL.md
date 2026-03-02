@@ -17,13 +17,13 @@ Launch the Brain Monitor, a live terminal dashboard showing real-time memory act
 Run this command:
 
 ```bash
-~/.claudia/daemon/venv/bin/python -m claudia_memory --tui
+claudia system-health --project-dir "$PWD" --pretty
 ```
 
-Launch it using the Bash tool with `run_in_background: true` so the Claude session stays responsive.
+This shows a comprehensive system health report. For continuous monitoring, use the Brain Visualizer instead (see `/brain` skill).
 
-If the venv doesn't exist, the memory daemon isn't installed. Tell the user:
-`bash ~/.claudia/daemon/scripts/install.sh`
+If the `claudia` CLI is not found, it's not installed. Tell the user:
+`npm install -g get-claudia && claudia setup`
 
 ---
 
@@ -32,15 +32,12 @@ If the venv doesn't exist, the memory daemon isn't installed. Tell the user:
 ```
 **Brain Monitor** launched.
 
-Live panels updating in real-time:
-- **Neural Pulse** - write/read/link activity (updates every 3s)
-- **Identity** - daemon health + memory stats (updates every 3s)
-- **Constellation** - entity dot grid by type (updates every 10s)
-- **Landscape** - importance distribution + memory types (updates every 10s)
+Showing:
+- **System Health** - CLI status, database stats, embedding model
+- **Memory Stats** - total memories, entities, relationships
+- **Recent Activity** - latest memory operations
 
-**Keys:** Q quit | R refresh | T toggle theme
-
-Changes to your memory system show up as they happen.
+For the full 3D interactive brain visualization, use `/brain`.
 ```
 
 ---

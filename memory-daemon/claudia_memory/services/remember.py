@@ -5,9 +5,11 @@ Handles storing memories, processing conversation turns,
 and auto-extracting entities and facts.
 """
 
+import hashlib as _hashlib
 import json
 import logging
 import uuid
+import uuid as _uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -32,6 +34,12 @@ def _audit_log(operation: str, **kwargs) -> None:
         audit_log(operation, **kwargs)
     except Exception as e:
         logger.debug(f"Could not log audit entry: {e}")
+
+
+def _compute_chain_hash(content: str, metadata, prev_hash) -> str:
+    """Compute SHA-256 chain hash for memory integrity verification."""
+    payload = f"{content}|{json.dumps(metadata, sort_keys=True) if metadata else ''}|{prev_hash or ''}"
+    return _hashlib.sha256(payload.encode()).hexdigest()
 
 
 class RememberService:
@@ -142,6 +150,8 @@ class RememberService:
         metadata: Optional[Dict] = None,
         origin_type: Optional[str] = None,
         source_channel: Optional[str] = None,
+        critical: bool = False,
+        fact_id: Optional[str] = None,
         _precomputed_embedding: Optional[List[float]] = None,
     ) -> Optional[int]:
         """
@@ -159,6 +169,8 @@ class RememberService:
             metadata: Additional metadata
             origin_type: 'user_stated', 'extracted', 'inferred', 'corrected' (Trust North Star)
             source_channel: Origin channel: claude_code, telegram, slack
+            critical: If True, mark this memory as sacred (immune to decay)
+            fact_id: Optional UUID for the memory; auto-generated if not provided
 
         Returns:
             Memory ID or None if duplicate
@@ -180,6 +192,9 @@ class RememberService:
                 (existing["id"],),
             )
             return existing["id"]
+
+        if fact_id is None:
+            fact_id = str(_uuid.uuid4())
 
         # Run deterministic guards
         guard_result = validate_memory(content, memory_type, importance, metadata)
@@ -230,6 +245,7 @@ class RememberService:
             "updated_at": datetime.utcnow().isoformat(),
             "metadata": json.dumps(metadata) if metadata else None,
             "origin_type": origin_type,
+            "fact_id": fact_id,
         }
         if source_context:
             insert_data["source_context"] = source_context
@@ -240,7 +256,35 @@ class RememberService:
         if temporal_markers_json:
             insert_data["temporal_markers"] = temporal_markers_json
 
+        if critical:
+            insert_data["lifecycle_tier"] = "sacred"
+            insert_data["sacred_reason"] = "user-protected"
+
         memory_id = self.db.insert("memories", insert_data)
+
+        # SHA-256 chain linking for memory integrity verification
+        try:
+            from ..config import get_config as _get_config
+            config = _get_config()
+            if config.enable_chain_verification:
+                prev_hash_rows = self.db.execute(
+                    "SELECT value FROM _meta WHERE key = 'chain_head'",
+                    fetch=True,
+                )
+                prev_hash = prev_hash_rows[0]["value"] if prev_hash_rows and prev_hash_rows[0]["value"] else None
+                chain_hash = _compute_chain_hash(content, metadata, prev_hash)
+                self.db.execute(
+                    "UPDATE memories SET hash = ?, prev_hash = ? WHERE id = ?",
+                    (chain_hash, prev_hash, memory_id),
+                )
+                self.db.execute(
+                    """INSERT INTO _meta (key, value, updated_at)
+                       VALUES ('chain_head', ?, datetime('now'))
+                       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at""",
+                    (chain_hash,),
+                )
+        except Exception as e:
+            logger.debug(f"Chain hash skipped: {e}")
 
         # Store embedding (use precomputed if available, otherwise generate)
         embedding = _precomputed_embedding or embed_sync(content)
@@ -1690,6 +1734,44 @@ class RememberService:
             insert_data["source"] = source
         return self.db.insert("episodes", insert_data)
 
+    def set_close_circle(self, entity_id: int, reason: str = "user-designated") -> dict:
+        """Mark an entity as close-circle and auto-promote core facts to sacred."""
+        from ..config import get_config
+        config = get_config()
+
+        self.db.execute(
+            "UPDATE entities SET close_circle = 1, close_circle_reason = ?, updated_at = datetime('now') WHERE id = ?",
+            (reason, entity_id),
+        )
+
+        promoted = 0
+        if config.enable_auto_sacred:
+            for keyword in config.sacred_core_keywords:
+                rows = self.db.execute(
+                    """
+                    SELECT m.id FROM memories m
+                    JOIN memory_entities me ON m.id = me.memory_id
+                    WHERE me.entity_id = ?
+                      AND m.invalidated_at IS NULL
+                      AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'sacred')
+                      AND LOWER(m.content) LIKE '%' || LOWER(?) || '%'
+                    """,
+                    (entity_id, keyword),
+                    fetch=True,
+                ) or []
+                for row in rows:
+                    self.db.execute(
+                        """UPDATE memories SET lifecycle_tier = 'sacred',
+                           sacred_reason = ?,
+                           updated_at = datetime('now')
+                           WHERE id = ? AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')""",
+                        (f"auto: close-circle keyword '{keyword}'", row["id"]),
+                    )
+                    promoted += 1
+
+        _audit_log("close_circle_set", details={"entity_id": entity_id, "reason": reason, "promoted": promoted}, entity_id=entity_id)
+        return {"entity_id": entity_id, "close_circle": True, "facts_promoted_to_sacred": promoted}
+
 
 # Global service instance
 _service: Optional[RememberService] = None
@@ -1779,3 +1861,8 @@ def invalidate_relationship(
 ) -> Optional[Dict[str, Any]]:
     """Invalidate a relationship without creating a replacement"""
     return get_remember_service().invalidate_relationship(source, target, relationship, reason)
+
+
+def set_close_circle(entity_id: int, **kwargs) -> dict:
+    """Mark entity as close-circle."""
+    return get_remember_service().set_close_circle(entity_id, **kwargs)
