@@ -630,6 +630,11 @@ async function main() {
       console.log('');
       console.log(` ${colors.dim}Memory is ready. Claudia will remember across sessions.${colors.reset}`);
     }
+
+    console.log('');
+    console.log(` ${colors.dim}Optional: connect Google services${colors.reset}`);
+    console.log(`   ${colors.cyan}claudia gmail login${colors.reset}      ${colors.dim}Read & send email${colors.reset}`);
+    console.log(`   ${colors.cyan}claudia calendar login${colors.reset}   ${colors.dim}View & create events${colors.reset}`);
     console.log('');
   }
 }

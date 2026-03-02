@@ -519,5 +519,101 @@ program
     await setupCommand(opts, program.opts());
   });
 
+// ── Gmail subcommand group ──
+const gmail = program
+  .command('gmail')
+  .description('Gmail integration (login, search, read)');
+
+gmail
+  .command('login')
+  .description('Sign in with Google to connect Gmail')
+  .action(async () => {
+    const { gmailLoginCommand } = await import('./commands/google-auth.js');
+    await gmailLoginCommand();
+  });
+
+gmail
+  .command('status')
+  .description('Check Gmail connection status')
+  .action(async () => {
+    const { gmailStatusCommand } = await import('./commands/google-auth.js');
+    await gmailStatusCommand();
+  });
+
+gmail
+  .command('search')
+  .description('Search emails (uses Gmail search syntax)')
+  .argument('<query>', 'Search query, e.g. "is:unread from:sarah"')
+  .option('--limit <n>', 'Max results', parseInt, 10)
+  .action(async (query, opts) => {
+    const { gmailSearchCommand } = await import('./commands/google-auth.js');
+    await gmailSearchCommand(query, opts);
+  });
+
+gmail
+  .command('read')
+  .description('Read a specific email by message ID')
+  .argument('<messageId>', 'Gmail message ID')
+  .action(async (messageId) => {
+    const { gmailReadCommand } = await import('./commands/google-auth.js');
+    await gmailReadCommand(messageId);
+  });
+
+gmail
+  .command('logout')
+  .description('Sign out of Gmail (remove stored tokens)')
+  .action(async () => {
+    const { gmailLogoutCommand } = await import('./commands/google-auth.js');
+    await gmailLogoutCommand();
+  });
+
+// ── Calendar subcommand group ──
+const calendar = program
+  .command('calendar')
+  .description('Google Calendar integration (login, list events)');
+
+calendar
+  .command('login')
+  .description('Sign in with Google to connect Calendar')
+  .action(async () => {
+    const { calendarLoginCommand } = await import('./commands/google-auth.js');
+    await calendarLoginCommand();
+  });
+
+calendar
+  .command('status')
+  .description('Check Calendar connection status')
+  .action(async () => {
+    const { calendarStatusCommand } = await import('./commands/google-auth.js');
+    await calendarStatusCommand();
+  });
+
+calendar
+  .command('list')
+  .description('List upcoming calendar events')
+  .option('--days <n>', 'Number of days ahead to look', parseInt, 7)
+  .option('--limit <n>', 'Max events', parseInt, 25)
+  .action(async (opts) => {
+    const { calendarListCommand } = await import('./commands/google-auth.js');
+    await calendarListCommand(opts);
+  });
+
+calendar
+  .command('logout')
+  .description('Sign out of Calendar (remove stored tokens)')
+  .action(async () => {
+    const { calendarLogoutCommand } = await import('./commands/google-auth.js');
+    await calendarLogoutCommand();
+  });
+
+// ── Google status (combined) ──
+program
+  .command('google-status')
+  .description('Show connection status for all Google services')
+  .action(async () => {
+    const { googleStatusCommand } = await import('./commands/google-auth.js');
+    await googleStatusCommand();
+  });
+
 // Parse and execute
 program.parseAsync(process.argv);

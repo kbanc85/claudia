@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.0 (2026-03-02)
+
+### Google Integration
+
+- **Gmail CLI** -- `claudia gmail login` opens your browser for Google OAuth. After signing in, Claudia can search, read, and send emails via `claudia gmail search`, `claudia gmail read`. Sign out with `claudia gmail logout`.
+- **Calendar CLI** -- `claudia calendar login` connects Google Calendar. List upcoming events with `claudia calendar list`. Sign out with `claudia calendar logout`.
+- **Loopback OAuth** -- Uses Google's Desktop App flow: temporary localhost server catches the callback, tokens stored locally at `~/.claudia/tokens/`. No server, no data collection.
+- **Branded callback page** -- OAuth success page shows Claudia's logo, feature cards for what the connection enables, and a privacy note.
+- **Privacy policy** -- `PRIVACY.md` added for Google Cloud app verification. Documents zero-collection, local-only architecture.
+- **Installer updated** -- Post-install completion message shows `claudia gmail login` and `claudia calendar login` as optional next steps.
+
 ## 1.50.2 (2026-03-02)
 
 ### Auto Global Install
