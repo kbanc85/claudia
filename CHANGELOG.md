@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.50.0 (2026-03-02)
+
+### The CLI Migration
+
+Claudia's memory system is rewritten as pure Node.js CLI subcommands, replacing the Python MCP daemon entirely. No more daemon startup bugs, port conflicts, or MCP schema drift. Claude invokes memory via `claudia memory <command>` through the Bash tool.
+
+- **21 new CLI files** -- Full Node.js implementation in `cli/` with better-sqlite3, sqlite-vec, and Ollama HTTP client. 7 core modules, 8 services, 5 command groups, 1 entry point.
+- **36 memory subcommands** -- `claudia memory save`, `recall`, `about`, `relate`, `batch`, `end-session`, `consolidate`, `briefing`, `temporal`, `graph`, `entities`, `modify`, `session`, `document`, `provenance`, `summary`, `reflections`, `project-health`, and more.
+- **Full MCP parity** -- All 21 MCP daemon tools ported to CLI equivalents with identical behavior and DB compatibility. Reads existing Python-created `.db` files with zero migration.
+- **35 template files updated** -- Every skill, hook, rule, and agent file rewritten to use CLI commands instead of MCP tool calls. Zero `memory.*` MCP references remain.
+- **Hooks rewritten** -- `session-health-check` and `pre-compact` hooks now call `claudia system-health` and `claudia memory consolidate` instead of HTTP pings to localhost:3848.
+- **MCP server entry removed** -- `.mcp.json.example` no longer registers `claudia-memory` as an MCP server. The CLI is the sole interface.
+
 ## 1.49.0 (2026-03-01)
 
 ### Visual Polish
