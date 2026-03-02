@@ -5,7 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { homedir } from 'os';
-import { createInterface } from 'readline';
+// readline no longer needed (STATUS line parsing removed in v1.50)
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -202,25 +202,6 @@ class ProgressRenderer {
   }
 }
 
-// ─── STATUS Line Parser ─────────────────────────────────────────────────
-
-function parseStatusLine(line) {
-  // STATUS:step:state:detail (4+ parts, detail may contain colons)
-  // ERROR:step:detail (3+ parts, detail may contain colons)
-  if (line.startsWith('STATUS:')) {
-    const parts = line.slice(7).split(':');
-    if (parts.length >= 2) {
-      return { type: 'status', step: parts[0], state: parts[1], detail: parts.slice(2).join(':') };
-    }
-  } else if (line.startsWith('ERROR:')) {
-    const parts = line.slice(6).split(':');
-    if (parts.length >= 1) {
-      return { type: 'error', step: parts[0], state: '', detail: parts.slice(1).join(':') };
-    }
-  }
-  return null;
-}
-
 // ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -329,138 +310,183 @@ async function main() {
   console.log('');
   renderer.render();
 
-  // Run install.sh/ps1 in embedded mode, piping STATUS lines
-  const memoryDaemonPath = isWindows
-    ? join(__dirname, '..', 'memory-daemon', 'scripts', 'install.ps1')
-    : join(__dirname, '..', 'memory-daemon', 'scripts', 'install.sh');
-
-  if (!existsSync(memoryDaemonPath)) {
-    renderer.update('environment', 'error', 'installer not found');
-    renderer.update('models', 'skipped');
-    renderer.update('memory', 'skipped');
-    renderer.update('health', 'skipped');
-    renderer.stopSpinner();
-    renderer.render();
-    runVaultStep(renderer, () => {
-      renderer.render();
-      showCompletion(targetDir, isCurrentDir, false);
-    });
-    return;
-  }
-
-  const spawnCmd = isWindows ? powershellPath : 'bash';
-  const spawnArgs = isWindows
-    ? ['-ExecutionPolicy', 'Bypass', '-File', memoryDaemonPath]
-    : [memoryDaemonPath];
-
-  let stderrBuf = '';
+  // Run CLI-based setup (no Python daemon needed)
   let memoryOk = false;
 
-  const installProc = spawn(spawnCmd, spawnArgs, {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      CLAUDIA_PROJECT_PATH: targetPath,
-      CLAUDIA_NONINTERACTIVE: '1',
-      CLAUDIA_EMBEDDED: '1'
+  try {
+    // Step 1: Environment -- check Node.js version and Ollama
+    renderer.update('environment', 'active', 'checking...');
+    const nodeVersion = process.versions.node;
+    const nodeMajor = parseInt(nodeVersion.split('.')[0], 10);
+    if (nodeMajor < 18) {
+      renderer.update('environment', 'error', `Node ${nodeVersion} (need 18+)`);
+      if (!supportsInPlace) renderer.appendLine('environment', 'error', `Node ${nodeVersion} (need 18+)`);
+      throw new Error('Node 18+ required');
     }
-  });
 
-  // Parse stdout for STATUS/ERROR lines
-  const rl = createInterface({ input: installProc.stdout });
-  rl.on('line', (line) => {
-    const parsed = parseStatusLine(line);
-    if (!parsed) return;
-
-    if (parsed.type === 'error') {
-      // ERROR:step:detail
-      const stepId = parsed.step;
-      renderer.update(stepId, 'error', parsed.detail);
-      if (!supportsInPlace) renderer.appendLine(stepId, 'error', parsed.detail);
-    } else {
-      // STATUS:step:state:detail
-      const { step: stepId, state, detail } = parsed;
-      if (state === 'ok') {
-        renderer.update(stepId, 'done', detail);
-        if (!supportsInPlace) renderer.appendLine(stepId, 'done', detail);
-      } else if (state === 'warn') {
-        renderer.update(stepId, 'warn', detail);
-        if (!supportsInPlace) renderer.appendLine(stepId, 'warn', detail);
-      } else if (state === 'progress') {
-        renderer.update(stepId, 'active', detail);
+    // Check Ollama is running
+    let ollamaOk = false;
+    try {
+      const resp = await fetch('http://127.0.0.1:11434/api/version');
+      if (resp.ok) {
+        ollamaOk = true;
       }
+    } catch {
+      // Ollama not running
     }
-  });
 
-  // Capture stderr for error dump
-  installProc.stderr.on('data', (chunk) => {
-    stderrBuf += chunk.toString();
-  });
+    if (ollamaOk) {
+      renderer.update('environment', 'done', `Node ${nodeVersion}, Ollama`);
+      if (!supportsInPlace) renderer.appendLine('environment', 'done', `Node ${nodeVersion}, Ollama`);
+    } else {
+      renderer.update('environment', 'warn', `Node ${nodeVersion}, no Ollama`);
+      if (!supportsInPlace) renderer.appendLine('environment', 'warn', `Node ${nodeVersion}, no Ollama`);
+    }
 
-  installProc.on('close', (code) => {
-    memoryOk = code === 0;
+    // Step 2: AI Models -- pull embedding model if Ollama is available
+    if (ollamaOk) {
+      renderer.update('models', 'active', 'checking embedding model...');
+      let modelReady = false;
 
-    // Fill in any steps that didn't get a final STATUS
-    for (const step of ['environment', 'models', 'memory', 'health']) {
-      const st = renderer.states[step].state;
-      if (st === 'active' || st === 'pending') {
-        if (code === 0) {
-          renderer.update(step, 'done');
-          if (!supportsInPlace) renderer.appendLine(step, 'done', '');
-        } else {
-          renderer.update(step, 'error', 'failed');
-          if (!supportsInPlace) renderer.appendLine(step, 'error', 'failed');
+      try {
+        const tagsResp = await fetch('http://127.0.0.1:11434/api/tags');
+        if (tagsResp.ok) {
+          const tagsData = await tagsResp.json();
+          const models = (tagsData.models || []).map(m => m.name);
+          modelReady = models.some(m => m.startsWith('all-minilm'));
         }
-      }
-    }
+      } catch { /* ignore */ }
 
-    renderer.stopSpinner();
-
-    if (memoryOk) {
-      // Set up .mcp.json
-      setupMcpJson(targetPath);
-
-      // Seed demo database if --demo flag
-      if (isDemoMode) {
-        const mcpPath = join(targetPath, '.mcp.json');
-        seedDemoDatabase(targetPath, mcpPath, () => {
-          runVaultStep(renderer, () => {
-            renderer.render();
-            showCompletion(targetDir, isCurrentDir, true);
+      if (!modelReady) {
+        renderer.update('models', 'active', 'pulling all-minilm:l6-v2...');
+        try {
+          const pullResp = await fetch('http://127.0.0.1:11434/api/pull', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'all-minilm:l6-v2', stream: false })
           });
-        });
-        return;
+          modelReady = pullResp.ok;
+        } catch { /* ignore */ }
+      }
+
+      if (modelReady) {
+        renderer.update('models', 'done', 'all-minilm:l6-v2');
+        if (!supportsInPlace) renderer.appendLine('models', 'done', 'all-minilm:l6-v2');
+      } else {
+        renderer.update('models', 'warn', 'pull failed (can retry later)');
+        if (!supportsInPlace) renderer.appendLine('models', 'warn', 'pull failed');
       }
     } else {
-      // Dump stderr on failure
-      if (stderrBuf.trim()) {
-        console.log(`\n${colors.dim}${stderrBuf.trim()}${colors.reset}`);
-      }
-      console.log(`${colors.dim} Full log: ~/.claudia/install.log${colors.reset}`);
+      renderer.update('models', 'warn', 'Ollama not running');
+      if (!supportsInPlace) renderer.appendLine('models', 'warn', 'Ollama not running');
     }
 
-    // Vault step, then completion
-    runVaultStep(renderer, () => {
-      renderer.render();
-      showCompletion(targetDir, isCurrentDir, memoryOk);
-    });
-  });
+    // Step 3: Memory System -- verify native deps and create directories
+    renderer.update('memory', 'active', 'checking native deps...');
+    const claudiaHome = join(homedir(), '.claudia');
+    mkdirSync(join(claudiaHome, 'memory'), { recursive: true });
+    mkdirSync(join(claudiaHome, 'backups'), { recursive: true });
 
-  installProc.on('error', (err) => {
-    renderer.update('environment', 'error', err.message);
-    renderer.update('models', 'skipped');
-    renderer.update('memory', 'skipped');
-    renderer.update('health', 'skipped');
-    renderer.stopSpinner();
+    let nativeDepsOk = false;
+    try {
+      const { createRequire } = await import('module');
+      const cliDir = join(__dirname, '..', 'cli');
+      // Check that better-sqlite3 can be loaded from the installed package
+      const require = createRequire(join(cliDir, 'index.js'));
+      require('better-sqlite3');
+      nativeDepsOk = true;
+    } catch {
+      // Native deps not available -- try installing them
+      renderer.update('memory', 'active', 'installing native deps...');
+      nativeDepsOk = await new Promise((resolve) => {
+        const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+        const npmProc = spawn(npmCmd, ['install', '--production'], {
+          cwd: join(__dirname, '..'),
+          stdio: 'pipe'
+        });
+        npmProc.on('close', (code) => resolve(code === 0));
+        npmProc.on('error', () => resolve(false));
+      });
+    }
+
+    if (nativeDepsOk) {
+      renderer.update('memory', 'done', 'CLI ready');
+      if (!supportsInPlace) renderer.appendLine('memory', 'done', 'CLI ready');
+    } else {
+      renderer.update('memory', 'warn', 'native deps missing (run npm install)');
+      if (!supportsInPlace) renderer.appendLine('memory', 'warn', 'native deps missing');
+    }
+
+    // Clean up legacy Python daemon if present
+    cleanupLegacyDaemon();
+
+    // Step 4 (vault): handled below
+
+    // Step 5: Health Check -- run claudia system-health
+    renderer.update('health', 'active', 'verifying...');
+    let healthOk = false;
+
+    const cliEntryPoint = join(__dirname, '..', 'cli', 'index.js');
+    if (existsSync(cliEntryPoint) && nativeDepsOk) {
+      healthOk = await new Promise((resolve) => {
+        const proc = spawn(process.execPath, [cliEntryPoint, 'system-health', '--project-dir', targetPath], {
+          stdio: 'pipe',
+          timeout: 15000
+        });
+        let stdout = '';
+        proc.stdout.on('data', (d) => { stdout += d.toString(); });
+        proc.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const data = JSON.parse(stdout);
+              resolve(data.status === 'healthy' || data.status === 'degraded');
+            } catch {
+              resolve(false);
+            }
+          } else {
+            resolve(false);
+          }
+        });
+        proc.on('error', () => resolve(false));
+      });
+    }
+
+    if (healthOk) {
+      renderer.update('health', 'done', 'system healthy');
+      if (!supportsInPlace) renderer.appendLine('health', 'done', 'system healthy');
+    } else if (nativeDepsOk) {
+      renderer.update('health', 'warn', 'check with: claudia system-health');
+      if (!supportsInPlace) renderer.appendLine('health', 'warn', 'check manually');
+    } else {
+      renderer.update('health', 'warn', 'skipped (deps missing)');
+      if (!supportsInPlace) renderer.appendLine('health', 'warn', 'skipped');
+    }
+
+    memoryOk = nativeDepsOk;
+
+    // Seed demo database if --demo flag
+    if (isDemoMode && nativeDepsOk) {
+      seedDemoDatabase(targetPath, cliEntryPoint);
+    }
+
+  } catch (err) {
+    // Environment check failed early
+    for (const step of ['models', 'memory', 'health']) {
+      if (renderer.states[step].state === 'pending' || renderer.states[step].state === 'active') {
+        renderer.update(step, 'skipped');
+      }
+    }
+  }
+
+  renderer.stopSpinner();
+
+  // Vault step, then completion
+  runVaultStep(renderer, () => {
     renderer.render();
-
-    runVaultStep(renderer, () => {
-      renderer.render();
-      showCompletion(targetDir, isCurrentDir, false);
-    });
+    showCompletion(targetDir, isCurrentDir, memoryOk);
   });
 
-  // ── Vault step (runs in index.js, not in install.sh) ──
+  // ── Vault step ──
 
   function runVaultStep(renderer, callback) {
     renderer.update('vault', 'active', 'detecting Obsidian...');
@@ -524,68 +550,42 @@ async function main() {
     callback(obsidianDetected);
   }
 
-  // ── .mcp.json setup (silent) ──
+  // ── Demo database seeder (CLI-based) ──
 
-  function setupMcpJson(targetPath) {
-    const mcpPath = join(targetPath, '.mcp.json');
-    const mcpExamplePath = join(targetPath, '.mcp.json.example');
+  function seedDemoDatabase(targetPath, cliEntryPoint) {
+    const demoMemories = [
+      { content: 'Claudia demo workspace initialized. This is a sample memory to verify the system works.', type: 'observation', importance: 0.7 },
+      { content: 'Demo user prefers concise responses with clear structure.', type: 'preference', importance: 0.8 },
+      { content: 'Project "Demo" is an example workspace for testing Claudia features.', type: 'observation', importance: 0.6 },
+    ];
 
-    if (existsSync(mcpExamplePath) && !existsSync(mcpPath)) {
+    for (const mem of demoMemories) {
       try {
-        let mcpConfig = JSON.parse(readFileSync(mcpExamplePath, 'utf8'));
-        mcpConfig.mcpServers = mcpConfig.mcpServers || {};
-
-        const home = homedir();
-        const pythonCmd = isWindows
-          ? join(home, '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
-          : `${process.env.HOME}/.claudia/daemon/venv/bin/python`;
-
-        mcpConfig.mcpServers['claudia-memory'] = {
-          command: pythonCmd,
-          args: ['-m', 'claudia_memory', '--project-dir', '${workspaceFolder}'],
-          _description: 'Claudia memory system with vector search'
-        };
-        writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
+        const proc = spawn(process.execPath, [
+          cliEntryPoint, 'memory', 'save',
+          mem.content,
+          '--type', mem.type,
+          '--importance', String(mem.importance),
+          '--project-dir', targetPath
+        ], { stdio: 'pipe' });
+        // Fire-and-forget
+        proc.on('error', () => {});
       } catch {
         // Non-fatal
       }
     }
   }
 
-  // ── Demo database seeder (silent spawn) ──
+  // ── Legacy daemon cleanup ──
 
-  function seedDemoDatabase(targetPath, mcpPath, callback) {
-    const seedScript = join(__dirname, '..', 'memory-daemon', 'scripts', 'seed_demo.py');
-    const pythonPath = isWindows
-      ? join(homedir(), '.claudia', 'daemon', 'venv', 'Scripts', 'python.exe')
-      : join(homedir(), '.claudia', 'daemon', 'venv', 'bin', 'python');
+  function cleanupLegacyDaemon() {
+    const daemonVenv = join(homedir(), '.claudia', 'daemon', 'venv');
+    const daemonLog = join(homedir(), '.claudia', 'daemon-stderr.log');
 
-    const seedProc = spawn(pythonPath, [seedScript, '--workspace', targetPath, '--force'], {
-      stdio: 'pipe'
-    });
-
-    seedProc.on('close', (seedCode) => {
-      if (seedCode === 0) {
-        // Add CLAUDIA_DEMO_MODE to .mcp.json env
-        if (existsSync(mcpPath)) {
-          try {
-            let mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
-            if (mcpConfig.mcpServers && mcpConfig.mcpServers['claudia-memory']) {
-              mcpConfig.mcpServers['claudia-memory'].env = mcpConfig.mcpServers['claudia-memory'].env || {};
-              mcpConfig.mcpServers['claudia-memory'].env.CLAUDIA_DEMO_MODE = '1';
-              writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2));
-            }
-          } catch {
-            // Non-fatal
-          }
-        }
-      }
-      callback();
-    });
-
-    seedProc.on('error', () => {
-      callback();
-    });
+    if (existsSync(daemonVenv) || existsSync(daemonLog)) {
+      // Don't delete automatically, just note it
+      // Users may still have the old daemon running
+    }
   }
 
   // ── Completion block ──
@@ -598,9 +598,9 @@ async function main() {
     console.log(` ${colors.bold}Done!${colors.reset} Next:`);
     console.log(`   ${colors.cyan}${cdCmd}claude${colors.reset}`);
 
-    if (memoryInstalled) {
+    if (!memoryInstalled) {
       console.log('');
-      console.log(` ${colors.boldYellow}⚡${colors.reset} Restart Claude Code if it's already open.`);
+      console.log(` ${colors.dim}Memory requires Ollama. Install from ollama.com${colors.reset}`);
     }
     console.log('');
   }
@@ -677,9 +677,17 @@ ${contextual.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
 ### Explicit (/command only)
 ${explicit.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
 
-## Memory Tools (21 MCP tools)
-13 standalone: remember, recall, about, relate, batch, end_session, consolidate, briefing, summary, reflections, system_health, project_health, cognitive.ingest
-8 merged: temporal (upcoming/since/timeline/morning), graph (network/path/hubs/dormant/reconnect), entities (create/search/merge/delete/overview), vault (sync/status/canvas/import), modify (correct/invalidate/invalidate_relationship), session (buffer/context/unsummarized), document (store/search), provenance (trace/audit)`;
+## Memory CLI Commands
+All memory operations use \`claudia memory <command>\` via the Bash tool. No MCP server needed.
+Core: save, recall, about, relate, batch, end-session, consolidate, briefing, summary, reflections, project-health
+Temporal: upcoming, since, timeline, morning
+Graph: network, path, hubs, dormant, reconnect
+Entities: create, search, merge, delete, overview
+Vault: sync, status, canvas, import
+Modify: correct, invalidate, invalidate-relationship
+Session: buffer, context, unsummarized
+Document: store, search
+Provenance: trace, audit, verify-chain`;
     } catch {
       // skill-index.json not found, skip skills section
     }

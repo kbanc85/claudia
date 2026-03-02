@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.50.1 (2026-03-02)
+
+### Installer Fix
+
+- **Installer rewritten for CLI** -- `bin/index.js` no longer depends on `memory-daemon/scripts/install.sh`. Environment, AI Models, Memory System, and Health Check steps now use direct Ollama HTTP calls, `createRequire` for native dep verification, and `claudia system-health` via the CLI.
+- **MCP setup removed** -- `setupMcpJson()` eliminated. No `.mcp.json` is created or modified during install.
+- **Demo seeder uses CLI** -- `--demo` flag now seeds via `claudia memory save` instead of Python `seed_demo.py`.
+- **Dead code removed** -- STATUS line parser and `createInterface` import cleaned up.
+
 ## 1.50.0 (2026-03-02)
 
 ### The CLI Migration
