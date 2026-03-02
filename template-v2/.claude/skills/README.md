@@ -170,7 +170,7 @@ argument-hint: [arg]
 | `follow-up-draft/` | Post-meeting thank-you |
 | `file-document/` | Save documents with provenance |
 | `new-person/` | Create relationship file |
-| `diagnose/` | Check memory daemon health |
+| `diagnose/` | Check Claudia CLI health |
 
 ## Effort Levels
 

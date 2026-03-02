@@ -16,8 +16,8 @@ inputs:
     description: The conversation content containing potential commitment language
 outputs:
   - name: commitment
-    type: memory_ops
-    description: Tracked commitment stored via memory.remember with type 'commitment'
+    type: cli_command
+    description: Tracked commitment stored via `claudia memory save` with type 'commitment'
   - name: context_update
     type: file
     description: Update to context/commitments.md or context/waiting.md
@@ -87,12 +87,17 @@ outputs:
    - Due: Deadline
    - Context: Any relevant notes
 
-3. **Persist to memory immediately** - Call `memory.remember` with:
+3. **Persist to memory immediately** - Run `claudia memory save --project-dir "$PWD"` with:
    - `content`: The commitment text (e.g., "Send proposal to Sarah by Friday")
    - `type`: "commitment"
    - `about`: [person name if applicable]
    - `importance`: 0.9
    - `source`: "conversation"
+
+   Example:
+   ```bash
+   claudia memory save "Send proposal to Sarah by Friday" --type commitment --about "Sarah Chen" --importance 0.9 --project-dir "$PWD"
+   ```
 
    This ensures the commitment survives context compaction and can be recalled semantically. Do not skip this step.
 
@@ -231,7 +236,7 @@ When detecting commitments, identify any explicit or implicit deadlines:
 
 ### How It Works
 
-The memory system automatically extracts and indexes deadlines when storing commitments. When calling `memory.remember` with `type: "commitment"`, include the full commitment text with the deadline language. The system will:
+The memory system automatically extracts and indexes deadlines when storing commitments. When calling `claudia memory save` with `--type commitment`, include the full commitment text with the deadline language. The system will:
 
 1. Parse temporal references from the content
 2. Resolve relative dates to absolute ISO dates

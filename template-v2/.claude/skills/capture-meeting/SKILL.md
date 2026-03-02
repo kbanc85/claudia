@@ -31,13 +31,15 @@ User provides one of:
 **Always file the raw transcript/notes FIRST.** This is not optional. Source preservation creates provenance: every extracted fact can trace back to where it came from.
 
 ```
-Call memory.document with operation="store":
-├── content: The FULL raw transcript/notes text (do not summarize)
-├── filename: YYYY-MM-DD-[person]-[topic].md
-├── source_type: "transcript"
-├── summary: Brief 1-line summary of the meeting
-├── about: [list of participant entity names]
+claudia memory document store \
+  --filename "YYYY-MM-DD-[person]-[topic].md" \
+  --source-type "transcript" \
+  --summary "Brief 1-line summary of the meeting" \
+  --about "participant1,participant2" \
+  --project-dir "$PWD" \
+  < content.md
 ```
+(Pipe the FULL raw transcript/notes text via stdin; do not summarize)
 
 The file is automatically routed to the right folder:
 - `people/sarah-chen/transcripts/2026-02-04-kickoff.md`
@@ -73,7 +75,7 @@ The file is automatically routed to the right folder:
    - Confirm entity names match existing entities
    - Adjust or remove any questionable extractions
 
-4. Call memory.batch with the reviewed operations
+4. Call `claudia memory batch --project-dir "$PWD"` with the reviewed operations (via stdin JSON)
 ```
 
 **Fallback: Manual extraction** (use when agent is unavailable or for very short notes)
@@ -103,11 +105,11 @@ The file is automatically routed to the right folder:
 
 ### 4. Link Provenance
 
-After extracting memories (facts, commitments) via memory.batch or memory.remember:
+After extracting memories (facts, commitments) via `claudia memory batch` or `claudia memory save`:
 ```
-Call memory.document again with memory_ids=[...] to link the stored transcript
-to the memories extracted from it. This creates the provenance chain:
-memory -> document -> file on disk.
+Run claudia memory document store --memory-ids "id1,id2,..." --project-dir "$PWD"
+to link the stored transcript to the memories extracted from it. This creates
+the provenance chain: memory -> document -> file on disk.
 ```
 
 Now the user can ask "where did you learn that Sarah prefers async communication?" and you can point to the exact transcript.
@@ -184,7 +186,7 @@ Ask for confirmation on:
 
 ## Quality Checklist
 
-- [ ] **Raw transcript/notes filed** (memory.document called with full content)
+- [ ] **Raw transcript/notes filed** (`claudia memory document store` called with full content)
 - [ ] Memories linked to source document (provenance chain complete)
 - [ ] Every action item has an owner
 - [ ] Every commitment has a deadline (even approximate)

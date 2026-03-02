@@ -157,10 +157,10 @@
     {
       "name": "diagnose",
       "path": "diagnose/SKILL.md",
-      "description": "Check memory daemon health and troubleshoot connectivity issues",
+      "description": "Check Claudia CLI health and troubleshoot connectivity issues",
       "invocation": "contextual",
       "effort_level": "low",
-      "triggers": ["is my memory working", "diagnose memory", "daemon health", "troubleshoot memory"]
+      "triggers": ["is my memory working", "diagnose memory", "cli health", "troubleshoot memory"]
     },
     {
       "name": "meeting-prep",

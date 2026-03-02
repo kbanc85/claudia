@@ -149,6 +149,7 @@ class ConsolidateService:
                 updated_at = ?
             WHERE importance > 0.7
               AND importance > ?
+              AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')
             """,
             (floor, slow_decay_rate, datetime.utcnow().isoformat(), floor),
         )
@@ -163,6 +164,7 @@ class ConsolidateService:
                 updated_at = ?
             WHERE importance <= 0.7
               AND importance > ?
+              AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')
             """,
             (floor, decay_rate, datetime.utcnow().isoformat(), floor),
         )
@@ -171,7 +173,7 @@ class ConsolidateService:
 
         memories_decayed = tier1_count + tier2_count
 
-        # Entities: same tiered approach
+        # Entities: same tiered approach (close-circle entities are protected from decay)
         self.db.execute(
             """
             UPDATE entities
@@ -179,6 +181,7 @@ class ConsolidateService:
                 updated_at = ?
             WHERE importance > 0.7
               AND importance > ?
+              AND (close_circle IS NULL OR close_circle = 0)
             """,
             (floor, slow_decay_rate, datetime.utcnow().isoformat(), floor),
         )
@@ -189,6 +192,7 @@ class ConsolidateService:
                 updated_at = ?
             WHERE importance <= 0.7
               AND importance > ?
+              AND (close_circle IS NULL OR close_circle = 0)
             """,
             (floor, decay_rate, datetime.utcnow().isoformat(), floor),
         )
@@ -201,6 +205,7 @@ class ConsolidateService:
                 updated_at = ?
             WHERE strength > 0.7
               AND strength > 0.01
+              AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')
             """,
             (slow_decay_rate, datetime.utcnow().isoformat()),
         )
@@ -211,6 +216,7 @@ class ConsolidateService:
                 updated_at = ?
             WHERE strength <= 0.7
               AND strength > 0.01
+              AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')
             """,
             (decay_rate, datetime.utcnow().isoformat()),
         )
@@ -2544,6 +2550,158 @@ class ConsolidateService:
             logger.info(f"Found {len(candidates)} potential entity duplicates")
         return candidates
 
+    def run_lifecycle_transitions(self) -> dict:
+        """Apply lifecycle tier transitions based on access patterns.
+
+        Cooling: memory not accessed for cooling_threshold_days AND not sacred
+        Archive: in cooling for archive_threshold_days AND importance < 0.3
+        """
+        config = self.config
+        now = datetime.utcnow()
+
+        cooling_cutoff = (now - timedelta(days=config.cooling_threshold_days)).isoformat()
+        archive_cutoff = (now - timedelta(days=config.archive_threshold_days)).isoformat()
+
+        # Active -> Cooling: not accessed recently, not sacred
+        cooled = 0
+        try:
+            cursor = self.db.execute(
+                """
+                UPDATE memories
+                SET lifecycle_tier = 'cooling', updated_at = datetime('now')
+                WHERE (lifecycle_tier = 'active' OR lifecycle_tier IS NULL)
+                  AND invalidated_at IS NULL
+                  AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')
+                  AND (last_accessed_at IS NULL OR last_accessed_at < ?)
+                  AND created_at < ?
+                """,
+                (cooling_cutoff, cooling_cutoff),
+            )
+            cooled = cursor.rowcount if hasattr(cursor, 'rowcount') and cursor.rowcount >= 0 else 0
+        except Exception as e:
+            logger.debug(f"Cooling transition error: {e}")
+
+        # Cooling -> Archived: been cooling long enough AND low importance
+        archived = 0
+        try:
+            cursor = self.db.execute(
+                """
+                UPDATE memories
+                SET lifecycle_tier = 'archived',
+                    archived_at = datetime('now'),
+                    updated_at = datetime('now')
+                WHERE lifecycle_tier = 'cooling'
+                  AND invalidated_at IS NULL
+                  AND importance < 0.3
+                  AND (last_accessed_at IS NULL OR last_accessed_at < ?)
+                  AND created_at < ?
+                """,
+                (archive_cutoff, archive_cutoff),
+            )
+            archived = cursor.rowcount if hasattr(cursor, 'rowcount') and cursor.rowcount >= 0 else 0
+        except Exception as e:
+            logger.debug(f"Archive transition error: {e}")
+
+        if cooled > 0 or archived > 0:
+            logger.info(f"Lifecycle transitions: {cooled} cooled, {archived} archived")
+
+        return {"cooled": cooled, "archived": archived}
+
+    def detect_auto_sacred(self) -> int:
+        """Auto-promote memories about close-circle entities that match sacred keywords."""
+        config = self.config
+        if not config.enable_auto_sacred:
+            return 0
+
+        promoted = 0
+        try:
+            close_entities = self.db.execute(
+                "SELECT id FROM entities WHERE close_circle = 1 AND deleted_at IS NULL",
+                fetch=True,
+            ) or []
+
+            for entity in close_entities:
+                entity_id = entity["id"]
+                for keyword in config.sacred_core_keywords:
+                    rows = self.db.execute(
+                        """
+                        SELECT m.id FROM memories m
+                        JOIN memory_entities me ON m.id = me.memory_id
+                        WHERE me.entity_id = ?
+                          AND m.invalidated_at IS NULL
+                          AND (m.lifecycle_tier IS NULL OR m.lifecycle_tier != 'sacred')
+                          AND LOWER(m.content) LIKE '%' || LOWER(?) || '%'
+                        """,
+                        (entity_id, keyword),
+                        fetch=True,
+                    ) or []
+                    for row in rows:
+                        self.db.execute(
+                            """UPDATE memories SET lifecycle_tier = 'sacred',
+                               sacred_reason = ?,
+                               updated_at = datetime('now')
+                               WHERE id = ? AND (lifecycle_tier IS NULL OR lifecycle_tier != 'sacred')""",
+                            (f"auto: close-circle keyword '{keyword}'", row["id"]),
+                        )
+                        promoted += 1
+        except Exception as e:
+            logger.debug(f"Auto-sacred detection error: {e}")
+
+        if promoted > 0:
+            logger.info(f"Auto-sacred: promoted {promoted} memories")
+        return promoted
+
+    def detect_close_circle_candidates(self) -> list:
+        """Detect entities that should be close-circle based on contact velocity."""
+        config = self.config
+        candidates = []
+        try:
+            # High contact velocity detection
+            rows = self.db.execute(
+                """
+                SELECT id, name, contact_frequency_days, contact_trend, description
+                FROM entities
+                WHERE type = 'person'
+                  AND deleted_at IS NULL
+                  AND (close_circle IS NULL OR close_circle = 0)
+                  AND contact_frequency_days IS NOT NULL
+                  AND contact_frequency_days < 7
+                  AND contact_trend IN ('accelerating', 'stable')
+                """,
+                fetch=True,
+            ) or []
+            for row in rows:
+                candidates.append({
+                    "entity_id": row["id"],
+                    "name": row["name"],
+                    "reason": f"high contact velocity ({row['contact_frequency_days']:.1f}d, {row['contact_trend']})",
+                })
+
+            # Keyword-based detection in entity descriptions
+            for keyword in config.close_circle_keywords:
+                desc_rows = self.db.execute(
+                    """
+                    SELECT id, name FROM entities
+                    WHERE type = 'person'
+                      AND deleted_at IS NULL
+                      AND (close_circle IS NULL OR close_circle = 0)
+                      AND LOWER(description) LIKE '%' || LOWER(?) || '%'
+                    """,
+                    (keyword,),
+                    fetch=True,
+                ) or []
+                for row in desc_rows:
+                    if not any(c["entity_id"] == row["id"] for c in candidates):
+                        candidates.append({
+                            "entity_id": row["id"],
+                            "name": row["name"],
+                            "reason": f"keyword match: '{keyword}' in description",
+                        })
+        except Exception as e:
+            logger.debug(f"Close-circle detection error: {e}")
+
+        return candidates
+
     def run_full_consolidation(self) -> Dict[str, Any]:
         """
         Run complete consolidation: decay, patterns, predictions.
@@ -2572,6 +2730,15 @@ class ConsolidateService:
             logger.warning(f"Decay phase failed: {e}")
             results["decay"] = {"error": str(e)}
             results["boosted"] = 0
+
+        # Phase 1b: Lifecycle transitions + auto-sacred
+        try:
+            results["lifecycle"] = self.run_lifecycle_transitions()
+            results["auto_sacred"] = self.detect_auto_sacred()
+            results["close_circle_candidates"] = len(self.detect_close_circle_candidates())
+        except Exception as e:
+            logger.warning(f"Lifecycle phase failed: {e}")
+            results["lifecycle"] = {"error": str(e)}
 
         # [4R: Reflect]
         # Phase 2: Merging (modifies memory content)

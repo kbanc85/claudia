@@ -101,6 +101,23 @@ class MemoryConfig:
     # Vault layout (PARA-inspired structure)
     vault_layout: str = "para"           # Vault organization style (only "para" for now)
 
+    # Lifecycle & Sacred memory settings
+    cooling_threshold_days: int = 60        # Days without access before memory enters 'cooling'
+    archive_threshold_days: int = 180       # Days in cooling + low importance before archiving
+    enable_auto_sacred: bool = True         # Auto-detect sacred facts for close-circle entities
+    close_circle_keywords: list = field(default_factory=lambda: [
+        "close friend", "bestie", "family", "inner circle", "best friend",
+        "spouse", "partner", "sibling", "parent", "child",
+    ])
+    sacred_core_keywords: list = field(default_factory=lambda: [
+        "birthday", "allergy", "family", "boundary", "health",
+        "never forget", "anniversary", "preference", "medical",
+        "dietary", "phobia", "trigger",
+    ])
+    enable_chain_verification: bool = True  # SHA-256 chain hashing on memories
+    context_builder_token_budget: int = 8000  # Default token budget for CRE
+    context_builder_max_facts: int = 30       # Max facts in CRE context window
+
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
 
@@ -194,6 +211,22 @@ class MemoryConfig:
                     config.auto_dedupe_threshold = data["auto_dedupe_threshold"]
                 if "graph_proximity_weight" in data:
                     config.graph_proximity_weight = data["graph_proximity_weight"]
+                if "cooling_threshold_days" in data:
+                    config.cooling_threshold_days = data["cooling_threshold_days"]
+                if "archive_threshold_days" in data:
+                    config.archive_threshold_days = data["archive_threshold_days"]
+                if "enable_auto_sacred" in data:
+                    config.enable_auto_sacred = data["enable_auto_sacred"]
+                if "close_circle_keywords" in data:
+                    config.close_circle_keywords = data["close_circle_keywords"]
+                if "sacred_core_keywords" in data:
+                    config.sacred_core_keywords = data["sacred_core_keywords"]
+                if "enable_chain_verification" in data:
+                    config.enable_chain_verification = data["enable_chain_verification"]
+                if "context_builder_token_budget" in data:
+                    config.context_builder_token_budget = data["context_builder_token_budget"]
+                if "context_builder_max_facts" in data:
+                    config.context_builder_max_facts = data["context_builder_max_facts"]
 
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Could not load config from {config_path}: {e}. Using defaults.")
@@ -276,6 +309,18 @@ class MemoryConfig:
         if not (0.0 <= self.graph_proximity_weight <= 1.0):
             logger.warning(f"graph_proximity_weight={self.graph_proximity_weight} out of range [0,1], using default 0.15")
             self.graph_proximity_weight = 0.15
+        if self.cooling_threshold_days < 1:
+            logger.warning(f"cooling_threshold_days={self.cooling_threshold_days} below minimum, using 60")
+            self.cooling_threshold_days = 60
+        if self.archive_threshold_days < self.cooling_threshold_days:
+            logger.warning(f"archive_threshold_days must be >= cooling_threshold_days, using {self.cooling_threshold_days * 3}")
+            self.archive_threshold_days = self.cooling_threshold_days * 3
+        if self.context_builder_token_budget < 500:
+            logger.warning(f"context_builder_token_budget={self.context_builder_token_budget} too small, using 2000")
+            self.context_builder_token_budget = 2000
+        if self.context_builder_max_facts < 5:
+            logger.warning(f"context_builder_max_facts={self.context_builder_max_facts} too small, using 10")
+            self.context_builder_max_facts = 10
 
     def save(self) -> None:
         """Save current configuration to ~/.claudia/config.json"""
@@ -319,6 +364,12 @@ class MemoryConfig:
             "graph_proximity_weight": self.graph_proximity_weight,
             "backup_daily_retention": self.backup_daily_retention,
             "backup_weekly_retention": self.backup_weekly_retention,
+            "cooling_threshold_days": self.cooling_threshold_days,
+            "archive_threshold_days": self.archive_threshold_days,
+            "enable_auto_sacred": self.enable_auto_sacred,
+            "enable_chain_verification": self.enable_chain_verification,
+            "context_builder_token_budget": self.context_builder_token_budget,
+            "context_builder_max_facts": self.context_builder_max_facts,
         }
 
         with open(config_path, "w") as f:

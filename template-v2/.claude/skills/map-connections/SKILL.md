@@ -84,22 +84,23 @@ Co-mentioned or contextually implied:
 
 Before creating entities:
 1. Normalize names to canonical form (lowercase, no titles)
-2. Check if entity already exists in memory via `memory.entities` (operation="search")
+2. Check if entity already exists in memory via `claudia memory entities search --project-dir "$PWD"`
 3. Merge new information with existing entity data
 4. Track which entities are new vs updated
 
 ### 5. Store in Memory
 
-Use `memory.batch` for efficiency:
+Use `claudia memory batch` for efficiency:
 
-```
-memory.batch operations=[
-  {op: "entity", name: "Sarah Chen", type: "person", description: "CEO at Acme Corp"},
-  {op: "entity", name: "Acme Corp", type: "organization"},
-  {op: "relate", source: "Sarah Chen", target: "Acme Corp", relationship: "works_at", strength: 1.0, origin_type: "extracted"},
-  {op: "relate", source: "Sarah Chen", target: "Tom Miller", relationship: "works_with", strength: 1.0, origin_type: "inferred"},
-  ...
+```bash
+claudia memory batch --project-dir "$PWD" <<'EOF'
+[
+  {"op": "entity", "name": "Sarah Chen", "type": "person", "description": "CEO at Acme Corp"},
+  {"op": "entity", "name": "Acme Corp", "type": "organization"},
+  {"op": "relate", "source": "Sarah Chen", "target": "Acme Corp", "relationship": "works_at", "strength": 1.0, "origin_type": "extracted"},
+  {"op": "relate", "source": "Sarah Chen", "target": "Tom Miller", "relationship": "works_with", "strength": 1.0, "origin_type": "inferred"}
 ]
+EOF
 ```
 
 For relationship `origin_type`:

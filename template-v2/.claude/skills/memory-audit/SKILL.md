@@ -23,10 +23,11 @@ When run without arguments, produce a system-level overview of everything in mem
 Query the memory system for aggregate counts:
 
 ```
-Call memory.entities with operation="search" and a broad query ("*" or "") to get total entity count.
-Call memory.recall with compact=true, limit=1 to estimate memory volume.
-Call memory.document with operation="search" (no filters) to count documents.
+claudia memory entities search --query "*" --project-dir "$PWD"
+claudia memory recall "*" --compact --limit 1 --project-dir "$PWD"
+claudia memory document search --project-dir "$PWD"
 ```
+Parse the JSON output from each command to get counts.
 
 Display:
 ```
@@ -44,9 +45,9 @@ Display:
 ### 2. People (Top 10 by Importance)
 
 ```
-Call memory.entities with operation="search", types=["person"], limit=10
+claudia memory entities search --types "person" --limit 10 --project-dir "$PWD"
 For each person:
-  Call memory.about to get memory count, last mentioned, key facts
+  claudia memory about "[person name]" --project-dir "$PWD"
 ```
 
 Display as a table:
@@ -62,21 +63,22 @@ Display as a table:
 
 Same pattern with types=["project"]:
 ```
-Call memory.entities with operation="search", types=["project"], limit=10
+claudia memory entities search --types "project" --limit 10 --project-dir "$PWD"
 ```
 
 ### 4. Active Patterns
 
 ```
-Call memory.session with operation="context" to get active patterns and insights
+claudia memory session context --project-dir "$PWD"
 ```
 
 ### 5. Provenance Sample
 
 Pick the 3 most recent high-importance memories and trace them:
 ```
-Call memory.recall with compact=true, limit=3
-For each result, call memory.provenance with operation="trace" to get full provenance
+claudia memory recall "*" --compact --limit 3 --project-dir "$PWD"
+For each result, run:
+  claudia memory provenance trace --memory-id "[id]" --project-dir "$PWD"
 ```
 
 Display:
@@ -99,7 +101,7 @@ When run with an entity name (e.g., `/memory-audit Sarah Chen`):
 ### 1. Profile
 
 ```
-Call memory.about with the entity name
+claudia memory about "[entity name]" --project-dir "$PWD"
 ```
 
 Display:
@@ -115,7 +117,7 @@ Display:
 
 ### 2. All Memories (grouped by type)
 
-From the memory.about response, group memories:
+From the `claudia memory about` JSON response, group memories:
 ```
 ### Facts (N)
 - [content] (importance: X, created: date)
@@ -137,7 +139,7 @@ From the memory.about response, group memories:
 ### 4. Linked Documents
 
 ```
-Call memory.document with operation="search", entity=[entity name]
+claudia memory document search --entity "[entity name]" --project-dir "$PWD"
 ```
 
 Display:
@@ -150,7 +152,7 @@ Display:
 
 For each commitment or high-importance memory (importance > 0.7):
 ```
-Call memory.provenance with operation="trace" for the memory ID
+claudia memory provenance trace --memory-id "[memory ID]" --project-dir "$PWD"
 ```
 
 Display:

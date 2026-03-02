@@ -22,7 +22,7 @@ outputs:
 
 # Judgment Awareness Skill
 
-**Triggers:** Activates at session start (after `memory.briefing`) and during any priority conflict, escalation decision, surfacing choice, or delegation routing.
+**Triggers:** Activates at session start (after `claudia memory briefing`) and during any priority conflict, escalation decision, surfacing choice, or delegation routing.
 
 ---
 
@@ -57,7 +57,7 @@ If a judgment rule conflicts with a principle, the principle wins silently.
 
 ### At Session Start
 
-After calling `memory.briefing`, silently check for `context/judgment.yaml`:
+After calling `claudia memory briefing`, silently check for `context/judgment.yaml`:
 
 1. If the file exists, read it and hold the rules in context
 2. If the file does not exist, continue normally (graceful degradation)

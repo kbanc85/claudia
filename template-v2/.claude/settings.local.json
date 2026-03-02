@@ -23,7 +23,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\" 2>/dev/null || bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh\" 2>/dev/null || echo {\"additionalContext\":\"Pre-compact hook skipped.\"}",
-            "timeout": 5000,
+            "timeout": 10000,
             "statusMessage": "Preserving context..."
           }
         ]

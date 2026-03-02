@@ -44,7 +44,7 @@ ls -la ~/.claudia/demo/*.db 2>/dev/null || echo "NO_DEMO_DBS"
 
 ### Step 2: Get current database
 
-The currently active database is determined by the memory daemon's configuration. Check the MCP config or environment:
+The currently active database is determined by the workspace directory. The CLI hashes the project path to find the right database:
 
 ```bash
 # Check current working directory to compute expected hash
@@ -115,7 +115,7 @@ Format "Last Active" as relative time (e.g., "2h ago", "3d ago", "14d ago").
 
 ## Use
 
-Switch to a different database by modifying the MCP configuration.
+Switch to a different database by setting the `CLAUDIA_DB_OVERRIDE` environment variable.
 
 ### Step 1: Verify database exists
 
@@ -147,7 +147,7 @@ You're about to switch from:
 To:
   **Target:** [target workspace path] ([target hash])
 
-This will modify your `.mcp.json` to set `CLAUDIA_DB_OVERRIDE`.
+This will set `CLAUDIA_DB_OVERRIDE` in your environment.
 **You'll need to restart Claude Code for the change to take effect.**
 
 Proceed? (yes/no)
@@ -155,26 +155,20 @@ Proceed? (yes/no)
 
 ### Step 4: Modify .mcp.json
 
-If confirmed, update the `.mcp.json` file to add `CLAUDIA_DB_OVERRIDE` environment variable:
+If confirmed, update the `.claude/settings.local.json` file to add `CLAUDIA_DB_OVERRIDE` environment variable:
 
-Read the current .mcp.json, then add or update the environment variable for the claudia-memory server:
+Read the current settings, then add or update the environment variable:
 
 ```bash
-# Check if .mcp.json exists
-cat .mcp.json 2>/dev/null || echo "NO_MCP_JSON"
+# Check if settings exist
+cat .claude/settings.local.json 2>/dev/null || echo "NO_SETTINGS"
 ```
 
 Then edit the file to add:
 ```json
 {
-  "mcpServers": {
-    "claudia-memory": {
-      "command": "...",
-      "args": ["..."],
-      "env": {
-        "CLAUDIA_DB_OVERRIDE": "/Users/kamil/.claudia/memory/<hash>.db"
-      }
-    }
+  "env": {
+    "CLAUDIA_DB_OVERRIDE": "/Users/kamil/.claudia/memory/<hash>.db"
   }
 }
 ```
@@ -389,7 +383,7 @@ No Claudia databases found.
 
 This could mean:
 - Claudia hasn't been set up yet (run `npx get-claudia`)
-- The memory daemon hasn't been used yet
+- The Claudia CLI hasn't been used yet
 - Databases are in a non-standard location
 
 Expected locations:

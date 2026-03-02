@@ -23,18 +23,18 @@ Execute these memory queries to build a comprehensive picture:
 ### Step 1: Entity Core (limit=50)
 
 ```
-memory.about(entity=[target], limit=50)
+claudia memory about "[target]" --limit 50 --project-dir "$PWD"
 ```
 
-Get everything known about the primary entity: memories, relationships, metadata, recent sessions.
+Get everything known about the primary entity (JSON output): memories, relationships, metadata, recent sessions.
 
 ### Step 2: Semantic Recall (limit=50)
 
 ```
-memory.recall(query=[target + context], limit=50)
+claudia memory recall "[target + context]" --limit 50 --project-dir "$PWD"
 ```
 
-Broad semantic search to catch memories that reference the entity indirectly or discuss related topics.
+Broad semantic search (JSON output) to catch memories that reference the entity indirectly or discuss related topics.
 
 ### Step 3: Connected Entities (limit=10 each, top 3 connections)
 
@@ -42,7 +42,7 @@ From the relationships returned in Step 1, identify the top 3 connected entities
 
 ```
 For each of top 3 related entities:
-  memory.about(entity=[connected], limit=10)
+  claudia memory about "[connected]" --limit 10 --project-dir "$PWD"
 ```
 
 This surfaces the network around the target: who they work with, what those people are doing, shared context.
@@ -50,7 +50,7 @@ This surfaces the network around the target: who they work with, what those peop
 ### Step 4: Temporal Sweep (limit=30)
 
 ```
-memory.recall(query=[target], limit=30, types=["observation", "learning", "commitment"])
+claudia memory recall "[target]" --limit 30 --types "observation,learning,commitment" --project-dir "$PWD"
 ```
 
 Pull time-sensitive items: observations that reveal trends, learnings that inform approach, commitments that need tracking.
@@ -58,7 +58,7 @@ Pull time-sensitive items: observations that reveal trends, learnings that infor
 ### Step 5: Episode Context
 
 ```
-memory.recall(query="session with [target]", limit=20)
+claudia memory recall "session with [target]" --limit 20 --project-dir "$PWD"
 ```
 
 Find session narratives that mention the target to understand the arc of the relationship over time.
@@ -71,7 +71,7 @@ Deduplicate results by memory ID across all steps before synthesis. If a memory 
 
 - **Entity not found**: If Step 1 returns 0 results, return early: "No memories about [entity]. Try a different name or spelling."
 - **Sparse connections**: If fewer than 3 connections exist, pull all available. Skip Step 3 entirely if 0 connections.
-- **Daemon unavailable**: Fall back to reading `context/` files and `people/*.md` directly. Note degraded mode in output.
+- **CLI unavailable**: Fall back to reading `context/` files and `people/*.md` directly. Note degraded mode in output.
 - **Contradictions**: When Step 1 and Step 2 return conflicting data, include both with `origin_type` labels so the user can resolve.
 
 ## Synthesis Format
@@ -124,4 +124,4 @@ After gathering all data, synthesize into this structure:
 
 ## Performance Notes
 
-This skill makes 6-8 memory calls (Steps 1-5 plus up to 3 connected entity lookups). Total memory budget: ~180 max (50+50+30+30+20). Designed for the 1M context window where pulling this many memories is practical without compaction risk. For quick lookups, use `memory.about` directly. Reserve `/deep-context` for when you need the full picture.
+This skill makes 6-8 CLI calls (Steps 1-5 plus up to 3 connected entity lookups). Total memory budget: ~180 max (50+50+30+30+20). Designed for the 1M context window where pulling this many memories is practical without compaction risk. For quick lookups, use `claudia memory about` directly. Reserve `/deep-context` for when you need the full picture.

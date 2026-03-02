@@ -40,9 +40,9 @@ Silently retrieve:
 - Existing reflections to avoid duplication
 - Active commitments and relationship states
 
-```
-Call memory.reflections to see what already exists
-Call memory.session with operation="context" for recent context (if available)
+```bash
+claudia memory reflections --project-dir "$PWD"    # see what already exists
+claudia memory session context --project-dir "$PWD" # recent context (if available)
 ```
 
 ### Step 2: Generate Reflections
@@ -150,7 +150,7 @@ User responses:
 
 ### Step 5: Store and Close
 
-Call `memory.end_session` with:
+Run `claudia memory end-session --project-dir "$PWD"` with:
 - `narrative`: Brief session summary
 - `reflections`: Array of approved reflections with type, content, and optional about fields
 - Other structured extractions (facts, commitments, entities) as needed
@@ -184,7 +184,7 @@ If only reflections (no rules): "Got it, I'll keep that in mind. See you next ti
 
 ### Storage
 
-Reflections are stored in the memory daemon's `reflections` table with:
+Reflections are stored in the memory system's `reflections` table with:
 - `reflection_type`: observation, pattern, learning, question
 - `content`: The reflection text
 - `about_entity_id`: Optional link to a specific entity
@@ -205,8 +205,8 @@ When similar reflections accumulate over time:
 ### Retrieval
 
 Reflections surface through:
-- `memory.reflections` tool for explicit retrieval
-- `memory.session` (operation="context") includes relevant reflections
+- `claudia memory reflections` CLI command for explicit retrieval
+- `claudia memory session context` includes relevant reflections
 - Semantic search matches reflections to current context
 
 ---
@@ -238,8 +238,8 @@ User: "That thing you learned about me preferring bullet points -
        that's only for technical content, not conversations."
 
 Claudia:
-1. Call memory.reflections with query to find the reflection
-2. Call memory.reflections with action: "update" and new content
+1. Run `claudia memory reflections --query "bullet points" --project-dir "$PWD"` to find the reflection
+2. Run `claudia memory reflections --action update --id <id> --content "..." --project-dir "$PWD"` to update
 3. Confirm: "Updated. I'll keep that distinction in mind."
 ```
 
@@ -248,7 +248,7 @@ User: "Delete the reflection about Monday mornings"
 
 Claudia:
 1. Search for the reflection
-2. Call memory.reflections with action: "delete" and reflection_id
+2. Run `claudia memory reflections --action delete --id <id> --project-dir "$PWD"` to delete
 3. Confirm: "Done, I've removed that."
 ```
 
@@ -256,7 +256,7 @@ Claudia:
 User: "Show me all your reflections about me"
 
 Claudia:
-1. Call memory.reflections with limit: 50
+1. Run `claudia memory reflections --limit 50 --project-dir "$PWD"`
 2. Format nicely with timeline info
 3. Offer to edit or delete any
 ```
@@ -289,9 +289,9 @@ At session start, load high-importance reflections to inform the interaction sty
 
 ---
 
-## Without Memory Daemon
+## Without Claudia CLI
 
-If the memory daemon is unavailable, store reflections in `context/learnings.md`:
+If the Claudia CLI is unavailable, store reflections in `context/learnings.md`:
 
 ```markdown
 ## Reflections

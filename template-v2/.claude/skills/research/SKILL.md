@@ -32,7 +32,7 @@ If the topic is clear and narrow, skip this and go straight to work.
 ### 2. Check Memory First
 
 ```
-memory.recall([topic]):
+claudia memory recall "[topic]" --project-dir "$PWD":
 ├── Existing knowledge found -> Surface it
 │   "I have some context on this from [date]:
 │    [summary of stored facts]
@@ -106,7 +106,7 @@ Use whatever tools are available (see Concierge skill for tool detection).
 ### 5. Store and Connect
 
 After presenting findings:
-- Store key facts via `memory.remember` with `source:web:` provenance
+- Store key facts via `claudia memory save` with `source:web:` provenance
 - Update relevant entities if research revealed new information
 - Connect to existing relationships or projects where relevant
 

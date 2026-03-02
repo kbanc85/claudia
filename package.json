@@ -26,15 +26,30 @@
     "url": "https://github.com/kbanc85/claudia/issues"
   },
   "bin": {
-    "get-claudia": "./bin/index.js"
+    "get-claudia": "./bin/index.js",
+    "claudia": "./cli/index.js"
   },
   "files": [
     "bin",
+    "cli",
     "template-v2",
-    "memory-daemon",
     "assets",
     "visualizer"
   ],
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "commander": "^13.1.0",
+    "sqlite-vec": "^0.1.6"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/integration",
+    "test:unit": "vitest run tests/unit"
+  },
   "engines": {
     "node": ">=18.0.0"
   },

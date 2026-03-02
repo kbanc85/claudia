@@ -48,13 +48,15 @@ Determine:
 ### 3. File It
 
 ```
-Call memory.document with operation="store":
-├── content: The FULL raw text (never summarize)
-├── filename: Descriptive name
-├── source_type: gmail | transcript | upload | capture
-├── summary: Brief description
-├── about: [entity names]
+claudia memory document store \
+  --filename "Descriptive name" \
+  --source-type "gmail|transcript|upload|capture" \
+  --summary "Brief description" \
+  --about "entity1,entity2" \
+  --project-dir "$PWD" \
+  < content.md
 ```
+(Pipe the FULL raw text via stdin; never summarize)
 
 ### 4. Confirm
 
@@ -70,7 +72,7 @@ The document is now searchable and linked to [entities].
 You can find it later with:
 - "Show me documents about [entity]"
 - "Find the email from [person]"
-- memory.document(operation="search", entity="[name]")
+- claudia memory document search --entity "[name]" --project-dir "$PWD"
 ```
 
 ## Source Types
@@ -107,12 +109,12 @@ If no entity linked:
 ```
 User: "Here's an email from Jim about the partnership terms. Save it."
 
-Call memory.document (operation="store"):
-- content: [full email text]
-- filename: "2026-02-04-jim-ferry-partnership.md"
-- source_type: "gmail"
-- summary: "Jim Ferry re: partnership terms and next steps"
-- about: ["Jim Ferry"]
+claudia memory document store \
+  --filename "2026-02-04-jim-ferry-partnership.md" \
+  --source-type "gmail" \
+  --summary "Jim Ferry re: partnership terms and next steps" \
+  --about "Jim Ferry" \
+  --project-dir "$PWD" < email.md
 
 Response:
 "Filed Jim's email about partnership terms.
@@ -124,12 +126,11 @@ You can find it later by asking about Jim's documents."
 ```
 User: "Here's some info I found about competitor pricing. Keep this."
 
-Call memory.document (operation="store"):
-- content: [research text]
-- filename: "2026-02-04-competitor-pricing-research.md"
-- source_type: "capture"
-- summary: "Competitor pricing analysis notes"
-- about: [] (or project name if relevant)
+claudia memory document store \
+  --filename "2026-02-04-competitor-pricing-research.md" \
+  --source-type "capture" \
+  --summary "Competitor pricing analysis notes" \
+  --project-dir "$PWD" < research.md
 
 Response:
 "Filed your competitor pricing research.
@@ -140,12 +141,12 @@ Saved to: general/documents/2026-02-04-competitor-pricing-research.md"
 ```
 User: "Save this contract from Acme Corp"
 
-Call memory.document (operation="store"):
-- content: [contract text]
-- filename: "2026-02-04-acme-corp-contract.md"
-- source_type: "upload"
-- summary: "Service agreement with Acme Corp"
-- about: ["Acme Corp"]
+claudia memory document store \
+  --filename "2026-02-04-acme-corp-contract.md" \
+  --source-type "upload" \
+  --summary "Service agreement with Acme Corp" \
+  --about "Acme Corp" \
+  --project-dir "$PWD" < contract.md
 
 Response:
 "Filed the Acme Corp contract.
@@ -156,9 +157,9 @@ Saved to: clients/acme-corp/documents/2026-02-04-contract.md"
 
 If you also extract facts from the document:
 
-1. File the document first (get document_id from response)
-2. Extract memories using memory.remember or memory.batch
-3. Call memory.document again with `memory_ids=[...]` to link provenance
+1. File the document first (get document_id from JSON response)
+2. Extract memories using `claudia memory save` or `claudia memory batch`
+3. Call `claudia memory document store --memory-ids "id1,id2,..."` to link provenance
 
 This creates the chain: memory -> document -> file on disk.
 

@@ -79,7 +79,7 @@ When multiple skills or agents could handle the same input:
 | User Input | Primary Skill | Why |
 |-----------|--------------|-----|
 | "Research X" | Research Scout (Tier 2) | Needs web search, external data |
-| "What do you know about X?" | `memory.about` directly | Memory lookup, no research needed |
+| "What do you know about X?" | `claudia memory about` directly | Memory lookup, no research needed |
 | "Deep dive on X" | `/deep-context` | Full memory analysis, no web needed |
 | "What am I missing?" | `/what-am-i-missing` | Risk/blind-spot surface, not research |
 

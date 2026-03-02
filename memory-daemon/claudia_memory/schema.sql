@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS entities (
     contact_frequency_days REAL,  -- Average days between contacts (rolling)
     contact_trend TEXT,  -- accelerating, stable, decelerating, dormant
     attention_tier TEXT DEFAULT 'standard',  -- active, watchlist, standard, archive
+    close_circle BOOLEAN DEFAULT FALSE,  -- Inner circle: never decay, auto-sacred
+    close_circle_reason TEXT,  -- Why this entity is close-circle
     UNIQUE(canonical_name, type)
 );
 
@@ -34,6 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_entities_importance ON entities(importance DESC);
 CREATE INDEX IF NOT EXISTS idx_entities_last_contact ON entities(last_contact_at);
 CREATE INDEX IF NOT EXISTS idx_entities_trend ON entities(contact_trend);
 CREATE INDEX IF NOT EXISTS idx_entities_attention_tier ON entities(attention_tier);
+CREATE INDEX IF NOT EXISTS idx_entities_close_circle ON entities(close_circle) WHERE close_circle = 1;
 
 -- Entity aliases for matching variations (e.g., "Sarah", "Sarah Chen", "S. Chen")
 CREATE TABLE IF NOT EXISTS entity_aliases (
@@ -70,7 +73,13 @@ CREATE TABLE IF NOT EXISTS memories (
     metadata TEXT,  -- JSON blob for flexible attributes
     source_channel TEXT DEFAULT 'claude_code',  -- Origin channel: claude_code, telegram, slack
     deadline_at TEXT,  -- ISO datetime for commitment deadlines (Phase 2: temporal intelligence)
-    temporal_markers TEXT  -- JSON: extracted temporal references from content
+    temporal_markers TEXT,  -- JSON: extracted temporal references from content
+    lifecycle_tier TEXT DEFAULT 'active',  -- sacred/active/cooling/archived
+    sacred_reason TEXT,  -- Why this memory is sacred (user-protected, auto-detected)
+    archived_at TEXT,  -- When this memory was archived
+    fact_id TEXT UNIQUE,  -- UUID for human-friendly reference
+    hash TEXT,  -- SHA-256 chain hash
+    prev_hash TEXT  -- Previous hash in chain (NULL for genesis)
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
@@ -79,6 +88,8 @@ CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(content_hash);
 CREATE INDEX IF NOT EXISTS idx_memories_deadline ON memories(deadline_at);
 CREATE INDEX IF NOT EXISTS idx_memories_verification ON memories(verification_status);
+CREATE INDEX IF NOT EXISTS idx_memories_lifecycle ON memories(lifecycle_tier);
+CREATE INDEX IF NOT EXISTS idx_memories_fact_id ON memories(fact_id);
 
 -- Junction table linking memories to entities
 CREATE TABLE IF NOT EXISTS memory_entities (
@@ -107,6 +118,7 @@ CREATE TABLE IF NOT EXISTS relationships (
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     metadata TEXT,
+    lifecycle_tier TEXT DEFAULT 'active',  -- Mirrors memory lifecycle for consistency
     UNIQUE(source_entity_id, target_entity_id, relationship_type)
 );
 
@@ -460,3 +472,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_dispatches_started ON agent_dispatches(star
 -- NOTE: dispatch_tier validation trigger is created by database.py migration code
 -- rather than here, because CREATE TRIGGER statements contain internal semicolons
 -- that the schema.sql line-based parser cannot handle.
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (20, 'Add lifecycle tiers, sacred memories, close-circle entities, fact_id, SHA-256 chain');
