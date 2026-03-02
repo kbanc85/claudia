@@ -202,6 +202,145 @@ class ProgressRenderer {
   }
 }
 
+// ─── Ollama helpers ──────────────────────────────────────────────────────
+
+/** Check if Ollama CLI is installed (on PATH or in common locations). */
+async function isOllamaInstalled() {
+  // Check PATH
+  const which = isWindows ? 'where' : 'which';
+  const found = await new Promise((resolve) => {
+    const proc = spawn(which, ['ollama'], { stdio: 'pipe', timeout: 5000 });
+    proc.on('close', (code) => resolve(code === 0));
+    proc.on('error', () => resolve(false));
+  });
+  if (found) return true;
+
+  // Check common install locations
+  if (process.platform === 'darwin') {
+    return existsSync('/usr/local/bin/ollama') || existsSync('/opt/homebrew/bin/ollama');
+  } else if (!isWindows) {
+    return existsSync('/usr/local/bin/ollama') || existsSync('/usr/bin/ollama');
+  }
+  return existsSync(join(process.env.LOCALAPPDATA || '', 'Ollama', 'ollama.exe'));
+}
+
+/**
+ * Install Ollama automatically.
+ * macOS: uses brew if available, otherwise curl installer
+ * Linux: uses official curl installer
+ * Windows: skip (requires manual download from ollama.com)
+ */
+async function installOllama() {
+  if (isWindows) return false; // Windows needs manual install from ollama.com
+
+  if (process.platform === 'darwin') {
+    // Try Homebrew first
+    const hasBrew = await new Promise((resolve) => {
+      const proc = spawn('which', ['brew'], { stdio: 'pipe', timeout: 5000 });
+      proc.on('close', (code) => resolve(code === 0));
+      proc.on('error', () => resolve(false));
+    });
+
+    if (hasBrew) {
+      return new Promise((resolve) => {
+        const proc = spawn('brew', ['install', 'ollama'], { stdio: 'pipe', timeout: 120000 });
+        proc.on('close', (code) => resolve(code === 0));
+        proc.on('error', () => resolve(false));
+      });
+    }
+  }
+
+  // Linux and macOS fallback: official install script
+  return new Promise((resolve) => {
+    const proc = spawn('sh', ['-c', 'curl -fsSL https://ollama.com/install.sh | sh'], {
+      stdio: 'pipe',
+      timeout: 120000
+    });
+    proc.on('close', (code) => resolve(code === 0));
+    proc.on('error', () => resolve(false));
+  });
+}
+
+/**
+ * Start the Ollama service and wait for it to respond.
+ * On macOS: open the Ollama app or run `ollama serve` in background.
+ * On Linux: run `ollama serve` in background.
+ * Returns true if Ollama API responds within ~15 seconds.
+ */
+async function startOllama() {
+  try {
+    if (process.platform === 'darwin') {
+      // Try macOS app first (installed by brew cask or .dmg), fall back to serve
+      const appExists = existsSync('/Applications/Ollama.app');
+      if (appExists) {
+        spawn('open', ['-a', 'Ollama'], { stdio: 'pipe', detached: true }).unref();
+      } else {
+        spawn('ollama', ['serve'], { stdio: 'pipe', detached: true }).unref();
+      }
+    } else if (!isWindows) {
+      spawn('ollama', ['serve'], { stdio: 'pipe', detached: true }).unref();
+    } else {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  // Poll until API responds (up to 15 seconds)
+  for (let i = 0; i < 15; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const resp = await fetch('http://127.0.0.1:11434/api/version');
+      if (resp.ok) return true;
+    } catch { /* not ready yet */ }
+  }
+  return false;
+}
+
+/**
+ * Ensure Ollama's Ed25519 identity key exists at ~/.ollama/id_ed25519.
+ * A fresh Ollama install sometimes creates ~/.ollama/ without the key file,
+ * causing registry pull requests to fail silently. We generate one with
+ * ssh-keygen (available on macOS, Linux, and Windows with Git).
+ */
+async function ensureOllamaKey() {
+  const ollamaDir = join(homedir(), '.ollama');
+  const keyPath = join(ollamaDir, 'id_ed25519');
+  if (existsSync(keyPath)) return;
+
+  mkdirSync(ollamaDir, { recursive: true });
+  try {
+    await new Promise((resolve, reject) => {
+      const proc = spawn('ssh-keygen', ['-t', 'ed25519', '-f', keyPath, '-N', '', '-q'], {
+        stdio: 'pipe',
+        timeout: 10000
+      });
+      proc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`ssh-keygen exited ${code}`)));
+      proc.on('error', reject);
+    });
+  } catch {
+    // ssh-keygen unavailable or failed; Ollama will need a restart to self-generate.
+  }
+}
+
+/**
+ * Restart Ollama so it regenerates missing config (identity keys, etc.).
+ * Kills the running process, waits, then delegates to startOllama().
+ */
+async function restartOllama() {
+  try {
+    const killCmd = isWindows ? 'taskkill' : 'pkill';
+    const killArgs = isWindows ? ['/f', '/im', 'ollama.exe'] : ['-f', 'ollama'];
+    await new Promise((resolve) => {
+      const proc = spawn(killCmd, killArgs, { stdio: 'pipe', timeout: 5000 });
+      proc.on('close', () => resolve());
+      proc.on('error', () => resolve());
+    });
+    await new Promise(r => setTimeout(r, 2000));
+  } catch { /* ignore */ }
+  return startOllama();
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -314,7 +453,7 @@ async function main() {
   let memoryOk = false;
 
   try {
-    // Step 1: Environment -- check Node.js version and Ollama
+    // Step 1: Environment -- check Node.js version, detect/install/start Ollama
     renderer.update('environment', 'active', 'checking...');
     const nodeVersion = process.versions.node;
     const nodeMajor = parseInt(nodeVersion.split('.')[0], 10);
@@ -324,15 +463,32 @@ async function main() {
       throw new Error('Node 18+ required');
     }
 
-    // Check Ollama is running
+    // Phase 1: Is Ollama running?
     let ollamaOk = false;
     try {
       const resp = await fetch('http://127.0.0.1:11434/api/version');
-      if (resp.ok) {
-        ollamaOk = true;
+      if (resp.ok) ollamaOk = true;
+    } catch { /* not running */ }
+
+    // Phase 2: If not running, is it installed?
+    if (!ollamaOk) {
+      const ollamaInstalled = await isOllamaInstalled();
+
+      if (!ollamaInstalled) {
+        // Phase 3: Not installed at all. Install it.
+        renderer.update('environment', 'active', 'installing Ollama...');
+        const installed = await installOllama();
+        if (!installed) {
+          renderer.update('environment', 'warn', `Node ${nodeVersion}, no Ollama`);
+          if (!supportsInPlace) renderer.appendLine('environment', 'warn', `Node ${nodeVersion}, no Ollama`);
+        }
       }
-    } catch {
-      // Ollama not running
+
+      // Phase 4: Installed (or just installed). Try starting it.
+      if (!ollamaOk) {
+        renderer.update('environment', 'active', 'starting Ollama...');
+        ollamaOk = await startOllama();
+      }
     }
 
     if (ollamaOk) {
@@ -358,15 +514,37 @@ async function main() {
       } catch { /* ignore */ }
 
       if (!modelReady) {
+        // Ensure Ollama's identity key exists (required for registry pulls).
+        // A fresh Ollama install may have ~/.ollama/ but no key file,
+        // causing silent pull failures. Generate one with ssh-keygen if missing.
+        await ensureOllamaKey();
+
         renderer.update('models', 'active', 'pulling all-minilm:l6-v2...');
+        let pullOk = false;
         try {
           const pullResp = await fetch('http://127.0.0.1:11434/api/pull', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'all-minilm:l6-v2', stream: false })
           });
-          modelReady = pullResp.ok;
+          pullOk = pullResp.ok;
         } catch { /* ignore */ }
+
+        // If pull failed, restart Ollama (regenerates keys) and retry once
+        if (!pullOk) {
+          renderer.update('models', 'active', 'retrying pull...');
+          await restartOllama();
+          try {
+            const retryResp = await fetch('http://127.0.0.1:11434/api/pull', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: 'all-minilm:l6-v2', stream: false })
+            });
+            pullOk = retryResp.ok;
+          } catch { /* ignore */ }
+        }
+
+        modelReady = pullOk;
       }
 
       if (modelReady) {

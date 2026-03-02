@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.1 (2026-03-02)
+
+### Installer: Auto-Install Ollama + Robust Model Pull
+
+- **Auto-install Ollama** -- Installer detects if Ollama is missing and installs it automatically via Homebrew (macOS) or the official install script (Linux). Windows users are guided to download manually.
+- **Auto-start Ollama** -- If Ollama is installed but not running, the installer starts it and waits for the API to respond before pulling models.
+- **Ollama key fix** -- Fresh Ollama installs can be missing `~/.ollama/id_ed25519`, causing silent pull failures. The installer now generates the key with `ssh-keygen` if absent, and retries the pull after restarting Ollama if the first attempt fails.
+
 ## 1.51.0 (2026-03-02)
 
 ### Google Integration
