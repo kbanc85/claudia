@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.2 (2026-03-02)
+
+### Gmail/Calendar CLI Discoverability
+
+- **CLAUDE.md updated** -- Gmail and Calendar CLI commands are now documented in the Integrations section of `CLAUDE.md`. Claude Code will recognize `claudia gmail login`, `claudia gmail search`, etc. as shell commands and execute them via the Bash tool instead of trying to interpret them as questions.
+
 ## 1.51.1 (2026-03-02)
 
 ### Installer: Auto-Install Ollama + Robust Model Pull
