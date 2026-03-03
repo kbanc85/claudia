@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.6 (2026-03-03)
+
+### Gmail Send
+
+- **`claudia gmail send`** -- Send emails with optional attachments via the Gmail API. Supports `--to`, `--subject`, `--body` (required), plus `--cc`, `--bcc`, `--attach` (repeatable for multiple files), `--html` (HTML body), `--thread` (reply to a thread), and `--reply-to` (threading headers). MIME message constructed with Node.js built-ins only (no external dependencies). Attachments are base64-encoded with MIME type detection from file extension. 25 MB per-file limit enforced client-side.
+
 ## 1.51.5 (2026-03-02)
 
 ### Database Migration Fix

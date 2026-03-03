@@ -522,7 +522,7 @@ program
 // ── Gmail subcommand group ──
 const gmail = program
   .command('gmail')
-  .description('Gmail integration (login, search, read)');
+  .description('Gmail integration (login, search, read, send)');
 
 gmail
   .command('login')
@@ -557,6 +557,23 @@ gmail
   .action(async (messageId) => {
     const { gmailReadCommand } = await import('./commands/google-auth.js');
     await gmailReadCommand(messageId);
+  });
+
+gmail
+  .command('send')
+  .description('Send an email (with optional attachments)')
+  .requiredOption('--to <email...>', 'Recipient email address(es)')
+  .requiredOption('--subject <text>', 'Email subject')
+  .requiredOption('--body <text>', 'Email body text')
+  .option('--cc <email...>', 'CC recipient(s)')
+  .option('--bcc <email...>', 'BCC recipient(s)')
+  .option('--attach <filepath...>', 'File(s) to attach')
+  .option('--html', 'Treat body as HTML', false)
+  .option('--thread <threadId>', 'Thread ID (for replies)')
+  .option('--reply-to <messageId>', 'Message-ID for In-Reply-To header')
+  .action(async (opts) => {
+    const { gmailSendCommand } = await import('./commands/google-auth.js');
+    await gmailSendCommand(opts);
   });
 
 gmail

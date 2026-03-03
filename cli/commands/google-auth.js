@@ -9,6 +9,7 @@
  *   claudia gmail status     - Check Gmail connection status
  *   claudia gmail search     - Search emails
  *   claudia gmail read       - Read a specific email
+ *   claudia gmail send       - Send an email with optional attachments
  *   claudia gmail logout     - Sign out of Gmail
  *   claudia calendar login   - Sign in with Google (Calendar only)
  *   claudia calendar status  - Check Calendar connection status
@@ -18,8 +19,145 @@
  *   claudia calendar logout  - Sign out of Calendar
  */
 
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { basename, extname } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { authenticate, getAccessToken, isAuthenticated, revokeTokens, authStatus } from '../core/google-oauth.js';
 import { outputJson as output } from '../core/output.js';
+
+// ── MIME Helpers (for gmail send) ──
+
+const MIME_TYPES = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  json: 'application/json',
+  xml: 'application/xml',
+  html: 'text/html',
+  zip: 'application/zip',
+  gz: 'application/gzip',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+  wav: 'audio/wav',
+};
+
+function getMimeType(filePath) {
+  const ext = extname(filePath).toLowerCase().replace('.', '');
+  return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
+/**
+ * Validate and read attachment files from disk.
+ * @param {string[]} filePaths
+ * @returns {Array<{path: string, data: Buffer, mimeType: string, filename: string}>}
+ */
+function prepareAttachments(filePaths) {
+  const MAX_SIZE = 25 * 1024 * 1024; // 25 MB Gmail limit
+  const attachments = [];
+
+  for (const filePath of filePaths) {
+    if (!existsSync(filePath)) {
+      throw new Error(`Attachment not found: ${filePath}`);
+    }
+    const stat = statSync(filePath);
+    if (!stat.isFile()) {
+      throw new Error(`Not a file: ${filePath}`);
+    }
+    if (stat.size > MAX_SIZE) {
+      throw new Error(`File too large (${(stat.size / 1024 / 1024).toFixed(1)} MB, max 25 MB): ${filePath}`);
+    }
+    attachments.push({
+      path: filePath,
+      data: readFileSync(filePath),
+      mimeType: getMimeType(filePath),
+      filename: basename(filePath),
+    });
+  }
+  return attachments;
+}
+
+/**
+ * Build an RFC 2822 MIME message string.
+ * @param {Object} opts
+ * @param {string[]} opts.to
+ * @param {string} opts.subject
+ * @param {string} opts.body
+ * @param {string[]} [opts.cc]
+ * @param {string[]} [opts.bcc]
+ * @param {boolean} [opts.html]
+ * @param {string} [opts.replyTo] - Message-ID for In-Reply-To/References
+ * @param {Array} [opts.attachments] - From prepareAttachments()
+ * @returns {string}
+ */
+function buildMimeMessage(opts) {
+  const lines = [];
+
+  // Headers
+  lines.push(`To: ${opts.to.join(', ')}`);
+  lines.push(`Subject: ${opts.subject}`);
+  lines.push('MIME-Version: 1.0');
+  if (opts.cc && opts.cc.length) lines.push(`Cc: ${opts.cc.join(', ')}`);
+  if (opts.bcc && opts.bcc.length) lines.push(`Bcc: ${opts.bcc.join(', ')}`);
+
+  if (opts.replyTo) {
+    const msgId = opts.replyTo.startsWith('<') ? opts.replyTo : `<${opts.replyTo}>`;
+    lines.push(`In-Reply-To: ${msgId}`);
+    lines.push(`References: ${msgId}`);
+  }
+
+  const hasAttachments = opts.attachments && opts.attachments.length > 0;
+  const contentType = opts.html ? 'text/html; charset=UTF-8' : 'text/plain; charset=UTF-8';
+
+  if (!hasAttachments) {
+    // Simple single-part message
+    lines.push(`Content-Type: ${contentType}`);
+    lines.push('Content-Transfer-Encoding: base64');
+    lines.push(''); // blank line separating headers from body
+    lines.push(Buffer.from(opts.body, 'utf-8').toString('base64'));
+  } else {
+    // Multipart/mixed
+    const boundary = `claudia_${randomBytes(16).toString('hex')}`;
+    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    lines.push('');
+
+    // Text part
+    lines.push(`--${boundary}`);
+    lines.push(`Content-Type: ${contentType}`);
+    lines.push('Content-Transfer-Encoding: base64');
+    lines.push('');
+    lines.push(Buffer.from(opts.body, 'utf-8').toString('base64'));
+    lines.push('');
+
+    // Attachment parts
+    for (const att of opts.attachments) {
+      lines.push(`--${boundary}`);
+      lines.push(`Content-Type: ${att.mimeType}; name="${att.filename}"`);
+      lines.push(`Content-Disposition: attachment; filename="${att.filename}"`);
+      lines.push('Content-Transfer-Encoding: base64');
+      lines.push('');
+      // Split base64 into 76-char lines per RFC 2045
+      const b64 = att.data.toString('base64');
+      lines.push((b64.match(/.{1,76}/g) || []).join('\r\n'));
+      lines.push('');
+    }
+
+    lines.push(`--${boundary}--`);
+  }
+
+  return lines.join('\r\n');
+}
 
 // ── Gmail Commands ──
 
@@ -143,6 +281,90 @@ export async function gmailReadCommand(messageId) {
     date: headers.find(h => h.name === 'Date')?.value || '',
     labels: data.labelIds || [],
     body,
+  });
+}
+
+export async function gmailSendCommand(opts) {
+  const token = await getAccessToken('gmail');
+  if (!token) {
+    console.error('Not authenticated. Run: claudia gmail login');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Validate required fields (belt-and-suspenders; Commander's requiredOption catches most)
+  if (!opts.to || opts.to.length === 0) {
+    console.error('At least one --to recipient is required.');
+    process.exitCode = 1;
+    return;
+  }
+  if (!opts.subject) {
+    console.error('--subject is required.');
+    process.exitCode = 1;
+    return;
+  }
+  if (!opts.body) {
+    console.error('--body is required.');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Prepare attachments
+  let attachments = [];
+  if (opts.attach && opts.attach.length > 0) {
+    try {
+      attachments = prepareAttachments(opts.attach);
+    } catch (err) {
+      console.error(err.message);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  // Build MIME message and base64url-encode it
+  const rawMessage = buildMimeMessage({
+    to: opts.to,
+    subject: opts.subject,
+    body: opts.body,
+    cc: opts.cc,
+    bcc: opts.bcc,
+    html: opts.html,
+    replyTo: opts.replyTo,
+    attachments,
+  });
+
+  const encodedMessage = Buffer.from(rawMessage, 'utf-8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const requestBody = { raw: encodedMessage };
+  if (opts.thread) {
+    requestBody.threadId = opts.thread;
+  }
+
+  const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error(`Gmail API error (${resp.status}): ${err}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const data = await resp.json();
+  output({
+    id: data.id,
+    threadId: data.threadId,
+    labelIds: data.labelIds || [],
   });
 }
 
