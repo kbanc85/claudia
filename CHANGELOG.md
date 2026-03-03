@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.18 (2026-03-03)
+
+### Fix: Embedding Storage + Functional Health Checks
+
+- **Fix: Vec0 primary keys now use BigInt** -- sqlite-vec v0.1.6 + better-sqlite3 requires `BigInt()` for INTEGER PRIMARY KEY columns in vec0 virtual tables. JS numbers are 64-bit floats, which sqlite-vec rejects. This was the actual root cause of the "Only integers are allows for primary key values" error on every embedding INSERT. Applied to all 6 INSERT locations across memory, entity, episode, and reflection embeddings.
+- **Fix: Vec0 MATCH queries now include `k = ?` constraint** -- All 3 vector search queries (memory recall, reflection search, episode search) were missing the required `AND k = ?` clause in the WHERE, causing "A LIMIT or 'k = ?' constraint is required on vec0 knn queries" errors. Semantic search now works end-to-end.
+- **New: Functional health checks in `system-health`** -- Health command now runs a full embedding roundtrip test: generate embedding via Ollama, verify dimensions match config, INSERT into vec0, MATCH query back, cleanup. Also checks dimension consistency across config, database _meta, and actual model output. Reports `memories_with_embeddings` count to surface coverage gaps.
+- **New: `resetAvailability()` on EmbeddingService** -- Health check now clears the cached availability state before probing, so it always reports live status instead of stale cache.
+- **New: Embedding coverage warning** -- If fewer than 50% of memories have embeddings, health check warns and suggests `--backfill-embeddings`.
+
 ## 1.51.17 (2026-03-03)
 
 ### Critical: Fix Embedding Storage + CLI Documentation

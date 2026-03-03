@@ -28,6 +28,17 @@ import { embed, embedBatch } from '../core/embeddings.js';
 function toVecParam(embedding) {
   return new Float32Array(embedding);
 }
+
+/**
+ * Wrap a primary key as BigInt for vec0 INSERT statements.
+ * sqlite-vec v0.1.6 + better-sqlite3 requires BigInt for INTEGER PRIMARY KEY
+ * columns in vec0 virtual tables (JS numbers are doubles, not SQLite integers).
+ * @param {number} id
+ * @returns {bigint}
+ */
+function toVecId(id) {
+  return BigInt(id);
+}
 import {
   validateMemory,
   validateEntity,
@@ -335,7 +346,7 @@ export async function rememberFact(db, content, options = {}) {
     try {
       db.run(
         'INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)',
-        [memoryId, toVecParam(embedding)]
+        [toVecId(memoryId), toVecParam(embedding)]
       );
     } catch (e) {
       process.stderr.write(`[remember] WARNING: Embedding NOT stored for memory ${memoryId}. Semantic search will not find this memory. Error: ${e.message}\n`);
@@ -450,7 +461,7 @@ export async function rememberEntity(db, name, entityType = 'person', options = 
       try {
         db.run(
           'INSERT OR REPLACE INTO entity_embeddings (entity_id, embedding) VALUES (?, ?)',
-          [entityId, toVecParam(embedding)]
+          [toVecId(entityId), toVecParam(embedding)]
         );
       } catch (e) {
         process.stderr.write(`[remember] WARNING: Embedding NOT stored for entity ${entityId}. Semantic search will not find this entity. Error: ${e.message}\n`);
@@ -810,7 +821,7 @@ export async function correctMemory(db, memoryId, correction, options = {}) {
     try {
       db.run(
         'INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)',
-        [memoryId, toVecParam(embedding)]
+        [toVecId(memoryId), toVecParam(embedding)]
       );
     } catch (e) {
       process.stderr.write(`[remember] WARNING: Embedding NOT updated for memory ${memoryId}. Error: ${e.message}\n`);
@@ -1017,7 +1028,7 @@ export async function endSession(db, episodeId, narrative, options = {}) {
     try {
       db.run(
         'INSERT OR REPLACE INTO episode_embeddings (episode_id, embedding) VALUES (?, ?)',
-        [episodeId, toVecParam(narrativeEmbedding)]
+        [toVecId(episodeId), toVecParam(narrativeEmbedding)]
       );
     } catch (e) {
       process.stderr.write(`[remember] WARNING: Embedding NOT stored for episode ${episodeId}. Error: ${e.message}\n`);
@@ -1182,7 +1193,7 @@ export async function storeReflection(db, content, reflectionType, options = {})
     try {
       db.run(
         'INSERT OR REPLACE INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)',
-        [reflectionId, toVecParam(embedding)]
+        [toVecId(reflectionId), toVecParam(embedding)]
       );
     } catch (e) {
       process.stderr.write(`[remember] WARNING: Embedding NOT stored for reflection ${reflectionId}. Error: ${e.message}\n`);
@@ -1226,7 +1237,7 @@ export async function updateReflection(db, reflectionId, options = {}) {
       try {
         db.run(
           'INSERT OR REPLACE INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)',
-          [reflectionId, toVecParam(embedding)]
+          [toVecId(reflectionId), toVecParam(embedding)]
         );
       } catch (e) {
         process.stderr.write(`[remember] WARNING: Embedding NOT updated for reflection ${reflectionId}. Error: ${e.message}\n`);

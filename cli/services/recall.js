@@ -804,9 +804,9 @@ export async function recall(db, config, query, {
       JOIN memories m ON m.id = me.memory_id
       LEFT JOIN memory_entities me2 ON m.id = me2.memory_id
       LEFT JOIN entities e ON me2.entity_id = e.id
-      WHERE me.embedding MATCH ?
+      WHERE me.embedding MATCH ? AND k = ?
     `);
-    params.push(toVecParam(queryEmbedding));
+    params.push(toVecParam(queryEmbedding), limit * 3);
 
     applyFilters(db, sqlParts, params, {
       memoryTypes, minImportance, dateAfter, dateBefore, aboutEntity, includeArchived,
@@ -1798,9 +1798,9 @@ export async function searchReflections(db, config, query, { limit = 10, reflect
         FROM reflection_embeddings re
         JOIN reflections r ON r.id = re.reflection_id
         LEFT JOIN entities e ON r.about_entity_id = e.id
-        WHERE re.embedding MATCH ?
+        WHERE re.embedding MATCH ? AND k = ?
       `;
-      const params = [toVecParam(queryEmbedding)];
+      const params = [toVecParam(queryEmbedding), limit * 2];
 
       if (reflectionTypes && reflectionTypes.length > 0) {
         const ph = reflectionTypes.map(() => '?').join(', ');
@@ -2409,11 +2409,11 @@ export async function recallEpisodes(db, config, query, { limit = 5 } = {}) {
         `SELECT e.*, (1.0 / (1.0 + ee.distance)) as relevance
          FROM episode_embeddings ee
          JOIN episodes e ON e.id = ee.episode_id
-         WHERE ee.embedding MATCH ?
+         WHERE ee.embedding MATCH ? AND k = ?
          AND e.is_summarized = 1
          ORDER BY relevance DESC
          LIMIT ?`,
-        [toVecParam(queryEmbedding), limit],
+        [toVecParam(queryEmbedding), limit * 2, limit],
       ) || [];
     } catch {
       // Vector search failed, fall back to keyword

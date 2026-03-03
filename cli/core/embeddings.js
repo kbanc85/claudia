@@ -196,6 +196,11 @@ class EmbeddingService {
   clearCache() {
     this._cache.clear();
   }
+
+  /** Reset cached availability so next isAvailable() re-checks Ollama. */
+  resetAvailability() {
+    this._available = null;
+  }
 }
 
 // ----- Module Singleton -----
