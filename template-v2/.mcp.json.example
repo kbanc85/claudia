@@ -1,36 +1,16 @@
 {
   "mcpServers": {
-
-    "gmail": {
-      "_disabled": true,
-      "command": "npx",
-      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "_setup": "Remove _disabled, restart Claude Code, authenticate when browser opens"
-    },
-
-    "google-calendar": {
-      "_disabled": true,
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
-      "_setup": "Remove _disabled, restart Claude Code, authenticate when browser opens"
-    }
-
   },
 
   "_notes": {
-    "quick_start": [
-      "1. Rename this file to .mcp.json",
-      "2. Remove _disabled from servers you want",
-      "3. Restart Claude Code",
-      "4. Gmail/Calendar will open a browser for you to authenticate with YOUR Google account"
-    ],
-    "memory": "Claudia's memory system now uses the `claudia` CLI (via Bash tool), not MCP. No MCP server needed for memory.",
+    "gmail_and_calendar": "Claudia has built-in Gmail and Calendar support. Run 'claudia google login' to connect. No MCP server needed.",
+    "memory": "Claudia's memory system uses the 'claudia' CLI (via Bash tool), not MCP. No MCP server needed for memory.",
     "security": "Each user authenticates with their own accounts. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",
       "web-search": "Claude Code has native WebSearch",
       "fetch": "Claude Code has native WebFetch"
     },
-    "more_servers": "Find more at mcp.so or github.com/modelcontextprotocol/servers"
+    "adding_servers": "Add MCP servers here if needed. Find more at mcp.so or github.com/modelcontextprotocol/servers"
   }
 }

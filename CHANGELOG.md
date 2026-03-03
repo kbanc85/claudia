@@ -2,6 +2,13 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.4 (2026-03-02)
+
+### MCP Cleanup
+
+- **Gmail/Calendar MCPs auto-disabled on install/upgrade** -- The installer now detects active Gmail and Google Calendar MCP servers in `.mcp.json` and disables them automatically. Claudia's native CLI commands (`claudia google login`, `claudia gmail search`, `claudia calendar list`, etc.) replace these external MCP servers entirely.
+- **`.mcp.json.example` cleaned up** -- Removed Gmail and Calendar MCP entries from the template. Added a note pointing users to `claudia google login` instead.
+
 ## 1.51.3 (2026-03-02)
 
 ### Google Polish

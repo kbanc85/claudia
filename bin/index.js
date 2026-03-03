@@ -413,6 +413,9 @@ async function main() {
     console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
   }
 
+  // Disable Gmail/Calendar MCP servers (Claudia has native CLI commands now)
+  disableGoogleMcpServers(targetPath);
+
   // Write context/whats-new.md for Claudia's self-awareness (silent)
   writeWhatsNewFile(targetPath, version);
 
@@ -813,6 +816,40 @@ async function main() {
     console.log(` ${colors.dim}Optional: connect Google services${colors.reset}`);
     console.log(`   ${colors.cyan}claudia google login${colors.reset}     ${colors.dim}Gmail + Calendar in one step${colors.reset}`);
     console.log('');
+  }
+}
+
+/**
+ * Disable Gmail and Google Calendar MCP servers in .mcp.json if present.
+ * Claudia now has native CLI commands for both services, so external MCP
+ * servers are no longer needed. This runs on both fresh installs and upgrades.
+ */
+function disableGoogleMcpServers(targetPath) {
+  const mcpPath = join(targetPath, '.mcp.json');
+  if (!existsSync(mcpPath)) return;
+
+  try {
+    const raw = readFileSync(mcpPath, 'utf-8');
+    const config = JSON.parse(raw);
+    if (!config.mcpServers) return;
+
+    const googleKeys = ['gmail', 'google-calendar', 'google_calendar', 'googleCalendar'];
+    let changed = false;
+
+    for (const key of googleKeys) {
+      if (config.mcpServers[key] && !config.mcpServers[key]._disabled) {
+        config.mcpServers[key]._disabled = true;
+        config.mcpServers[key]._replaced_by = 'claudia google login';
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+      console.log(` ${colors.yellow}→${colors.reset} Disabled Gmail/Calendar MCP servers (replaced by ${colors.cyan}claudia google login${colors.reset})`);
+    }
+  } catch {
+    // Not valid JSON or can't read -- skip silently
   }
 }
 
