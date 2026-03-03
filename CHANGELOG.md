@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.13 (2026-03-03)
+
+### Gmail & Calendar: Back to MCP
+
+- **Reverted Gmail and Calendar from CLI to MCP servers** -- Gmail and Calendar integrations now use the third-party MCP packages (`@gongrzhe/server-gmail-autoauth-mcp` and `@gongrzhe/server-calendar-autoauth-mcp`) instead of Claudia's built-in CLI commands. Each user sets up their own Google Cloud Console project with their own OAuth credentials. No shared authentication. Setup instructions in CLAUDE.md.
+- **Existing users: MCPs auto-restored** -- If v1.51.9-v1.51.12 moved your Gmail/Calendar MCPs to `_disabled_mcpServers`, the installer now moves them back to active `mcpServers`.
+- CLI commands (`claudia gmail`, `claudia calendar`) remain available as a fallback.
+
 ## 1.51.12 (2026-03-03)
 
 ### OAuth Login: Instant Exit + Auto-Close Tab

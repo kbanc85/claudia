@@ -469,10 +469,11 @@ async function main() {
     console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
   }
 
-  // Move legacy MCP servers (memory, Gmail, Calendar) to _disabled_mcpServers.
-  // Claude Code's native disable format: servers in _disabled_mcpServers are
-  // preserved but not launched. User can move them back to re-enable if needed.
+  // Move legacy MCP servers (memory daemon only) to _disabled_mcpServers.
   disableLegacyMcpServers(targetPath);
+
+  // Restore Gmail/Calendar MCPs that v1.51.9-v1.51.12 incorrectly disabled.
+  restoreMcpServers(targetPath);
 
   // Warn if global ~/.claude.json has legacy MCP servers we can't auto-fix
   warnGlobalLegacyMcpServers();
@@ -886,8 +887,9 @@ async function main() {
  *
  * Replaced servers:
  * - claudia-memory  → `claudia memory` CLI (Node.js, direct SQLite)
- * - gmail           → `claudia gmail` CLI
- * - google-calendar → `claudia calendar` CLI
+ *
+ * Note: Gmail and Calendar are NOT legacy -- they use third-party MCP packages
+ * that each user authenticates with their own Google Cloud credentials.
  */
 function disableLegacyMcpServers(targetPath) {
   const mcpPath = join(targetPath, '.mcp.json');
@@ -898,19 +900,11 @@ function disableLegacyMcpServers(targetPath) {
     const config = JSON.parse(raw);
     if (!config.mcpServers) return;
 
-    // Map of MCP server keys to their CLI replacement description.
-    // These servers are superseded by native CLI commands and should not
-    // be launched by Claude Code. We MOVE them from mcpServers into the
-    // _disabled_mcpServers top-level key, which is Claude Code's native
-    // disable format (used by the /mcp toggle UI). This preserves the
-    // full config so the user can move it back to re-enable if needed.
+    // Only the memory daemon MCP is truly legacy (replaced by claudia memory CLI).
+    // Gmail and Calendar MCPs are the primary integration path and should NOT be disabled.
     const legacyServers = {
       'claudia-memory':    'claudia memory CLI',
       'claudia_memory':    'claudia memory CLI',
-      'gmail':             'claudia google login',
-      'google-calendar':   'claudia google login',
-      'google_calendar':   'claudia google login',
-      'googleCalendar':    'claudia google login',
     };
 
     let changed = false;
@@ -918,17 +912,14 @@ function disableLegacyMcpServers(targetPath) {
 
     for (const [key, replacement] of Object.entries(legacyServers)) {
       if (config.mcpServers[key]) {
-        // Ensure _disabled_mcpServers exists as a top-level sibling
         if (!config._disabled_mcpServers) config._disabled_mcpServers = {};
 
-        // Preserve full server config, strip our old _disabled flag if present
         const serverConfig = { ...config.mcpServers[key] };
         delete serverConfig._disabled;
         delete serverConfig._replaced_by;
         serverConfig._replaced_by = replacement;
         config._disabled_mcpServers[key] = serverConfig;
 
-        // Remove from active servers so Claude Code won't launch it
         delete config.mcpServers[key];
         changed = true;
         disabled.push(key);
@@ -958,14 +949,10 @@ function warnGlobalLegacyMcpServers() {
     const config = JSON.parse(raw);
     if (!config.mcpServers) return;
 
-    // Servers that Claudia's CLI replaces. Only warn about these.
+    // Only the memory daemon is truly legacy. Gmail/Calendar MCPs are fine.
     const legacyServers = {
       'claudia-memory':    'claudia memory CLI',
       'claudia_memory':    'claudia memory CLI',
-      'gmail':             'claudia gmail CLI',
-      'google-calendar':   'claudia calendar CLI',
-      'google_calendar':   'claudia calendar CLI',
-      'googleCalendar':    'claudia calendar CLI',
     };
 
     const found = [];
@@ -981,6 +968,50 @@ function warnGlobalLegacyMcpServers() {
       console.log(` ${colors.dim}   To fix: edit ~/.claude.json and remove them from mcpServers,${colors.reset}`);
       console.log(` ${colors.dim}   or move them to _disabled_mcpServers to preserve the config.${colors.reset}`);
       console.log();
+    }
+  } catch {
+    // Not valid JSON or can't read -- skip silently
+  }
+}
+
+/**
+ * Restore Gmail and Calendar MCP servers that were moved to _disabled_mcpServers
+ * by v1.51.9-v1.51.12. Those versions treated them as "legacy" but we've reverted
+ * to MCP as the primary Gmail/Calendar integration path.
+ */
+function restoreMcpServers(targetPath) {
+  const mcpPath = join(targetPath, '.mcp.json');
+  if (!existsSync(mcpPath)) return;
+
+  try {
+    const raw = readFileSync(mcpPath, 'utf-8');
+    const config = JSON.parse(raw);
+    if (!config._disabled_mcpServers) return;
+    if (!config.mcpServers) config.mcpServers = {};
+
+    const toRestore = ['gmail', 'google-calendar'];
+    let changed = false;
+    const restored = [];
+
+    for (const key of toRestore) {
+      if (config._disabled_mcpServers[key] && !config.mcpServers[key]) {
+        const serverConfig = { ...config._disabled_mcpServers[key] };
+        delete serverConfig._replaced_by;
+        config.mcpServers[key] = serverConfig;
+        delete config._disabled_mcpServers[key];
+        changed = true;
+        restored.push(key);
+      }
+    }
+
+    // Clean up _disabled_mcpServers if it's now empty
+    if (config._disabled_mcpServers && Object.keys(config._disabled_mcpServers).length === 0) {
+      delete config._disabled_mcpServers;
+    }
+
+    if (changed) {
+      writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+      console.log(` ${colors.green}✓${colors.reset} Restored MCP servers: ${restored.join(', ')} (moved back from _disabled_mcpServers)`);
     }
   } catch {
     // Not valid JSON or can't read -- skip silently

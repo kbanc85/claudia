@@ -1,11 +1,21 @@
 {
   "mcpServers": {
+    "gmail": {
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
+      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-gmail-autoauth-mcp auth"
+    },
+    "google-calendar": {
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/server-calendar-autoauth-mcp"],
+      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth"
+    }
   },
 
   "_notes": {
-    "gmail_and_calendar": "Claudia has built-in Gmail and Calendar support. Run 'claudia google login' to connect. No MCP server needed.",
+    "gmail_and_calendar": "Gmail and Calendar use third-party MCP servers. Each user sets up their own Google Cloud Console credentials. See the Google Integration Setup section in CLAUDE.md.",
     "memory": "Claudia's memory system uses the 'claudia' CLI (via Bash tool), not MCP. No MCP server needed for memory.",
-    "security": "Each user authenticates with their own accounts. OAuth tokens are stored locally on your machine, never shared.",
+    "security": "Each user authenticates with their own Google accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",
       "web-search": "Claude Code has native WebSearch",

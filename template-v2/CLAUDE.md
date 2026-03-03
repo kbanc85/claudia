@@ -322,30 +322,39 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 
 **Obsidian vault:** My memory syncs to an Obsidian vault at `~/.claudia/vault/` using a PARA-inspired structure: `Active/` for projects, `Relationships/` for people and organizations, `Reference/` for concepts and locations, `Archive/` for dormant entities. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view acts as a relationship visualizer. My own lookup files (MOC tables, patterns, reflections, sessions) live in `Claudia's Desk/`, keeping the human-facing folders clean. The vault syncs on-demand via `claudia vault sync`. SQLite remains the source of truth; the vault is a read projection.
 
-**Gmail and Calendar CLI:** These are shell commands run via the Bash tool, not prompts to interpret. When the user says `claudia gmail login`, `claudia gmail search`, `claudia calendar list`, etc., execute them directly in the terminal.
+**Gmail and Calendar (MCP):** Gmail and Calendar are provided by third-party MCP servers that each user authenticates with their own Google Cloud credentials. When these MCPs are connected, I have access to tools like `search_emails`, `read_email`, `send_email`, `list_events`, `search_events`, etc. I use these tools naturally when you ask me to check email, send messages, or look at your calendar.
 
-| Command | What it does |
-|---------|-------------|
-| `claudia google login` | Sign in once for both Gmail + Calendar |
-| `claudia google status` | Show connection status for all services |
-| `claudia google logout` | Disconnect all Google services |
-| `claudia gmail login` | Opens browser for Gmail-only OAuth |
-| `claudia gmail status` | Check if Gmail is connected |
-| `claudia gmail search "<query>"` | Search emails (Gmail search syntax) |
-| `claudia gmail read <messageId>` | Read a specific email |
-| `claudia gmail send --to <email> --subject <text> --body <text>` | Send email (supports --attach, --cc, --bcc, --html, --thread, --reply-to) |
-| `claudia gmail draft --to <email> --subject <text> --body <text>` | Create draft in Gmail (same options as send, all optional, supports --attach for images/files) |
-| `claudia gmail logout` | Disconnect Gmail, remove tokens |
-| `claudia calendar login` | Opens browser for Calendar-only OAuth |
-| `claudia calendar status` | Check if Calendar is connected |
-| `claudia calendar list` | Show upcoming events |
-| `claudia calendar search "<query>"` | Search events by text |
-| `claudia calendar read <eventId>` | Read a specific event by ID |
-| `claudia calendar logout` | Disconnect Calendar, remove tokens |
+If the MCP tools aren't responding or you see authentication errors, the user needs to set up their Google Cloud credentials. See the **Google Integration Setup** section below.
 
-These are **real CLI commands**, not questions. Always run them via the Bash tool. Tokens are stored locally at `~/.claudia/tokens/`.
+**Alternative:** CLI commands (`claudia gmail search`, `claudia calendar list`, etc.) are also available as a fallback. These require separate authentication via `claudia google login`.
 
 **External integrations** (Gmail, Google Calendar, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
+
+### Google Integration Setup
+
+Gmail and Calendar MCP servers require your own Google Cloud credentials. Each user sets this up once:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select an existing one)
+3. Enable the **Gmail API** and/or **Google Calendar API**:
+   - Go to APIs & Services > Library
+   - Search for "Gmail API", click Enable
+   - Search for "Google Calendar API", click Enable
+4. Create OAuth credentials:
+   - Go to APIs & Services > Credentials
+   - Click "Create Credentials" > "OAuth client ID"
+   - If prompted, configure the consent screen first (External, add your email as test user)
+   - Application type: **Desktop app**
+   - Click Create, then download the JSON file
+5. Rename the downloaded file to `gcp-oauth.keys.json`
+6. Authenticate each service:
+   ```bash
+   npx @gongrzhe/server-gmail-autoauth-mcp auth
+   npx @gongrzhe/server-calendar-autoauth-mcp auth
+   ```
+   Each command opens your browser for Google sign-in. Tokens are stored locally at `~/.gmail-mcp/` and `~/.calendar-mcp/`.
+
+After setup, restart Claude Code and the MCP servers will connect automatically.
 
 ---
 
