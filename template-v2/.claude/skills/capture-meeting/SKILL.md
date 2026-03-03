@@ -117,16 +117,39 @@ Now the user can ask "where did you learn that Sarah prefers async communication
 
 ### 5. Organize
 
-**Before writing any files, query current state to avoid stale data:**
-- Grep for actual counts (e.g., completed interviews, open tasks) before updating dashboards or trackers
-- Read the person file fresh before updating it (don't rely on context from earlier in the session)
-- Check existing commitments before adding duplicates
+**Before writing any files, verify current state (never trust in-session counts):**
+
+For project/interview trackers:
+- Count completed items fresh: `grep -rl "status: completed" <project-folder>/ | wc -l`
+- Count outstanding items: `grep -rl "status: scheduled\|status: pending" <project-folder>/ | wc -l`
+- Read the dashboard/README file fresh: don't rely on counts from earlier in the session
+- **If the tracker count doesn't match the grep count, the grep count is authoritative**
+
+For people files:
+- Read the person file fresh before updating (don't rely on earlier context)
+- Check `claudia memory about "person name" --project-dir "$PWD"` for latest memory DB state
+
+For commitments:
+- Read `context/commitments.md` fresh before adding new items
+- Check for duplicates by searching for the person's name + topic
 
 Then update:
 - Person files with new context
 - Commitment and waiting items
-- Dashboard or tracker files with verified counts
+- Dashboard or tracker files with **verified counts from grep, not from memory**
 - Create files for new people if needed
+
+### 5b. Reconcile Status Sources (MANDATORY after any status change)
+
+When you've changed an entity's status (interview completed, deliverable finished, etc.):
+
+1. **Update the primary source** (vault file YAML frontmatter or entity file)
+2. **Update the memory DB** (`claudia memory save` or `claudia memory correct`)
+3. **Verify dashboard/tracker counts:**
+   - Grep actual file status values (see Step 5 above)
+   - Compare to dashboard/README stated count
+   - If mismatch: update dashboard with the grep-verified count
+4. **Never use in-session counts.** Always grep/query fresh at write time. Previous context (even from minutes ago in the same session) can be stale if files were modified.
 
 ### 6. Synthesize
 
@@ -192,6 +215,14 @@ Ask for confirmation on:
 - Flagging concerns (interpretation required)
 - File location (if ambiguous)
 
+## Error Recovery
+
+If a batch of parallel commands fails:
+- Re-run each failed command individually (parallel failures cascade, individual runs often succeed)
+- Never assume all commands failed just because one did
+- Check error messages: if it says "sibling tool call errored," the other commands weren't actually attempted
+- When a grep or count command fails, retry with a simpler approach before reporting stale data
+
 ## Quality Checklist
 
 - [ ] **Raw transcript/notes filed** (`claudia memory document store` called with full content)
@@ -203,6 +234,8 @@ Ask for confirmation on:
 - [ ] Related person files flagged for update
 - [ ] No unexplained jargon or unclear references
 - [ ] All markdown tables render correctly (header, separator, and data rows on separate lines)
+- [ ] **Status sources reconciled** (file YAML, memory DB, and dashboard/tracker all agree)
+- [ ] **Dashboard counts verified** via fresh grep, not in-session memory
 
 ## Tone
 

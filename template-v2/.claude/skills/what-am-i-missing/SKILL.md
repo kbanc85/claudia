@@ -44,6 +44,16 @@ Looking at the bigger picture:
 - Opportunities cooling
 - Decisions being avoided
 
+### 6. Data Consistency Check
+Cross-reference memory DB against file state to catch divergence:
+- Run `claudia memory recall "project status commitments" --project-dir "$PWD" --limit 10`
+- Compare recalled statuses (interview completion, deliverable state) against file-based trackers
+- For any active project with a dashboard/README tracker, grep actual file statuses and compare to stated counts
+- Flag contradictions: "Memory says X is completed, but tracker shows it outstanding" (or vice versa)
+- Recommend correction path: update the stale source to match the authoritative one
+
+This step catches the scenario where an interview/task was processed but only some status sources were updated.
+
 ## Output Format
 
 ```
@@ -100,11 +110,18 @@ Looking at the bigger picture:
 **Recovery Actions:**
 - [Overdue item]: [What to do now]
 
+### Data Consistency
+
+- [Source A] says [X], but [Source B] says [Y]
+  -> Authoritative source: [which one and why]
+  -> Fix: Update [stale source] to match
+
 ### Summary
 
 Critical: [X items need immediate attention]
 Watch: [Y items to keep an eye on]
 Consider: [Z strategic things to think about]
+Consistency: [N data mismatches found across sources]
 ```
 
 ## Tone

@@ -50,6 +50,10 @@ When enhanced memory is available, use urgency-driven ordering. Run `claudia mem
 
 The brief should be urgency-driven, not category-driven. The old approach said "here are your commitments." The new approach says "here's what needs your attention RIGHT NOW."
 
+### Verification Step
+
+For any item flagged as overdue or at-risk, **read the actual file to confirm status hasn't changed** since the last memory update. Memory DB and file state can diverge (e.g., an interview was marked complete in the file but the memory DB wasn't updated). A 10-second grep is cheaper than reporting stale status.
+
 ---
 
 ## What to Surface
