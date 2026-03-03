@@ -167,9 +167,10 @@ export async function gmailLoginCommand() {
     await authenticate('gmail');
     console.log('\n\u2713 Gmail connected! Claudia can now read and send emails.');
     console.log('  Try: claudia gmail search "is:unread"');
+    process.exit(0);
   } catch (err) {
     console.error(`\n\u2717 ${err.message}`);
-    process.exitCode = 1;
+    process.exit(1);
   }
 }
 
@@ -458,9 +459,10 @@ export async function calendarLoginCommand() {
     await authenticate('calendar');
     console.log('\n\u2713 Calendar connected! Claudia can now read and create events.');
     console.log('  Try: claudia calendar list');
+    process.exit(0);
   } catch (err) {
     console.error(`\n\u2717 ${err.message}`);
-    process.exitCode = 1;
+    process.exit(1);
   }
 }
 
@@ -633,9 +635,10 @@ export async function googleLoginCommand() {
     console.log('\n\u2713 Google connected! Claudia can now access Gmail and Calendar.');
     console.log('  Try: claudia gmail search "is:unread"');
     console.log('  Try: claudia calendar list');
+    process.exit(0);
   } catch (err) {
     console.error(`\n\u2717 ${err.message}`);
-    process.exitCode = 1;
+    process.exit(1);
   }
 }
 

@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.12 (2026-03-03)
+
+### OAuth Login: Instant Exit + Auto-Close Tab
+
+- **Fix: login commands now exit immediately** -- Three-pronged fix for the 2-minute hang: (1) `openBrowser()` child process is now `.unref()`'d so it doesn't keep the event loop alive, (2) `process.exit(0)` in all login command handlers as a safety net, (3) the browser callback page now auto-closes after 3 seconds with `window.close()` and shows a "Close This Tab" button as fallback.
+
 ## 1.51.11 (2026-03-03)
 
 ### OAuth Login Speed Fix

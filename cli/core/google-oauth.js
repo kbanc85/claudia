@@ -309,14 +309,16 @@ function findAvailablePort() {
 
 function openBrowser(url) {
   // Use execFile (not exec) to avoid shell injection.
-  // The URL is constructed internally, not from user input, but safe practice regardless.
+  // .unref() the child process so it doesn't keep the Node.js event loop alive.
+  let child;
   if (process.platform === 'darwin') {
-    execFile('open', [url], () => {});
+    child = execFile('open', [url], () => {});
   } else if (process.platform === 'win32') {
-    execFile('cmd', ['/c', 'start', '""', url], () => {});
+    child = execFile('cmd', ['/c', 'start', '""', url], () => {});
   } else {
-    execFile('xdg-open', [url], () => {});
+    child = execFile('xdg-open', [url], () => {});
   }
+  if (child) child.unref();
 }
 
 function htmlPage(title, message, service) {
@@ -416,12 +418,20 @@ function htmlPage(title, message, service) {
   hr { border: none; border-top: 1px solid #e8e8ed; margin: 0 0 0.85rem; }
   .footer { color: #86868b; font-size: 0.72rem; line-height: 1.6; }
   .footer .close { color: #aeaeb2; margin-top: 0.25rem; }
+  .close-btn {
+    display: inline-block; margin-top: 1rem; padding: 0.5rem 1.5rem;
+    border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 500;
+    cursor: pointer; background: #00CED1; color: #fff;
+    transition: opacity 0.2s;
+  }
+  .close-btn:hover { opacity: 0.85; }
+  .auto-close { color: #aeaeb2; font-size: 0.7rem; margin-top: 0.5rem; }
 </style></head>
 <body>
 <div class="card">
   <div class="checkmark">${isSuccess ? '&#10003;' : '&#10007;'}</div>
   <h1>${isSuccess ? serviceName + ' Connected' : title}</h1>
-  <p class="subtitle">${isSuccess ? 'You can close this tab and return to your terminal.' : message}</p>
+  <p class="subtitle">${isSuccess ? 'Claudia is ready. Returning to your terminal.' : message}</p>
   ${isSuccess ? `
   <div class="service-label">What Claudia can do</div>
   <div class="features">${featuresHtml}</div>
@@ -429,6 +439,17 @@ function htmlPage(title, message, service) {
   <div class="footer">
     <div>&#128274; Tokens stored locally. They never leave your machine.</div>
   </div>
+  <button class="close-btn" onclick="window.close()">Close This Tab</button>
+  <div class="auto-close" id="countdown">Closing in 3s...</div>
+  <script>
+    let t=3;
+    const el=document.getElementById('countdown');
+    const iv=setInterval(()=>{
+      t--;
+      if(t<=0){clearInterval(iv);window.close();el.textContent='You can close this tab now.';}
+      else{el.textContent='Closing in '+t+'s...';}
+    },1000);
+  </script>
   ` : `
   <div class="footer" style="margin-top:0.5rem;">
     <div>Check your terminal for details, then try again.</div>
