@@ -470,7 +470,7 @@ async function main() {
   }
 
   // Disable Gmail/Calendar MCP servers (Claudia has native CLI commands now)
-  disableGoogleMcpServers(targetPath);
+  disableLegacyMcpServers(targetPath);
 
   // Write context/whats-new.md for Claudia's self-awareness (silent)
   writeWhatsNewFile(targetPath, version);
@@ -876,11 +876,15 @@ async function main() {
 }
 
 /**
- * Disable Gmail and Google Calendar MCP servers in .mcp.json if present.
- * Claudia now has native CLI commands for both services, so external MCP
- * servers are no longer needed. This runs on both fresh installs and upgrades.
+ * Disable legacy MCP servers in .mcp.json that have been replaced by native CLI commands.
+ * This runs on both fresh installs and upgrades.
+ *
+ * Replaced servers:
+ * - claudia-memory  → `claudia memory` CLI (Node.js, direct SQLite)
+ * - gmail           → `claudia gmail` CLI
+ * - google-calendar → `claudia calendar` CLI
  */
-function disableGoogleMcpServers(targetPath) {
+function disableLegacyMcpServers(targetPath) {
   const mcpPath = join(targetPath, '.mcp.json');
   if (!existsSync(mcpPath)) return;
 
@@ -889,20 +893,31 @@ function disableGoogleMcpServers(targetPath) {
     const config = JSON.parse(raw);
     if (!config.mcpServers) return;
 
-    const googleKeys = ['gmail', 'google-calendar', 'google_calendar', 'googleCalendar'];
-    let changed = false;
+    // Map of MCP server keys to their CLI replacement description
+    const legacyServers = {
+      'claudia-memory':    'claudia memory CLI',
+      'claudia_memory':    'claudia memory CLI',
+      'gmail':             'claudia google login',
+      'google-calendar':   'claudia google login',
+      'google_calendar':   'claudia google login',
+      'googleCalendar':    'claudia google login',
+    };
 
-    for (const key of googleKeys) {
+    let changed = false;
+    const disabled = [];
+
+    for (const [key, replacement] of Object.entries(legacyServers)) {
       if (config.mcpServers[key] && !config.mcpServers[key]._disabled) {
         config.mcpServers[key]._disabled = true;
-        config.mcpServers[key]._replaced_by = 'claudia google login';
+        config.mcpServers[key]._replaced_by = replacement;
         changed = true;
+        disabled.push(key);
       }
     }
 
     if (changed) {
       writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-      console.log(` ${colors.yellow}→${colors.reset} Disabled Gmail/Calendar MCP servers (replaced by ${colors.cyan}claudia google login${colors.reset})`);
+      console.log(` ${colors.yellow}→${colors.reset} Disabled legacy MCP: ${disabled.join(', ')} (replaced by native CLI)`);
     }
   } catch {
     // Not valid JSON or can't read -- skip silently

@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.8 (2026-03-03)
+
+### Memory MCP Retirement
+
+- **Legacy `claudia-memory` MCP auto-disabled on install/upgrade** -- The old Python daemon MCP server is now automatically disabled in `.mcp.json`, just like the Gmail/Calendar MCPs. The native `claudia memory` CLI replaces it entirely. This prevents Claude Code from using the MCP tools instead of the CLI commands.
+
+### Proactive Memory Lookup
+
+- **"Search before asking" rule** -- Claudia now has an explicit directive to always query memory when someone is referenced by name or relationship ("my wife", "my boss", "my client"). She resolves the reference via `memory recall` and `memory about` before asking the user for information she might already have.
+
 ## 1.51.7 (2026-03-03)
 
 ### Gmail Draft
