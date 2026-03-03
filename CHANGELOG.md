@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.10 (2026-03-03)
+
+### Global MCP Config Warning
+
+- **Warn about legacy MCP servers in global `~/.claude.json`** -- The installer now checks the global Claude Code config for legacy MCP servers (memory daemon, Gmail, Calendar) that overlap with Claudia's native CLI commands. These global entries can't be auto-fixed (they're shared across all projects), but the installer warns the user with specific instructions to clean them up. This catches the case where project-level `.mcp.json` is clean but a global config is still launching duplicate MCP servers.
+
 ## 1.51.9 (2026-03-03)
 
 ### MCP Disable Fix

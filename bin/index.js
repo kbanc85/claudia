@@ -474,6 +474,9 @@ async function main() {
   // preserved but not launched. User can move them back to re-enable if needed.
   disableLegacyMcpServers(targetPath);
 
+  // Warn if global ~/.claude.json has legacy MCP servers we can't auto-fix
+  warnGlobalLegacyMcpServers();
+
   // Write context/whats-new.md for Claudia's self-awareness (silent)
   writeWhatsNewFile(targetPath, version);
 
@@ -935,6 +938,49 @@ function disableLegacyMcpServers(targetPath) {
     if (changed) {
       writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
       console.log(` ${colors.yellow}→${colors.reset} Disabled legacy MCP: ${disabled.join(', ')} (moved to _disabled_mcpServers)`);
+    }
+  } catch {
+    // Not valid JSON or can't read -- skip silently
+  }
+}
+
+/**
+ * Check the global ~/.claude.json for legacy MCP servers that overlap with
+ * Claudia's native CLI commands. We don't modify global config (too risky),
+ * but we warn the user so they can clean it up manually.
+ */
+function warnGlobalLegacyMcpServers() {
+  const globalConfigPath = join(homedir(), '.claude.json');
+  if (!existsSync(globalConfigPath)) return;
+
+  try {
+    const raw = readFileSync(globalConfigPath, 'utf-8');
+    const config = JSON.parse(raw);
+    if (!config.mcpServers) return;
+
+    // Servers that Claudia's CLI replaces. Only warn about these.
+    const legacyServers = {
+      'claudia-memory':    'claudia memory CLI',
+      'claudia_memory':    'claudia memory CLI',
+      'gmail':             'claudia gmail CLI',
+      'google-calendar':   'claudia calendar CLI',
+      'google_calendar':   'claudia calendar CLI',
+      'googleCalendar':    'claudia calendar CLI',
+    };
+
+    const found = [];
+    for (const key of Object.keys(legacyServers)) {
+      if (config.mcpServers[key]) found.push(key);
+    }
+
+    if (found.length > 0) {
+      console.log();
+      console.log(` ${colors.boldYellow}⚠  Legacy MCP servers found in global config${colors.reset}`);
+      console.log(` ${colors.dim}   ~/.claude.json still has: ${found.join(', ')}${colors.reset}`);
+      console.log(` ${colors.dim}   These overlap with Claudia's CLI and may cause duplicate behavior.${colors.reset}`);
+      console.log(` ${colors.dim}   To fix: edit ~/.claude.json and remove them from mcpServers,${colors.reset}`);
+      console.log(` ${colors.dim}   or move them to _disabled_mcpServers to preserve the config.${colors.reset}`);
+      console.log();
     }
   } catch {
     // Not valid JSON or can't read -- skip silently
