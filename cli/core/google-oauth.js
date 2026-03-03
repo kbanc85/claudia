@@ -126,24 +126,27 @@ export async function authenticate(service) {
       const error = url.searchParams.get('error');
 
       if (error) {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
         res.end(htmlPage('Authorization Failed', 'Something went wrong. Check your terminal for details.', service));
-        server.close();
+        server.close(() => {});
+        server.closeAllConnections();
         reject(new Error(`Google auth error: ${error}`));
         return;
       }
 
       if (returnedState !== state) {
-        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.writeHead(400, { 'Content-Type': 'text/html', 'Connection': 'close' });
         res.end(htmlPage('Security Error', 'State mismatch. Please try again.', service));
-        server.close();
+        server.close(() => {});
+        server.closeAllConnections();
         reject(new Error('OAuth state mismatch (possible CSRF). Try again.'));
         return;
       }
 
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
       res.end(htmlPage('Connected', `You're all set. Claudia is now connected.`, service));
-      server.close();
+      server.close(() => {});
+      server.closeAllConnections();
       resolve(authCode);
     });
 
@@ -153,7 +156,8 @@ export async function authenticate(service) {
 
     // Timeout after 2 minutes
     const timeout = setTimeout(() => {
-      server.close();
+      server.close(() => {});
+      server.closeAllConnections();
       reject(new Error('Authentication timed out (2 minutes). Run the command again to retry.'));
     }, 120_000);
 

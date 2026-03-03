@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.11 (2026-03-03)
+
+### OAuth Login Speed Fix
+
+- **Fix: `claudia google login` no longer hangs for 2 minutes** -- The OAuth callback server used HTTP/1.1 keep-alive connections by default. After the browser received the "Connected!" page, it held the TCP connection open, preventing the Node.js process from exiting. The command would hang until Claude Code's 2-minute Bash timeout killed it. Fixed by setting `Connection: close` headers on all responses and calling `server.closeAllConnections()` (Node 18.2+) to force-destroy sockets immediately. Login now completes in ~10 seconds.
+
 ## 1.51.10 (2026-03-03)
 
 ### Global MCP Config Warning
