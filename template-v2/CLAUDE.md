@@ -328,9 +328,28 @@ If the MCP tools aren't responding or you see authentication errors, the user ne
 
 **Alternative:** CLI commands (`claudia gmail search`, `claudia calendar list`, etc.) are also available as a fallback. These require separate authentication via `claudia google login`.
 
-**Rube (500+ Apps):** Rube (by Composio) is an optional MCP aggregator that connects Claudia to Slack, Notion, Google Drive, GitHub, Linear, Jira, and hundreds more apps through a single server. Each user creates their own free Rube account, connects the apps they want via one-click OAuth, and Claudia gets access to all of them through one MCP connection.
+**Rube (500+ Apps):** Rube (by Composio) is an optional MCP aggregator that connects Claudia to hundreds of apps through a single server. Each user creates their own free Rube account, connects the apps they want via one-click OAuth, and Claudia gets access to all of them through one MCP connection.
 
-If a user asks about connecting apps, integrations, Slack, Notion, Drive, GitHub, or similar services, proactively suggest Rube as the easiest path. Walk them through setup step by step.
+If a user asks about connecting apps, integrations, or any of the services listed below, proactively suggest Rube as the easiest path. Walk them through setup step by step.
+
+**What you can connect through Rube:**
+
+| Category | Apps |
+|----------|------|
+| **Communication** | Slack, Discord, Microsoft Teams, Telegram |
+| **Email** | Gmail, Outlook, Yahoo Mail |
+| **Meeting Notes & Transcription** | Granola, Otter.ai, Fireflies.ai |
+| **Project Management** | Jira, Linear, Asana, Trello, Monday.com, ClickUp, Basecamp |
+| **Knowledge & Docs** | Notion, Confluence, Google Docs, Coda |
+| **Cloud Storage** | Google Drive, Dropbox, OneDrive, Box |
+| **Code & Dev** | GitHub, GitLab, Bitbucket |
+| **Databases & Spreadsheets** | Airtable, Google Sheets, Supabase, PostgreSQL |
+| **CRM & Sales** | HubSpot, Salesforce, Pipedrive |
+| **Design** | Figma, Canva |
+| **Social Media** | X/Twitter, LinkedIn, Instagram |
+| **Finance** | Stripe, QuickBooks, Xero |
+| **Calendar** | Google Calendar, Outlook Calendar, Calendly |
+| **And 500+ more** | Browse the full list at [rube.app](https://rube.app) |
 
 **External integrations** (Gmail, Google Calendar, Rube, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
 
@@ -340,11 +359,11 @@ If a user asks about connecting apps, integrations, Slack, Notion, Drive, GitHub
 - Go to [rube.app](https://rube.app) and sign up (free tier available)
 - This is the user's own account. They manage billing and app connections directly with Rube.
 
-**Step 2: Connect apps in Rube's marketplace**
-- In the Rube dashboard, browse the marketplace of 500+ apps
+**Step 2: Connect the apps you want**
+- In the Rube dashboard, browse the marketplace
 - Click any app to connect it (each uses its own OAuth popup, handled by Rube)
-- Popular apps: Gmail, Slack, Notion, Google Drive, GitHub, Linear, Jira, Trello, Asana, HubSpot, Salesforce, Discord, Figma, Airtable
-- Users can add more apps at any time without reconfiguring Claudia
+- Start with the apps you use most: Slack, Notion, GitHub, Google Drive, etc.
+- You can add more apps at any time without reconfiguring Claudia
 
 **Step 3: Copy the API key**
 - In the Rube dashboard, find the API key / Bearer token
@@ -365,7 +384,17 @@ If a user asks about connecting apps, integrations, Slack, Notion, Drive, GitHub
 - Close and reopen Claude Code for the MCP to connect
 - Once connected, Rube's tools appear automatically
 
-**Using Rube-connected apps:** Once Rube is connected, use the tools naturally: "Send a Slack message to #general", "Create a Notion page", "List my open GitHub issues", "Search my Google Drive for the Q4 report", etc. The MCP tools from Rube will have names like `SLACK_SEND_MESSAGE`, `NOTION_CREATE_PAGE`, `GITHUB_LIST_ISSUES`, etc. Use them when they match what the user is asking for.
+**Using Rube-connected apps:** Once Rube is connected, use the tools naturally. Examples:
+- "Send a Slack message to #general saying the deploy is done"
+- "Create a Notion page with today's meeting notes"
+- "List my open GitHub issues on the claudia repo"
+- "Search my Google Drive for the Q4 report"
+- "Show me my Granola meeting notes from this week"
+- "Add a task to my Jira sprint"
+- "Check my Stripe dashboard for recent payments"
+- "Create an Airtable record in the Contacts table"
+
+The MCP tools from Rube will have names like `SLACK_SEND_MESSAGE`, `NOTION_CREATE_PAGE`, `GITHUB_LIST_ISSUES`, etc. Use them when they match what the user is asking for.
 
 **Troubleshooting Rube:**
 

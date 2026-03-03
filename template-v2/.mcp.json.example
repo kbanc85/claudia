@@ -16,7 +16,7 @@
       "env": {
         "COMPOSIO_API_KEY": ""
       },
-      "_setup": "Connect 500+ apps (Slack, Notion, Drive, GitHub...) via Rube. 1) Sign up free at https://rube.app 2) Connect your apps in Rube's marketplace 3) Copy your API key from the dashboard 4) Paste it in COMPOSIO_API_KEY above 5) Restart Claude Code. See Rube section in CLAUDE.md for full guide."
+      "_setup": "Connect 500+ apps via Rube: Slack, Notion, Drive, GitHub, Granola, Otter.ai, Jira, Linear, Airtable, HubSpot, Stripe, and more. 1) Sign up free at https://rube.app 2) Connect your apps in Rube's marketplace 3) Copy your API key from the dashboard 4) Paste it in COMPOSIO_API_KEY above 5) Restart Claude Code. See Rube section in CLAUDE.md for full guide."
     }
   },
 

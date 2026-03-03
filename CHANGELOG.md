@@ -2,6 +2,13 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.16 (2026-03-03)
+
+### Rube: Categorized App Directory
+
+- **Categorized app list in CLAUDE.md** -- Rube section now shows apps by category (Communication, Meeting Notes & Transcription, Project Management, Databases, CRM, etc.) so users know exactly what they can connect. Includes Granola, Otter.ai, Fireflies.ai, Jira, Linear, Airtable, Supabase, HubSpot, Stripe, and many more.
+- **More usage examples** -- Added examples for Granola meeting notes, Jira sprints, Stripe payments, Airtable records.
+
 ## 1.51.15 (2026-03-03)
 
 ### Rube Integration (500+ Apps)
