@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.14 (2026-03-03)
+
+### Installer Banner Fix
+
+- **Fix: installer no longer shows `claudia google login`** -- The post-install banner now points to "Google Integration Setup" in CLAUDE.md instead of the old CLI login command, matching the MCP-first approach from v1.51.13.
+
 ## 1.51.13 (2026-03-03)
 
 ### Gmail & Calendar: Back to MCP

@@ -875,8 +875,8 @@ async function main() {
     }
 
     console.log('');
-    console.log(` ${colors.dim}Optional: connect Google services${colors.reset}`);
-    console.log(`   ${colors.cyan}claudia google login${colors.reset}     ${colors.dim}Gmail + Calendar in one step${colors.reset}`);
+    console.log(` ${colors.dim}Optional: Gmail & Calendar require Google Cloud credentials.${colors.reset}`);
+    console.log(` ${colors.dim}See "Google Integration Setup" in CLAUDE.md for step-by-step instructions.${colors.reset}`);
     console.log('');
   }
 }
