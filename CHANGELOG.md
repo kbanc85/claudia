@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.20 (2026-03-03)
+
+### Fix: Multi-Source Status Reconciliation
+
+- **capture-meeting: concrete verification commands** -- Replaced vague "query current state" with specific grep commands for counting completed/outstanding items. Grep count is now explicitly authoritative over in-session memory.
+- **capture-meeting: mandatory source reconciliation (Step 5b)** -- After any status change, all three sources (file YAML, memory DB, dashboard tracker) must be updated and cross-checked. Never use in-session counts.
+- **capture-meeting: error recovery guidance** -- Documents how to handle cascading "sibling tool call errored" failures by re-running commands individually.
+- **what-am-i-missing: Data Consistency Check (section 6)** -- New check cross-references memory DB against file-based trackers, flags contradictions like "memory says completed but tracker says outstanding."
+- **morning-brief: verification step** -- Overdue/at-risk items now verified against actual file state before reporting, catching stale memory DB entries.
+- **New rule: shell-compatibility** -- Bans zsh-reserved variable names (`status`, `path`, `prompt`), documents safe patterns for macOS default shell.
+
 ## 1.51.19 (2026-03-03)
 
 ### Installer UX + License Update
