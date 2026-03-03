@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.19 (2026-03-03)
+
+### Installer UX + License Update
+
+- **Installer now asks y/n before installing or upgrading** -- Users confirm before any files are written. Auto-approves in non-TTY environments (CI/scripts) and with `--yes`/`-y` flags.
+- **Blank line between banner and status** -- Visual spacing between "Research in AI that learns how you work" and the first status line.
+- **Logo hairline adjusted** -- Top hair block shifted left to better align with the face.
+- **License changed to PolyForm Noncommercial 1.0.0** -- Replaces Apache 2.0. Free for personal, research, educational, and nonprofit use. Commercial licensing available via mail@kbanc.com.
+
 ## 1.51.18 (2026-03-03)
 
 ### Fix: Embedding Storage + Functional Health Checks

@@ -5,7 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { homedir } from 'os';
-// readline no longer needed (STATUS line parsing removed in v1.50)
+import { createInterface } from 'readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,6 +49,20 @@ function getVersion() {
   } catch {
     return '0.0.0';
   }
+}
+
+// Simple y/n prompt. Returns true if user confirms (or non-TTY / --yes flag).
+function confirm(question) {
+  if (!isTTY || process.argv.includes('--yes') || process.argv.includes('-y')) {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(` ${question} ${colors.dim}(y/n)${colors.reset} `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase().startsWith('y'));
+    });
+  });
 }
 
 // Compact portrait-only banner
@@ -410,7 +424,7 @@ async function main() {
 
   const isDemoMode = args.includes('--demo');
   const skipMemory = args.includes('--no-memory');
-  const filteredArgs = args.filter(a => a !== '--demo' && a !== '--no-memory');
+  const filteredArgs = args.filter(a => a !== '--demo' && a !== '--no-memory' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
 
   // Support "." or "upgrade" for current directory
@@ -427,6 +441,14 @@ async function main() {
     if (hasClaudioFiles) {
       isUpgrade = true;
     }
+  }
+
+  // Ask for confirmation before installing or upgrading
+  const action = isUpgrade ? 'Update Claudia' : `Install Claudia to ./${targetDir}`;
+  const confirmed = await confirm(`${action}?`);
+  if (!confirmed) {
+    console.log(` ${colors.dim}Cancelled.${colors.reset}`);
+    process.exit(0);
   }
 
   // Create target directory if not current dir (only for fresh installs)
@@ -466,6 +488,7 @@ async function main() {
       process.exit(1);
     }
 
+    console.log('');
     console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
   }
 

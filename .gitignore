@@ -1,21 +1,35 @@
+# Dependencies
 node_modules/
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
 *.log
+npm-debug.log*
 
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-*.egg-info/
+# Sensitive files
+credentials.json
+*.pem
+*.key
+
+# Build artifacts
 dist/
-!visualizer/dist/
 build/
-visualizer/src-legacy/
 
-# Local
-.claude/settings.local.json
-tmp/
-
-# Tarballs
-*.tgz
-.worktrees/
+# Temporary files
+*.tmp
+*.temp
