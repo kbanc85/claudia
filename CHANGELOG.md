@@ -2,6 +2,13 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.15 (2026-03-03)
+
+### Rube Integration (500+ Apps)
+
+- **Optional Rube MCP server** -- Connect Slack, Notion, Drive, GitHub, Linear, Jira, and 500+ more apps through a single MCP server via Rube (by Composio). Each user creates their own free Rube account at rube.app, connects apps via one-click OAuth, and pastes one API key. Works alongside existing Gmail/Calendar MCPs.
+- **Comprehensive setup guidance in CLAUDE.md** -- Claudia can now walk users through Rube setup step by step, troubleshoot connection issues, and explain the difference between Rube and individual MCPs.
+
 ## 1.51.14 (2026-03-03)
 
 ### Installer Banner Fix

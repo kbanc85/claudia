@@ -9,13 +9,22 @@
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-calendar-autoauth-mcp"],
       "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth"
+    },
+    "rube": {
+      "command": "npx",
+      "args": ["-y", "@composio/rube-mcp"],
+      "env": {
+        "COMPOSIO_API_KEY": ""
+      },
+      "_setup": "Connect 500+ apps (Slack, Notion, Drive, GitHub...) via Rube. 1) Sign up free at https://rube.app 2) Connect your apps in Rube's marketplace 3) Copy your API key from the dashboard 4) Paste it in COMPOSIO_API_KEY above 5) Restart Claude Code. See Rube section in CLAUDE.md for full guide."
     }
   },
 
   "_notes": {
     "gmail_and_calendar": "Gmail and Calendar use third-party MCP servers. Each user sets up their own Google Cloud Console credentials. See the Google Integration Setup section in CLAUDE.md.",
+    "rube": "Rube (by Composio) connects 500+ apps through one MCP server. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
     "memory": "Claudia's memory system uses the 'claudia' CLI (via Bash tool), not MCP. No MCP server needed for memory.",
-    "security": "Each user authenticates with their own Google accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
+    "security": "Each user authenticates with their own accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",
       "web-search": "Claude Code has native WebSearch",

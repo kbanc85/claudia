@@ -328,7 +328,56 @@ If the MCP tools aren't responding or you see authentication errors, the user ne
 
 **Alternative:** CLI commands (`claudia gmail search`, `claudia calendar list`, etc.) are also available as a fallback. These require separate authentication via `claudia google login`.
 
-**External integrations** (Gmail, Google Calendar, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
+**Rube (500+ Apps):** Rube (by Composio) is an optional MCP aggregator that connects Claudia to Slack, Notion, Google Drive, GitHub, Linear, Jira, and hundreds more apps through a single server. Each user creates their own free Rube account, connects the apps they want via one-click OAuth, and Claudia gets access to all of them through one MCP connection.
+
+If a user asks about connecting apps, integrations, Slack, Notion, Drive, GitHub, or similar services, proactively suggest Rube as the easiest path. Walk them through setup step by step.
+
+**External integrations** (Gmail, Google Calendar, Rube, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
+
+### Rube Setup (Guide Users Through This)
+
+**Step 1: Create a Rube account**
+- Go to [rube.app](https://rube.app) and sign up (free tier available)
+- This is the user's own account. They manage billing and app connections directly with Rube.
+
+**Step 2: Connect apps in Rube's marketplace**
+- In the Rube dashboard, browse the marketplace of 500+ apps
+- Click any app to connect it (each uses its own OAuth popup, handled by Rube)
+- Popular apps: Gmail, Slack, Notion, Google Drive, GitHub, Linear, Jira, Trello, Asana, HubSpot, Salesforce, Discord, Figma, Airtable
+- Users can add more apps at any time without reconfiguring Claudia
+
+**Step 3: Copy the API key**
+- In the Rube dashboard, find the API key / Bearer token
+- It may be under "Settings", "MCP Settings", or "Install Rube"
+
+**Step 4: Add to Claudia's config**
+- Open `.mcp.json` in the project root
+- Find the `rube` server section
+- Paste the API key into the `COMPOSIO_API_KEY` value:
+  ```json
+  "env": {
+    "COMPOSIO_API_KEY": "paste-key-here"
+  }
+  ```
+- Alternatively, set it as an environment variable: `export COMPOSIO_API_KEY=paste-key-here`
+
+**Step 5: Restart Claude Code**
+- Close and reopen Claude Code for the MCP to connect
+- Once connected, Rube's tools appear automatically
+
+**Using Rube-connected apps:** Once Rube is connected, use the tools naturally: "Send a Slack message to #general", "Create a Notion page", "List my open GitHub issues", "Search my Google Drive for the Q4 report", etc. The MCP tools from Rube will have names like `SLACK_SEND_MESSAGE`, `NOTION_CREATE_PAGE`, `GITHUB_LIST_ISSUES`, etc. Use them when they match what the user is asking for.
+
+**Troubleshooting Rube:**
+
+| Problem | Solution |
+|---------|----------|
+| Rube MCP not connecting | Check that `COMPOSIO_API_KEY` is set in `.mcp.json` or environment. Restart Claude Code. |
+| Tool not found for an app | The user needs to connect that app in Rube's marketplace first (rube.app dashboard). |
+| Authentication expired | The user should reconnect the specific app in Rube's dashboard (re-authorize OAuth). |
+| Rate limited | Rube has usage limits on the free tier. The user may need to upgrade at rube.app/pricing. |
+| Want to disconnect an app | Go to Rube dashboard and disconnect the app there. No Claudia config changes needed. |
+
+**Rube vs. Individual MCPs:** Rube works alongside (not instead of) Gmail and Calendar MCPs. Individual MCPs give a direct connection with no intermediary but require per-service Google Cloud setup. Rube gives one setup for everything but routes data through Composio servers. Both can coexist. If a user has both Gmail MCP and Rube's Gmail connected, prefer the direct MCP tools.
 
 ### Google Integration Setup
 
