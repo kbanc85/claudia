@@ -469,7 +469,9 @@ async function main() {
     console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
   }
 
-  // Disable Gmail/Calendar MCP servers (Claudia has native CLI commands now)
+  // Move legacy MCP servers (memory, Gmail, Calendar) to _disabled_mcpServers.
+  // Claude Code's native disable format: servers in _disabled_mcpServers are
+  // preserved but not launched. User can move them back to re-enable if needed.
   disableLegacyMcpServers(targetPath);
 
   // Write context/whats-new.md for Claudia's self-awareness (silent)
@@ -893,7 +895,12 @@ function disableLegacyMcpServers(targetPath) {
     const config = JSON.parse(raw);
     if (!config.mcpServers) return;
 
-    // Map of MCP server keys to their CLI replacement description
+    // Map of MCP server keys to their CLI replacement description.
+    // These servers are superseded by native CLI commands and should not
+    // be launched by Claude Code. We MOVE them from mcpServers into the
+    // _disabled_mcpServers top-level key, which is Claude Code's native
+    // disable format (used by the /mcp toggle UI). This preserves the
+    // full config so the user can move it back to re-enable if needed.
     const legacyServers = {
       'claudia-memory':    'claudia memory CLI',
       'claudia_memory':    'claudia memory CLI',
@@ -907,9 +914,19 @@ function disableLegacyMcpServers(targetPath) {
     const disabled = [];
 
     for (const [key, replacement] of Object.entries(legacyServers)) {
-      if (config.mcpServers[key] && !config.mcpServers[key]._disabled) {
-        config.mcpServers[key]._disabled = true;
-        config.mcpServers[key]._replaced_by = replacement;
+      if (config.mcpServers[key]) {
+        // Ensure _disabled_mcpServers exists as a top-level sibling
+        if (!config._disabled_mcpServers) config._disabled_mcpServers = {};
+
+        // Preserve full server config, strip our old _disabled flag if present
+        const serverConfig = { ...config.mcpServers[key] };
+        delete serverConfig._disabled;
+        delete serverConfig._replaced_by;
+        serverConfig._replaced_by = replacement;
+        config._disabled_mcpServers[key] = serverConfig;
+
+        // Remove from active servers so Claude Code won't launch it
+        delete config.mcpServers[key];
         changed = true;
         disabled.push(key);
       }
@@ -917,7 +934,7 @@ function disableLegacyMcpServers(targetPath) {
 
     if (changed) {
       writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-      console.log(` ${colors.yellow}→${colors.reset} Disabled legacy MCP: ${disabled.join(', ')} (replaced by native CLI)`);
+      console.log(` ${colors.yellow}→${colors.reset} Disabled legacy MCP: ${disabled.join(', ')} (moved to _disabled_mcpServers)`);
     }
   } catch {
     // Not valid JSON or can't read -- skip silently

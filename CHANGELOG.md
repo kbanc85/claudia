@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.9 (2026-03-03)
+
+### MCP Disable Fix
+
+- **Fix: legacy MCP servers now properly disabled** -- Previous versions set `_disabled: true` inside `mcpServers` entries, which is not a supported Claude Code feature. Claude Code was still launching the legacy MCP servers (memory daemon, Gmail, Calendar) even though they appeared "disabled." The installer now uses Claude Code's native disable format: servers are **moved** from `mcpServers` to the `_disabled_mcpServers` top-level key. This matches what Claude Code's own `/mcp` toggle does. The full config is preserved in `_disabled_mcpServers` so users can move it back to re-enable if needed.
+
 ## 1.51.8 (2026-03-03)
 
 ### Memory MCP Retirement
