@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.7 (2026-03-03)
+
+### Gmail Draft
+
+- **`claudia gmail draft`** -- Create draft emails with optional attachments via the Gmail API. Same MIME support as `gmail send` (--attach for images/files, --html, --cc, --bcc, --thread, --reply-to) but all fields are optional since drafts can be completed in the Gmail UI. Uses the `drafts.create` endpoint.
+
+### Installer Self-Update
+
+- **Self-update trampoline** -- `npx get-claudia .` now checks the npm registry on startup and automatically re-executes with the latest version if the cached copy is outdated. No more stale installs from npx caching. Falls back gracefully if offline. Protected against infinite recursion via `CLAUDIA_SKIP_UPDATE_CHECK` env var.
+
 ## 1.51.6 (2026-03-03)
 
 ### Gmail Send

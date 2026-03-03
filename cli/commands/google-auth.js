@@ -10,6 +10,7 @@
  *   claudia gmail search     - Search emails
  *   claudia gmail read       - Read a specific email
  *   claudia gmail send       - Send an email with optional attachments
+ *   claudia gmail draft      - Create a draft email with optional attachments
  *   claudia gmail logout     - Sign out of Gmail
  *   claudia calendar login   - Sign in with Google (Calendar only)
  *   claudia calendar status  - Check Calendar connection status
@@ -25,7 +26,7 @@ import { randomBytes } from 'node:crypto';
 import { authenticate, getAccessToken, isAuthenticated, revokeTokens, authStatus } from '../core/google-oauth.js';
 import { outputJson as output } from '../core/output.js';
 
-// ── MIME Helpers (for gmail send) ──
+// ── MIME Helpers (for gmail send & draft) ──
 
 const MIME_TYPES = {
   png: 'image/png',
@@ -365,6 +366,79 @@ export async function gmailSendCommand(opts) {
     id: data.id,
     threadId: data.threadId,
     labelIds: data.labelIds || [],
+  });
+}
+
+export async function gmailDraftCommand(opts) {
+  const token = await getAccessToken('gmail');
+  if (!token) {
+    console.error('Not authenticated. Run: claudia gmail login');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Drafts are more lenient than send: subject and body can be empty
+  const to = opts.to || [];
+  const subject = opts.subject || '';
+  const body = opts.body || '';
+
+  // Prepare attachments
+  let attachments = [];
+  if (opts.attach && opts.attach.length > 0) {
+    try {
+      attachments = prepareAttachments(opts.attach);
+    } catch (err) {
+      console.error(err.message);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  // Build MIME message and base64url-encode it
+  const rawMessage = buildMimeMessage({
+    to,
+    subject,
+    body,
+    cc: opts.cc,
+    bcc: opts.bcc,
+    html: opts.html,
+    replyTo: opts.replyTo,
+    attachments,
+  });
+
+  const encodedMessage = Buffer.from(rawMessage, 'utf-8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  // Gmail drafts API: { message: { raw, threadId? } }
+  const message = { raw: encodedMessage };
+  if (opts.thread) {
+    message.threadId = opts.thread;
+  }
+
+  const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error(`Gmail API error (${resp.status}): ${err}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const data = await resp.json();
+  output({
+    id: data.id,
+    messageId: data.message?.id,
+    threadId: data.message?.threadId,
   });
 }
 

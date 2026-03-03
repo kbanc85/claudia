@@ -329,6 +329,7 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 | `claudia gmail search "<query>"` | Search emails (Gmail search syntax) |
 | `claudia gmail read <messageId>` | Read a specific email |
 | `claudia gmail send --to <email> --subject <text> --body <text>` | Send email (supports --attach, --cc, --bcc, --html, --thread, --reply-to) |
+| `claudia gmail draft --to <email> --subject <text> --body <text>` | Create draft in Gmail (same options as send, all optional, supports --attach for images/files) |
 | `claudia gmail logout` | Disconnect Gmail, remove tokens |
 | `claudia calendar login` | Opens browser for Calendar-only OAuth |
 | `claudia calendar status` | Check if Calendar is connected |

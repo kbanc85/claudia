@@ -341,10 +341,66 @@ async function restartOllama() {
   return startOllama();
 }
 
+// ─── Self-update trampoline ──────────────────────────────────────────────
+// npx aggressively caches packages. If the user runs `npx get-claudia .`
+// and a newer version exists, we re-exec with the latest to avoid stale installs.
+
+function isNewerVersion(latest, current) {
+  const a = latest.split('.').map(Number);
+  const b = current.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) > (b[i] || 0)) return true;
+    if ((a[i] || 0) < (b[i] || 0)) return false;
+  }
+  return false;
+}
+
+async function checkForNewerVersion(currentVersion) {
+  // Skip if already re-execing (prevent infinite recursion)
+  if (process.env.CLAUDIA_SKIP_UPDATE_CHECK) return null;
+  // Skip for --help / --version (no need to update-check)
+  if (process.argv.includes('--help') || process.argv.includes('-h') || process.argv.includes('--version')) return null;
+
+  try {
+    const resp = await fetch('https://registry.npmjs.org/get-claudia/latest', {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const latest = data.version;
+    if (latest && isNewerVersion(latest, currentVersion)) return latest;
+  } catch {
+    // Network error or timeout: proceed with current version
+  }
+  return null;
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
   const version = getVersion();
+
+  // Self-update trampoline: re-exec with latest if we're stale
+  const newerVersion = await checkForNewerVersion(version);
+  if (newerVersion) {
+    process.stdout.write(`\n ${colors.yellow}→${colors.reset} v${newerVersion} available (running v${version}). Updating...\n\n`);
+    const npxCmd = isWindows ? 'npx.cmd' : 'npx';
+    try {
+      const child = spawn(npxCmd, ['--yes', `get-claudia@${newerVersion}`, ...process.argv.slice(2)], {
+        stdio: 'inherit',
+        env: { ...process.env, CLAUDIA_SKIP_UPDATE_CHECK: '1' },
+      });
+      await new Promise((resolve, reject) => {
+        child.on('close', (code) => resolve(code));
+        child.on('error', reject);
+      }).then((code) => {
+        process.exit(code || 0);
+      });
+    } catch {
+      // Re-exec failed, fall through to current version
+      process.stdout.write(` ${colors.dim}Update failed, continuing with v${version}${colors.reset}\n`);
+    }
+  }
 
   // Print compact banner
   process.stdout.write(getBanner(version));

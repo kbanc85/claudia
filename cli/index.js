@@ -522,7 +522,7 @@ program
 // ── Gmail subcommand group ──
 const gmail = program
   .command('gmail')
-  .description('Gmail integration (login, search, read, send)');
+  .description('Gmail integration (login, search, read, send, draft)');
 
 gmail
   .command('login')
@@ -574,6 +574,23 @@ gmail
   .action(async (opts) => {
     const { gmailSendCommand } = await import('./commands/google-auth.js');
     await gmailSendCommand(opts);
+  });
+
+gmail
+  .command('draft')
+  .description('Create a draft email (with optional attachments)')
+  .option('--to <email...>', 'Recipient email address(es)')
+  .option('--subject <text>', 'Email subject')
+  .option('--body <text>', 'Email body text')
+  .option('--cc <email...>', 'CC recipient(s)')
+  .option('--bcc <email...>', 'BCC recipient(s)')
+  .option('--attach <filepath...>', 'File(s) to attach')
+  .option('--html', 'Treat body as HTML', false)
+  .option('--thread <threadId>', 'Thread ID (for replies)')
+  .option('--reply-to <messageId>', 'Message-ID for In-Reply-To header')
+  .action(async (opts) => {
+    const { gmailDraftCommand } = await import('./commands/google-auth.js');
+    await gmailDraftCommand(opts);
   });
 
 gmail
