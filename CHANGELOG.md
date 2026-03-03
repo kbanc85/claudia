@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.17 (2026-03-03)
+
+### Critical: Fix Embedding Storage + CLI Documentation
+
+- **Fix: Embeddings now stored as Float32Array** -- All vec0 virtual table inserts (memory, entity, episode, reflection embeddings) were using `JSON.stringify()` which better-sqlite3 rejects. Now uses `new Float32Array()` matching the sqlite-vec Node.js API. This restores semantic/vector search, which was silently falling back to keyword-only FTS matching.
+- **Fix: CLI reference in memory-manager.md** -- Corrected inaccurate flags (`--about`, `--summary`, `--action`), added batch JSON schema with examples, documented all 45+ subcommands including temporal, graph, provenance, and session groups. Added valid option values table.
+- **Fix: Batch error messages now show expected format** -- "Invalid JSON input" now includes the expected `{"op":...}` schema inline. Added validation for missing `op` field and non-array input.
+- **Fix: Embedding failure warnings now explicit** -- Changed from misleading "cosmetic" stderr messages to clear warnings explaining semantic search won't find the memory.
+- **Fix: capture-meeting skill** -- Added pronoun context requirement for agent dispatch (prevents Haiku misgendering). Added pre-query step for dashboard/tracker state to prevent stale counts. Fixed `document store` example syntax (positional file arg, not flags).
+
 ## 1.51.16 (2026-03-03)
 
 ### Rube: Categorized App Directory

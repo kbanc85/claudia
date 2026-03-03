@@ -13,6 +13,14 @@ import { dirname, join } from 'node:path';
 import { canonicalName } from './extraction.js';
 import { embed } from '../core/embeddings.js';
 
+/**
+ * Convert a JS number[] embedding to Float32Array for sqlite-vec MATCH queries.
+ * better-sqlite3 requires Float32Array (not JSON strings) for vec0 virtual tables.
+ */
+function toVecParam(embedding) {
+  return new Float32Array(embedding);
+}
+
 // ---------------------------------------------------------------------------
 // Internal state
 // ---------------------------------------------------------------------------
@@ -798,7 +806,7 @@ export async function recall(db, config, query, {
       LEFT JOIN entities e ON me2.entity_id = e.id
       WHERE me.embedding MATCH ?
     `);
-    params.push(JSON.stringify(queryEmbedding));
+    params.push(toVecParam(queryEmbedding));
 
     applyFilters(db, sqlParts, params, {
       memoryTypes, minImportance, dateAfter, dateBefore, aboutEntity, includeArchived,
@@ -1792,7 +1800,7 @@ export async function searchReflections(db, config, query, { limit = 10, reflect
         LEFT JOIN entities e ON r.about_entity_id = e.id
         WHERE re.embedding MATCH ?
       `;
-      const params = [JSON.stringify(queryEmbedding)];
+      const params = [toVecParam(queryEmbedding)];
 
       if (reflectionTypes && reflectionTypes.length > 0) {
         const ph = reflectionTypes.map(() => '?').join(', ');
@@ -2405,7 +2413,7 @@ export async function recallEpisodes(db, config, query, { limit = 5 } = {}) {
          AND e.is_summarized = 1
          ORDER BY relevance DESC
          LIMIT ?`,
-        [JSON.stringify(queryEmbedding), limit],
+        [toVecParam(queryEmbedding), limit],
       ) || [];
     } catch {
       // Vector search failed, fall back to keyword

@@ -15,25 +15,78 @@ effort-level: medium
 ## CLI Command Reference
 
 All memory operations use the `claudia` CLI via the Bash tool. Every command outputs JSON.
+All commands accept `--project-dir "$PWD"` to specify the workspace.
+
+### Core Operations
 
 | Operation | CLI Command |
 |-----------|-------------|
 | Save a memory | `claudia memory save "content" --type fact --importance 0.8 --person "Name"` |
 | Recall/search | `claudia memory recall "query" --limit 10` |
 | Entity context | `claudia memory about "entity name"` |
-| Create entity | `claudia memory entities create "Name" --type person` |
+| Create entity | `claudia memory entities create "Name" --type person --description "..."` |
 | Relate entities | `claudia memory relate --source "A" --target "B" --type works_with` |
-| Batch operations | `claudia memory batch --file ops.json` |
-| Buffer turn | `claudia memory session buffer --user-content "..." --assistant-content "..."` |
-| End session | `claudia memory end-session --summary "..." --narrative "..."` |
-| File document | `claudia memory document store ./file.md --source-type transcript --about "Name"` |
 | Correct memory | `claudia memory modify correct <id> "correction text"` |
 | Invalidate | `claudia memory modify invalidate <id>` |
 | Briefing | `claudia memory briefing` |
-| Reflections | `claudia memory reflections --save "learning text" --type observation` |
+| Reflections | `claudia memory reflections --save "text" --type observation` |
 | Consolidate | `claudia memory consolidate` |
 
-All commands accept `--project-dir "$PWD"` to specify the workspace.
+### Document Storage
+
+File argument is **positional** (not a flag):
+
+```bash
+claudia memory document store ./transcript.txt --source-type transcript --summary "Interview with Alex"
+```
+
+Options: `--source-type` (gmail, transcript, upload, capture, session), `--source-ref`, `--summary`.
+Search: `claudia memory document search "query" --source-type transcript --limit 10`
+
+### Batch Operations
+
+Reads JSON from stdin or `--file`. Format is an array of operations:
+
+```bash
+echo '[
+  {"op":"entity","name":"Alex Gregory","type":"person","description":"EVP Sales & Marketing"},
+  {"op":"remember","content":"Alex uses GPT for candidate evaluation","about":["Alex Gregory"],"type":"fact","importance":0.8},
+  {"op":"relate","source":"Alex Gregory","target":"Beemok","relationship":"works_at","strength":1.0}
+]' | claudia memory batch --project-dir "$PWD"
+```
+
+Valid `op` values: `entity`, `remember`, `relate`, `correct`, `invalidate`.
+
+### Session Lifecycle
+
+```bash
+claudia memory session buffer --user "..." --assistant "..."
+claudia memory end-session --narrative "Session summary text"
+claudia memory end-session --file /tmp/session-data.json
+claudia memory session context
+claudia memory session unsummarized
+```
+
+Note: `end-session` requires `--narrative` or `--file` (not `--summary`).
+
+### Valid Option Values
+
+| Option | Values |
+|--------|--------|
+| `--type` (memory) | fact, preference, observation, learning, commitment, pattern |
+| `--type` (entity) | person, organization, project, concept, location |
+| `--type` (reflection) | observation, pattern, learning, question |
+| `--source-type` (document) | gmail, transcript, upload, capture, session |
+| `--source-channel` | claude_code, telegram, slack |
+
+### Additional Commands
+
+| Group | Commands |
+|-------|----------|
+| Temporal | `temporal upcoming --days 14`, `temporal since <date>`, `temporal timeline <entity>`, `temporal morning` |
+| Graph | `graph network <entity>`, `graph path <A> <B>`, `graph hubs`, `graph dormant`, `graph reconnect` |
+| Provenance | `provenance trace <id>`, `provenance audit --entity-id <id>`, `provenance verify-chain` |
+| Entities | `entities search <query>`, `entities merge --source <id> --target <id>`, `entities overview <names...>` |
 
 ---
 

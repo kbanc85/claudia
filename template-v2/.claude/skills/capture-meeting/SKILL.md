@@ -31,15 +31,12 @@ User provides one of:
 **Always file the raw transcript/notes FIRST.** This is not optional. Source preservation creates provenance: every extracted fact can trace back to where it came from.
 
 ```
-claudia memory document store \
-  --filename "YYYY-MM-DD-[person]-[topic].md" \
+claudia memory document store /path/to/transcript.txt \
   --source-type "transcript" \
   --summary "Brief 1-line summary of the meeting" \
-  --about "participant1,participant2" \
-  --project-dir "$PWD" \
-  < content.md
+  --project-dir "$PWD"
 ```
-(Pipe the FULL raw transcript/notes text via stdin; do not summarize)
+The first argument is the file path (positional, not a flag). Save the transcript to disk first, then pass the path.
 
 The file is automatically routed to the right folder:
 - `people/sarah-chen/transcripts/2026-02-04-kickoff.md`
@@ -61,7 +58,10 @@ The file is automatically routed to the right folder:
 1. Dispatch Document Processor (Haiku) with:
    - The full transcript text
    - extraction_type: "memory_operations"
-   - Context: participant names, meeting topic, date
+   - Context: participant names with pronouns (e.g., "Alex Gregory (he/him), EVP Sales"),
+     meeting topic, date
+   - IMPORTANT: Always include pronouns and titles in the dispatch prompt.
+     Haiku can misgender or mis-title participants without this context.
 
 2. Agent returns memory_operations[] array with:
    - Facts, preferences, observations
@@ -70,6 +70,7 @@ The file is automatically routed to the right folder:
    - Relationship links
 
 3. Review agent output (judgment layer):
+   - Verify pronouns and titles are correct
    - Verify commitment wording is accurate
    - Check importance scores are reasonable
    - Confirm entity names match existing entities
@@ -116,8 +117,15 @@ Now the user can ask "where did you learn that Sarah prefers async communication
 
 ### 5. Organize
 
-- Update person files with new context
-- Link commitments and waiting items
+**Before writing any files, query current state to avoid stale data:**
+- Grep for actual counts (e.g., completed interviews, open tasks) before updating dashboards or trackers
+- Read the person file fresh before updating it (don't rely on context from earlier in the session)
+- Check existing commitments before adding duplicates
+
+Then update:
+- Person files with new context
+- Commitment and waiting items
+- Dashboard or tracker files with verified counts
 - Create files for new people if needed
 
 ### 6. Synthesize

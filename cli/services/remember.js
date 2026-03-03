@@ -18,6 +18,16 @@ import { dirname, join } from 'node:path';
 import { contentHash } from '../core/database.js';
 import { getConfig } from '../core/config.js';
 import { embed, embedBatch } from '../core/embeddings.js';
+
+/**
+ * Convert a JS number[] embedding to Float32Array for sqlite-vec.
+ * better-sqlite3 requires Float32Array (not JSON strings) for vec0 virtual tables.
+ * @param {number[]} embedding
+ * @returns {Float32Array}
+ */
+function toVecParam(embedding) {
+  return new Float32Array(embedding);
+}
 import {
   validateMemory,
   validateEntity,
@@ -325,10 +335,10 @@ export async function rememberFact(db, content, options = {}) {
     try {
       db.run(
         'INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)',
-        [memoryId, JSON.stringify(embedding)]
+        [memoryId, toVecParam(embedding)]
       );
     } catch (e) {
-      process.stderr.write(`[remember] Could not store memory embedding: ${e.message}\n`);
+      process.stderr.write(`[remember] WARNING: Embedding NOT stored for memory ${memoryId}. Semantic search will not find this memory. Error: ${e.message}\n`);
     }
   }
 
@@ -440,10 +450,10 @@ export async function rememberEntity(db, name, entityType = 'person', options = 
       try {
         db.run(
           'INSERT OR REPLACE INTO entity_embeddings (entity_id, embedding) VALUES (?, ?)',
-          [entityId, JSON.stringify(embedding)]
+          [entityId, toVecParam(embedding)]
         );
       } catch (e) {
-        process.stderr.write(`[remember] Could not store entity embedding: ${e.message}\n`);
+        process.stderr.write(`[remember] WARNING: Embedding NOT stored for entity ${entityId}. Semantic search will not find this entity. Error: ${e.message}\n`);
       }
     }
 
@@ -800,10 +810,10 @@ export async function correctMemory(db, memoryId, correction, options = {}) {
     try {
       db.run(
         'INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)',
-        [memoryId, JSON.stringify(embedding)]
+        [memoryId, toVecParam(embedding)]
       );
     } catch (e) {
-      process.stderr.write(`[remember] Could not update memory embedding: ${e.message}\n`);
+      process.stderr.write(`[remember] WARNING: Embedding NOT updated for memory ${memoryId}. Error: ${e.message}\n`);
     }
   }
 
@@ -1007,10 +1017,10 @@ export async function endSession(db, episodeId, narrative, options = {}) {
     try {
       db.run(
         'INSERT OR REPLACE INTO episode_embeddings (episode_id, embedding) VALUES (?, ?)',
-        [episodeId, JSON.stringify(narrativeEmbedding)]
+        [episodeId, toVecParam(narrativeEmbedding)]
       );
     } catch (e) {
-      process.stderr.write(`[remember] Could not store episode embedding: ${e.message}\n`);
+      process.stderr.write(`[remember] WARNING: Embedding NOT stored for episode ${episodeId}. Error: ${e.message}\n`);
     }
   }
 
@@ -1172,10 +1182,10 @@ export async function storeReflection(db, content, reflectionType, options = {})
     try {
       db.run(
         'INSERT OR REPLACE INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)',
-        [reflectionId, JSON.stringify(embedding)]
+        [reflectionId, toVecParam(embedding)]
       );
     } catch (e) {
-      process.stderr.write(`[remember] Could not store reflection embedding: ${e.message}\n`);
+      process.stderr.write(`[remember] WARNING: Embedding NOT stored for reflection ${reflectionId}. Error: ${e.message}\n`);
     }
   }
 
@@ -1216,10 +1226,10 @@ export async function updateReflection(db, reflectionId, options = {}) {
       try {
         db.run(
           'INSERT OR REPLACE INTO reflection_embeddings (reflection_id, embedding) VALUES (?, ?)',
-          [reflectionId, JSON.stringify(embedding)]
+          [reflectionId, toVecParam(embedding)]
         );
       } catch (e) {
-        process.stderr.write(`[remember] Could not update reflection embedding: ${e.message}\n`);
+        process.stderr.write(`[remember] WARNING: Embedding NOT updated for reflection ${reflectionId}. Error: ${e.message}\n`);
       }
     }
   }

@@ -249,7 +249,7 @@ export async function memoryBatchCommand(opts, globalOpts) {
     }
 
     if (!jsonText || !jsonText.trim()) {
-      outputError('No operations provided. Use --file or pipe JSON to stdin.');
+      outputError('No operations provided. Use --file or pipe JSON to stdin. Expected format: [{"op":"remember","content":"...","about":["Entity"],"type":"fact"}, ...]');
       process.exitCode = 1;
       return;
     }
@@ -258,7 +258,19 @@ export async function memoryBatchCommand(opts, globalOpts) {
     try {
       operations = JSON.parse(jsonText);
     } catch (parseErr) {
-      outputError('Invalid JSON input', { error: parseErr.message });
+      outputError('Invalid JSON input. Expected: array of objects with "op" field (remember|entity|relate|correct|invalidate). Example: [{"op":"remember","content":"...","type":"fact"}]', { error: parseErr.message });
+      process.exitCode = 1;
+      return;
+    }
+
+    if (!Array.isArray(operations)) {
+      outputError('Batch input must be a JSON array. Expected: [{"op":"remember",...}, {"op":"entity",...}, ...]');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (operations.length > 0 && !operations[0].op) {
+      outputError('Each batch operation must have an "op" field. Valid ops: remember, entity, relate, correct, invalidate. Example: {"op":"remember","content":"...","about":["Entity"],"type":"fact"}');
       process.exitCode = 1;
       return;
     }
