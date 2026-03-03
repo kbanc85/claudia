@@ -948,7 +948,7 @@ class Database:
                 "ALTER TABLE memories ADD COLUMN lifecycle_tier TEXT DEFAULT 'active'",
                 "ALTER TABLE memories ADD COLUMN sacred_reason TEXT",
                 "ALTER TABLE memories ADD COLUMN archived_at TEXT",
-                "ALTER TABLE memories ADD COLUMN fact_id TEXT UNIQUE",
+                "ALTER TABLE memories ADD COLUMN fact_id TEXT",
                 "ALTER TABLE memories ADD COLUMN hash TEXT",
                 "ALTER TABLE memories ADD COLUMN prev_hash TEXT",
                 # Entities: close-circle
@@ -971,7 +971,7 @@ class Database:
                     "CREATE INDEX IF NOT EXISTS idx_memories_lifecycle ON memories(lifecycle_tier)"
                 )
                 conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_memories_fact_id ON memories(fact_id)"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_fact_id ON memories(fact_id)"
                 )
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_entities_close_circle ON entities(close_circle) WHERE close_circle = 1"

@@ -2,6 +2,13 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.5 (2026-03-02)
+
+### Database Migration Fix
+
+- **Fix: migration 20 `fact_id` column** -- SQLite does not allow `UNIQUE` constraints on `ALTER TABLE ADD COLUMN`. Migration 20 was silently failing, leaving the `fact_id` column missing and all memory writes broken (`table memories has no column named fact_id`). Fixed by adding the column without the constraint and enforcing uniqueness via a `CREATE UNIQUE INDEX` instead. Existing databases stuck at this broken state will self-heal on next startup.
+- **Fix: `schema.sql` missing from npm package** -- The `memory-daemon/claudia_memory/schema.sql` file was not included in the published npm tarball, causing `[database] Schema file not found` warnings on every CLI invocation. Added to `package.json` `files` array.
+
 ## 1.51.4 (2026-03-02)
 
 ### MCP Cleanup

@@ -1,6 +1,6 @@
 {
   "name": "get-claudia",
-  "version": "1.51.4",
+  "version": "1.51.5",
   "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
@@ -34,7 +34,8 @@
     "cli",
     "template-v2",
     "assets",
-    "visualizer"
+    "visualizer",
+    "memory-daemon/claudia_memory/schema.sql"
   ],
   "dependencies": {
     "better-sqlite3": "^11.8.1",
