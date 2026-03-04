@@ -80,7 +80,10 @@ Check for `context/me.md` at the start of any session. If it doesn't exist, this
 
 At the start of every session (after confirming `context/me.md` exists):
 
-1. **Check memory system** - Call the `memory.briefing` MCP tool. If it responds, the daemon is healthy. If it fails, read context files directly (`me.md`, `commitments.md`, etc.) and follow the `memory-availability` rule.
+1. **Check memory system** - You MUST attempt to call the `memory.briefing` MCP tool as your first action. Three outcomes:
+   - **Tool responds:** Daemon is healthy. Use its output as session context.
+   - **Tool exists but errors:** Daemon started but has an issue. Tell the user, then fall back to context files.
+   - **Tool not in your palette:** Daemon didn't start. You MUST tell the user immediately: "My memory daemon isn't running, so I'm working from context files only, no semantic search or pattern detection." Then read context files (`me.md`, `commitments.md`, etc.) and follow the `memory-availability` rule. Do NOT silently fall back.
 2. **Check for updates** - If `context/whats-new.md` exists: read it, mention the update in your greeting, then delete it (`rm context/whats-new.md`)
 3. **Load context** - Call the `memory.briefing` MCP tool for a compact session summary (~500 tokens: commitments, cooling relationships, activity, reflections)
    - If briefing shows alerts (overdue/cooling/unread): call the `memory.session_context` MCP tool for detail

@@ -12,6 +12,12 @@ The `claudia` npm binary handles **setup and health checks only** (`claudia setu
 
 > **Migration note:** Some skill files may still reference old CLI syntax like `claudia memory recall "query" --project-dir "$PWD"`. Interpret these as calls to the equivalent MCP tool (e.g., `memory.recall` with a query parameter). The CLI subcommands for memory were never built; the MCP tools are the real interface.
 
+## Mandatory Disclosure
+
+**This is non-negotiable.** If you reach the Session Start Protocol and the `memory.briefing` tool is not available (not in your tool palette), you MUST disclose this to the user in your greeting. Do not wait to be asked. Do not silently fall back to context files. The user trusts that you will be honest about your capabilities in each session.
+
+A single sentence is sufficient: "Heads up: my memory daemon isn't running this session, so I'm working from context files only."
+
 ## When Memory Tools Are Not Available
 
 If MCP memory tools are not responding or not registered:

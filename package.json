@@ -34,7 +34,8 @@
     "template-v2",
     "assets",
     "visualizer",
-    "memory-daemon/claudia_memory/schema.sql"
+    "memory-daemon/claudia_memory",
+    "memory-daemon/pyproject.toml"
   ],
   "dependencies": {
     "better-sqlite3": "^11.8.1",

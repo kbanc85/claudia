@@ -89,12 +89,13 @@ ${y}██${w}██${r}  ${w}██${r}  ${w}██${y}██${r}
 `;
 }
 
-// ─── 5 Unified Steps ────────────────────────────────────────────────────
+// ─── 6 Unified Steps ────────────────────────────────────────────────────
 
 const STEPS = [
   { id: 'environment', label: 'Environment' },
   { id: 'models',      label: 'AI Models' },
   { id: 'memory',      label: 'Memory System' },
+  { id: 'daemon',      label: 'Memory Daemon' },
   { id: 'vault',       label: 'Obsidian Vault' },
   { id: 'health',      label: 'Health Check' },
 ];
@@ -507,10 +508,11 @@ async function main() {
     renderer.skip('environment');
     renderer.skip('models');
     renderer.skip('memory');
+    renderer.skip('daemon');
     renderer.skip('health');
 
     if (!supportsInPlace) {
-      for (const id of ['environment', 'models', 'memory', 'health']) {
+      for (const id of ['environment', 'models', 'memory', 'daemon', 'health']) {
         renderer.appendLine(id, 'skipped', 'skipped');
       }
     }
@@ -679,9 +681,108 @@ async function main() {
     // Note: claudia-memory daemon is the primary memory interface (MCP server).
     // The CLI (better-sqlite3) provides system-health and fallback access.
 
-    // Step 4 (vault): handled below
+    // Step 4: Memory Daemon -- Python venv + claudia-memory package
+    renderer.update('daemon', 'active', 'checking Python...');
+    let daemonOk = false;
+    const daemonVenvDir = join(homedir(), '.claudia', 'daemon', 'venv');
+    const venvPython = isWindows
+      ? join(daemonVenvDir, 'Scripts', 'python.exe')
+      : join(daemonVenvDir, 'bin', 'python');
+    const venvPip = isWindows
+      ? join(daemonVenvDir, 'Scripts', 'pip')
+      : join(daemonVenvDir, 'bin', 'pip');
 
-    // Step 5: Health Check -- run claudia system-health
+    // Phase 1: Find Python 3.10+
+    let pythonCmd = null;
+    for (const cmd of ['python3', 'python']) {
+      const ver = await new Promise((resolve) => {
+        const proc = spawn(cmd, ['--version'], { stdio: 'pipe' });
+        let stdout = '';
+        proc.stdout.on('data', (d) => { stdout += d.toString(); });
+        proc.on('close', () => resolve(stdout.trim()));
+        proc.on('error', () => resolve(''));
+      });
+      const match = ver.match(/Python (\d+)\.(\d+)/);
+      if (match) {
+        const major = parseInt(match[1], 10);
+        const minor = parseInt(match[2], 10);
+        if (major > 3 || (major === 3 && minor >= 10)) {
+          pythonCmd = cmd;
+          break;
+        }
+      }
+    }
+
+    if (!pythonCmd) {
+      renderer.update('daemon', 'warn', 'Python 3.10+ not found');
+      if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'Python 3.10+ not found');
+    } else {
+      // Phase 2: Create venv if it doesn't exist
+      if (!existsSync(venvPython)) {
+        renderer.update('daemon', 'active', 'creating venv...');
+        mkdirSync(join(homedir(), '.claudia', 'daemon'), { recursive: true });
+        const venvCreated = await new Promise((resolve) => {
+          const proc = spawn(pythonCmd, ['-m', 'venv', daemonVenvDir], { stdio: 'pipe' });
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        });
+        if (!venvCreated) {
+          renderer.update('daemon', 'warn', 'venv creation failed');
+          if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'venv creation failed');
+        }
+      }
+
+      // Phase 3: Install/upgrade claudia-memory into venv
+      if (existsSync(venvPip)) {
+        renderer.update('daemon', 'active', 'installing daemon...');
+        const daemonSrc = join(__dirname, '..', 'memory-daemon');
+        const pipInstalled = await new Promise((resolve) => {
+          const proc = spawn(venvPip, ['install', '--upgrade', '--quiet', daemonSrc], {
+            stdio: 'pipe',
+            timeout: 120000
+          });
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        });
+        if (pipInstalled) {
+          daemonOk = true;
+        } else {
+          renderer.update('daemon', 'warn', 'pip install failed');
+          if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'pip install failed');
+        }
+      }
+
+      // Phase 4: Verify daemon can be imported
+      if (daemonOk && existsSync(venvPython)) {
+        const verified = await new Promise((resolve) => {
+          const proc = spawn(venvPython, ['-c', 'import claudia_memory; print("ok")'], {
+            stdio: 'pipe',
+            timeout: 10000
+          });
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        });
+        if (!verified) {
+          daemonOk = false;
+          renderer.update('daemon', 'warn', 'daemon import failed');
+          if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'import failed');
+        }
+      }
+
+      if (daemonOk) {
+        renderer.update('daemon', 'done', 'claudia-memory ready');
+        if (!supportsInPlace) renderer.appendLine('daemon', 'done', 'claudia-memory ready');
+      }
+    }
+
+    // Configure .mcp.json with correct daemon path
+    if (daemonOk) {
+      ensureDaemonMcpConfig(targetPath, venvPython);
+    }
+
+    // Step 5 (vault): handled below
+
+    // Step 6: Health Check -- run claudia system-health
     renderer.update('health', 'active', 'verifying...');
     let healthOk = false;
 
@@ -874,6 +975,49 @@ function restoreMcpServers(targetPath) {
   } catch {
     // Not valid JSON or can't read -- skip silently
   }
+}
+
+/**
+ * Ensure .mcp.json has a working claudia-memory daemon entry.
+ * - Fresh install (no .mcp.json): creates one with just the daemon entry.
+ * - Upgrade: updates the daemon command/args with the correct venv path.
+ * Only writes if the venv Python binary exists (daemon was installed).
+ */
+function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
+  if (!existsSync(venvPythonPath)) return;
+
+  const mcpPath = join(targetPath, '.mcp.json');
+
+  const daemonConfig = {
+    command: venvPythonPath,
+    args: ['-m', 'claudia_memory', '--project-dir', targetPath],
+    _description: 'Claudia memory system with vector search'
+  };
+
+  let config;
+  if (existsSync(mcpPath)) {
+    try {
+      config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    } catch {
+      return; // Malformed JSON -- don't touch
+    }
+  } else {
+    // Fresh install: create minimal .mcp.json
+    config = {
+      mcpServers: {},
+      _notes: {
+        quick_start: [
+          '1. Restart Claude Code after changes',
+          '2. See .mcp.json.example for additional servers (Gmail, Calendar, etc.)',
+          '3. Each user authenticates with their own accounts'
+        ]
+      }
+    };
+  }
+
+  if (!config.mcpServers) config.mcpServers = {};
+  config.mcpServers['claudia-memory'] = daemonConfig;
+  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
 }
 
 function installVisualizer() {
