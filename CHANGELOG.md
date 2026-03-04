@@ -2,6 +2,21 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.53.0 (2026-03-04)
+
+### The Reliability Release: Self-Diagnosing MCP Daemon
+
+The memory daemon had 12 silent failure points between `python -m claudia_memory` and tools appearing in Claude Code. Every failure produced the same user experience: "tools not in palette, no idea why." This release makes the daemon observable, self-diagnosing, and self-healing.
+
+- **`--preflight` flag** -- Validates all 11 startup steps (Python version, MCP SDK, config, database path, database connection, schema, migrations, sqlite-vec, MCP server, tool count, Ollama) without entering MCP mode. Writes structured JSON results to `~/.claudia/daemon-preflight.json` with specific fix instructions for each failure. Exit code 0 if all critical checks pass, 1 if any fail.
+- **`--repair` flag** -- Reads preflight results and auto-fixes common issues: clears stale WAL checkpoints, creates missing database directories, re-runs schema and migrations, installs sqlite-vec, creates default config.json. Re-runs preflight after repairs to verify.
+- **Startup manifest** -- Daemon writes `~/.claudia/daemon-session.json` (PID, timestamp, db path, stdin type, tool count) when it successfully enters the MCP stdio loop. Updated with `exited_at` on clean shutdown. Lets diagnostics distinguish "never started" from "started then died" from "running."
+- **Installer runs preflight** -- After installing the daemon and configuring `.mcp.json`, the installer now runs `--preflight` and reports results. Users see exactly whether their daemon will work at install time.
+- **Rewritten diagnose skill** -- `/diagnose` now checks `.mcp.json` config, runs preflight, inspects the session manifest, checks the standalone daemon, and probes the database directly. Each failure shows the specific fix command. Replaces the old skill that only checked CLI availability (irrelevant to MCP startup).
+- **Missing schema.sql is now a hard error** -- Previously logged a warning and continued with no tables. Now raises `FileNotFoundError` with a reinstall command.
+- **Better startup logging** -- Daemon logs database path, config source, and project ID at startup for easier debugging.
+- **Archived dead code** -- Removed old `cli/`, `docs/plans/`, `template/`, `site/`, `openclaw-skills/` directories that were no longer referenced.
+
 ## 1.51.26 (2026-03-04)
 
 ### The Memory Fix: Auto-Install Daemon for All Users

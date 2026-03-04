@@ -261,6 +261,354 @@ def _auto_migrate_legacy() -> None:
                      "Run --migrate-legacy manually to retry.")
 
 
+def _write_preflight_result(result: dict) -> Path:
+    """Write preflight result JSON to ~/.claudia/daemon-preflight.json."""
+    out_path = Path.home() / ".claudia" / "daemon-preflight.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    import json as _json
+    with open(out_path, "w") as f:
+        _json.dump(result, f, indent=2)
+    return out_path
+
+
+def run_preflight(project_id: str = None, debug: bool = False) -> dict:
+    """Validate the entire MCP daemon startup chain.
+
+    Returns a dict with 'ok' (bool) and 'checks' (list of check results).
+    Each check has: name, ok, detail, and optionally 'fix' when it fails.
+    """
+    from datetime import datetime as dt
+
+    if project_id:
+        set_project_id(project_id)
+
+    checks = []
+    result = {
+        "timestamp": dt.now().isoformat(timespec="seconds"),
+        "ok": True,
+        "project_id": project_id,
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "checks": checks,
+    }
+
+    # 1. Python version >= 3.10
+    py_ok = sys.version_info >= (3, 10)
+    checks.append({
+        "name": "python_version",
+        "ok": py_ok,
+        "critical": True,
+        "detail": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        **({"fix": "Python 3.10+ is required. Install from python.org or your package manager."} if not py_ok else {}),
+    })
+
+    # 2. MCP SDK importable
+    try:
+        import mcp
+        mcp_version = getattr(mcp, "__version__", "unknown")
+        checks.append({"name": "mcp_sdk", "ok": True, "critical": True, "detail": mcp_version})
+    except ImportError as e:
+        checks.append({
+            "name": "mcp_sdk", "ok": False, "critical": True,
+            "detail": str(e),
+            "fix": "Install the MCP SDK: pip install mcp",
+        })
+
+    # 3. Config loads
+    try:
+        config = get_config()
+        config_path = Path.home() / ".claudia" / "config.json"
+        config_source = str(config_path) if config_path.exists() else "defaults"
+        checks.append({"name": "config_load", "ok": True, "critical": False, "detail": config_source})
+    except Exception as e:
+        checks.append({
+            "name": "config_load", "ok": False, "critical": False,
+            "detail": str(e),
+            "fix": "Check ~/.claudia/config.json for valid JSON syntax.",
+        })
+        config = None
+
+    # 4. Database path writable
+    if config:
+        db_path = Path(config.db_path)
+        result["db_path"] = str(db_path)
+        db_dir = db_path.parent
+        try:
+            db_dir.mkdir(parents=True, exist_ok=True)
+            # Test writability
+            test_file = db_dir / ".preflight_test"
+            test_file.write_text("ok")
+            test_file.unlink()
+            checks.append({"name": "db_path", "ok": True, "critical": True, "detail": str(db_path)})
+        except Exception as e:
+            checks.append({
+                "name": "db_path", "ok": False, "critical": True,
+                "detail": str(e),
+                "fix": f"Ensure the directory {db_dir} exists and is writable.",
+            })
+    else:
+        result["db_path"] = "unknown"
+
+    # 5. Database connection (short timeout)
+    if config:
+        try:
+            conn = sqlite3.connect(str(config.db_path), timeout=5.0)
+            conn.execute("SELECT 1")
+            conn.close()
+            checks.append({"name": "db_connect", "ok": True, "critical": True, "detail": "connected"})
+        except Exception as e:
+            detail = str(e)
+            fix = "Check for another process holding a lock on the database."
+            if "locked" in detail.lower():
+                fix = "Another process may be using the database. Check for running claudia processes."
+            checks.append({
+                "name": "db_connect", "ok": False, "critical": True,
+                "detail": detail, "fix": fix,
+            })
+
+    # 6. schema.sql exists and parseable
+    schema_path = Path(__file__).parent / "schema.sql"
+    if schema_path.exists():
+        try:
+            content = schema_path.read_text()
+            stmt_count = content.count(";")
+            checks.append({
+                "name": "schema_load", "ok": True, "critical": True,
+                "detail": f"{stmt_count} statements",
+            })
+        except Exception as e:
+            checks.append({
+                "name": "schema_load", "ok": False, "critical": True,
+                "detail": str(e),
+                "fix": "schema.sql is unreadable. Reinstall: pip install --force-reinstall claudia-memory",
+            })
+    else:
+        checks.append({
+            "name": "schema_load", "ok": False, "critical": True,
+            "detail": "file not found",
+            "fix": f"Schema file missing at {schema_path}. Reinstall: pip install --force-reinstall claudia-memory",
+        })
+
+    # 7. Migrations
+    if config:
+        try:
+            from .database import Database
+            db = Database(Path(config.db_path))
+            db.initialize()
+            checks.append({"name": "migrations", "ok": True, "critical": True, "detail": "up to date"})
+            db.close()
+        except Exception as e:
+            checks.append({
+                "name": "migrations", "ok": False, "critical": True,
+                "detail": str(e),
+                "fix": "Database migration failed. Try --repair or reinstall claudia-memory.",
+            })
+
+    # 8. sqlite-vec extension
+    if config:
+        try:
+            conn = sqlite3.connect(str(config.db_path), timeout=5.0)
+            vec_loaded = False
+            # Method 1: Python package (preferred)
+            try:
+                import sqlite_vec
+                if hasattr(conn, "enable_load_extension"):
+                    conn.enable_load_extension(True)
+                sqlite_vec.load(conn)
+                if hasattr(conn, "enable_load_extension"):
+                    conn.enable_load_extension(False)
+                vec_loaded = True
+            except ImportError:
+                pass
+            except Exception:
+                pass
+            # Method 2: Native extension (fallback)
+            if not vec_loaded and hasattr(conn, "enable_load_extension"):
+                try:
+                    conn.enable_load_extension(True)
+                    conn.load_extension("vec0")
+                    conn.enable_load_extension(False)
+                    vec_loaded = True
+                except Exception:
+                    pass
+            if vec_loaded:
+                vec_ver = conn.execute("SELECT vec_version()").fetchone()[0]
+                conn.close()
+                checks.append({"name": "sqlite_vec", "ok": True, "critical": False, "detail": vec_ver})
+            else:
+                conn.close()
+                checks.append({
+                    "name": "sqlite_vec", "ok": False, "critical": False,
+                    "detail": "could not load extension",
+                    "fix": "Install sqlite-vec: pip install sqlite-vec (in the daemon venv)",
+                })
+        except Exception as e:
+            checks.append({
+                "name": "sqlite_vec", "ok": False, "critical": False,
+                "detail": str(e),
+                "fix": "Install sqlite-vec: pip install sqlite-vec (in the daemon venv)",
+            })
+
+    # 9. MCP server object
+    try:
+        from .mcp.server import server as mcp_server_obj
+        assert mcp_server_obj is not None
+        checks.append({"name": "mcp_server", "ok": True, "critical": True, "detail": "initialized"})
+    except Exception as e:
+        checks.append({
+            "name": "mcp_server", "ok": False, "critical": True,
+            "detail": str(e),
+            "fix": "MCP server failed to initialize. Reinstall: pip install --force-reinstall claudia-memory",
+        })
+
+    # 10. Tool count
+    try:
+        from .mcp.server import list_tools as _list_tools
+        import asyncio as _asyncio
+        tools_result = _asyncio.run(_list_tools())
+        tool_count = len(tools_result.tools) if hasattr(tools_result, "tools") else 0
+        ok = tool_count > 0
+        checks.append({
+            "name": "tool_count", "ok": ok, "critical": True,
+            "detail": f"{tool_count} tools",
+            **({"fix": "No tools registered. The MCP server code may have a bug."} if not ok else {}),
+        })
+    except Exception as e:
+        checks.append({
+            "name": "tool_count", "ok": False, "critical": True,
+            "detail": str(e),
+            "fix": "Could not enumerate tools. Check for import errors in MCP server.",
+        })
+
+    # 11. Ollama (non-critical)
+    if config:
+        try:
+            import httpx
+            resp = httpx.get(f"{config.ollama_host}/api/tags", timeout=3)
+            if resp.status_code == 200:
+                checks.append({"name": "ollama", "ok": True, "critical": False, "detail": config.ollama_host})
+            else:
+                checks.append({
+                    "name": "ollama", "ok": False, "critical": False,
+                    "detail": f"HTTP {resp.status_code}",
+                    "fix": "Ollama is not responding. Start it or check the configured host.",
+                })
+        except Exception:
+            checks.append({
+                "name": "ollama", "ok": False, "critical": False,
+                "detail": "not reachable",
+                "fix": "Ollama not running. Memory works without it, but vector search is disabled.",
+            })
+
+    # Compute overall ok (all critical checks must pass)
+    result["ok"] = all(c["ok"] for c in checks if c.get("critical", False))
+
+    # Write result file
+    out_path = _write_preflight_result(result)
+
+    # Print human-readable summary
+    print(f"Claudia Memory Daemon Preflight Check")
+    print(f"{'=' * 42}")
+    for c in checks:
+        icon = "PASS" if c["ok"] else ("WARN" if not c.get("critical") else "FAIL")
+        print(f"  [{icon}] {c['name']}: {c['detail']}")
+        if not c["ok"] and "fix" in c:
+            print(f"         Fix: {c['fix']}")
+    print()
+    verdict = "ALL CHECKS PASSED" if result["ok"] else "CRITICAL CHECKS FAILED"
+    print(f"  Result: {verdict}")
+    print(f"  Details: {out_path}")
+
+    return result
+
+
+def attempt_repairs(preflight_result: dict, project_id: str = None) -> int:
+    """Attempt to auto-fix common issues found by preflight.
+
+    Returns the number of issues fixed.
+    """
+    if project_id:
+        set_project_id(project_id)
+
+    config = get_config()
+    fixed = 0
+    failed_checks = [c for c in preflight_result.get("checks", []) if not c["ok"]]
+
+    if not failed_checks:
+        return 0
+
+    for check in failed_checks:
+        name = check["name"]
+
+        if name == "schema_load":
+            # Can't fix missing schema.sql, that requires reinstall
+            print(f"  [SKIP] {name}: requires reinstall")
+            continue
+
+        if name == "db_connect":
+            # Try WAL checkpoint to clear stale locks
+            try:
+                db_path = config.db_path
+                conn = sqlite3.connect(str(db_path), timeout=10.0)
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                conn.close()
+                print(f"  [FIXED] {name}: cleared WAL checkpoint")
+                fixed += 1
+            except Exception as e:
+                print(f"  [FAIL] {name}: {e}")
+
+        elif name == "migrations":
+            # Re-run schema + migrations
+            try:
+                from .database import Database
+                db = Database(Path(config.db_path))
+                db.initialize()
+                db.close()
+                print(f"  [FIXED] {name}: re-ran schema and migrations")
+                fixed += 1
+            except Exception as e:
+                print(f"  [FAIL] {name}: {e}")
+
+        elif name == "config_load":
+            # Create default config.json
+            config_path = Path.home() / ".claudia" / "config.json"
+            if not config_path.exists():
+                try:
+                    import json as _json
+                    config_path.parent.mkdir(parents=True, exist_ok=True)
+                    config_path.write_text(_json.dumps({}, indent=2))
+                    print(f"  [FIXED] {name}: created empty config.json")
+                    fixed += 1
+                except Exception as e:
+                    print(f"  [FAIL] {name}: {e}")
+
+        elif name == "sqlite_vec":
+            # Try pip install sqlite-vec in the current environment
+            import subprocess
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "sqlite-vec"],
+                    capture_output=True, text=True, timeout=60,
+                )
+                print(f"  [FIXED] {name}: installed sqlite-vec")
+                fixed += 1
+            except Exception as e:
+                print(f"  [FAIL] {name}: {e}")
+
+        elif name == "db_path":
+            # Try to create the directory
+            try:
+                Path(config.db_path).parent.mkdir(parents=True, exist_ok=True)
+                print(f"  [FIXED] {name}: created database directory")
+                fixed += 1
+            except Exception as e:
+                print(f"  [FAIL] {name}: {e}")
+
+        else:
+            print(f"  [SKIP] {name}: no auto-fix available")
+
+    return fixed
+
+
 def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = None) -> None:
     """
     Run the Claudia Memory Daemon.
@@ -280,6 +628,10 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
         logger.info(f"Project isolation enabled: {project_id}")
 
     config = get_config()
+    config_path = Path.home() / ".claudia" / "config.json"
+    logger.info(f"Database path: {config.db_path}")
+    logger.info(f"Config source: {config_path if config_path.exists() else 'defaults'}")
+    logger.info(f"Project: {project_id or 'default'}")
 
     if not mcp_mode:
         # Only enforce singleton for the standalone background daemon.
@@ -432,6 +784,17 @@ def main():
         help="Manually migrate data from legacy claudia.db to project-specific database",
     )
     parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Validate the entire startup chain without entering MCP mode. "
+             "Writes results to ~/.claudia/daemon-preflight.json and exits.",
+    )
+    parser.add_argument(
+        "--repair",
+        action="store_true",
+        help="Auto-fix common issues found by preflight (missing tables, stale WAL, etc.)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview migration without making changes (use with --migrate-legacy)",
@@ -452,6 +815,24 @@ def main():
         set_project_id(project_id)
         # Set workspace path environment variable for database metadata
         os.environ["CLAUDIA_WORKSPACE_PATH"] = args.project_dir
+
+    if args.preflight:
+        preflight = run_preflight(project_id=project_id, debug=args.debug)
+        sys.exit(0 if preflight["ok"] else 1)
+
+    if args.repair:
+        preflight = run_preflight(project_id=project_id, debug=args.debug)
+        if preflight["ok"]:
+            print("\nAll checks passed. Nothing to repair.")
+            sys.exit(0)
+        print(f"\nAttempting repairs...")
+        failed = [c for c in preflight["checks"] if not c["ok"]]
+        fixed = attempt_repairs(preflight, project_id=project_id)
+        print(f"\nFixed {fixed} of {len(failed)} issues.")
+        # Re-run preflight to verify
+        print("\nRe-running preflight to verify...")
+        verify = run_preflight(project_id=project_id, debug=args.debug)
+        sys.exit(0 if verify["ok"] else 1)
 
     if args.consolidate:
         # One-shot consolidation

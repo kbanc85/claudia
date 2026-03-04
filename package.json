@@ -1,6 +1,6 @@
 {
   "name": "get-claudia",
-  "version": "1.51.26",
+  "version": "1.53.0",
   "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
@@ -30,28 +30,16 @@
   },
   "files": [
     "bin",
-    "cli",
     "template-v2",
     "assets",
     "visualizer",
     "memory-daemon/claudia_memory",
-    "memory-daemon/pyproject.toml"
+    "memory-daemon/pyproject.toml",
+    "CHANGELOG.md"
   ],
-  "dependencies": {
-    "better-sqlite3": "^11.8.1",
-    "commander": "^13.1.0",
-    "sqlite-vec": "^0.1.6"
-  },
-  "devDependencies": {
-    "vitest": "^3.0.0"
-  },
-  "scripts": {
-    "site:build": "node scripts/build-dossier-site.mjs",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:integration": "vitest run tests/integration",
-    "test:unit": "vitest run tests/unit"
-  },
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {},
   "engines": {
     "node": ">=18.0.0"
   },

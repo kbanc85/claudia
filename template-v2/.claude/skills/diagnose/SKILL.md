@@ -14,73 +14,90 @@ System health check for Claudia's memory infrastructure. Run this when:
 
 ## Process
 
-### Step 1: Check CLI Availability
+### Step 1: Check .mcp.json Configuration
 
-First, verify the `claudia` CLI is available:
-
-```bash
-which claudia 2>/dev/null || echo "claudia CLI not found on PATH"
-claudia --version 2>/dev/null || echo "claudia CLI not responding"
-```
-
-If the `claudia` command is not found, the CLI is not installed or not on PATH.
-
-### Step 2: Test Memory Connection
-
-If the CLI is available, try a simple operation:
+Read the project's `.mcp.json` file and verify:
+- A `claudia-memory` entry exists under `mcpServers`
+- The `command` field points to a real Python binary
+- The `args` include `--project-dir` matching the current directory
 
 ```bash
-claudia system-health --project-dir "$PWD"
+cat .mcp.json 2>/dev/null || echo "No .mcp.json found"
 ```
 
-**Possible outcomes:**
-- Success with health data: Memory system fully operational
-- Success but empty: Working but no data yet (new install)
-- Error/timeout: CLI installed but database or system unhealthy
-- Command not found: CLI not installed
+If `.mcp.json` is missing or has no `claudia-memory` entry, the daemon was never configured. Fix:
+```bash
+npx get-claudia .
+```
 
-### Step 2.5: Detect Platform
+If the Python binary in the `command` field doesn't exist:
+```bash
+# Check if venv exists
+ls -la ~/.claudia/daemon/venv/bin/python 2>/dev/null || echo "Daemon venv not found"
+```
 
-Run: `uname -s 2>/dev/null || echo Windows`
+### Step 2: Run Preflight Check
 
-Use the appropriate command set below (macOS/Linux or Windows).
-
-### Step 3: Check System Components
-
-**macOS/Linux:**
+The daemon has a built-in preflight validator that tests all 11 startup steps:
 
 ```bash
-# Check if claudia CLI is on PATH
-which claudia
+# Extract the Python path from .mcp.json and run preflight
+VENV_PYTHON=$(python3 -c "import json; c=json.load(open('.mcp.json')); print(c.get('mcpServers',{}).get('claudia-memory',{}).get('command',''))" 2>/dev/null)
 
-# Check system health
-claudia system-health --project-dir "$PWD"
-
-# Check database exists and has data
-ls -la ~/.claudia/memory/*.db 2>/dev/null || echo "No database found"
-sqlite3 ~/.claudia/memory/claudia.db "SELECT COUNT(*) as memories FROM memories; SELECT COUNT(*) as entities FROM entities;" 2>/dev/null || echo "Cannot query database"
-
-# Check for embedding model
-ollama list 2>/dev/null | grep minilm || echo "Embedding model not found"
+if [[ -n "$VENV_PYTHON" && -x "$VENV_PYTHON" ]]; then
+  "$VENV_PYTHON" -m claudia_memory --preflight --project-dir "$PWD"
+else
+  echo "Cannot find daemon Python binary. Re-run: npx get-claudia ."
+fi
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-# Check if claudia CLI is available
-Get-Command claudia -ErrorAction SilentlyContinue
-
-# Check system health
-claudia system-health --project-dir "$PWD"
-
-# Check database exists and has data
-dir "$env:USERPROFILE\.claudia\memory\*.db" 2>$null
-
-# Check for embedding model
-ollama list 2>$null | Select-String minilm
+If the preflight file exists, read it for structured results:
+```bash
+cat ~/.claudia/daemon-preflight.json 2>/dev/null
 ```
 
-### Step 4: Report Results
+### Step 3: Check Session Manifest
+
+The daemon writes a manifest when it successfully enters the MCP loop:
+
+```bash
+cat ~/.claudia/daemon-session.json 2>/dev/null || echo "No session manifest (daemon never started)"
+```
+
+If the manifest exists, check whether the process is still alive:
+```bash
+PID=$(python3 -c "import json; print(json.load(open('$HOME/.claudia/daemon-session.json')).get('pid',''))" 2>/dev/null)
+if [[ -n "$PID" ]]; then
+  ps -p "$PID" > /dev/null 2>&1 && echo "Daemon running (PID $PID)" || echo "Daemon died (PID $PID no longer running)"
+fi
+```
+
+### Step 4: Check Standalone Daemon
+
+```bash
+curl -s http://localhost:3848/status 2>/dev/null || echo "Standalone daemon not running (this is normal if using MCP-only mode)"
+```
+
+### Step 5: Check Database Directly
+
+```bash
+ls -la ~/.claudia/memory/*.db 2>/dev/null || echo "No database files found"
+
+# If database exists, check record counts
+for db_file in ~/.claudia/memory/*.db; do
+  [[ -f "$db_file" ]] || continue
+  echo "Database: $db_file"
+  sqlite3 "$db_file" "SELECT 'memories: ' || COUNT(*) FROM memories; SELECT 'entities: ' || COUNT(*) FROM entities;" 2>/dev/null || echo "  Cannot query (may be locked)"
+done
+```
+
+### Step 6: Check Embedding Model
+
+```bash
+ollama list 2>/dev/null | grep -E "minilm|nomic|mxbai" || echo "No embedding model found (memory works without it, but vector search is disabled)"
+```
+
+### Step 7: Report Results
 
 Format the diagnosis as:
 
@@ -90,71 +107,105 @@ Format the diagnosis as:
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| Claudia CLI | ✅/❌ | [version or "not found"] |
-| Database | ✅/❌ | [path, size, record counts] |
-| System Health | ✅/❌ | [response or error] |
-| Embedding Model | ✅/❌ | [model name or "not found"] |
+| .mcp.json config | ✅/❌ | [daemon entry present/missing] |
+| Daemon Python binary | ✅/❌ | [path exists/missing] |
+| Preflight | ✅/❌ | [all passed / N failures] |
+| Session manifest | ✅/❌ | [running/died/never started] |
+| Standalone daemon | ✅/❌/➖ | [healthy/not running] |
+| Database | ✅/❌ | [path, record counts] |
+| Embedding model | ✅/❌ | [model name or "not found"] |
 
 **Overall:** [Healthy / Degraded / Not Connected]
 
-[If issues found, provide specific fix instructions]
+[If issues found, show the specific fix from preflight results]
 ---
 ```
 
 ## Common Issues and Fixes
 
-### Issue: Claudia CLI not found
+### Issue: "MCP server failed" in Claude Code
 
-**Cause:** CLI not installed or not on PATH
+**Most likely cause:** The daemon crashes during startup before reaching the MCP handshake.
+
+**Fix:** Run the preflight check to see exactly which step fails:
+```bash
+~/.claudia/daemon/venv/bin/python -m claudia_memory --preflight --project-dir "$PWD"
+```
+
+If preflight shows fixable issues, try auto-repair:
+```bash
+~/.claudia/daemon/venv/bin/python -m claudia_memory --repair --project-dir "$PWD"
+```
+
+### Issue: Tools not in palette but no error
+
+**Cause:** Daemon started but exited before Claude Code could handshake, or Claude Code closed stdin too early.
+
+**Fix:** Check the session manifest:
+```bash
+cat ~/.claudia/daemon-session.json
+```
+- If missing: daemon never reached the MCP loop (run preflight)
+- If present with `exited_at`: daemon started and exited cleanly (check stdin_type, should be "pipe")
+- If present without `exited_at` and PID is dead: daemon crashed after starting
+
+### Issue: Preflight shows db_connect FAIL
+
+**Cause:** Database is locked by another process.
 
 **Fix:**
 ```bash
-npm install -g get-claudia
-claudia setup
+# Find processes using the database
+lsof ~/.claudia/memory/*.db 2>/dev/null
+# Or try auto-repair
+~/.claudia/daemon/venv/bin/python -m claudia_memory --repair --project-dir "$PWD"
 ```
 
-If installed via npx but not globally, the binary may not be on PATH. Either install globally or use the full path.
+### Issue: Preflight shows schema_load FAIL
 
-### Issue: Database empty or missing
-
-**Cause:** Fresh install or database corruption
-
-**Fix:**
-1. If fresh install: Normal, database populates as you use Claudia
-2. If was working before: Check for database file, may need to restore from backup
-
-### Issue: CLI installed but commands fail
-
-**Cause:** Database corruption, missing dependencies, or version mismatch
-
-**Fix:**
-1. Update to latest Claudia version: `npm install -g get-claudia`
-2. Run setup again: `claudia setup`
-3. Check Node.js version is 18+: `node --version`
-
-### Issue: Embedding model not available
-
-**Cause:** Ollama not installed or model not pulled
+**Cause:** The claudia-memory package is corrupted or incompletely installed.
 
 **Fix:**
 ```bash
-# Install Ollama (if not installed)
-# See https://ollama.ai for installation
-
-# Pull the embedding model
-ollama pull all-minilm:l6-v2
+~/.claudia/daemon/venv/bin/pip install --force-reinstall claudia-memory
+```
+Or re-run the installer:
+```bash
+npx get-claudia .
 ```
 
-Note: Memory still works without Ollama, but semantic search and vector-based recall will be unavailable. Basic keyword search and explicit lookups still function.
+### Issue: Preflight shows sqlite_vec WARN
+
+**Cause:** sqlite-vec extension not installed. Memory works without it, but vector search is disabled.
+
+**Fix:**
+```bash
+~/.claudia/daemon/venv/bin/pip install sqlite-vec
+```
+
+### Issue: Daemon venv not found
+
+**Cause:** Fresh install or venv was deleted.
+
+**Fix:**
+```bash
+npx get-claudia .
+```
+This recreates the venv and installs the daemon.
 
 ### Issue: Wrong project directory
 
-**Cause:** CLI is using a different project hash than expected
+**Cause:** .mcp.json has a different --project-dir than expected.
 
 **Fix:**
-Ensure you're passing the correct project directory:
+Check the args in `.mcp.json`:
 ```bash
-claudia system-health --project-dir "$PWD"
+python3 -c "import json; c=json.load(open('.mcp.json')); print(c['mcpServers']['claudia-memory']['args'])"
 ```
+The `--project-dir` should match your current working directory. Re-run `npx get-claudia .` from the correct directory to fix it.
 
-The CLI uses the project directory to determine which database to use. Each project gets its own isolated database based on a hash of the directory path.
+### Issue: Python 3.10+ not found
+
+**Cause:** System Python is too old for the daemon.
+
+**Fix:** Install Python 3.10+ from python.org, Homebrew (`brew install python@3.12`), or your package manager.

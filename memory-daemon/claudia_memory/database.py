@@ -243,7 +243,11 @@ class Database:
 
                 logger.info(f"Database initialized at {self.db_path}")
             else:
-                logger.warning(f"Schema file not found at {schema_path}")
+                raise FileNotFoundError(
+                    f"Schema file not found at {schema_path}. "
+                    "The claudia-memory package may be corrupted. "
+                    "Reinstall with: pip install --force-reinstall claudia-memory"
+                )
 
             # Create vec0 virtual tables with configurable dimensions
             self._create_vec0_tables(conn)

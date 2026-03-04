@@ -3322,16 +3322,101 @@ def _build_morning_context() -> str:
     return "\n".join(sections)
 
 
+def _write_startup_manifest(db_path: str, stdin_info: str, tool_count: int = 0) -> None:
+    """Write a session manifest so diagnostics can verify the daemon started.
+
+    The manifest at ~/.claudia/daemon-session.json proves the daemon reached
+    the MCP stdio loop. If this file is missing, the daemon never started.
+    If present with a stale PID, the daemon started but died.
+    """
+    import os
+    from datetime import datetime as _dt
+    from pathlib import Path as _Path
+
+    manifest_path = _Path.home() / ".claudia" / "daemon-session.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "pid": os.getpid(),
+        "started_at": _dt.now().isoformat(timespec="seconds"),
+        "db_path": db_path,
+        "project_dir": os.environ.get("CLAUDIA_WORKSPACE_PATH", ""),
+        "stdin_type": stdin_info,
+        "tool_count": tool_count,
+    }
+    try:
+        manifest_path.write_text(json.dumps(manifest, indent=2))
+        logger.info(f"Startup manifest written to {manifest_path}")
+    except Exception as e:
+        logger.warning(f"Could not write startup manifest: {e}")
+
+
+def _cleanup_startup_manifest() -> None:
+    """Update the session manifest with exit timestamp on clean shutdown."""
+    from datetime import datetime as _dt
+    from pathlib import Path as _Path
+
+    manifest_path = _Path.home() / ".claudia" / "daemon-session.json"
+    if not manifest_path.exists():
+        return
+    try:
+        data = json.loads(manifest_path.read_text())
+        data["exited_at"] = _dt.now().isoformat(timespec="seconds")
+        manifest_path.write_text(json.dumps(data, indent=2))
+    except Exception:
+        pass
+
+
 async def run_server():
-    """Run the MCP server"""
+    """Run the MCP server via stdio transport.
+
+    The server stays alive as long as stdin remains open (i.e., the MCP client
+    keeps the pipe connected). When stdin closes, the server exits cleanly.
+    """
     # Initialize database
     db = get_db()
     db.initialize()
 
-    logger.info("Starting Claudia Memory MCP server")
+    # Log stdin state for diagnostics (helps debug "exits immediately" issues)
+    stdin_info = "unknown"
+    try:
+        import os
+        import stat
+        fd = sys.stdin.fileno()
+        mode = os.fstat(fd).st_mode
+        if stat.S_ISFIFO(mode):
+            stdin_info = "pipe"
+        elif stat.S_ISREG(mode):
+            stdin_info = "file"
+        elif stat.S_ISCHR(mode):
+            stdin_info = "tty/char-device"
+        else:
+            stdin_info = f"mode={oct(mode)}"
+    except Exception:
+        stdin_info = "not available (no fileno)"
+    logger.info(f"Starting Claudia Memory MCP server (stdin={stdin_info})")
 
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            # Count registered tools for the manifest
+            try:
+                tools_result = await list_tools()
+                tool_count = len(tools_result.tools) if hasattr(tools_result, "tools") else 0
+            except Exception:
+                tool_count = 0
+
+            # Write startup manifest BEFORE entering the message loop
+            _write_startup_manifest(
+                db_path=str(db.db_path),
+                stdin_info=stdin_info,
+                tool_count=tool_count,
+            )
+
+            await server.run(read_stream, write_stream, server.create_initialization_options())
+        logger.info("MCP server exited normally (stdin closed by client)")
+    except Exception:
+        logger.exception("MCP server crashed with exception")
+    finally:
+        _cleanup_startup_manifest()
 
 
 def main():

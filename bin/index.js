@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -462,13 +462,19 @@ async function main() {
     // Fresh install: copy everything
     try {
       cpSync(templatePath, targetPath, { recursive: true });
+      // npm strips .gitignore from packages, so we ship it as "gitignore" and rename here
+      const gitignoreSrc = join(targetPath, 'gitignore');
+      const gitignoreDest = join(targetPath, '.gitignore');
+      if (existsSync(gitignoreSrc) && !existsSync(gitignoreDest)) {
+        renameSync(gitignoreSrc, gitignoreDest);
+      }
     } catch (error) {
       console.error(`\n${colors.red}!${colors.reset}  Error copying files: ${error.message}`);
       process.exit(1);
     }
   } else {
     // Upgrade: copy framework files, preserve user data
-    const frameworkPaths = ['.claude', 'CLAUDE.md', '.gitignore', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
+    const frameworkPaths = ['.claude', 'CLAUDE.md', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
 
     try {
       for (const item of frameworkPaths) {
@@ -482,6 +488,13 @@ async function main() {
         } else {
           cpSync(src, dest, { force: true });
         }
+      }
+
+      // npm strips .gitignore from packages, so we ship it as "gitignore"
+      const gitignoreSrc = join(templatePath, 'gitignore');
+      const gitignoreDest = join(targetPath, '.gitignore');
+      if (existsSync(gitignoreSrc)) {
+        cpSync(gitignoreSrc, gitignoreDest, { force: true });
       }
     } catch (error) {
       console.error(`\n${colors.red}!${colors.reset}  Error upgrading files: ${error.message}`);
@@ -642,44 +655,27 @@ async function main() {
       if (!supportsInPlace) renderer.appendLine('models', 'warn', 'Ollama not running');
     }
 
-    // Step 3: Memory System -- verify native deps (for system-health diagnostic) and create directories
-    renderer.update('memory', 'active', 'checking native deps...');
+    // Step 3: Memory System -- create directories, check for existing database
+    renderer.update('memory', 'active', 'checking directories...');
     const claudiaHome = join(homedir(), '.claudia');
     mkdirSync(join(claudiaHome, 'memory'), { recursive: true });
     mkdirSync(join(claudiaHome, 'backups'), { recursive: true });
 
-    let nativeDepsOk = false;
-    try {
-      const { createRequire } = await import('module');
-      const cliDir = join(__dirname, '..', 'cli');
-      // Check that better-sqlite3 can be loaded from the installed package
-      const require = createRequire(join(cliDir, 'index.js'));
-      require('better-sqlite3');
-      nativeDepsOk = true;
-    } catch {
-      // Native deps not available -- try installing them
-      renderer.update('memory', 'active', 'installing native deps...');
-      nativeDepsOk = await new Promise((resolve) => {
-        const npmCmd = isWindows ? 'npm.cmd' : 'npm';
-        const npmProc = spawn(npmCmd, ['install', '--production'], {
-          cwd: join(__dirname, '..'),
-          stdio: 'pipe'
-        });
-        npmProc.on('close', (code) => resolve(code === 0));
-        npmProc.on('error', () => resolve(false));
-      });
-    }
+    // Check if a database already exists (existing user)
+    const memoryDir = join(claudiaHome, 'memory');
+    const existingDbs = readdirSync(memoryDir).filter(f => f.endsWith('.db') && !f.includes('.backup'));
+    const hasExistingDb = existingDbs.length > 0;
 
-    if (nativeDepsOk) {
-      renderer.update('memory', 'done', 'Database ready');
-      if (!supportsInPlace) renderer.appendLine('memory', 'done', 'Database ready');
+    if (hasExistingDb) {
+      renderer.update('memory', 'done', `${existingDbs.length} database(s) found`);
+      if (!supportsInPlace) renderer.appendLine('memory', 'done', `${existingDbs.length} database(s) found`);
     } else {
-      renderer.update('memory', 'warn', 'native deps missing (run npm install)');
-      if (!supportsInPlace) renderer.appendLine('memory', 'warn', 'native deps missing');
+      renderer.update('memory', 'done', 'Directories ready (new install)');
+      if (!supportsInPlace) renderer.appendLine('memory', 'done', 'Directories ready');
     }
 
-    // Note: claudia-memory daemon is the primary memory interface (MCP server).
-    // The CLI (better-sqlite3) provides system-health and fallback access.
+    // Memory operations use the claudia-memory daemon (MCP server).
+    // The daemon creates and migrates databases on first startup.
 
     // Step 4: Memory Daemon -- Python venv + claudia-memory package
     renderer.update('daemon', 'active', 'checking Python...');
@@ -780,33 +776,75 @@ async function main() {
       ensureDaemonMcpConfig(targetPath, venvPython);
     }
 
+    // Run preflight check to verify daemon can actually start
+    if (daemonOk && existsSync(venvPython)) {
+      renderer.update('daemon', 'active', 'running preflight...');
+      const preflightOk = await new Promise((resolve) => {
+        const proc = spawn(venvPython, [
+          '-m', 'claudia_memory', '--preflight', '--project-dir', targetPath
+        ], { stdio: 'pipe', timeout: 30000 });
+        let stdout = '';
+        let stderr = '';
+        proc.stdout.on('data', (d) => { stdout += d.toString(); });
+        proc.stderr.on('data', (d) => { stderr += d.toString(); });
+        proc.on('close', (code) => {
+          if (code === 0) {
+            resolve({ ok: true });
+          } else {
+            // Extract failure details from stdout
+            const lines = stdout.split('\n').filter(l => l.includes('[FAIL]'));
+            resolve({ ok: false, failures: lines.map(l => l.trim()) });
+          }
+        });
+        proc.on('error', () => resolve({ ok: false, failures: ['preflight process failed to start'] }));
+      });
+      if (preflightOk.ok) {
+        renderer.update('daemon', 'done', 'preflight passed');
+        if (!supportsInPlace) renderer.appendLine('daemon', 'done', 'preflight passed');
+      } else {
+        renderer.update('daemon', 'warn', 'preflight failed');
+        if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'preflight failed');
+        // Show failure details after renderer stops
+        if (preflightOk.failures && preflightOk.failures.length > 0) {
+          for (const line of preflightOk.failures.slice(0, 3)) {
+            if (!supportsInPlace) renderer.appendLine('daemon', 'warn', `  ${line}`);
+          }
+        }
+      }
+    }
+
+    // Register LaunchAgent for standalone daemon (macOS only)
+    if (daemonOk && process.platform === 'darwin') {
+      await ensureLaunchAgent(venvPython, targetPath);
+    }
+
     // Step 5 (vault): handled below
 
-    // Step 6: Health Check -- run claudia system-health
+    // Step 6: Health Check -- check daemon health endpoint or verify daemon can import
     renderer.update('health', 'active', 'verifying...');
     let healthOk = false;
 
-    const cliEntryPoint = join(__dirname, '..', 'cli', 'index.js');
-    if (existsSync(cliEntryPoint) && nativeDepsOk) {
+    // Try the standalone daemon's health endpoint first (port 3848)
+    try {
+      const healthResp = await fetch('http://localhost:3848/status', {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (healthResp.ok) {
+        const healthData = await healthResp.json();
+        healthOk = healthData.status === 'healthy' || healthData.status === 'degraded';
+      }
+    } catch {
+      // Standalone daemon not running -- that's OK, check daemon importability instead
+    }
+
+    // Fallback: verify the daemon can at least be imported
+    if (!healthOk && daemonOk && existsSync(venvPython)) {
       healthOk = await new Promise((resolve) => {
-        const proc = spawn(process.execPath, [cliEntryPoint, 'system-health', '--project-dir', targetPath], {
+        const proc = spawn(venvPython, ['-c', 'from claudia_memory.database import Database; print("ok")'], {
           stdio: 'pipe',
-          timeout: 15000
+          timeout: 10000
         });
-        let stdout = '';
-        proc.stdout.on('data', (d) => { stdout += d.toString(); });
-        proc.on('close', (code) => {
-          if (code === 0) {
-            try {
-              const data = JSON.parse(stdout);
-              resolve(data.status === 'healthy' || data.status === 'degraded');
-            } catch {
-              resolve(false);
-            }
-          } else {
-            resolve(false);
-          }
-        });
+        proc.on('close', (code) => resolve(code === 0));
         proc.on('error', () => resolve(false));
       });
     }
@@ -814,18 +852,15 @@ async function main() {
     if (healthOk) {
       renderer.update('health', 'done', 'system healthy');
       if (!supportsInPlace) renderer.appendLine('health', 'done', 'system healthy');
-    } else if (nativeDepsOk) {
+    } else if (daemonOk) {
+      renderer.update('health', 'warn', 'daemon installed, standalone not running');
+      if (!supportsInPlace) renderer.appendLine('health', 'warn', 'standalone not running');
+    } else {
       renderer.update('health', 'warn', 'check CLAUDE.md for troubleshooting');
       if (!supportsInPlace) renderer.appendLine('health', 'warn', 'check manually');
-    } else {
-      renderer.update('health', 'warn', 'skipped (deps missing)');
-      if (!supportsInPlace) renderer.appendLine('health', 'warn', 'skipped');
     }
 
-    memoryOk = nativeDepsOk;
-
-    // (Global CLI install and demo seeder removed in v1.51.25.
-    //  Memory operations use the MCP daemon, not the CLI binary.)
+    memoryOk = daemonOk || hasExistingDb;
 
   } catch (err) {
     // Environment check failed early
@@ -920,11 +955,11 @@ async function main() {
 
     if (!memoryInstalled) {
       console.log('');
-      console.log(` ${colors.dim}Memory requires the claudia-memory daemon and Ollama.${colors.reset}`);
-      console.log(` ${colors.dim}See CLAUDE.md for setup instructions.${colors.reset}`);
+      console.log(` ${colors.dim}Memory requires Python 3.10+, the claudia-memory daemon, and Ollama.${colors.reset}`);
+      console.log(` ${colors.dim}Re-run setup after installing Python and Ollama.${colors.reset}`);
     } else {
       console.log('');
-      console.log(` ${colors.dim}Memory database ready. Claudia will remember across sessions.${colors.reset}`);
+      console.log(` ${colors.dim}Memory system ready. Claudia will remember across sessions.${colors.reset}`);
     }
 
     console.log('');
@@ -1018,6 +1053,78 @@ function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
   if (!config.mcpServers) config.mcpServers = {};
   config.mcpServers['claudia-memory'] = daemonConfig;
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+}
+
+/**
+ * Register (or update) the macOS LaunchAgent for the standalone daemon.
+ * The standalone daemon runs 24/7 for scheduled jobs (consolidation, decay, vault sync).
+ * This is separate from the MCP daemon that Claude Code spawns per-session.
+ */
+async function ensureLaunchAgent(venvPythonPath, projectDir) {
+  const plistDir = join(homedir(), 'Library', 'LaunchAgents');
+  const plistPath = join(plistDir, 'com.claudia.memory.plist');
+
+  const plistContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.claudia.memory</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${venvPythonPath}</string>
+        <string>-m</string>
+        <string>claudia_memory</string>
+        <string>--standalone</string>
+        <string>--project-dir</string>
+        <string>${projectDir}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>${join(homedir(), '.claudia', 'daemon')}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>${join(homedir(), '.claudia', 'daemon-stdout.log')}</string>
+    <key>StandardErrorPath</key>
+    <string>${join(homedir(), '.claudia', 'daemon-stderr.log')}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>`;
+
+  try {
+    mkdirSync(plistDir, { recursive: true });
+    const needsUpdate = !existsSync(plistPath) || readFileSync(plistPath, 'utf8') !== plistContent;
+    if (needsUpdate) {
+      // Unload existing agent if present (ignore errors)
+      try {
+        await new Promise((resolve) => {
+          const proc = spawn('launchctl', ['unload', plistPath], { stdio: 'pipe', timeout: 5000 });
+          proc.on('close', () => resolve());
+          proc.on('error', () => resolve());
+        });
+      } catch { /* not loaded */ }
+
+      writeFileSync(plistPath, plistContent);
+
+      // Load the new agent
+      await new Promise((resolve) => {
+        const proc = spawn('launchctl', ['load', plistPath], { stdio: 'pipe', timeout: 5000 });
+        proc.on('close', () => resolve());
+        proc.on('error', () => resolve());
+      });
+    }
+  } catch {
+    // Non-fatal: standalone daemon is optional
+  }
 }
 
 function installVisualizer() {

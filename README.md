@@ -110,26 +110,6 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 
 ---
 
-## Try It in 30 Seconds
-
-Demo mode creates a pre-populated installation with realistic fake data. No setup, no configuration.
-
-```bash
-npx get-claudia my-demo --demo
-cd my-demo
-claude
-```
-
-**What's in the demo:**
-- 60 people across investor, founder, and client networks
-- 15 organizations and 15 projects
-- 115 memories (facts, commitments, observations)
-- Overdue items and relationship warnings to explore
-
-The demo database is isolated in `~/.claudia/demo/`. Your real data is never touched.
-
----
-
 ## Quick Start
 
 ```bash
@@ -144,7 +124,7 @@ claude
 
 Say hi. She'll introduce herself, learn about you in a natural conversation, and generate a personalized workspace within a few sessions.
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 18+, Python 3.10+ (for memory)
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 18+, Python 3.10+ (for memory), [Ollama](https://ollama.com) (for embeddings)
 
 <details>
 <summary><strong>Template-only install (no memory system)</strong></summary>
@@ -158,14 +138,14 @@ Installs only the template layer (skills, commands, rules). Claudia works using 
 </details>
 
 <details>
-<summary><strong>Upgrading from a previous version?</strong></summary>
+<summary><strong>Upgrading or fixing a broken install?</strong></summary>
 
 ```bash
 cd your-claudia-directory
 npx get-claudia .
 ```
 
-This upgrades framework files while preserving your data (context/, people/, projects/).
+This upgrades framework files (CLAUDE.md, skills, rules, daemon code) while preserving your data (context/, people/, projects/, databases). Safe to run multiple times. The installer detects existing installations and only updates system files.
 
 </details>
 
@@ -299,33 +279,41 @@ Plus ~30 proactive skills (commitment detection, pattern recognition, judgment a
 
 ## How It Works
 
-**43 skills · 21 MCP tools · 510+ tests**
+**59 skills · 33 MCP tools · 500+ tests**
 
 Claudia has two layers:
 
-**Template layer** (markdown) defines who she is. 43 skills, commands, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`). Workspace templates let you spin up new projects with `/new-workspace [name]`.
+**Template layer** (markdown) defines who she is. 59 skills, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`). Workspace templates let you spin up new projects with `/new-workspace [name]`.
 
-**Memory system** (Python) defines what she remembers. SQLite + vector embeddings + three services:
+**Memory system** (Python) defines what she remembers. Two daemon modes share the same SQLite database:
 
-| Service | What It Does |
-|---------|--------------|
-| **Remember** | Stores facts, entities, relationships with embeddings |
-| **Recall** | Retrieves via hybrid ranking (vector + importance + recency) |
-| **Consolidate** | Background: decay old memories, detect patterns, track relationships |
+| Daemon | When | Purpose |
+|--------|------|---------|
+| **MCP daemon** | Per-session (stdio) | Serves ~33 memory tools to Claude Code |
+| **Standalone daemon** | 24/7 (LaunchAgent) | Runs scheduled jobs even when Claude Code is closed |
+
+| Scheduled Job | When | What It Does |
+|---------------|------|--------------|
+| Adaptive decay | 2 AM | Fades old memories, high-importance at half rate |
+| Consolidation | 3 AM | Merges duplicates, detects patterns, tracks relationships |
+| Vault sync | 3:15 AM | Syncs memory to Obsidian vault (PARA structure) |
+| Pattern detection | Every 6h | Surfaces trends across conversations |
 
 ```
 You ──► Claude Code ──► Reads Claudia's templates ──► Becomes Claudia
                                                            │
+                                                    MCP daemon (stdio)
+                                                           │
                                                            ▼
-                              Memory daemon (local) ◄── MCP tools
-                                      │
-                               ┌──────┼──────┐
-                               ▼      ▼      ▼
-                           SQLite  Ollama  Obsidian vault
-                          +vectors         (PARA structure)
+                                                     SQLite + vectors
+                                                           ▲
+                                                           │
+                                              Standalone daemon (24/7)
+                                               ┌──────┼──────┐
+                                               ▼      ▼      ▼
+                                          Scheduler Ollama  Obsidian vault
+                                                           (PARA structure)
 ```
-
-**Local cognitive extraction, zero API calls.** Paste a meeting transcript or email thread. A local language model (Qwen3, SmolLM3, or Llama 3.2 via Ollama) extracts entities, commitments, and decisions in seconds. Claude reviews the extractions and applies judgment. No data leaves your machine.
 
 **Agent team for speed.** Claudia delegates structured work to a two-tier team. Tier 1 (Haiku): fast workers for document archiving, processing, and schedule analysis. Tier 2 (Sonnet): a research scout with independent context for multi-turn web research. Claudia keeps relationship judgment and strategy decisions for herself.
 
@@ -379,28 +367,40 @@ Without the memory system, Claudia still works using markdown files. With it, sh
 <details>
 <summary><strong>Troubleshooting</strong></summary>
 
-**Memory tools not appearing?**
+**Memory tools not appearing in Claude Code?**
+1. Check `.mcp.json` has a `claudia-memory` entry with the correct venv Python path
+2. Restart Claude Code in a NEW terminal
+3. Re-run the installer to fix paths: `npx get-claudia .`
+
+**Check standalone daemon health:**
 ```bash
-~/.claudia/diagnose.sh
-# Then restart Claude Code in a NEW terminal
+curl http://localhost:3848/status
+launchctl list | grep claudia
+tail -20 ~/.claudia/daemon-stderr.log
 ```
 
-**Check daemon health:**
+**Standalone daemon not running?**
 ```bash
-curl http://localhost:3848/health
-tail -f ~/.claudia/daemon-stderr.log
+launchctl load ~/Library/LaunchAgents/com.claudia.memory.plist
 ```
 
 **Ollama not running after reboot?**
 ```bash
-launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist
+open -a Ollama          # macOS
+ollama serve            # Linux
 ```
 
 **Pull models manually:**
 ```bash
-ollama pull all-minilm:l6-v2    # Embeddings
-ollama pull qwen3:4b             # Cognitive tools (optional)
+ollama pull all-minilm:l6-v2    # Embeddings (required)
 ```
+
+**Broken install? Re-run setup:**
+```bash
+cd your-claudia-directory
+npx get-claudia .
+```
+This updates daemon code, skills, and rules while preserving your databases and context files.
 
 </details>
 
@@ -410,8 +410,9 @@ ollama pull qwen3:4b             # Cognitive tools (optional)
 
 Claudia is open source under the Apache 2.0 License.
 
-- **Template changes:** `template-v2/`
-- **Memory system:** `memory-daemon/` (tests: `pytest tests/`)
+- **Template (skills, rules, identity):** `template-v2/`
+- **Memory daemon (Python):** `memory-daemon/` (tests: `cd memory-daemon && pytest tests/`)
+- **Installer:** `bin/index.js`
 - **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Dev guide:** [CLAUDE.md](CLAUDE.md)
 
