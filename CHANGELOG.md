@@ -2,6 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.25 (2026-03-04)
+
+### The Cleanup: Strip Unreachable CLI Code
+
+The `claudia` CLI binary shipped 40+ memory subcommands (12,932 lines) that no user could reach because the package isn't globally installed (`npx get-claudia` is a temporary download) and `claudia` on many systems resolves to AWS Lambda's `claudia.js`. This release archives that dead code and cleans up the installer.
+
+- **Archived 13 CLI files** to `_archived/cli-v1/` (12,932 lines, ~160KB). Commands, services, and OAuth code moved out of the active codebase but preserved for reference.
+- **Pruned `cli/index.js`** from 694 lines to 47. Only `system-health` and `setup` remain (used internally by the installer).
+- **Removed `claudia` bin entry** from `package.json`. No more PATH collision with AWS Lambda's `claudia.js`.
+- **Removed Gmail/Calendar credential message** from installer output. Setup info already lives in `.mcp.json.example` and CLAUDE.md.
+- **Removed silent global CLI install** attempt that ran `npm install -g` behind the scenes.
+- **Removed demo database seeder** that called the now-archived `claudia memory save` command.
+- **Updated `writeWhatsNewFile()`** to reference MCP tools instead of non-existent CLI commands.
+- **Updated Session Start Protocol** in CLAUDE.md to use `memory.briefing` MCP tool instead of the unreachable `claudia system-health` CLI command.
+- **Updated health check fallback** message to point to CLAUDE.md instead of the unreachable CLI.
+
 ## 1.51.24 (2026-03-04)
 
 ### Installer: MCP-Primary Memory Architecture
