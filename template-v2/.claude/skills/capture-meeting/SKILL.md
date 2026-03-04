@@ -30,16 +30,12 @@ User provides one of:
 
 **Always file the raw transcript/notes FIRST.** This is not optional. Source preservation creates provenance: every extracted fact can trace back to where it came from.
 
-```
-claudia memory document store \
-  --filename "YYYY-MM-DD-[person]-[topic].md" \
-  --source-type "transcript" \
-  --summary "Brief 1-line summary of the meeting" \
-  --about "participant1,participant2" \
-  --project-dir "$PWD" \
-  < content.md
-```
-(Pipe the FULL raw transcript/notes text via stdin; do not summarize)
+Call the `memory.file` MCP tool with:
+- `filename`: "YYYY-MM-DD-[person]-[topic].md"
+- `source_type`: "transcript"
+- `summary`: "Brief 1-line summary of the meeting"
+- `about`: ["participant1", "participant2"]
+- `content`: The FULL raw transcript/notes text (do not summarize)
 
 The file is automatically routed to the right folder:
 - `people/sarah-chen/transcripts/2026-02-04-kickoff.md`
@@ -75,7 +71,7 @@ The file is automatically routed to the right folder:
    - Confirm entity names match existing entities
    - Adjust or remove any questionable extractions
 
-4. Call `claudia memory batch --project-dir "$PWD"` with the reviewed operations (via stdin JSON)
+4. Call the `memory.batch` MCP tool with the reviewed operations array
 ```
 
 **Fallback: Manual extraction** (use when agent is unavailable or for very short notes)
@@ -105,12 +101,9 @@ The file is automatically routed to the right folder:
 
 ### 4. Link Provenance
 
-After extracting memories (facts, commitments) via `claudia memory batch` or `claudia memory save`:
-```
-Run claudia memory document store --memory-ids "id1,id2,..." --project-dir "$PWD"
-to link the stored transcript to the memories extracted from it. This creates
-the provenance chain: memory -> document -> file on disk.
-```
+After extracting memories (facts, commitments) via the `memory.batch` or `memory.remember` MCP tools:
+
+Call the `memory.file` MCP tool with the `memory_ids` parameter set to the IDs of the memories you extracted. This links the stored transcript to the memories extracted from it, creating the provenance chain: memory -> document -> file on disk.
 
 Now the user can ask "where did you learn that Sarah prefers async communication?" and you can point to the exact transcript.
 
@@ -135,7 +128,7 @@ For each participant in the meeting:
 
 - Add new commitments to `context/commitments.md` (ask for confirmation on wording and deadline)
 - Add new waiting items to `context/waiting.md`
-- If the CLI is available, store via `claudia memory save` as well
+- If memory MCP tools are available, also store via the `memory.remember` MCP tool
 
 #### 5c. Update workspace files (if applicable)
 
@@ -233,7 +226,7 @@ Ask for confirmation on:
 
 ## Quality Checklist
 
-- [ ] **Raw transcript/notes filed** (`claudia memory document store` called with full content)
+- [ ] **Raw transcript/notes filed** (`memory.file` MCP tool called with full content)
 - [ ] Memories linked to source document (provenance chain complete)
 - [ ] Every action item has an owner
 - [ ] Every commitment has a deadline (even approximate)

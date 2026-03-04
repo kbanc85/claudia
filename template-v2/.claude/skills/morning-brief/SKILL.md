@@ -12,14 +12,14 @@ Provide a concise morning brief to start the day with clarity. Surface what matt
 
 ### Enhanced Memory System (if available)
 
-1. **Run `claudia memory temporal morning --project-dir "$PWD"`** to get a curated morning digest in a single call:
+1. **Call the `memory.morning_context` MCP tool** to get a curated morning digest in a single call:
    - Stale commitments (3+ days old, importance > 0.3)
    - Cooling relationships (people not contacted in 30+ days)
    - Cross-entity connections (people who co-appear but have no explicit relationship)
    - Active predictions and insights
    - Recent activity (72h)
 
-2. **Run `claudia memory recall "query" --project-dir "$PWD"`** for specific follow-up queries as needed
+2. **Call the `memory.recall` MCP tool** for specific follow-up queries as needed
 
 ### Judgment Rules (if available)
 
@@ -79,14 +79,14 @@ This builds trust by showing the verification happened.
 
 ## Temporal Awareness
 
-When enhanced memory is available, use urgency-driven ordering. Run `claudia memory temporal` to organize the brief by time sensitivity:
+When enhanced memory is available, use urgency-driven ordering. Use the `memory.morning_context` MCP tool to organize the brief by time sensitivity:
 
 ### Urgency Tiers (in order)
 
-1. **Urgent** (`claudia memory temporal upcoming --days 2 --project-dir "$PWD"`): Overdue commitments + due today + due tomorrow. These lead the brief.
-2. **This Week** (`claudia memory temporal upcoming --days 7 --project-dir "$PWD"`): Remaining commitments due this week.
-3. **Since Last Session** (`claudia memory temporal since --project-dir "$PWD"`): New memories, entities, and changes since the last conversation.
-4. **Reconnections** (`claudia memory graph reconnect --project-dir "$PWD"`): People trending toward dormancy who need attention, with context (last topic, open commitments).
+1. **Urgent** (from `memory.morning_context` or `memory.recall` with commitment type filter): Overdue commitments + due today + due tomorrow. These lead the brief.
+2. **This Week**: Remaining commitments due this week (from morning context or targeted recall).
+3. **Since Last Session** (from `memory.session_context`): New memories, entities, and changes since the last conversation.
+4. **Reconnections** (from `memory.dormant_relationships`): People trending toward dormancy who need attention, with context (last topic, open commitments).
 5. **Cooling Relationships**: From pattern detection (existing behavior).
 6. **Reflections**: Active high-importance reflections from `/meditate`.
 
@@ -98,7 +98,7 @@ The brief should be urgency-driven, not category-driven. The old approach said "
 
 ### 1. Predictions First (Enhanced Memory)
 
-If `claudia memory session context --project-dir "$PWD"` returns predictions, lead with them:
+If the `memory.session_context` MCP tool returns predictions, lead with them:
 - **Relationship alerts** - "Sarah: no contact in 45 days"
 - **Commitment warnings** - "Proposal deadline was yesterday"
 - **Pattern insights** - "You've mentioned being stretched thin 3 times this week"
@@ -113,7 +113,7 @@ Check for urgent items:
 
 ### 3. Today's Commitments
 
-From `claudia memory recall` or `context/commitments.md`:
+From the `memory.recall` MCP tool or `context/commitments.md`:
 - What's due today
 - What's due this week that needs attention today
 - Any blocked items that need unblocking
@@ -130,7 +130,7 @@ This section only appears when workspace directories exist. It uses file-system 
 
 ### 4. Relationship Health Dashboard
 
-From `claudia memory temporal morning` relationship health section:
+From the `memory.morning_context` MCP tool's relationship health section:
 
 **Dormant relationships by severity:**
 - **30+ days**: Consider reaching out (still warm)
@@ -153,7 +153,7 @@ From predictions or checking `people/` files:
 ### 5. Today's Meetings (if calendar integration available)
 
 For each meeting:
-- Check `claudia memory about "name" --project-dir "$PWD"` or `people/` for relevant relationship context
+- Call the `memory.about` MCP tool with the attendee name, or check `people/` for relevant relationship context
 - Note any commitments to or from attendees
 - Check waiting items for pending items
 - Suggest 1-2 talking points based on history

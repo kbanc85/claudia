@@ -2,6 +2,21 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.22 (2026-03-04)
+
+### Memory Interface Alignment (CLI to MCP)
+
+All documentation previously referenced a CLI interface (`claudia memory recall`, `claudia memory save`, etc.) that was never built. The actual working interface is MCP tools from the claudia-memory daemon. This release updates the 8 highest-priority files to match reality.
+
+- **memory-manager.md: full rewrite** -- Authoritative memory reference now describes MCP tools (`memory.recall`, `memory.remember`, `memory.about`, etc.) instead of non-existent CLI subcommands. Includes full MCP Tool Reference table and migration note for skills not yet updated.
+- **memory-availability.md: MCP architecture** -- Failure mode documentation now correctly describes the daemon not running (check `.mcp.json`, verify daemon startup) instead of a missing CLI binary.
+- **CLAUDE.md: session protocol** -- Session start/end instructions now reference `memory.briefing`, `memory.session_context`, and `memory.end_session` MCP tools instead of CLI commands.
+- **morning-brief: MCP tool calls** -- All CLI commands replaced with MCP equivalents (`memory.morning_context`, `memory.recall`, `memory.about`, `memory.dormant_relationships`).
+- **capture-meeting: MCP tool calls** -- Document filing (`memory.file`), batch operations (`memory.batch`), and provenance linking updated to MCP syntax.
+- **meditate: MCP tool calls** -- Reflection retrieval, storage (`memory.end_session`), and natural language editing examples updated to MCP syntax.
+- **hooks.json: MCP instructions** -- Session start verification, context loading, turn buffering, and source filing instructions now reference MCP tools.
+- **pre-compact.sh/.py: advisory-only** -- Removed non-functional CLI calls. Now emits advisory text pointing Claude to the correct MCP tools for pre-compaction capture.
+
 ## 1.51.21 (2026-03-04)
 
 ### Data Freshness Protections

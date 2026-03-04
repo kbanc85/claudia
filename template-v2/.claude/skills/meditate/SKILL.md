@@ -40,10 +40,8 @@ Silently retrieve:
 - Existing reflections to avoid duplication
 - Active commitments and relationship states
 
-```bash
-claudia memory reflections --project-dir "$PWD"    # see what already exists
-claudia memory session context --project-dir "$PWD" # recent context (if available)
-```
+- Call the `memory.reflections` MCP tool to see what already exists
+- Call the `memory.session_context` MCP tool for recent context (if available)
 
 ### Step 2: Generate Reflections
 
@@ -150,7 +148,7 @@ User responses:
 
 ### Step 5: Store and Close
 
-Run `claudia memory end-session --project-dir "$PWD"` with:
+Call the `memory.end_session` MCP tool with:
 - `narrative`: Brief session summary
 - `reflections`: Array of approved reflections with type, content, and optional about fields
 - Other structured extractions (facts, commitments, entities) as needed
@@ -205,8 +203,8 @@ When similar reflections accumulate over time:
 ### Retrieval
 
 Reflections surface through:
-- `claudia memory reflections` CLI command for explicit retrieval
-- `claudia memory session context` includes relevant reflections
+- The `memory.reflections` MCP tool for explicit retrieval
+- The `memory.session_context` MCP tool includes relevant reflections
 - Semantic search matches reflections to current context
 
 ---
@@ -238,8 +236,8 @@ User: "That thing you learned about me preferring bullet points -
        that's only for technical content, not conversations."
 
 Claudia:
-1. Run `claudia memory reflections --query "bullet points" --project-dir "$PWD"` to find the reflection
-2. Run `claudia memory reflections --action update --id <id> --content "..." --project-dir "$PWD"` to update
+1. Call the `memory.reflections` MCP tool with query: "bullet points" to find the reflection
+2. Call the `memory.reflections` MCP tool with action: "update", id: <id>, content: "..." to update
 3. Confirm: "Updated. I'll keep that distinction in mind."
 ```
 
@@ -247,8 +245,8 @@ Claudia:
 User: "Delete the reflection about Monday mornings"
 
 Claudia:
-1. Search for the reflection
-2. Run `claudia memory reflections --action delete --id <id> --project-dir "$PWD"` to delete
+1. Search for the reflection via `memory.reflections` MCP tool
+2. Call the `memory.reflections` MCP tool with action: "delete", id: <id> to delete
 3. Confirm: "Done, I've removed that."
 ```
 
@@ -256,7 +254,7 @@ Claudia:
 User: "Show me all your reflections about me"
 
 Claudia:
-1. Run `claudia memory reflections --limit 50 --project-dir "$PWD"`
+1. Call the `memory.reflections` MCP tool with limit: 50
 2. Format nicely with timeline info
 3. Offer to edit or delete any
 ```
@@ -289,9 +287,9 @@ At session start, load high-importance reflections to inform the interaction sty
 
 ---
 
-## Without Claudia CLI
+## Without Memory Tools
 
-If the Claudia CLI is unavailable, store reflections in `context/learnings.md`:
+If the memory MCP tools are unavailable, store reflections in `context/learnings.md`:
 
 ```markdown
 ## Reflections
