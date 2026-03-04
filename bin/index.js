@@ -422,9 +422,8 @@ async function main() {
   // Determine target directory and flags
   const args = process.argv.slice(2);
 
-  const isDemoMode = args.includes('--demo');
   const skipMemory = args.includes('--no-memory');
-  const filteredArgs = args.filter(a => a !== '--demo' && a !== '--no-memory' && a !== '--yes' && a !== '-y');
+  const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
 
   // Support "." or "upgrade" for current directory
@@ -641,7 +640,7 @@ async function main() {
       if (!supportsInPlace) renderer.appendLine('models', 'warn', 'Ollama not running');
     }
 
-    // Step 3: Memory System -- verify native deps (for CLI + system-health) and create directories
+    // Step 3: Memory System -- verify native deps (for system-health diagnostic) and create directories
     renderer.update('memory', 'active', 'checking native deps...');
     const claudiaHome = join(homedir(), '.claudia');
     mkdirSync(join(claudiaHome, 'memory'), { recursive: true });
@@ -715,7 +714,7 @@ async function main() {
       renderer.update('health', 'done', 'system healthy');
       if (!supportsInPlace) renderer.appendLine('health', 'done', 'system healthy');
     } else if (nativeDepsOk) {
-      renderer.update('health', 'warn', 'check with: claudia system-health');
+      renderer.update('health', 'warn', 'check CLAUDE.md for troubleshooting');
       if (!supportsInPlace) renderer.appendLine('health', 'warn', 'check manually');
     } else {
       renderer.update('health', 'warn', 'skipped (deps missing)');
@@ -724,35 +723,8 @@ async function main() {
 
     memoryOk = nativeDepsOk;
 
-    // Auto-install CLI globally so `claudia` is on PATH
-    if (nativeDepsOk) {
-      let cliOnPath = false;
-      try {
-        cliOnPath = await new Promise((resolve) => {
-          const whichCmd = isWindows ? 'where' : 'which';
-          const proc = spawn(whichCmd, ['claudia'], { stdio: 'pipe' });
-          proc.on('close', (code) => resolve(code === 0));
-          proc.on('error', () => resolve(false));
-        });
-      } catch { /* ignore */ }
-
-      if (!cliOnPath) {
-        // Silently install globally so hooks can find `claudia`
-        await new Promise((resolve) => {
-          const npmCmd = isWindows ? 'npm.cmd' : 'npm';
-          const proc = spawn(npmCmd, ['install', '-g', 'get-claudia@' + version], {
-            stdio: 'pipe'
-          });
-          proc.on('close', () => resolve());
-          proc.on('error', () => resolve());
-        });
-      }
-    }
-
-    // Seed demo database if --demo flag
-    if (isDemoMode && nativeDepsOk) {
-      seedDemoDatabase(targetPath, cliEntryPoint);
-    }
+    // (Global CLI install and demo seeder removed in v1.51.25.
+    //  Memory operations use the MCP daemon, not the CLI binary.)
 
   } catch (err) {
     // Environment check failed early
@@ -835,33 +807,6 @@ async function main() {
     callback(obsidianDetected);
   }
 
-  // ── Demo database seeder (CLI-based) ──
-
-  function seedDemoDatabase(targetPath, cliEntryPoint) {
-    const demoMemories = [
-      { content: 'Claudia demo workspace initialized. This is a sample memory to verify the system works.', type: 'observation', importance: 0.7 },
-      { content: 'Demo user prefers concise responses with clear structure.', type: 'preference', importance: 0.8 },
-      { content: 'Project "Demo" is an example workspace for testing Claudia features.', type: 'observation', importance: 0.6 },
-    ];
-
-    for (const mem of demoMemories) {
-      try {
-        const proc = spawn(process.execPath, [
-          cliEntryPoint, 'memory', 'save',
-          mem.content,
-          '--type', mem.type,
-          '--importance', String(mem.importance),
-          '--project-dir', targetPath
-        ], { stdio: 'pipe' });
-        // Fire-and-forget
-        proc.on('error', () => {});
-      } catch {
-        // Non-fatal
-      }
-    }
-  }
-
-
   // ── Completion block ──
 
   function showCompletion(targetDir, isCurrentDir, memoryInstalled) {
@@ -881,9 +826,6 @@ async function main() {
       console.log(` ${colors.dim}Memory database ready. Claudia will remember across sessions.${colors.reset}`);
     }
 
-    console.log('');
-    console.log(` ${colors.dim}Optional: Gmail & Calendar require Google Cloud credentials.${colors.reset}`);
-    console.log(` ${colors.dim}See "Google Integration Setup" in CLAUDE.md for step-by-step instructions.${colors.reset}`);
     console.log('');
   }
 }
@@ -1005,17 +947,10 @@ ${contextual.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
 ### Explicit (/command only)
 ${explicit.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
 
-## Memory CLI Commands
-All memory operations use \`claudia memory <command>\` via the Bash tool. No MCP server needed.
-Core: save, recall, about, relate, batch, end-session, consolidate, briefing, summary, reflections, project-health
-Temporal: upcoming, since, timeline, morning
-Graph: network, path, hubs, dormant, reconnect
-Entities: create, search, merge, delete, overview
-Vault: sync, status, canvas, import
-Modify: correct, invalidate, invalidate-relationship
-Session: buffer, context, unsummarized
-Document: store, search
-Provenance: trace, audit, verify-chain`;
+## Memory System
+Memory operations use MCP tools from the claudia-memory daemon (memory.recall, memory.remember, memory.about, etc.).
+The daemon provides ~33 tools for semantic search, pattern detection, and relationship tracking.
+See the memory-manager skill for the full tool reference.`;
     } catch {
       // skill-index.json not found, skip skills section
     }

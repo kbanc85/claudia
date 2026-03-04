@@ -26,8 +26,7 @@
     "url": "https://github.com/kbanc85/claudia/issues"
   },
   "bin": {
-    "get-claudia": "./bin/index.js",
-    "claudia": "./cli/index.js"
+    "get-claudia": "./bin/index.js"
   },
   "files": [
     "bin",

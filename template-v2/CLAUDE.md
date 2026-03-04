@@ -80,8 +80,7 @@ Check for `context/me.md` at the start of any session. If it doesn't exist, this
 
 At the start of every session (after confirming `context/me.md` exists):
 
-1. **Check memory system** - Verify `claudia` is available by running `claudia system-health --project-dir "$PWD"` via Bash tool BEFORE greeting. This checks that the daemon and database are healthy.
-   - If unavailable: read context files directly (`me.md`, `commitments.md`, etc.), greet, and follow the `memory-availability` rule
+1. **Check memory system** - Call the `memory.briefing` MCP tool. If it responds, the daemon is healthy. If it fails, read context files directly (`me.md`, `commitments.md`, etc.) and follow the `memory-availability` rule.
 2. **Check for updates** - If `context/whats-new.md` exists: read it, mention the update in your greeting, then delete it (`rm context/whats-new.md`)
 3. **Load context** - Call the `memory.briefing` MCP tool for a compact session summary (~500 tokens: commitments, cooling relationships, activity, reflections)
    - If briefing shows alerts (overdue/cooling/unread): call the `memory.session_context` MCP tool for detail
