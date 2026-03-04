@@ -1614,7 +1614,7 @@ async def list_tools() -> ListToolsResult:
                         "default": "fact",
                     },
                     "about": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Entity names this memory relates to (people, projects, etc.)",
                     },
@@ -1668,12 +1668,12 @@ async def list_tools() -> ListToolsResult:
                         "description": "What to search for (required unless ids is provided)",
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum number of results",
                         "default": 10,
                     },
                     "types": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Filter by memory types (fact, preference, observation, learning, commitment)",
                     },
@@ -1687,7 +1687,7 @@ async def list_tools() -> ListToolsResult:
                         "default": False,
                     },
                     "ids": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "integer"},
                         "description": "Fetch specific memories by ID (skips search). Use after a compact search to get full content.",
                     },
@@ -1711,7 +1711,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Name of the person, project, or entity",
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum number of memories to return",
                         "default": 20,
                     },
@@ -1798,7 +1798,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "episode_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Episode ID from buffer_turn calls during the session",
                     },
                     "narrative": {
@@ -1812,7 +1812,7 @@ async def list_tools() -> ListToolsResult:
                         ),
                     },
                     "facts": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -1846,7 +1846,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Structured facts, preferences, observations, learnings extracted from the session",
                     },
                     "commitments": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -1874,7 +1874,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Commitments or promises made during the session",
                     },
                     "entities": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -1895,7 +1895,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "New or updated entities mentioned during the session",
                     },
                     "relationships": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -1909,12 +1909,12 @@ async def list_tools() -> ListToolsResult:
                         "description": "Relationships between entities observed during the session",
                     },
                     "key_topics": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Main topics discussed in the session",
                     },
                     "reflections": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -1971,7 +1971,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Semantic search query (optional). If omitted, returns recent high-importance reflections.",
                     },
                     "types": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {
                             "type": "string",
                             "enum": ["observation", "pattern", "learning", "question"],
@@ -1983,7 +1983,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter to reflections about a specific entity (optional)",
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "default": 10,
                         "description": "Maximum results to return",
                     },
@@ -1994,7 +1994,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Action: get (list), search (semantic), update, delete",
                     },
                     "reflection_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Reflection ID (required for update/delete actions)",
                     },
                     "content": {
@@ -2019,7 +2019,7 @@ async def list_tools() -> ListToolsResult:
                 "type": "object",
                 "properties": {
                     "operations": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "description": "Array of operations to execute in order",
                         "items": {
                             "type": "object",
@@ -2181,7 +2181,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "List of entity names to summarize",
                     },
                     "top_facts_limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum top facts per entity (default 5)",
                         "default": 5,
                     },
@@ -2234,7 +2234,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Name of the person to project health for",
                     },
                     "days_ahead": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "How far ahead to project (default 30)",
                         "default": 30,
                     },
@@ -2261,7 +2261,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Which temporal query to run",
                     },
                     "days": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Look ahead window in days (for upcoming, default 14)",
                         "default": 14,
                     },
@@ -2279,7 +2279,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Entity name (for timeline, or optional filter for since)",
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum results",
                         "default": 50,
                     },
@@ -2319,12 +2319,12 @@ async def list_tools() -> ListToolsResult:
                         "description": "Second entity (for path operation)",
                     },
                     "max_depth": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum hops to search (for path, default 4)",
                         "default": 4,
                     },
                     "min_connections": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Minimum relationships to be a hub (for hubs, default 5)",
                         "default": 5,
                     },
@@ -2334,7 +2334,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter by entity type (for hubs)",
                     },
                     "days": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Days without activity (for dormant, default 60)",
                         "default": 60,
                     },
@@ -2344,7 +2344,7 @@ async def list_tools() -> ListToolsResult:
                         "default": 0.3,
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum results to return",
                         "default": 20,
                     },
@@ -2384,7 +2384,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Entity description (for create)",
                     },
                     "aliases": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Alternative names (for create)",
                     },
@@ -2393,20 +2393,20 @@ async def list_tools() -> ListToolsResult:
                         "description": "Search query (for search)",
                     },
                     "types": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Filter by entity types (for search)",
                     },
                     "source_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Entity ID to merge FROM (for merge)",
                     },
                     "target_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Entity ID to merge INTO (for merge)",
                     },
                     "entity_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Entity ID (for delete)",
                     },
                     "reason": {
@@ -2414,7 +2414,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Reason for merge or delete",
                     },
                     "entities": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Entity names for overview",
                     },
@@ -2429,7 +2429,7 @@ async def list_tools() -> ListToolsResult:
                         "default": True,
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum results (for search, default 10)",
                         "default": 10,
                     },
@@ -2492,7 +2492,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Which modification to perform",
                     },
                     "memory_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Memory ID (for correct, invalidate)",
                     },
                     "correction": {
@@ -2545,7 +2545,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "What the assistant said (for buffer)",
                     },
                     "episode_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Episode ID from previous buffer call (for buffer)",
                     },
                     "source": {
@@ -2598,12 +2598,12 @@ async def list_tools() -> ListToolsResult:
                         "description": "Brief summary (for store)",
                     },
                     "about": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "string"},
                         "description": "Entity names this document relates to",
                     },
                     "memory_ids": {
-                        "type": ["array", "string"],
+                        "type": "array",
                         "items": {"type": "integer"},
                         "description": "Memory IDs to link (for store)",
                     },
@@ -2620,7 +2620,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "Filter by entity (for search)",
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum results (for search, default 20)",
                         "default": 20,
                     },
@@ -2647,15 +2647,15 @@ async def list_tools() -> ListToolsResult:
                         "description": "Which provenance operation to perform",
                     },
                     "memory_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Memory ID (for trace, or audit by memory)",
                     },
                     "entity_id": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Entity ID (for audit by entity)",
                     },
                     "limit": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum audit entries (default 20)",
                         "default": 20,
                     },
@@ -2712,7 +2712,7 @@ async def list_tools() -> ListToolsResult:
                         "description": "What context to build for",
                     },
                     "token_budget": {
-                        "type": ["integer", "string"],
+                        "type": "string",
                         "description": "Maximum tokens (default: 8000)",
                     },
                     "include_sacred": {

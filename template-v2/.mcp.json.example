@@ -6,36 +6,40 @@
       "_description": "Claudia memory system with vector search",
       "_setup": "Auto-configured by the installer (npx get-claudia). The installer creates a Python venv at ~/.claudia/daemon/venv/ and sets the correct command path in .mcp.json automatically."
     },
-    "gmail": {
+    "_disabled_gmail": {
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-gmail-autoauth-mcp auth"
+      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-gmail-autoauth-mcp auth",
+      "_warning": "Enabling this adds a second stdio server. Claude Code bug #17962 may cause silent failures with multiple stdio servers. Consider using Rube (HTTP) for Gmail instead."
     },
-    "google-calendar": {
+    "_disabled_google-calendar": {
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-calendar-autoauth-mcp"],
-      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth"
+      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth",
+      "_warning": "Enabling this adds a second stdio server. Claude Code bug #17962 may cause silent failures with multiple stdio servers. Consider using Rube (HTTP) for Gmail/Calendar instead."
     },
     "rube": {
-      "command": "npx",
-      "args": ["-y", "@composio/rube-mcp"],
-      "env": {
-        "COMPOSIO_API_KEY": ""
+      "type": "http",
+      "url": "https://mcp.composio.dev",
+      "headers": {
+        "x-composio-api-key": ""
       },
-      "_setup": "Connect 500+ apps via Rube: Slack, Notion, Drive, GitHub, Granola, Otter.ai, Jira, Linear, Airtable, HubSpot, Stripe, and more. 1) Sign up free at https://rube.app 2) Connect your apps in Rube's marketplace 3) Copy your API key from the dashboard 4) Paste it in COMPOSIO_API_KEY above 5) Restart Claude Code. See Rube section in CLAUDE.md for full guide."
+      "_description": "Rube by Composio -- 500+ app integrations (HTTP, no stdio conflict)",
+      "_setup": "Connect 500+ apps via Rube: Slack, Notion, Drive, GitHub, Granola, Otter.ai, Jira, Linear, Airtable, HubSpot, Stripe, and more. 1) Sign up free at https://rube.app 2) Connect your apps in Rube's marketplace 3) Copy your API key from the dashboard 4) Paste it in x-composio-api-key above 5) Restart Claude Code. See Rube section in CLAUDE.md for full guide."
     }
   },
 
   "_notes": {
+    "stdio_warning": "Claude Code can only reliably connect to ONE stdio MCP server at a time (bug #17962). claudia-memory is the essential one. For Gmail/Calendar, use Rube (HTTP) instead of enabling individual stdio servers.",
     "memory": "Claudia's memory is powered by the claudia-memory daemon (Python MCP server). It provides ~33 tools for semantic search, pattern detection, and relationship tracking. The installer (npx get-claudia) automatically sets up the daemon in a Python venv at ~/.claudia/daemon/venv/ and configures .mcp.json.",
-    "gmail_and_calendar": "Gmail and Calendar use third-party MCP servers. Each user sets up their own Google Cloud Console credentials. See the Google Integration Setup section in CLAUDE.md.",
-    "rube": "Rube (by Composio) connects 500+ apps through one MCP server. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
+    "gmail_and_calendar": "Gmail and Calendar are disabled by default to avoid the multiple-stdio bug. To use them: either enable them individually (rename _disabled_gmail to gmail) knowing only one stdio server is reliable, or connect them through Rube (HTTP, no conflict).",
+    "rube": "Rube (by Composio) connects 500+ apps through one HTTP MCP connection. No stdio conflict. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
     "security": "Each user authenticates with their own accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",
       "web-search": "Claude Code has native WebSearch",
       "fetch": "Claude Code has native WebFetch"
     },
-    "adding_servers": "Add MCP servers here if needed. Find more at mcp.so or github.com/modelcontextprotocol/servers"
+    "adding_servers": "Add MCP servers here if needed. Find more at mcp.so or github.com/modelcontextprotocol/servers. Be aware that adding stdio servers alongside claudia-memory may cause connection issues."
   }
 }

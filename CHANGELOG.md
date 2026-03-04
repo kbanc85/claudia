@@ -2,6 +2,21 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.53.1 (2026-03-04)
+
+### The One-Stdio Fix: Memory Tools Actually Connect
+
+The daemon was healthy, all 26 tools registered, preflight passed, but tools silently vanished from Claude Code's palette. Root cause: `.mcp.json.example` shipped with 4 active stdio MCP servers. Claude Code bug [#17962](https://github.com/anthropics/claude-code/issues/17962) means only one stdio server connects reliably. Additionally, the daemon's JSON schemas used union type shorthand (`["integer","string"]`) that Claude Code's Zod validator may reject ([#10031](https://github.com/anthropics/claude-code/issues/10031)).
+
+- **Disable extra stdio servers by default** -- `.mcp.json.example` now ships gmail and google-calendar as `_disabled_` prefixed keys. Only `claudia-memory` is active as stdio. Matches the v1.49.0 pattern that worked.
+- **Rube switched to HTTP transport** -- Rube (Composio) entry changed from `command: npx` (stdio) to `type: http` with `url: https://mcp.composio.dev`. No stdio conflict, no slot consumed.
+- **Fix JSON Schema union types** -- Tool schemas changed from `["integer","string"]` and `["array","string"]` to simple `"string"` and `"array"`. The `_coerce_int()` and `_coerce_arg()` helpers already handle type conversion at runtime, so the unions were unnecessary and potentially caused all tools to vanish.
+- **Multi-stdio detection in installer** -- New `warnMultipleStdioServers()` warns during install if >1 stdio server is active. New "MCP Config" progress step shows stdio server count.
+- **Post-install component checklist** -- Installer now shows a component summary (Personality & Skills, Memory Daemon, MCP Config, Stdio Servers) with status indicators after install/upgrade.
+- **Diagnose skill: Step 1b** -- New diagnostic step counts active stdio servers and flags multiples. New common issue entry for "Multiple stdio MCP servers" with fix instructions.
+- **Fix `restoreMcpServers()`** -- Restore function no longer re-enables gmail/google-calendar as active stdio servers on upgrade. Only `claudia-memory` is restored from `_disabled_mcpServers`.
+- **Closed GitHub issues** -- [#7](https://github.com/kbanc85/claudia/issues/7) (migration 20 UNIQUE constraint) and [#8](https://github.com/kbanc85/claudia/issues/8) (schema.sql missing from npm) were both fixed in earlier releases by the removal of the Node.js CLI.
+
 ## 1.53.0 (2026-03-04)
 
 ### The Reliability Release: Self-Diagnosing MCP Daemon

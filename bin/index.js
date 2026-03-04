@@ -96,6 +96,7 @@ const STEPS = [
   { id: 'models',      label: 'AI Models' },
   { id: 'memory',      label: 'Memory System' },
   { id: 'daemon',      label: 'Memory Daemon' },
+  { id: 'mcp',         label: 'MCP Config' },
   { id: 'vault',       label: 'Obsidian Vault' },
   { id: 'health',      label: 'Health Check' },
 ];
@@ -774,6 +775,7 @@ async function main() {
     // Configure .mcp.json with correct daemon path
     if (daemonOk) {
       ensureDaemonMcpConfig(targetPath, venvPython);
+      warnMultipleStdioServers(targetPath);
     }
 
     // Run preflight check to verify daemon can actually start
@@ -818,9 +820,23 @@ async function main() {
       await ensureLaunchAgent(venvPython, targetPath);
     }
 
-    // Step 5 (vault): handled below
+    // MCP Config step: verify .mcp.json is correct and check stdio server count
+    renderer.update('mcp', 'active', 'checking .mcp.json...');
+    const mcpCheckResult = checkMcpConfig(targetPath);
+    if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount <= 1) {
+      renderer.update('mcp', 'done', `claudia-memory configured${mcpCheckResult.stdioCount === 1 ? '' : ' (no stdio servers?)'}`);
+      if (!supportsInPlace) renderer.appendLine('mcp', 'done', 'claudia-memory configured');
+    } else if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount > 1) {
+      renderer.update('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers (only 1 reliable)`);
+      if (!supportsInPlace) renderer.appendLine('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers`);
+    } else {
+      renderer.update('mcp', 'warn', 'claudia-memory not in .mcp.json');
+      if (!supportsInPlace) renderer.appendLine('mcp', 'warn', 'daemon not configured');
+    }
 
-    // Step 6: Health Check -- check daemon health endpoint or verify daemon can import
+    // Vault step: handled below
+
+    // Health Check: check daemon health endpoint or verify daemon can import
     renderer.update('health', 'active', 'verifying...');
     let healthOk = false;
 
@@ -950,16 +966,35 @@ async function main() {
 
     console.log('');
     console.log(`${colors.dim}${'━'.repeat(46)}${colors.reset}`);
-    console.log(` ${colors.bold}Done!${colors.reset} Open Claude Code:`);
+
+    // Post-install component summary
+    const mcpCheck = checkMcpConfig(targetPath);
+    const components = [
+      { name: 'Personality & Skills', ok: true },
+      { name: 'Memory Daemon', ok: memoryInstalled },
+      { name: 'MCP Config', ok: mcpCheck.hasDaemon },
+      { name: 'Stdio Servers', ok: mcpCheck.stdioCount <= 1, warn: mcpCheck.stdioCount > 1 ? `${mcpCheck.stdioCount} active (only 1 reliable)` : null },
+    ];
+
+    console.log(` ${colors.bold}Components:${colors.reset}`);
+    for (const c of components) {
+      if (c.ok && !c.warn) {
+        console.log(`   ${colors.green}✓${colors.reset} ${c.name}`);
+      } else if (c.warn) {
+        console.log(`   ${colors.yellow}⚠${colors.reset} ${c.name} ${colors.dim}${c.warn}${colors.reset}`);
+      } else {
+        console.log(`   ${colors.yellow}○${colors.reset} ${c.name} ${colors.dim}(not ready)${colors.reset}`);
+      }
+    }
+
+    console.log('');
+    console.log(` ${colors.bold}Next:${colors.reset} Open Claude Code:`);
     console.log(`   ${colors.cyan}${cdCmd}claude${colors.reset}`);
 
     if (!memoryInstalled) {
       console.log('');
       console.log(` ${colors.dim}Memory requires Python 3.10+, the claudia-memory daemon, and Ollama.${colors.reset}`);
       console.log(` ${colors.dim}Re-run setup after installing Python and Ollama.${colors.reset}`);
-    } else {
-      console.log('');
-      console.log(` ${colors.dim}Memory system ready. Claudia will remember across sessions.${colors.reset}`);
     }
 
     console.log('');
@@ -969,9 +1004,10 @@ async function main() {
 
 /**
  * Restore MCP servers that were moved to _disabled_mcpServers by earlier versions.
- * - Gmail/Calendar: v1.51.9-v1.51.12 treated them as legacy, now restored.
  * - claudia-memory: v1.51.13+ treated the daemon as legacy (replaced by CLI),
  *   but MCP is the primary memory interface as of v1.51.22.
+ * - Gmail/Calendar are NOT restored: Claude Code bug #17962 means multiple stdio
+ *   servers silently fail. Users should use Rube (HTTP) instead.
  */
 function restoreMcpServers(targetPath) {
   const mcpPath = join(targetPath, '.mcp.json');
@@ -983,7 +1019,8 @@ function restoreMcpServers(targetPath) {
     if (!config._disabled_mcpServers) return;
     if (!config.mcpServers) config.mcpServers = {};
 
-    const toRestore = ['gmail', 'google-calendar', 'claudia-memory', 'claudia_memory'];
+    // Only restore claudia-memory, not gmail/google-calendar (multiple stdio bug #17962)
+    const toRestore = ['claudia-memory', 'claudia_memory'];
     let changed = false;
     const restored = [];
 
@@ -1053,6 +1090,51 @@ function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
   if (!config.mcpServers) config.mcpServers = {};
   config.mcpServers['claudia-memory'] = daemonConfig;
   writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+}
+
+/**
+ * Check .mcp.json configuration and return status.
+ * Returns { hasDaemon, stdioCount, stdioServers }.
+ */
+function checkMcpConfig(targetPath) {
+  const mcpPath = join(targetPath, '.mcp.json');
+  if (!existsSync(mcpPath)) return { hasDaemon: false, stdioCount: 0, stdioServers: [] };
+  try {
+    const config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    const servers = config.mcpServers || {};
+    const hasDaemon = !!servers['claudia-memory'];
+    const stdioServers = Object.entries(servers)
+      .filter(([key]) => !key.startsWith('_'))
+      .filter(([, val]) => !val._disabled && (!val.type || val.type === 'stdio'))
+      .map(([key]) => key);
+    return { hasDaemon, stdioCount: stdioServers.length, stdioServers };
+  } catch {
+    return { hasDaemon: false, stdioCount: 0, stdioServers: [] };
+  }
+}
+
+/**
+ * Warn if multiple stdio MCP servers are active in .mcp.json.
+ * Claude Code bug #17962: only one stdio server connects reliably.
+ */
+function warnMultipleStdioServers(targetPath) {
+  const mcpPath = join(targetPath, '.mcp.json');
+  if (!existsSync(mcpPath)) return;
+  try {
+    const config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    const servers = config.mcpServers || {};
+    const stdioServers = Object.entries(servers)
+      .filter(([key]) => !key.startsWith('_disabled') && !key.startsWith('_'))
+      .filter(([, val]) => !val._disabled && (!val.type || val.type === 'stdio'))
+      .map(([key]) => key);
+
+    if (stdioServers.length > 1) {
+      console.log('');
+      console.log(`  ${colors.boldYellow}⚠ Warning:${colors.reset} ${stdioServers.length} stdio MCP servers detected: ${stdioServers.join(', ')}`);
+      console.log(`  ${colors.dim}Claude Code can only reliably connect to one stdio server at a time (bug #17962).${colors.reset}`);
+      console.log(`  ${colors.dim}claudia-memory should be the only stdio server. Use Rube (HTTP) for Gmail/Calendar.${colors.reset}`);
+    }
+  } catch { /* ignore parse errors */ }
 }
 
 /**
