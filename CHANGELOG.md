@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.26 (2026-03-04)
+
+### The Memory Fix: Auto-Install Daemon for All Users
+
+The memory daemon source was not included in the npm package and the installer did not install it. Users had to manually `pip install` the daemon from source, which nobody did. The MCP server never started, Claude Code silently skipped it, and Claudia had no memory capabilities.
+
+- **Bundle daemon source in npm package** -- `memory-daemon/claudia_memory/` (40 files) and `pyproject.toml` now ship with the npm tarball. Package size goes from ~500KB to ~2.7MB.
+- **Add "Memory Daemon" step to installer** -- New Step 4 detects Python 3.10+, creates a venv at `~/.claudia/daemon/venv/`, pip installs the bundled daemon source, and verifies the import. Non-blocking: warns and continues if Python is missing.
+- **Auto-configure `.mcp.json`** -- New `ensureDaemonMcpConfig()` writes the correct daemon entry with the absolute venv Python path. Preserves all existing MCP server entries. Creates the file if it doesn't exist.
+- **Strengthen Session Start Protocol** -- Three mandatory outcomes when checking `memory.briefing`: tool responds (healthy), tool errors (tell user), tool missing (MUST disclose degraded mode immediately).
+- **Add Mandatory Disclosure rule** -- `memory-availability.md` now requires upfront honesty when the daemon isn't running. No silent fallback to context files.
+- **Update `.mcp.json.example`** -- Daemon entry now says "Auto-configured by installer" instead of manual setup instructions.
+
 ## 1.51.25 (2026-03-04)
 
 ### The Cleanup: Strip Unreachable CLI Code
