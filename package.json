@@ -1,6 +1,6 @@
 {
   "name": "get-claudia",
-  "version": "1.51.20",
+  "version": "1.51.21",
   "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
@@ -46,6 +46,7 @@
     "vitest": "^3.0.0"
   },
   "scripts": {
+    "site:build": "node scripts/build-dossier-site.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/integration",

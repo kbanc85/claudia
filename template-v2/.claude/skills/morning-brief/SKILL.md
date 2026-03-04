@@ -33,6 +33,48 @@ Provide a concise morning brief to start the day with clarity. Surface what matt
 
 Use `context/commitments.md`, `context/waiting.md`, and `people/` files.
 
+### Workspace Verification (Active Projects)
+
+Before reporting status for any active project, check if it has a workspace with source files.
+
+**Step 1: Detect active workspaces**
+
+Check if the `workspaces/` directory exists and has subdirectories. Each subdirectory is a project workspace.
+
+**Step 2: For each active workspace, scan source files**
+
+For each workspace subdirectory, check for directories that contain trackable items:
+
+```
+workspaces/[slug]/
+  interviews/     <- Count .md files for interview total
+  meetings/       <- Count for meeting total
+  deliverables/   <- Check status in each file
+  agreements/     <- Check for signed/pending
+  Dashboard.md    <- Read for current phase/status
+```
+
+The file count in these directories IS the canonical status. Do not override it with counts from MEMORY.md, context files, or your own recollection.
+
+**Step 3: Report from source, not summary**
+
+When including project status in the brief, report from the file system:
+
+- "Interviews: 19 completed (19 files in interviews/)"
+- "Phase: Assessment (from Dashboard.md)"
+
+Not from memory: "9 interviews completed (from notes)"
+
+**Step 4: Flag discrepancies**
+
+If a workspace file count contradicts what you have in notes or memory, report both:
+
+> Note: I had 9 interviews in my notes, but found 19 files in the workspace. Using the file count.
+
+This builds trust by showing the verification happened.
+
+**Without workspaces:** If `workspaces/` doesn't exist, skip this step. Rely on database and context file data as before.
+
 ---
 
 ## Temporal Awareness
@@ -49,10 +91,6 @@ When enhanced memory is available, use urgency-driven ordering. Run `claudia mem
 6. **Reflections**: Active high-importance reflections from `/meditate`.
 
 The brief should be urgency-driven, not category-driven. The old approach said "here are your commitments." The new approach says "here's what needs your attention RIGHT NOW."
-
-### Verification Step
-
-For any item flagged as overdue or at-risk, **read the actual file to confirm status hasn't changed** since the last memory update. Memory DB and file state can diverge (e.g., an interview was marked complete in the file but the memory DB wasn't updated). A 10-second grep is cheaper than reporting stale status.
 
 ---
 
@@ -79,6 +117,16 @@ From `claudia memory recall` or `context/commitments.md`:
 - What's due today
 - What's due this week that needs attention today
 - Any blocked items that need unblocking
+
+### 3.5. Active Project Status (Workspace-Verified)
+
+If workspaces exist with active projects:
+- Scan each workspace for current status from source files
+- Report verified counts and phase from Dashboard.md
+- Flag any items that need attention (stale deliverables, overdue milestones)
+- Cross-reference with commitments for upcoming deadlines
+
+This section only appears when workspace directories exist. It uses file-system truth, not summaries.
 
 ### 4. Relationship Health Dashboard
 
@@ -149,6 +197,10 @@ Keep it scannable. Lead with predictions and warnings.
 - **[Time]** [Who/What] - [One-line context]
   - Last talked: [date]
   - Open items: [any commitments/waiting]
+
+### 🏗️ Active Projects
+- **[Project Name]** — Phase: [from Dashboard] | [X] [items] completed (verified)
+  - Next: [upcoming items or deadlines]
 
 ### 👀 Relationship Health
 **Needs attention:**

@@ -31,12 +31,15 @@ User provides one of:
 **Always file the raw transcript/notes FIRST.** This is not optional. Source preservation creates provenance: every extracted fact can trace back to where it came from.
 
 ```
-claudia memory document store /path/to/transcript.txt \
+claudia memory document store \
+  --filename "YYYY-MM-DD-[person]-[topic].md" \
   --source-type "transcript" \
   --summary "Brief 1-line summary of the meeting" \
-  --project-dir "$PWD"
+  --about "participant1,participant2" \
+  --project-dir "$PWD" \
+  < content.md
 ```
-The first argument is the file path (positional, not a flag). Save the transcript to disk first, then pass the path.
+(Pipe the FULL raw transcript/notes text via stdin; do not summarize)
 
 The file is automatically routed to the right folder:
 - `people/sarah-chen/transcripts/2026-02-04-kickoff.md`
@@ -58,10 +61,7 @@ The file is automatically routed to the right folder:
 1. Dispatch Document Processor (Haiku) with:
    - The full transcript text
    - extraction_type: "memory_operations"
-   - Context: participant names with pronouns (e.g., "Alex Gregory (he/him), EVP Sales"),
-     meeting topic, date
-   - IMPORTANT: Always include pronouns and titles in the dispatch prompt.
-     Haiku can misgender or mis-title participants without this context.
+   - Context: participant names, meeting topic, date
 
 2. Agent returns memory_operations[] array with:
    - Facts, preferences, observations
@@ -70,7 +70,6 @@ The file is automatically routed to the right folder:
    - Relationship links
 
 3. Review agent output (judgment layer):
-   - Verify pronouns and titles are correct
    - Verify commitment wording is accurate
    - Check importance scores are reasonable
    - Confirm entity names match existing entities
@@ -115,41 +114,42 @@ the provenance chain: memory -> document -> file on disk.
 
 Now the user can ask "where did you learn that Sarah prefers async communication?" and you can point to the exact transcript.
 
-### 5. Organize
+### 5. Downstream Updates
 
-**Before writing any files, verify current state (never trust in-session counts):**
+After extracting information, propagate changes to the files that depend on it. These updates ensure that summaries stay in sync with source material.
 
-For project/interview trackers:
-- Count completed items fresh: `grep -rl "status: completed" <project-folder>/ | wc -l`
-- Count outstanding items: `grep -rl "status: scheduled\|status: pending" <project-folder>/ | wc -l`
-- Read the dashboard/README file fresh: don't rely on counts from earlier in the session
-- **If the tracker count doesn't match the grep count, the grep count is authoritative**
+#### 5a. Update person files
 
-For people files:
-- Read the person file fresh before updating (don't rely on earlier context)
-- Check `claudia memory about "person name" --project-dir "$PWD"` for latest memory DB state
+For each participant in the meeting:
 
-For commitments:
-- Read `context/commitments.md` fresh before adding new items
-- Check for duplicates by searching for the person's name + topic
+1. Check if `people/[name-slug].md` exists
+2. If it exists:
+   - Update "Last Contact" date to today
+   - Add this meeting to "Our History" or interaction log
+   - Update "Current Context" if new information was shared
+   - Add any new commitments to the person's section
+3. If it does not exist and this person seems important (mentioned multiple times, has commitments, or has a working relationship):
+   - Offer to create a new person file: "I'd like to create a file for [person]. They [reason]. Should I?"
 
-Then update:
-- Person files with new context
-- Commitment and waiting items
-- Dashboard or tracker files with **verified counts from grep, not from memory**
-- Create files for new people if needed
+#### 5b. Update commitment and waiting files
 
-### 5b. Reconcile Status Sources (MANDATORY after any status change)
+- Add new commitments to `context/commitments.md` (ask for confirmation on wording and deadline)
+- Add new waiting items to `context/waiting.md`
+- If the CLI is available, store via `claudia memory save` as well
 
-When you've changed an entity's status (interview completed, deliverable finished, etc.):
+#### 5c. Update workspace files (if applicable)
 
-1. **Update the primary source** (vault file YAML frontmatter or entity file)
-2. **Update the memory DB** (`claudia memory save` or `claudia memory correct`)
-3. **Verify dashboard/tracker counts:**
-   - Grep actual file status values (see Step 5 above)
-   - Compare to dashboard/README stated count
-   - If mismatch: update dashboard with the grep-verified count
-4. **Never use in-session counts.** Always grep/query fresh at write time. Previous context (even from minutes ago in the same session) can be stale if files were modified.
+Check if this meeting belongs to an active workspace:
+
+1. Does the meeting topic match a workspace in `workspaces/`?
+2. Is a meeting participant associated with a workspace project?
+
+If yes:
+- File the meeting notes in `workspaces/[slug]/meetings/`
+- Update `workspaces/[slug]/Dashboard.md` if the meeting changed project status or phase
+- If the meeting created new deliverables or items, add them to the relevant workspace subdirectory
+
+If no workspace match, file in the standard location per the document store routing.
 
 ### 6. Synthesize
 
@@ -193,13 +193,22 @@ Create a summary that captures:
 ### 🌡️ Sentiment
 [Brief read on how the meeting went, relationship health]
 
-### 📂 File Updates
+### 📂 Updates Made
 
-Shall I:
-- [ ] Add commitments to tracking? [List them]
-- [ ] Add waiting items? [List them]
-- [ ] Update [person]'s file with new context?
-- [ ] Create files for new people mentioned?
+**Person files:**
+- Updated [person]'s last contact and history
+- Added [commitment] to [person]'s commitments section
+- ? Create file for [new person]? They [reason]. (Your call.)
+
+**Commitments added:**
+- "[Commitment]" — due [date] (added to tracking)
+- Waiting on "[item]" from [person] (added to waiting)
+
+**Workspace:** [if applicable]
+- Meeting filed in workspaces/[slug]/meetings/
+- Dashboard updated: [what changed]
+
+*Anything I should adjust?*
 
 *Meeting notes saved to: [location]*
 
@@ -208,20 +217,19 @@ Shall I:
 
 ## Judgment Points
 
+Proceed automatically with:
+- Updating last contact dates in person files (factual, low-risk)
+- Adding meeting to history tables in person files (factual, low-risk)
+- Filing meeting notes in workspace directories (organizational, low-risk)
+
 Ask for confirmation on:
 - Adding commitments (user must own promises)
 - Adding waiting items (setting expectations)
+- Creating NEW person files (new entity in the system)
 - Updating sentiment in person files (subjective)
+- Changing project phase/status in workspace Dashboard (consequential)
 - Flagging concerns (interpretation required)
 - File location (if ambiguous)
-
-## Error Recovery
-
-If a batch of parallel commands fails:
-- Re-run each failed command individually (parallel failures cascade, individual runs often succeed)
-- Never assume all commands failed just because one did
-- Check error messages: if it says "sibling tool call errored," the other commands weren't actually attempted
-- When a grep or count command fails, retry with a simpler approach before reporting stale data
 
 ## Quality Checklist
 
@@ -234,8 +242,9 @@ If a batch of parallel commands fails:
 - [ ] Related person files flagged for update
 - [ ] No unexplained jargon or unclear references
 - [ ] All markdown tables render correctly (header, separator, and data rows on separate lines)
-- [ ] **Status sources reconciled** (file YAML, memory DB, and dashboard/tracker all agree)
-- [ ] **Dashboard counts verified** via fresh grep, not in-session memory
+- [ ] Person files updated for all participants with existing files
+- [ ] Workspace files updated if meeting belongs to an active project
+- [ ] No stale counts left in any summary file that was updated
 
 ## Tone
 

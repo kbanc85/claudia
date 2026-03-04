@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.21 (2026-03-04)
+
+### Data Freshness Protections
+
+- **New rule: data-freshness** -- Establishes canonical source hierarchy (source files > database > context files > MEMORY.md). When tiers disagree, higher-authority sources win. Includes the Freshness Test: verify counts against source files before reporting them.
+- **Principle 14: Auto-Memory Discipline** -- MEMORY.md is for structural knowledge, not volatile data. Introduces the Pointer Rule (store "files are at X" not "9 completed") and the Timestamp Rule (dated facts need verification notes).
+- **Trust North Star Principle 6: Data Freshness is a Trust Obligation** -- Reporting a stale count is the same category of trust violation as presenting an inference as fact. Adds verification triggers and freshness signaling guidelines.
+- **morning-brief: workspace verification** -- Before reporting project status, scans workspace directories for actual file counts. Reports from file-system truth, not summaries. Flags discrepancies transparently.
+- **capture-meeting: downstream updates** -- Step 5 "Organize" replaced with prescriptive "Downstream Updates" (5a: person files, 5b: commitments, 5c: workspace files). Factual updates (last contact, history) proceed automatically; consequential changes still require confirmation.
+
 ## 1.51.20 (2026-03-03)
 
 ### Fix: Multi-Source Status Reconciliation
