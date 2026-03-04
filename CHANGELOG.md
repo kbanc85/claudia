@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.24 (2026-03-04)
+
+### Installer: MCP-Primary Memory Architecture
+
+The installer was actively disabling the claudia-memory MCP daemon and reporting "CLI ready," directly contradicting the documentation updates from v1.51.22-23. This release aligns the installer with the MCP-primary architecture.
+
+- **Removed daemon disabling** -- `disableLegacyMcpServers()` no longer removes `claudia-memory` from `.mcp.json`. The function and its global config warning counterpart have been removed entirely.
+- **Daemon restoration for existing users** -- `restoreMcpServers()` now includes `claudia-memory` and `claudia_memory` in its restore list. Users who upgraded through v1.51.13+ will get their daemon config automatically restored from `_disabled_mcpServers`.
+- **Updated status messages** -- Memory system check now reports "Database ready" instead of "CLI ready". Completion message mentions the daemon.
+- **Template includes daemon** -- `.mcp.json.example` now lists `claudia-memory` as an MCP server with setup instructions. Memory note updated to describe MCP daemon architecture.
+- **Removed legacy cleanup** -- Removed `cleanupLegacyDaemon()` stub and all "legacy daemon" language from the installer.
+
 ## 1.51.23 (2026-03-04)
 
 ### Memory Interface Alignment (Patch)
