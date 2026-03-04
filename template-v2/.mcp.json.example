@@ -1,5 +1,10 @@
 {
   "mcpServers": {
+    "claudia-memory": {
+      "command": "python",
+      "args": ["-m", "claudia_memory"],
+      "_setup": "Memory daemon (recommended). Install: cd memory-daemon && pip install -e '.[nlp]' && ollama pull nomic-embed-text. See CLAUDE.md for details."
+    },
     "gmail": {
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
@@ -21,9 +26,9 @@
   },
 
   "_notes": {
+    "memory": "Claudia's memory is powered by the claudia-memory daemon (Python MCP server). It provides ~33 tools for semantic search, pattern detection, and relationship tracking. The 'claudia' npm CLI handles setup and health checks. See CLAUDE.md for daemon installation.",
     "gmail_and_calendar": "Gmail and Calendar use third-party MCP servers. Each user sets up their own Google Cloud Console credentials. See the Google Integration Setup section in CLAUDE.md.",
     "rube": "Rube (by Composio) connects 500+ apps through one MCP server. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
-    "memory": "Claudia's memory system uses the 'claudia' CLI (via Bash tool), not MCP. No MCP server needed for memory.",
     "security": "Each user authenticates with their own accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",

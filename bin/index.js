@@ -492,14 +492,8 @@ async function main() {
     console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
   }
 
-  // Move legacy MCP servers (memory daemon only) to _disabled_mcpServers.
-  disableLegacyMcpServers(targetPath);
-
-  // Restore Gmail/Calendar MCPs that v1.51.9-v1.51.12 incorrectly disabled.
+  // Restore MCP servers that earlier versions incorrectly disabled.
   restoreMcpServers(targetPath);
-
-  // Warn if global ~/.claude.json has legacy MCP servers we can't auto-fix
-  warnGlobalLegacyMcpServers();
 
   // Write context/whats-new.md for Claudia's self-awareness (silent)
   writeWhatsNewFile(targetPath, version);
@@ -647,7 +641,7 @@ async function main() {
       if (!supportsInPlace) renderer.appendLine('models', 'warn', 'Ollama not running');
     }
 
-    // Step 3: Memory System -- verify native deps and create directories
+    // Step 3: Memory System -- verify native deps (for CLI + system-health) and create directories
     renderer.update('memory', 'active', 'checking native deps...');
     const claudiaHome = join(homedir(), '.claudia');
     mkdirSync(join(claudiaHome, 'memory'), { recursive: true });
@@ -676,15 +670,15 @@ async function main() {
     }
 
     if (nativeDepsOk) {
-      renderer.update('memory', 'done', 'CLI ready');
-      if (!supportsInPlace) renderer.appendLine('memory', 'done', 'CLI ready');
+      renderer.update('memory', 'done', 'Database ready');
+      if (!supportsInPlace) renderer.appendLine('memory', 'done', 'Database ready');
     } else {
       renderer.update('memory', 'warn', 'native deps missing (run npm install)');
       if (!supportsInPlace) renderer.appendLine('memory', 'warn', 'native deps missing');
     }
 
-    // Clean up legacy Python daemon if present
-    cleanupLegacyDaemon();
+    // Note: claudia-memory daemon is the primary memory interface (MCP server).
+    // The CLI (better-sqlite3) provides system-health and fallback access.
 
     // Step 4 (vault): handled below
 
@@ -867,17 +861,6 @@ async function main() {
     }
   }
 
-  // ── Legacy daemon cleanup ──
-
-  function cleanupLegacyDaemon() {
-    const daemonVenv = join(homedir(), '.claudia', 'daemon', 'venv');
-    const daemonLog = join(homedir(), '.claudia', 'daemon-stderr.log');
-
-    if (existsSync(daemonVenv) || existsSync(daemonLog)) {
-      // Don't delete automatically, just note it
-      // Users may still have the old daemon running
-    }
-  }
 
   // ── Completion block ──
 
@@ -891,10 +874,11 @@ async function main() {
 
     if (!memoryInstalled) {
       console.log('');
-      console.log(` ${colors.dim}Memory requires Ollama. Install from ollama.com${colors.reset}`);
+      console.log(` ${colors.dim}Memory requires the claudia-memory daemon and Ollama.${colors.reset}`);
+      console.log(` ${colors.dim}See CLAUDE.md for setup instructions.${colors.reset}`);
     } else {
       console.log('');
-      console.log(` ${colors.dim}Memory is ready. Claudia will remember across sessions.${colors.reset}`);
+      console.log(` ${colors.dim}Memory database ready. Claudia will remember across sessions.${colors.reset}`);
     }
 
     console.log('');
@@ -904,103 +888,12 @@ async function main() {
   }
 }
 
-/**
- * Disable legacy MCP servers in .mcp.json that have been replaced by native CLI commands.
- * This runs on both fresh installs and upgrades.
- *
- * Replaced servers:
- * - claudia-memory  → `claudia memory` CLI (Node.js, direct SQLite)
- *
- * Note: Gmail and Calendar are NOT legacy -- they use third-party MCP packages
- * that each user authenticates with their own Google Cloud credentials.
- */
-function disableLegacyMcpServers(targetPath) {
-  const mcpPath = join(targetPath, '.mcp.json');
-  if (!existsSync(mcpPath)) return;
-
-  try {
-    const raw = readFileSync(mcpPath, 'utf-8');
-    const config = JSON.parse(raw);
-    if (!config.mcpServers) return;
-
-    // Only the memory daemon MCP is truly legacy (replaced by claudia memory CLI).
-    // Gmail and Calendar MCPs are the primary integration path and should NOT be disabled.
-    const legacyServers = {
-      'claudia-memory':    'claudia memory CLI',
-      'claudia_memory':    'claudia memory CLI',
-    };
-
-    let changed = false;
-    const disabled = [];
-
-    for (const [key, replacement] of Object.entries(legacyServers)) {
-      if (config.mcpServers[key]) {
-        if (!config._disabled_mcpServers) config._disabled_mcpServers = {};
-
-        const serverConfig = { ...config.mcpServers[key] };
-        delete serverConfig._disabled;
-        delete serverConfig._replaced_by;
-        serverConfig._replaced_by = replacement;
-        config._disabled_mcpServers[key] = serverConfig;
-
-        delete config.mcpServers[key];
-        changed = true;
-        disabled.push(key);
-      }
-    }
-
-    if (changed) {
-      writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-      console.log(` ${colors.yellow}→${colors.reset} Disabled legacy MCP: ${disabled.join(', ')} (moved to _disabled_mcpServers)`);
-    }
-  } catch {
-    // Not valid JSON or can't read -- skip silently
-  }
-}
 
 /**
- * Check the global ~/.claude.json for legacy MCP servers that overlap with
- * Claudia's native CLI commands. We don't modify global config (too risky),
- * but we warn the user so they can clean it up manually.
- */
-function warnGlobalLegacyMcpServers() {
-  const globalConfigPath = join(homedir(), '.claude.json');
-  if (!existsSync(globalConfigPath)) return;
-
-  try {
-    const raw = readFileSync(globalConfigPath, 'utf-8');
-    const config = JSON.parse(raw);
-    if (!config.mcpServers) return;
-
-    // Only the memory daemon is truly legacy. Gmail/Calendar MCPs are fine.
-    const legacyServers = {
-      'claudia-memory':    'claudia memory CLI',
-      'claudia_memory':    'claudia memory CLI',
-    };
-
-    const found = [];
-    for (const key of Object.keys(legacyServers)) {
-      if (config.mcpServers[key]) found.push(key);
-    }
-
-    if (found.length > 0) {
-      console.log();
-      console.log(` ${colors.boldYellow}⚠  Legacy MCP servers found in global config${colors.reset}`);
-      console.log(` ${colors.dim}   ~/.claude.json still has: ${found.join(', ')}${colors.reset}`);
-      console.log(` ${colors.dim}   These overlap with Claudia's CLI and may cause duplicate behavior.${colors.reset}`);
-      console.log(` ${colors.dim}   To fix: edit ~/.claude.json and remove them from mcpServers,${colors.reset}`);
-      console.log(` ${colors.dim}   or move them to _disabled_mcpServers to preserve the config.${colors.reset}`);
-      console.log();
-    }
-  } catch {
-    // Not valid JSON or can't read -- skip silently
-  }
-}
-
-/**
- * Restore Gmail and Calendar MCP servers that were moved to _disabled_mcpServers
- * by v1.51.9-v1.51.12. Those versions treated them as "legacy" but we've reverted
- * to MCP as the primary Gmail/Calendar integration path.
+ * Restore MCP servers that were moved to _disabled_mcpServers by earlier versions.
+ * - Gmail/Calendar: v1.51.9-v1.51.12 treated them as legacy, now restored.
+ * - claudia-memory: v1.51.13+ treated the daemon as legacy (replaced by CLI),
+ *   but MCP is the primary memory interface as of v1.51.22.
  */
 function restoreMcpServers(targetPath) {
   const mcpPath = join(targetPath, '.mcp.json');
@@ -1012,7 +905,7 @@ function restoreMcpServers(targetPath) {
     if (!config._disabled_mcpServers) return;
     if (!config.mcpServers) config.mcpServers = {};
 
-    const toRestore = ['gmail', 'google-calendar'];
+    const toRestore = ['gmail', 'google-calendar', 'claudia-memory', 'claudia_memory'];
     let changed = false;
     const restored = [];
 
