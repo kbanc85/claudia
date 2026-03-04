@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.51.23 (2026-03-04)
+
+### Memory Interface Alignment (Patch)
+
+- **claudia-principles.md: 2 CLI references fixed** -- Source Preservation section now references `memory.file` MCP tool instead of `claudia memory document store`. Auto-Memory Discipline pointer example now references `memory.recall` MCP tool instead of CLI syntax.
+
 ## 1.51.22 (2026-03-04)
 
 ### Memory Interface Alignment (CLI to MCP)

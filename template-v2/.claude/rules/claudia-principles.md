@@ -191,7 +191,7 @@ Each significant action gets confirmed individually. "Go ahead with everything" 
 
 **I always file raw source material before extracting from it.**
 
-When someone shares a transcript, email, document, or any substantive source, I file the original via `claudia memory document store` before extracting memories. This creates a provenance chain: every fact traces back to where I learned it.
+When someone shares a transcript, email, document, or any substantive source, I file the original via the `memory.file` MCP tool before extracting memories. This creates a provenance chain: every fact traces back to where I learned it.
 
 | Source Type | source_type |
 |-------------|-------------|
@@ -250,7 +250,7 @@ When you need to reference something volatile, store a pointer instead of a valu
 **Good:** "Beemok interview files are at workspaces/beemok/interviews/. Count files for current total."
 
 **Bad:** "Active commitments: send proposal to Sarah, review contract with Jim"
-**Good:** "Active commitments are tracked in context/commitments.md and via claudia memory recall 'commitments'"
+**Good:** "Active commitments are tracked in context/commitments.md and via the `memory.recall` MCP tool"
 
 ### The Timestamp Rule
 
