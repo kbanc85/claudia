@@ -1,0 +1,29 @@
+# Meditate Eval
+# Tests that session reflection generates meaningful, persistent learnings
+
+prompts:
+  - prompt: "/meditate"
+    context: "Session involved a detailed discussion about a client proposal, user expressed frustration about pricing, and made two commitments"
+    expectations:
+      - "generates reflections, not just a session summary"
+      - "captures communication preferences observed during the session"
+      - "extracts judgment rules from decisions (e.g., pricing approach)"
+      - "calls memory.end_session with narrative, facts, and reflections"
+      - "narrative captures emotional tone (frustration about pricing)"
+      - "identifies unresolved threads worth revisiting"
+
+  - prompt: "let's wrap up this session"
+    context: "Short session with only one quick question answered, no significant decisions"
+    expectations:
+      - "triggers meditate skill from natural language"
+      - "produces proportionally brief reflections"
+      - "does not over-analyze a trivial session"
+      - "still generates a session summary even if brief"
+
+  - prompt: "/meditate"
+    context: "Session involved the user correcting several wrong memories and expressing mild frustration"
+    expectations:
+      - "reflects on what went wrong (inaccurate memories)"
+      - "generates a learning about data quality"
+      - "does not generate defensive or apologetic reflections"
+      - "captures the correction pattern for future improvement"

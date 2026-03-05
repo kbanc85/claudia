@@ -1,6 +1,6 @@
 ---
 name: capability-suggester
-description: Notice repeated user behaviors and suggest new commands, workflows, or structure to streamline their work.
+description: Notice repeated user behaviors and suggest new commands, workflows, structure, or integrations to streamline work. Also detects when the user's setup has outgrown its current structure and suggests targeted upgrades. Activates when repeated task patterns, workflow friction, structural gaps, or business growth signals are detected.
 user-invocable: false
 invocation: proactive
 effort-level: high
@@ -10,22 +10,39 @@ triggers:
   - "frequent status check query"
   - "mentions checking external tool"
   - "workflow gap between steps"
+  - "files created outside existing structure"
+  - "tracking something with no home"
+  - "business complexity has grown"
+  - "workflow friction observed"
 inputs:
   - name: behavior_pattern
     type: string
-    description: Observed repeated behavior or workflow pattern
+    description: Observed repeated behavior, workflow pattern, or structural gap
 outputs:
   - name: suggestion
     type: text
-    description: Proposed enhancement (new command, workflow change, or structure addition)
+    description: Proposed enhancement (new command, workflow change, structure addition, or integration)
   - name: capability
     type: file
-    description: New skill file or structural change if user accepts the suggestion
+    description: New skill file, structural change, or template if user accepts the suggestion
 ---
 
 # Capability Suggester Skill
 
-**Triggers:** Activates when patterns of repeated behavior reach a threshold.
+**Triggers:** Activates when patterns of repeated behavior reach a threshold, or when structural gaps create friction.
+
+---
+
+## Philosophy
+
+Structure should grow organically from actual needs, not be imposed upfront. This skill watches for both repeated behaviors and structural friction, offering targeted solutions.
+
+**Core Principles:**
+- Observe before suggesting
+- One suggestion at a time, not a flood
+- Accept "no" gracefully
+- Remember declined suggestions (don't re-suggest)
+- Explain the why, not just the what
 
 ---
 
@@ -82,17 +99,46 @@ Want me to prompt for client file updates after meeting captures?"
 ### Structure Needs
 
 **Detection:**
+- Files created outside the existing structure repeatedly
 - Topics that don't have a home
 - Files that are getting too long
 - Categories that are emerging
 
 **Examples:**
 ```
-"You've mentioned 'partnerships' in several contexts but don't
-have a dedicated folder. Should we create partnerships/ ?"
+"I notice you've been saving [X] type files in random places.
+Want me to create a dedicated folder for those?"
+
+"You've created 3 client notes in /context.
+Should we set up proper client folders?"
 
 "Your patterns.md is getting long. Want me to split it into
 work-patterns.md and relationship-patterns.md?"
+```
+
+### Business Depth Upgrades
+
+If user chose "minimal" or "starter" initially, watch for signs they need more:
+
+**Minimal to Starter:**
+- Mentions tracking multiple things manually
+- Asks about pipelines or active work lists
+- Discusses finances more than occasionally
+
+**Starter to Full:**
+- Manages 3+ active clients/projects
+- Needs accountability tracking
+- Discusses methodology or repeatable processes
+- Mentions tax planning or financial complexity
+
+**Suggest:**
+```
+"Your workflow has gotten more complex since we started. Want me to add:
+- Pipeline tracking (active, prospecting, completed)
+- Financial structure (expenses, invoicing, tax planning)
+- Templates for common tasks
+
+I can add just what you need, not everything at once."
 ```
 
 ### Integration Needs
@@ -108,7 +154,6 @@ work-patterns.md and relationship-patterns.md?"
 - "Can you check my email/calendar/Notion..."
 - "Let me paste this from [service]..."
 - "I need to go look at [service] for..."
-- "Here's what [service] says..."
 - "Can you see my [service]?"
 
 **Response:**
@@ -123,15 +168,11 @@ your pages without the copy-paste."
 "You've asked about your email a few times. I can't see it yet,
 but I can help you set that up. Takes about 5 minutes for Gmail.
 Interested?"
-
-"I see you check your calendar separately before our morning briefs.
-Want me to include your schedule automatically? I can connect to
-Google Calendar if you'd like."
 ```
 
 **Guardrails:**
 - Only suggest once per service (check declined list in learnings.md)
-- Don't interrupt workflow-suggest at natural pause points
+- Don't interrupt workflow, suggest at natural pause points
 - If they said "maybe later" during onboarding, wait at least a week
 
 ---
@@ -145,7 +186,20 @@ Track behavior without mentioning it until threshold reached:
 - 2+ for complex workflows
 - Immediate for obvious improvements
 
-### 2. Propose Enhancement
+### 2. Wait for a Natural Moment
+
+**Good times to suggest:**
+- Start of session: "Before we dive in, I noticed something..."
+- End of weekly review: "One observation from reviewing your week..."
+- After completing a task: "That's done. Quick thought..."
+- When they mention friction: "You mentioned [X] being messy. Want me to..."
+
+**Bad times:**
+- During focused work
+- When user is stressed
+- If pattern is sensitive and context is wrong
+
+### 3. Propose Enhancement
 
 **Format:**
 ```
@@ -153,45 +207,28 @@ Track behavior without mentioning it until threshold reached:
 
 Would you like me to [specific solution]?
 
-This would [benefit]."
+This would [benefit].
+
+Totally fine if not - just noticed the pattern."
 ```
 
-**Examples:**
-
-```
-"I've noticed you check client health status at the start of each week.
-
-Would you like me to add a client health summary to your Monday morning brief?
-
-This would save you from manually checking each client file."
-```
-
-```
-"You often draft follow-up emails after sales calls.
-
-Would you like me to create a /sales-followup command that:
-- Uses the meeting notes as context
-- Drafts a templated follow-up
-- Suggests next steps based on the conversation
-
-I could have this ready for your next call."
-```
-
-### 3. Accept Response
+### 4. Accept Response
 
 **If yes:**
-- Create the enhancement
-- Explain how to use it
+- Create the enhancement immediately
+- Show what was added
+- Offer a quick tour if it's substantial
 - Note in learnings.md
 
-**If no:**
-- Acknowledge gracefully
-- Don't suggest again for a while
-- Note preference in learnings.md
+**If "not now" / "maybe later":**
+- Note the suggestion and timing
+- Wait at least 2 weeks before similar suggestions
+- Acknowledge: "No problem. I'll let you know if the pattern continues."
 
-**If "maybe later":**
-- Note for future
-- Remind in a week or when context is relevant
+**If "no" / declined:**
+- Record the declined suggestion
+- Don't suggest the same thing again (unless they explicitly ask)
+- Acknowledge: "Got it. Won't mention it again."
 
 ---
 
@@ -199,26 +236,10 @@ I could have this ready for your next call."
 
 ### New Commands
 
-**Template:**
-```markdown
-# [Command Name]
-
-[Brief description of what it does]
-
-## When to Use
-[Trigger conditions]
-
-## What It Does
-[Step by step]
-
-## Output
-[What user gets]
-```
-
 **Process:**
 1. Draft command based on observed pattern
 2. Propose to user with explanation
-3. If approved, create in `.claude/commands/`
+3. If approved, create in `.claude/skills/`
 4. Confirm creation and explain usage
 
 ### Workflow Enhancements
@@ -245,22 +266,11 @@ Want me to enhance it to also:
 - Split growing files
 - Add templates for new types
 
-**Example:**
-```
-"You've started tracking vendor relationships separately from clients.
-
-Should I create:
-- vendors/ folder with similar structure to clients/
-- /vendor-status command for quick checks?"
-```
-
 ---
 
-## Learning Integration
+## Tracking Suggestions
 
-### What Gets Stored
-
-In `context/learnings.md`:
+Maintain in `context/learnings.md`:
 
 ```markdown
 ## Suggested Capabilities
@@ -268,10 +278,12 @@ In `context/learnings.md`:
 ### Accepted
 - /linkedin-quick command (created Jan 15)
 - Auto-client-update after meetings (enabled Jan 18)
+- Pipeline tracking folders (created Feb 1)
 
-### Declined
+### Declined (Don't Re-suggest)
 - Partnership folder (user prefers flat structure)
 - Automatic deadline reminders (user finds them annoying)
+- Full pipeline structure - prefers minimal
 
 ### Pending
 - Sales follow-up template (user said "maybe later" - Jan 20)
@@ -286,43 +298,89 @@ Track whether suggestions are used:
 
 ---
 
+## Suggestion Library
+
+### For Users Who Started Minimal
+
+**Pipeline Tracking:**
+```
+"You've mentioned 3 different clients this week but don't have a pipeline.
+Want me to set up tracking so you can see active work at a glance?"
+```
+
+**Financial Tracking:**
+```
+"I notice you discuss finances fairly often. Your setup is minimal right now.
+Want me to add an overview file for tracking revenue and expenses?"
+```
+
+**Commitments Tracking:**
+```
+"You've made several promises this week. Want me to set up a dedicated
+commitments tracker so nothing slips through?"
+```
+
+### For Users Who Started Starter
+
+**Full Pipeline:**
+```
+"Your pipeline is getting busier. Want me to add prospecting and completed
+tracking so you can see your full sales funnel?"
+```
+
+**Templates Library:**
+```
+"You do a lot of similar tasks. Want me to set up a templates folder with
+starting points for client intake, meeting prep, and reviews?"
+```
+
+### For All Users
+
+**Weekly Review Template:**
+```
+"You do informal weekly reviews. Want me to create a template so you hit
+the same key areas each time?"
+```
+
+**Methodology Documentation:**
+```
+"You've described how you approach [X] a few times. Want me to document it
+so you (and I) can reference it consistently?"
+```
+
+**New Folder for Recurring Content:**
+```
+"You've created several [X] files. Want me to set up a dedicated folder
+so they're easier to find?"
+```
+
+---
+
+## Frequency Limits
+
+- Maximum 1 suggestion per session (unless asked)
+- Space out suggestions over time
+- Wait 2 weeks after any suggestion before the next
+- Exception: If they ask "what should I add?" give fuller recommendations
+
+---
+
 ## Guardrails
 
 ### Don't Overwhelm
-
 - Max 1 suggestion per session (unless asked)
-- Space out suggestions over time
 - Don't repeat declined suggestions
+- Space suggestions over time
 
 ### Don't Over-Engineer
-
 - Start with simple solutions
 - Only suggest what's clearly needed
 - Avoid adding complexity for its own sake
 
 ### Respect User Style
-
 - Some users like lots of structure
 - Some prefer minimal tooling
 - Learn and adapt to their preference
-
----
-
-## Proactive vs. Reactive
-
-### Proactive (I bring it up)
-- When pattern is clear and benefit is obvious
-- During natural pauses in work
-- At start of session if something significant
-
-### Reactive (when asked)
-```
-User: "Is there anything you think we should add?"
-User: "What could we do to make this easier?"
-User: "Any suggestions for improving my workflow?"
-```
-
-Provide comprehensive list of observed opportunities.
 
 ---
 
@@ -331,6 +389,14 @@ Provide comprehensive list of observed opportunities.
 ### With Pattern Recognizer
 - Feed patterns into capability analysis
 - Notice when patterns suggest tooling needs
+
+### With Commitment Detector
+- When commitments pile up without a system, suggest tracking
+- Suggest /what-am-i-missing command if not present
+
+### With Risk Surfacer
+- When risks relate to structural gaps, suggest structure
+- Missing pipeline causes capacity issues → Suggest pipeline
 
 ### With Memory Manager
 - Persist suggestions and responses

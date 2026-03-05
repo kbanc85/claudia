@@ -1,0 +1,27 @@
+# Capture Meeting Eval
+# Tests that meeting capture extracts structured data and files source material
+
+prompts:
+  - prompt: "Here are my notes from a call with Sarah Chen about the Q4 roadmap. She mentioned they're moving to microservices, the migration is due by March 15. I promised to send her our API docs by Friday. Also met her colleague James Wright who leads the platform team."
+    expectations:
+      - "extracts at least one commitment (send API docs by Friday)"
+      - "files the source material via memory.file before extracting"
+      - "identifies Sarah Chen and James Wright as entities"
+      - "detects the March 15 deadline"
+      - "uses structured output format with emoji headers"
+      - "asks user to confirm before storing extracted data"
+
+  - prompt: "capture this meeting"
+    context: "User provides a multi-paragraph transcript with 3 participants, 2 action items, and 1 decision"
+    expectations:
+      - "separates decisions from action items from general discussion"
+      - "attributes action items to specific people"
+      - "offers to create or update person files for participants"
+      - "stores the full transcript before extracting"
+
+  - prompt: "Here are brief notes: Quick sync with Mike. All good, no action items."
+    expectations:
+      - "handles minimal notes gracefully"
+      - "does not invent commitments or action items"
+      - "still files the source material"
+      - "keeps output proportional to input length"

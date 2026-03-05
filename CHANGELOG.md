@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.53.4 (2026-03-04)
+
+### The Skill Sharpening Release
+
+Systematic improvement of Claudia's 41 default skills for better contextual triggering, testing, and maintainability. Follows the Skill Creator's best practices for description-driven activation and progressive disclosure.
+
+- **Improved skill descriptions** -- 8 SKILL.md files updated with richer trigger context so Claude matches skills more accurately from natural language (meditate, new-person, draft-reply, follow-up-draft, memory-manager, pattern-recognizer, meeting-prep, weekly-review)
+- **Skill index v2 with examples** -- `skill-index.json` bumped to schema v2. All 41 entries now include `examples` arrays with 3-6 natural-language utterances for long-tail matching (e.g., "anything urgent this morning?" triggers morning-brief)
+- **Consolidated overlapping skills (43 to 41)** -- Merged `concierge` into `research/SKILL.md` (tool detection, staleness tracking, proactive offers). Merged `structure-evolution` into `capability-suggester.md` (usage gap detection, business depth upgrades, suggestion library)
+- **Eval templates for 5 skills** -- Added `evals/basic.yaml` for morning-brief, capture-meeting, new-person, diagnose, and meditate. Compatible with the Skill Creator plugin for automated quality testing
+- **Reference files for 4 skills** -- Added `references/` subdirectories for diagnose (common-issues), ingest-sources (extraction-patterns), research (source-evaluation), and new-workspace (workspace-templates). Keeps SKILL.md lean via progressive disclosure
+- **README updated** -- Documented `examples` field in schema reference, added progressive disclosure and eval documentation, updated effort level table for 41 skills
+
 ## 1.53.3 (2026-03-04)
 
 ### Fix: Actually restore disabled MCP servers on upgrade

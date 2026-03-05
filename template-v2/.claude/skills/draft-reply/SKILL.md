@@ -1,6 +1,6 @@
 ---
 name: draft-reply
-description: Draft an email response with tone matching the relationship context. Shows draft for approval.
+description: Draft an email response with tone matching the relationship context. Shows draft for approval before sending. Use when user says "draft a reply", "respond to this email", "write a response to [person]", or shares an email and asks for help replying.
 effort-level: medium
 ---
 

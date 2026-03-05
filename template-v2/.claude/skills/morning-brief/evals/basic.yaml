@@ -1,0 +1,29 @@
+# Morning Brief Eval
+# Tests that the morning brief skill produces well-structured, actionable output
+
+prompts:
+  - prompt: "/morning-brief"
+    context: "User has context/me.md, context/commitments.md with 2 overdue items, and 3 people files with varying last-contact dates"
+    expectations:
+      - "produces structured output with emoji section headers"
+      - "surfaces overdue commitments prominently"
+      - "includes reconnection suggestions for cooling relationships"
+      - "organizes by urgency (overdue first, then upcoming, then FYI)"
+      - "ends with a horizontal rule separator"
+      - "does not hallucinate commitments not in source files"
+
+  - prompt: "what's on my plate today?"
+    context: "User has no overdue items, 1 meeting today, and all relationships healthy"
+    expectations:
+      - "triggers morning-brief skill from natural language"
+      - "reports clean status without inventing problems"
+      - "mentions the upcoming meeting"
+      - "keeps output concise when nothing is urgent"
+
+  - prompt: "/morning-brief"
+    context: "Memory daemon is not running, only context files available"
+    expectations:
+      - "falls back to reading context files directly"
+      - "discloses degraded mode to user"
+      - "still produces a useful brief from available files"
+      - "does not crash or produce empty output"

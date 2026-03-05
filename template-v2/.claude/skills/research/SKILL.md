@@ -1,20 +1,40 @@
 ---
 name: research
-description: Deep research on a topic with web sources, memory integration, and stored findings. Triggers on "research this", "look into", "find out about", "dig into".
+description: Deep research on a topic with web sources, memory integration, and stored findings. Also handles quick context-aware lookups when current information would improve the conversation. Triggers on "research this", "look into", "find out about", "dig into", "look up", "what's new with", "check current", "any updates on", "latest info".
 argument-hint: "[topic or question]"
 effort-level: high
 ---
 
 # Research
 
-Deep research on a topic, grounded in web sources and connected to Claudia's memory.
+Deep research on a topic, grounded in web sources and connected to Claudia's memory. Also handles context-aware lookups when current external information would improve quality.
 
 ## Usage
 `/research [topic or question]`
 
 ## How It Works
 
-This command activates the Concierge skill for focused, multi-step research. Unlike a quick web search, `/research` is deliberate: it checks memory first, searches strategically, fetches relevant sources, synthesizes findings, and stores key facts for future sessions.
+This skill handles all research, from quick lookups to multi-source deep dives. Unlike a raw web search, research is deliberate: it checks memory first, builds queries using relationship context, searches strategically, fetches relevant sources, synthesizes findings, and stores key facts for future sessions.
+
+## Tool Detection
+
+Research works with whatever tools are available. Check what exists and adapt:
+
+```
+Research tool detection:
+├── WebFetch available?          → Use for single-page fetches
+├── WebSearch available?         → Use for broad searches
+├── fetch MCP available?         → Use for cleaner page extraction
+├── web-search MCP available?    → Use for DuckDuckGo search (no API key)
+├── brave-search MCP available?  → Use for Brave search
+├── firecrawl MCP available?     → Use for JS-heavy sites, multi-page crawls
+└── Nothing available?           → Tell user honestly, suggest options
+```
+
+Never hard-depend on a specific tool. Use the best available. If multiple options exist, prefer in this order:
+1. Built-in tools (WebFetch, WebSearch) - zero setup, always there
+2. Free MCP servers (fetch, web-search) - no API keys
+3. API-backed MCP servers (brave-search, firecrawl) - most capable
 
 ## Process
 
@@ -31,20 +51,32 @@ If the topic is clear and narrow, skip this and go straight to work.
 
 ### 2. Check Memory First
 
+Before reaching for the web, check what Claudia already knows:
+
 ```
-claudia memory recall "[topic]" --project-dir "$PWD":
-├── Existing knowledge found -> Surface it
+memory.recall "[topic]":
+├── Fresh results (< 7 days) → Use them, offer to refresh
 │   "I have some context on this from [date]:
 │    [summary of stored facts]
 │    Want me to verify this is still current?"
-├── Stale knowledge found -> Note it
+├── Stale results (> 7 days) → Note staleness, offer to update
 │   "Last time I looked into this was [date]. Let me refresh."
-└── Nothing found -> Proceed to web research
+└── No results → Proceed to web research
 ```
 
-### 3. Research
+This avoids redundant fetches and surfaces compounding knowledge.
 
-Use whatever tools are available (see Concierge skill for tool detection).
+### 3. Context-Aware Query Building
+
+Use memory context to build better queries. Claudia knows things a search engine doesn't:
+
+- **Project context:** User says "check the docs for that framework" → Claudia knows they mean Next.js because she remembers the project
+- **Relationship context:** "See if their company announced anything" → Claudia knows "their" refers to Sarah's company, Acme Corp
+- **Historical context:** "Has anything changed since we last looked?" → Claudia knows what was found last time and when
+
+Turn vague intent into precise queries. This is the edge.
+
+### 4. Research
 
 **For factual lookups** (one clear answer expected):
 - Search for the topic
@@ -69,7 +101,7 @@ Use whatever tools are available (see Concierge skill for tool detection).
 - Cross-reference with what Claudia knows about the user's position
 - Focus on actionable intelligence, not general summaries
 
-### 4. Synthesize and Report
+### 5. Synthesize and Report
 
 ```
 ## Research: [Topic]
@@ -103,12 +135,56 @@ Use whatever tools are available (see Concierge skill for tool detection).
 *Key facts stored in memory. I'll remember this next time the topic comes up.*
 ```
 
-### 5. Store and Connect
+For quick lookups, use a condensed version:
+```
+[Answer grounded in fetched content]
+
+Source: [URL] (fetched [date])
+```
+
+### 6. Store and Connect
 
 After presenting findings:
-- Store key facts via `claudia memory save` with `source:web:` provenance
+- Store key facts via `memory.remember` with `source:web:` provenance
 - Update relevant entities if research revealed new information
 - Connect to existing relationships or projects where relevant
+
+Store facts, not entire pages. Focus on:
+- Specific data points (prices, dates, version numbers)
+- Decisions or announcements that affect the user's work
+- Technical details relevant to active projects
+- Changes from previously known information
+
+## Staleness Tracking
+
+When research results are stored in memory, the source URL and fetch date are preserved. On future queries:
+
+- If Claudia finds a memory tagged `source:web:*` that's older than 7 days, note this: "I have this from [date]. Want a fresh check?"
+- If a user asks the same question as a previous session, surface the stored answer first, then offer to update
+- During morning brief or weekly review, if stored research is relevant to upcoming commitments and older than 14 days, flag it as potentially stale
+
+## Proactive Research Offers
+
+Research can proactively offer to look things up when it detects value. This is not automatic fetching, it's offering.
+
+**When to offer:**
+- User states something as fact that might be outdated
+- Discussion involves pricing, deadlines, or terms that change over time
+- Meeting prep for a company Claudia hasn't researched recently
+- User is making a decision that could benefit from current data
+
+**How to offer:**
+```
+"That might have changed since [version/date]. Want me to check the current docs?"
+```
+```
+"I have info on [topic] from [date]. Want me to see if anything's updated?"
+```
+
+**When NOT to offer:**
+- User is in flow and hasn't paused for input
+- The topic is clearly opinion-based, not fact-checkable
+- User has previously declined similar offers in this session
 
 ## Tone
 
@@ -139,3 +215,35 @@ If no web tools are available:
 
 What works best?"
 ```
+
+## Error Handling
+
+When fetches fail (403, timeout, JS-only page):
+```
+"I couldn't access that page directly - [reason].
+Options:
+- Try a different URL if you have one
+- Paste the content and I'll work with it
+- [If enhanced MCP available] I can try with a different tool"
+```
+
+Never silently fail. Never guess what a page says. If the fetch didn't work, say so.
+
+## Privacy and Consent
+
+- **Sensitive domains** (competitor sites, personal information): Ask before fetching
+- **User says "don't look that up":** Respect it. Don't offer again for that topic this session
+- **All fetches are visible** in the tool call UI. Nothing happens in the background without the user seeing it
+
+## Integration with Other Skills
+
+### With Meeting Prep
+- Research can enrich meeting prep with current company news, recent announcements
+- Offer: "I'm prepping for your call with [person]. Want me to check [company]'s recent news?"
+
+### With Risk Surfacer
+- Research can verify or dismiss flagged risks
+- Stale research on critical topics gets surfaced as a watch item
+
+### With Connector Discovery
+- When research hits limitations (JS rendering, multi-page crawl), suggest relevant MCP tools

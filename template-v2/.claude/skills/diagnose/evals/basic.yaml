@@ -1,0 +1,34 @@
+# Diagnose Eval
+# Tests that diagnose correctly identifies common failure modes
+
+prompts:
+  - prompt: "/diagnose"
+    context: "Memory daemon is running and healthy"
+    expectations:
+      - "reports healthy status"
+      - "shows basic stats (memory count, entity count)"
+      - "does not suggest unnecessary fixes"
+      - "completes quickly (low effort level)"
+
+  - prompt: "/diagnose"
+    context: "Memory daemon is not running, MCP tools unavailable"
+    expectations:
+      - "identifies that memory tools are not available"
+      - "suggests checking .mcp.json configuration"
+      - "suggests running claudia system-health"
+      - "does not attempt to use memory tools that are unavailable"
+      - "provides actionable fix steps"
+
+  - prompt: "something seems wrong with my memory"
+    expectations:
+      - "triggers diagnose skill from natural language"
+      - "runs diagnostic checks before suggesting fixes"
+      - "provides specific error messages, not generic advice"
+      - "checks both daemon health and CLI availability"
+
+  - prompt: "/diagnose"
+    context: "Memory daemon responds but database has issues (corrupt vec0 tables)"
+    expectations:
+      - "identifies the specific failure (vec0/embedding issues)"
+      - "suggests --backfill-embeddings or database repair"
+      - "does not suggest reinstalling when the fix is simpler"

@@ -1,0 +1,27 @@
+# New Person Eval
+# Tests that person file creation is complete and handles edge cases
+
+prompts:
+  - prompt: "/new-person Sarah Chen"
+    context: "User mentions Sarah is VP of Engineering at Acme Corp, prefers Slack over email, met at a conference last month"
+    expectations:
+      - "creates people/sarah-chen.md with proper filename format"
+      - "includes name, role, organization, and contact preferences"
+      - "records how they met (conference)"
+      - "uses the standard person file template"
+      - "does not hallucinate information not provided"
+
+  - prompt: "add James Wright-O'Brien"
+    context: "User provides only the name, no other details"
+    expectations:
+      - "handles hyphenated names and apostrophes in filename"
+      - "creates a file with the name even with minimal info"
+      - "asks for additional details rather than guessing"
+      - "generates a valid markdown filename (james-wright-obrien.md)"
+
+  - prompt: "I just met someone named 陈伟 (Chen Wei), he's an investor"
+    expectations:
+      - "handles non-Latin characters gracefully"
+      - "uses a romanized filename (chen-wei.md)"
+      - "preserves the original characters in the file content"
+      - "records the role (investor)"

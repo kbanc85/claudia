@@ -51,9 +51,15 @@ Skills live in `.claude/skills/` and can be either:
 .claude/skills/
 └── ingest-sources/
     ├── SKILL.md          # Main skill file (required)
+    ├── references/       # Optional deep-dive content (progressive disclosure)
+    ├── evals/            # Optional eval templates (Skill Creator compatible)
     ├── templates/        # Optional supporting files
     └── examples/         # Optional examples
 ```
+
+**Progressive disclosure:** Keep SKILL.md lean (under 500 lines). Move detailed reference content into `references/` subdirectories. Claude reads these on demand when deeper context is needed.
+
+**Eval templates:** Skills can include `evals/basic.yaml` with test prompts and expectations. These are compatible with the Skill Creator plugin for automated skill quality testing.
 
 ### SKILL.md Format
 
@@ -86,6 +92,9 @@ effort-level: low | medium | high | max
 triggers:                    # Natural language activation patterns
   - "pattern one"
   - "pattern two"
+examples:                    # Full natural-language utterances for matching (v2)
+  - "what should I focus on today?"
+  - "anything urgent this morning?"
 inputs:                      # Expected input data
   - name: input_name
     type: string | entity | date | file
@@ -114,6 +123,7 @@ argument-hint: [arg]
 | `description` | Yes | Used for contextual matching and skill index |
 | `effort-level` | Yes | Thinking budget: `low`, `medium`, `high`, `max` |
 | `triggers` | No | 3-5 natural language phrases that activate the skill |
+| `examples` | No | Full natural-language utterances for long-tail matching (v2) |
 | `inputs` | No | Structured input expectations (name, type, description) |
 | `outputs` | No | What the skill produces (name, type, description) |
 | `invocation` | No | `explicit`, `contextual` (default), or `proactive` |
@@ -197,7 +207,7 @@ effort-level: medium
 |--------|--------|
 | **low** | morning-brief, client-health, financial-snapshot, growth-check, databases, diagnose, brain-monitor, inbox-check, judgment-awareness |
 | **medium** | meeting-prep, draft-reply, follow-up-draft, file-document, new-person, capture-meeting, summarize-doc, memory-audit, brain, fix-duplicates, memory-health, memory-manager, onboarding, structure-generator, agent-dispatcher, new-workspace |
-| **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, concierge, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, structure-evolution, hire-agent |
+| **high** | weekly-review, meditate, research, what-am-i-missing, map-connections, commitment-detector, capability-suggester, connector-discovery, pattern-recognizer, relationship-tracker, risk-surfacer, hire-agent |
 | **max** | ingest-sources, pipeline-review, deep-context |
 
 ## Creating Custom Skills

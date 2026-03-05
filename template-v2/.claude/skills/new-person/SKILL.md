@@ -1,6 +1,6 @@
 ---
 name: new-person
-description: Create a relationship tracking file for a person with contact info and history.
+description: Create a relationship tracking file for a person with contact info, history, and communication preferences. Use when user says "new person", "add [name]", "create a file for [name]", "track this person", or mentions someone important who doesn't have a file yet.
 argument-hint: "[name]"
 effort-level: medium
 ---

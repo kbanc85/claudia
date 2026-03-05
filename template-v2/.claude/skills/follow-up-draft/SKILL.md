@@ -1,6 +1,6 @@
 ---
 name: follow-up-draft
-description: Create a post-meeting thank-you or follow-up email with key points and next steps.
+description: Create a post-meeting thank-you or follow-up email with key points and next steps. Use when user says "follow-up email", "thank you note", "post-meeting email", "send a follow-up to [person]", or after a meeting capture when next steps need communicating.
 argument-hint: "[person name]"
 effort-level: medium
 ---

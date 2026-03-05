@@ -1,6 +1,6 @@
 {
-  "$schema": "Claudia Skill Index v1",
-  "description": "Progressive loading index - lightweight metadata for all skills",
+  "$schema": "Claudia Skill Index v2",
+  "description": "Progressive loading index - lightweight metadata for all skills with trigger examples for contextual matching",
   "skills": [
     {
       "name": "onboarding",
@@ -8,7 +8,12 @@
       "description": "Guide new users through a conversational discovery flow to create a personalized Claudia setup",
       "invocation": "proactive",
       "effort_level": "medium",
-      "triggers": ["first run", "new user setup", "no me.md exists", "getting started"]
+      "triggers": ["first run", "new user setup", "no me.md exists", "getting started"],
+      "examples": [
+        "this is my first time using Claudia",
+        "help me get set up",
+        "I'm new here"
+      ]
     },
     {
       "name": "structure-generator",
@@ -16,15 +21,25 @@
       "description": "Create personalized folder structures and files based on user archetype and workflow needs",
       "invocation": "proactive",
       "effort_level": "medium",
-      "triggers": ["after onboarding", "create folder structure", "set up workspace", "archetype setup"]
+      "triggers": ["after onboarding", "create folder structure", "set up workspace", "archetype setup"],
+      "examples": [
+        "set up my folder structure",
+        "create the consultant template",
+        "build my workspace layout"
+      ]
     },
     {
       "name": "memory-manager",
       "path": "memory-manager.md",
-      "description": "Handle cross-session persistence using the enhanced memory system with fallback to markdown files",
+      "description": "Handle cross-session persistence using MCP tools from the claudia-memory server, with fallback to markdown files. Activates at session start to load context and session end to save learnings. Use when memory tools respond, fail, or are unavailable.",
       "invocation": "proactive",
       "effort_level": "medium",
-      "triggers": ["session start", "session end", "save context", "load memory"]
+      "triggers": ["session start", "session end", "save context", "load memory"],
+      "examples": [
+        "save what we discussed",
+        "remember this for next time",
+        "what do you remember from last session?"
+      ]
     },
     {
       "name": "agent-dispatcher",
@@ -32,7 +47,12 @@
       "description": "Detects when to delegate tasks to specialized agents with two-tier dispatch",
       "invocation": "proactive",
       "effort_level": "medium",
-      "triggers": ["delegate task", "use agent team", "process document", "research task"]
+      "triggers": ["delegate task", "use agent team", "process document", "research task"],
+      "examples": [
+        "process this document for me",
+        "can your team handle this?",
+        "delegate this research"
+      ]
     },
     {
       "name": "judgment-awareness",
@@ -40,7 +60,12 @@
       "description": "Load and apply user-defined judgment rules from context/judgment.yaml to inform priority conflicts, escalation decisions, surfacing, and delegation",
       "invocation": "proactive",
       "effort_level": "low",
-      "triggers": ["priority conflict", "which task matters more", "escalation decision", "what to surface first"]
+      "triggers": ["priority conflict", "which task matters more", "escalation decision", "what to surface first"],
+      "examples": [
+        "which of these should I prioritize?",
+        "should I escalate this?",
+        "what matters more right now?"
+      ]
     },
     {
       "name": "commitment-detector",
@@ -48,15 +73,25 @@
       "description": "Automatically detect promises and commitments in conversation and offer to track them",
       "invocation": "proactive",
       "effort_level": "high",
-      "triggers": ["I'll send", "I promised", "by Friday", "I need to", "I committed to"]
+      "triggers": ["I'll send", "I promised", "by Friday", "I need to", "I committed to"],
+      "examples": [
+        "I'll have the proposal to Sarah by Thursday",
+        "I told them I'd follow up next week",
+        "I need to send the contract before Friday"
+      ]
     },
     {
       "name": "pattern-recognizer",
       "path": "pattern-recognizer.md",
-      "description": "Notice trends, recurring themes, and patterns across conversations and surface them when relevant",
+      "description": "Notice trends, recurring themes, and patterns across conversations and surface them when relevant. Activates when the same topic, frustration, or behavior appears across 3+ interactions.",
       "invocation": "proactive",
       "effort_level": "high",
-      "triggers": ["recurring theme detected", "repeated behavior", "trend noticed", "pattern emerging"]
+      "triggers": ["recurring theme detected", "repeated behavior", "trend noticed", "pattern emerging"],
+      "examples": [
+        "I've noticed you keep mentioning being overwhelmed",
+        "this is the third time this has come up",
+        "you tend to delay on these kinds of tasks"
+      ]
     },
     {
       "name": "relationship-tracker",
@@ -64,7 +99,12 @@
       "description": "Surface relevant context when people are mentioned and track relationship health with velocity-based reconnection suggestions",
       "invocation": "proactive",
       "effort_level": "high",
-      "triggers": ["person name mentioned", "who is", "relationship context", "people file lookup"]
+      "triggers": ["person name mentioned", "who is", "relationship context", "people file lookup"],
+      "examples": [
+        "tell me about Sarah Chen",
+        "when did I last talk to Mike?",
+        "who should I reconnect with?"
+      ]
     },
     {
       "name": "risk-surfacer",
@@ -72,23 +112,25 @@
       "description": "Proactively identify and surface potential problems using velocity-based relationship trends and commitment risk detection",
       "invocation": "proactive",
       "effort_level": "high",
-      "triggers": ["overdue commitment", "cooling relationship", "capacity risk", "deadline approaching"]
+      "triggers": ["overdue commitment", "cooling relationship", "capacity risk", "deadline approaching"],
+      "examples": [
+        "am I at risk of missing any deadlines?",
+        "are any relationships going cold?",
+        "what could go wrong this week?"
+      ]
     },
     {
       "name": "capability-suggester",
       "path": "capability-suggester.md",
-      "description": "Notice repeated user behaviors and suggest new commands, workflows, or structure to streamline work",
+      "description": "Notice repeated user behaviors and suggest new commands, workflows, structure, or integrations to streamline work. Also detects when the user's setup has outgrown its current structure and suggests targeted upgrades.",
       "invocation": "proactive",
       "effort_level": "high",
-      "triggers": ["repeated task pattern", "workflow gap", "frequent request", "could be automated"]
-    },
-    {
-      "name": "structure-evolution",
-      "path": "structure-evolution.md",
-      "description": "Periodically analyze workflow and proactively suggest structural improvements to the Claudia setup",
-      "invocation": "proactive",
-      "effort_level": "high",
-      "triggers": ["files created outside structure", "workflow friction", "business growth", "missing capability"]
+      "triggers": ["repeated task pattern", "workflow gap", "frequent request", "could be automated", "files created outside structure", "workflow friction", "business growth"],
+      "examples": [
+        "you keep doing this manually, want me to automate it?",
+        "your setup might need an upgrade",
+        "I noticed a gap in your workflow"
+      ]
     },
     {
       "name": "hire-agent",
@@ -96,55 +138,12 @@
       "description": "Suggests new agents based on repeated task patterns",
       "invocation": "proactive",
       "effort_level": "high",
-      "triggers": ["repeated delegation pattern", "new agent needed", "automation opportunity", "task pattern detected"]
-    },
-    {
-      "name": "morning-brief",
-      "path": "morning-brief/SKILL.md",
-      "description": "Daily digest organized by urgency: overdue commitments, upcoming deadlines, reconnection suggestions, and recent changes",
-      "invocation": "explicit",
-      "effort_level": "low",
-      "triggers": ["morning", "daily brief", "start my day", "what's on today", "what's on my plate"]
-    },
-    {
-      "name": "client-health",
-      "path": "client-health/SKILL.md",
-      "description": "Health check across active client engagements showing status, deliverables, and concerns",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["how are my clients", "client status", "client health check", "engagement review"]
-    },
-    {
-      "name": "financial-snapshot",
-      "path": "financial-snapshot/SKILL.md",
-      "description": "Quick view of revenue, expenses, invoicing, and cash flow with key metrics",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["cash position", "revenue check", "financial overview", "money status"]
-    },
-    {
-      "name": "growth-check",
-      "path": "growth-check/SKILL.md",
-      "description": "Periodic reflection on development, skills, learning, and progress toward goals",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["am I growing", "development check", "personal growth review", "progress on goals"]
-    },
-    {
-      "name": "databases",
-      "path": "databases/SKILL.md",
-      "description": "View all Claudia memory databases, switch between them, manage isolation",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["which database", "switch workspace", "show databases", "list databases"]
-    },
-    {
-      "name": "brain-monitor",
-      "path": "brain-monitor/SKILL.md",
-      "description": "Terminal dashboard for real-time memory stats and activity",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["brain monitor", "show dashboard", "memory dashboard", "terminal brain"]
+      "triggers": ["repeated delegation pattern", "new agent needed", "automation opportunity", "task pattern detected"],
+      "examples": [
+        "I keep delegating this same type of work",
+        "could a new agent handle this?",
+        "this task keeps coming up"
+      ]
     },
     {
       "name": "vault-awareness",
@@ -152,31 +151,158 @@
       "description": "Manage Obsidian vault projection with syncing, bidirectional edits, canvas generation, and vault-to-memory import",
       "invocation": "proactive",
       "effort_level": "low",
-      "triggers": ["mention Obsidian", "ask about vault", "sync to vault", "generate canvas", "browse memories"]
+      "triggers": ["mention Obsidian", "ask about vault", "sync to vault", "generate canvas", "browse memories"],
+      "examples": [
+        "sync my vault",
+        "show me the Obsidian graph",
+        "generate a canvas for this project",
+        "update the vault with recent changes"
+      ]
+    },
+    {
+      "name": "morning-brief",
+      "path": "morning-brief/SKILL.md",
+      "description": "Daily digest organized by urgency: overdue commitments, upcoming deadlines, reconnection suggestions, and recent changes. Activates at the start of the day or when user asks about their agenda.",
+      "invocation": "explicit",
+      "effort_level": "low",
+      "triggers": ["morning", "daily brief", "start my day", "what's on today", "what's on my plate"],
+      "examples": [
+        "what should I focus on today?",
+        "give me my morning brief",
+        "anything urgent this morning?",
+        "what's on fire?",
+        "how does my day look?"
+      ]
+    },
+    {
+      "name": "client-health",
+      "path": "client-health/SKILL.md",
+      "description": "Health check across active client engagements showing status, deliverables, and concerns",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["how are my clients", "client status", "client health check", "engagement review"],
+      "examples": [
+        "how are my clients doing?",
+        "any client issues I should know about?",
+        "show me client health across the board",
+        "which clients need attention?"
+      ]
+    },
+    {
+      "name": "financial-snapshot",
+      "path": "financial-snapshot/SKILL.md",
+      "description": "Quick view of revenue, expenses, invoicing, and cash flow with key metrics",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["cash position", "revenue check", "financial overview", "money status"],
+      "examples": [
+        "what's my cash position?",
+        "how much revenue this month?",
+        "give me a financial overview",
+        "any outstanding invoices?"
+      ]
+    },
+    {
+      "name": "growth-check",
+      "path": "growth-check/SKILL.md",
+      "description": "Periodic reflection on development, skills, learning, and progress toward goals",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["am I growing", "development check", "personal growth review", "progress on goals"],
+      "examples": [
+        "am I making progress on my goals?",
+        "how am I developing professionally?",
+        "what skills have I improved recently?",
+        "give me a growth check"
+      ]
+    },
+    {
+      "name": "databases",
+      "path": "databases/SKILL.md",
+      "description": "View all Claudia memory databases, switch between them, manage isolation",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["which database", "switch workspace", "show databases", "list databases"],
+      "examples": [
+        "which database am I using?",
+        "show me all my databases",
+        "switch to the work database",
+        "list available databases"
+      ]
+    },
+    {
+      "name": "brain-monitor",
+      "path": "brain-monitor/SKILL.md",
+      "description": "Terminal dashboard for real-time memory stats and activity",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["brain monitor", "show dashboard", "memory dashboard", "terminal brain"],
+      "examples": [
+        "show me the brain monitor",
+        "open the memory dashboard",
+        "what's happening in my memory system?",
+        "show brain activity"
+      ]
     },
     {
       "name": "diagnose",
       "path": "diagnose/SKILL.md",
-      "description": "Check Claudia CLI health and troubleshoot connectivity issues",
+      "description": "Check memory system health and troubleshoot connectivity issues. Use when memory commands aren't working, at session start if something seems wrong, or when user asks about memory status.",
       "invocation": "contextual",
       "effort_level": "low",
-      "triggers": ["is my memory working", "diagnose memory", "cli health", "troubleshoot memory"]
+      "triggers": ["is my memory working", "diagnose memory", "cli health", "troubleshoot memory"],
+      "examples": [
+        "is my memory working?",
+        "something seems wrong with the memory system",
+        "diagnose my setup",
+        "why can't you remember things?",
+        "run a health check"
+      ]
+    },
+    {
+      "name": "inbox-check",
+      "path": "inbox-check/SKILL.md",
+      "description": "Lightweight inbox triage across all configured email accounts with two-tier fetch and judgment. Use when user asks about their email.",
+      "invocation": "contextual",
+      "effort_level": "low",
+      "triggers": ["check my inbox", "any new emails", "check email", "inbox"],
+      "examples": [
+        "check my inbox",
+        "any new emails?",
+        "what's in my email?",
+        "anything important in my inbox?",
+        "check email for me"
+      ]
     },
     {
       "name": "meeting-prep",
       "path": "meeting-prep/SKILL.md",
-      "description": "One-page briefing before a call or meeting with person context and open items",
+      "description": "One-page briefing before a call or meeting with person context, open items, and talking points. Use when user is preparing for a meeting or call.",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["prep me for my call", "meeting prep", "brief me before", "get ready for meeting"]
+      "triggers": ["prep me for my call", "meeting prep", "brief me before", "get ready for meeting"],
+      "examples": [
+        "prep me for my call with Sarah",
+        "I have a meeting with Acme Corp in an hour",
+        "brief me before my 2pm",
+        "what should I know before talking to Mike?",
+        "meeting prep for the board call"
+      ]
     },
     {
       "name": "capture-meeting",
       "path": "capture-meeting/SKILL.md",
-      "description": "Process meeting notes or transcript to extract decisions, commitments, and insights",
+      "description": "Process meeting notes or transcript to extract decisions, commitments, insights, and relationship updates. Use when user shares notes from a call or meeting.",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["capture this meeting", "here are my notes", "process meeting notes", "meeting transcript"]
+      "triggers": ["capture this meeting", "here are my notes", "process meeting notes", "meeting transcript"],
+      "examples": [
+        "here are my notes from the call with Sarah",
+        "capture this meeting",
+        "process these meeting notes",
+        "I just had a call, here's what happened",
+        "here's the transcript from today's meeting"
+      ]
     },
     {
       "name": "summarize-doc",
@@ -184,7 +310,14 @@
       "description": "Create an executive summary of any document at the appropriate level of detail",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["summarize this", "main points", "give me the gist", "executive summary"]
+      "triggers": ["summarize this", "main points", "give me the gist", "executive summary"],
+      "examples": [
+        "summarize this document",
+        "what are the main points?",
+        "give me the gist of this",
+        "executive summary please",
+        "tl;dr on this?"
+      ]
     },
     {
       "name": "memory-audit",
@@ -192,7 +325,14 @@
       "description": "Show everything Claudia knows with provenance tracing and entity counts",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["what do you know", "show memories", "memory audit", "what do you remember about"]
+      "triggers": ["what do you know", "show memories", "memory audit", "what do you remember about"],
+      "examples": [
+        "what do you know about me?",
+        "show me everything you remember about Sarah",
+        "memory audit",
+        "what do you know about the Acme project?",
+        "where did you learn that?"
+      ]
     },
     {
       "name": "brain",
@@ -200,7 +340,14 @@
       "description": "Launch the 3D Brain Visualizer showing entities, relationships, and memories as an interactive graph",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["show your brain", "visualize memory", "open the brain", "memory graph"]
+      "triggers": ["show your brain", "visualize memory", "open the brain", "memory graph"],
+      "examples": [
+        "show me your brain",
+        "open the brain visualizer",
+        "visualize my memory network",
+        "show the relationship graph",
+        "I want to see the 3D brain"
+      ]
     },
     {
       "name": "fix-duplicates",
@@ -208,7 +355,13 @@
       "description": "Find and merge duplicate entities in the memory system",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["clean up duplicates", "merge these people", "fix duplicate entities", "dedupe"]
+      "triggers": ["clean up duplicates", "merge these people", "fix duplicate entities", "dedupe"],
+      "examples": [
+        "I think you have duplicates for Sarah",
+        "clean up duplicate entries",
+        "merge these two people",
+        "are there any duplicate entities?"
+      ]
     },
     {
       "name": "memory-health",
@@ -216,7 +369,13 @@
       "description": "Check memory system health and data quality with stats and recommendations",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["how's my memory", "system health", "memory stats", "data quality"]
+      "triggers": ["how's my memory", "system health", "memory stats", "data quality"],
+      "examples": [
+        "how healthy is my memory system?",
+        "show me memory stats",
+        "any data quality issues?",
+        "how many memories do I have?"
+      ]
     },
     {
       "name": "file-document",
@@ -224,23 +383,41 @@
       "description": "Store a document, email, or text for future reference with entity linking and provenance",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["save this email", "file this", "store this document", "save for later"]
+      "triggers": ["save this email", "file this", "store this document", "save for later"],
+      "examples": [
+        "file this email for me",
+        "save this document",
+        "store this for future reference",
+        "keep this on record"
+      ]
     },
     {
       "name": "new-person",
       "path": "new-person/SKILL.md",
-      "description": "Create a relationship tracking file for a person with contact info and history",
+      "description": "Create a relationship tracking file for a person with contact info, history, and communication preferences. Use when user mentions someone important who doesn't have a file yet.",
       "invocation": "contextual",
       "effort_level": "medium",
-      "triggers": ["new person", "create contact", "add person", "track this person"]
+      "triggers": ["new person", "create contact", "add person", "track this person"],
+      "examples": [
+        "add Sarah Chen as a new person",
+        "create a file for Mike from Acme",
+        "I want to track this person",
+        "new contact: James Wright, VP at TechCorp"
+      ]
     },
     {
-      "name": "concierge",
-      "path": "concierge.md",
-      "description": "Context-aware web research that connects findings to memory, relationships, and accumulated knowledge",
+      "name": "new-workspace",
+      "path": "new-workspace/SKILL.md",
+      "description": "Create a workspace skeleton for a new project, client, or venture with populated templates and dashboard. Use when starting a new engagement or project.",
       "invocation": "contextual",
-      "effort_level": "high",
-      "triggers": ["look up", "what's new", "check current", "any updates on", "latest info"]
+      "effort_level": "medium",
+      "triggers": ["new workspace", "new project", "new client setup", "create workspace"],
+      "examples": [
+        "create a workspace for the Acme project",
+        "new client setup for TechCorp",
+        "I'm starting a new project, set up a workspace",
+        "new workspace for my consulting engagement"
+      ]
     },
     {
       "name": "connector-discovery",
@@ -248,23 +425,46 @@
       "description": "Help users connect external tools in a gentle, non-technical way with plain language guidance",
       "invocation": "contextual",
       "effort_level": "high",
-      "triggers": ["can you see my email", "connect to Notion", "integrate with", "set up connection"]
+      "triggers": ["can you see my email", "connect to Notion", "integrate with", "set up connection"],
+      "examples": [
+        "can you see my email?",
+        "how do I connect my calendar?",
+        "I want to integrate with Slack",
+        "can you access my Google Drive?",
+        "set up Notion integration"
+      ]
     },
     {
       "name": "research",
       "path": "research/SKILL.md",
-      "description": "Deep research on a topic with web sources, memory integration, and stored findings",
+      "description": "Deep research on a topic with web sources, memory integration, and stored findings. Also handles quick context-aware lookups when current information would improve the conversation.",
       "invocation": "contextual",
       "effort_level": "high",
-      "triggers": ["research this", "look into", "find out about", "dig into"]
+      "triggers": ["research this", "look into", "find out about", "dig into", "look up", "what's new with", "check current", "any updates on"],
+      "examples": [
+        "research this topic for me",
+        "look into the latest pricing for Vercel",
+        "what's new with React Server Components?",
+        "dig into the competitive landscape",
+        "any updates on that API deprecation?",
+        "check the current status of the bill"
+      ]
     },
     {
       "name": "what-am-i-missing",
       "path": "what-am-i-missing/SKILL.md",
-      "description": "Surface risks, blind spots, and overlooked items across commitments and relationships",
+      "description": "Surface risks, blind spots, overlooked items, and accountability across commitments and relationships",
       "invocation": "contextual",
       "effort_level": "high",
-      "triggers": ["what am I overlooking", "blind spots", "what's falling through the cracks", "any risks"]
+      "triggers": ["what am I overlooking", "blind spots", "what's falling through the cracks", "any risks"],
+      "examples": [
+        "what am I missing?",
+        "any blind spots I should know about?",
+        "what's falling through the cracks?",
+        "am I overdue on anything?",
+        "check my commitments for issues",
+        "what do I owe people?"
+      ]
     },
     {
       "name": "map-connections",
@@ -272,47 +472,85 @@
       "description": "Scan context files to extract entities and relationships into the memory system",
       "invocation": "contextual",
       "effort_level": "high",
-      "triggers": ["who knows who", "network graph", "map my connections", "extract relationships"]
+      "triggers": ["who knows who", "network graph", "map my connections", "extract relationships"],
+      "examples": [
+        "map out my professional network",
+        "who knows who in my contacts?",
+        "extract relationships from my files",
+        "build a connection map"
+      ]
     },
     {
       "name": "weekly-review",
       "path": "weekly-review/SKILL.md",
-      "description": "Guided weekly reflection across all relationships, commitments, and projects",
+      "description": "Guided weekly reflection across all relationships, commitments, and projects with pattern analysis. Use at end of week for structured reflection.",
       "invocation": "contextual",
       "effort_level": "high",
-      "triggers": ["weekly review", "end of week", "reflect on this week", "weekly check-in"]
+      "triggers": ["weekly review", "end of week", "reflect on this week", "weekly check-in"],
+      "examples": [
+        "let's do a weekly review",
+        "how did my week go?",
+        "end of week reflection",
+        "weekly check-in time",
+        "review my week"
+      ]
     },
     {
       "name": "meditate",
       "path": "meditate/SKILL.md",
-      "description": "End-of-session reflection generating persistent learnings and cross-session insights",
+      "description": "End-of-session reflection generating persistent learnings about user preferences, communication patterns, and cross-session insights. Also extracts judgment rules from decisions made during the session.",
       "invocation": "contextual",
       "effort_level": "high",
-      "triggers": ["let's wrap up", "end the session", "session reflection", "time to meditate"]
+      "triggers": ["let's wrap up", "end the session", "session reflection", "time to meditate"],
+      "examples": [
+        "let's wrap up this session",
+        "time to meditate",
+        "end the session and reflect",
+        "what did you learn from this conversation?",
+        "session reflection"
+      ]
     },
     {
       "name": "draft-reply",
       "path": "draft-reply/SKILL.md",
-      "description": "Draft an email response with tone matching the relationship context",
+      "description": "Draft an email response with tone matching the relationship context. Shows draft for approval before sending.",
       "invocation": "explicit",
       "effort_level": "medium",
-      "triggers": ["draft a reply", "respond to this email", "write a response", "reply to this"]
+      "triggers": ["draft a reply", "respond to this email", "write a response", "reply to this"],
+      "examples": [
+        "draft a reply to Sarah's email",
+        "help me respond to this message",
+        "write a response to the client",
+        "reply to this email for me"
+      ]
     },
     {
       "name": "follow-up-draft",
       "path": "follow-up-draft/SKILL.md",
-      "description": "Create a post-meeting thank-you or follow-up email with key points and next steps",
+      "description": "Create a post-meeting thank-you or follow-up email with key points and next steps. Use after a meeting capture when next steps need communicating.",
       "invocation": "explicit",
       "effort_level": "medium",
-      "triggers": ["follow-up email", "thank you note", "post-meeting email", "send a follow-up"]
+      "triggers": ["follow-up email", "thank you note", "post-meeting email", "send a follow-up"],
+      "examples": [
+        "draft a follow-up to my meeting with Sarah",
+        "write a thank you note for the call",
+        "send a post-meeting follow-up",
+        "follow up with the key points from today"
+      ]
     },
     {
       "name": "ingest-sources",
       "path": "ingest-sources/SKILL.md",
-      "description": "Process multiple source documents with Extract-Then-Aggregate discipline",
+      "description": "Process multiple source documents with Extract-Then-Aggregate discipline. Use when user shares multiple transcripts, emails, or documents for batch processing.",
       "invocation": "explicit",
       "effort_level": "max",
-      "triggers": ["process these transcripts", "batch process", "ingest these documents", "multiple sources"]
+      "triggers": ["process these transcripts", "batch process", "ingest these documents", "multiple sources"],
+      "examples": [
+        "process all the transcripts in this folder",
+        "I have 5 meeting notes to ingest",
+        "batch process these interview recordings",
+        "ingest these source documents"
+      ]
     },
     {
       "name": "pipeline-review",
@@ -320,7 +558,14 @@
       "description": "Review active pipeline, opportunities, capacity, and stalled items needing attention",
       "invocation": "contextual",
       "effort_level": "max",
-      "triggers": ["pipeline status", "capacity check", "what's in the pipeline", "deal flow"]
+      "triggers": ["pipeline status", "capacity check", "what's in the pipeline", "deal flow"],
+      "examples": [
+        "show me my pipeline",
+        "what's the status of my deals?",
+        "capacity check, am I overloaded?",
+        "any stalled opportunities?",
+        "pipeline review"
+      ]
     },
     {
       "name": "deep-context",
@@ -328,23 +573,14 @@
       "description": "Full-context deep analysis pulling up to 180 memories for comprehensive synthesis",
       "invocation": "contextual",
       "effort_level": "max",
-      "triggers": ["deep dive", "full context", "everything about", "strategic analysis"]
-    },
-    {
-      "name": "new-workspace",
-      "path": "new-workspace/SKILL.md",
-      "description": "Create a workspace skeleton for a new project, client, or venture with populated templates and dashboard",
-      "invocation": "contextual",
-      "effort_level": "medium",
-      "triggers": ["new workspace", "new project", "new client setup", "create workspace"]
-    },
-    {
-      "name": "inbox-check",
-      "path": "inbox-check/SKILL.md",
-      "description": "Lightweight inbox triage across all configured email accounts with two-tier fetch and judgment",
-      "invocation": "contextual",
-      "effort_level": "low",
-      "triggers": ["check my inbox", "any new emails", "check email", "inbox"]
+      "triggers": ["deep dive", "full context", "everything about", "strategic analysis"],
+      "examples": [
+        "give me the full picture on this",
+        "deep dive into the Acme relationship",
+        "I need a comprehensive analysis",
+        "everything you know about this project",
+        "strategic analysis of my position"
+      ]
     }
   ]
 }

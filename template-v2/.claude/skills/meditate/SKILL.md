@@ -1,6 +1,6 @@
 ---
 name: meditate
-description: End-of-session reflection. Generate persistent learnings about user preferences, communication patterns, and cross-session insights. Captures what Claude learns about working with this user.
+description: End-of-session reflection generating persistent learnings about user preferences, communication patterns, and cross-session insights. Activates when wrapping up a session, or when user says "let's wrap up", "end the session", "time to reflect", or "meditate". Also extracts judgment rules from decisions made during the session.
 effort-level: high
 ---
 

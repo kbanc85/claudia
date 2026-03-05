@@ -1,6 +1,6 @@
 ---
 name: memory-manager
-description: Handle cross-session persistence using MCP tools from the claudia-memory server, with fallback to markdown files.
+description: Handle cross-session persistence using MCP tools from the claudia-memory server, with fallback to markdown files. Activates at session start to load context and briefing, during conversation to buffer turns and store memories, and at session end to save learnings. Use when memory tools respond, fail, or are unavailable.
 user-invocable: false
 invocation: proactive
 effort-level: medium
