@@ -34,6 +34,8 @@ The `claudia` npm binary handles setup and diagnostics (`claudia setup`, `claudi
 | Correct memory | `memory.correct` | memory_id, correction, reason |
 | Invalidate memory | `memory.invalidate` | memory_id, reason |
 | Session briefing | `memory.briefing` | (none) |
+| Multi-query search | `memory.multi_recall` | queries (array of strings or objects), limit, compact |
+| Deep context | `memory.deep_context` | target, entity_limit, recall_limit, max_connections |
 | Manage reflections | `memory.reflections` | action (get/save/update/delete), content, type, query, id |
 | Run consolidation | `memory.consolidate` | lightweight (bool) |
 
@@ -193,6 +195,19 @@ Avoid redundant memory calls within a session:
 - **File-vs-memory rule:** If you just read a person file (`people/[name].md`), do not also call `memory.about` for the same person unless you need memories not in the file (e.g., cross-project context or recent session narratives).
 - **Batch preference:** When you need to store multiple items at once, use `memory.batch` over sequential calls.
 - **Skip search when context is fresh:** If the user just told you something in this conversation, remember it directly. Don't search memory for what was just said.
+- **Compound tools first:** When you need multiple recall queries (e.g., morning brief, meeting prep), prefer `memory.multi_recall` over sequential `memory.recall` calls. For deep entity analysis, prefer `memory.deep_context` over manual multi-step pulls.
+
+### Compound Tools Reference
+
+These tools batch multiple operations into a single call, reducing round trips:
+
+| Tool | Replaces | When to Use |
+|------|----------|-------------|
+| `memory.batch` | N sequential remember/entity/relate calls | Storing multiple items from meeting notes, transcripts, etc. |
+| `memory.multi_recall` | N sequential recall calls | Morning brief follow-ups, research across multiple dimensions |
+| `memory.deep_context` | 6-8 about/recall/episode calls | Meeting prep, relationship deep dives, strategic analysis |
+| `memory.briefing` | Loading all context files at session start | Session start (already standard protocol) |
+| `memory.morning_context` | Multiple temporal/commitment queries | Morning brief data assembly |
 
 ---
 

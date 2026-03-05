@@ -19,7 +19,7 @@ Provide a concise morning brief to start the day with clarity. Surface what matt
    - Active predictions and insights
    - Recent activity (72h)
 
-2. **Call the `memory.recall` MCP tool** for specific follow-up queries as needed
+2. **Call `memory.multi_recall`** for follow-up queries (batches multiple searches in one call), or `memory.recall` for a single specific query
 
 ### Judgment Rules (if available)
 

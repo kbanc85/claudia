@@ -1224,6 +1224,273 @@ async def _handle_ingest(arguments, db, config, logger, **ctx):
     )
 
 
+@_handler("memory.multi_recall")
+async def _handle_multi_recall(arguments, db, config, logger, **ctx):
+    """Execute multiple recall queries in a single call and return deduplicated results.
+
+    This is the compound equivalent of calling memory.recall N times sequentially.
+    Saves N-1 model round trips and deduplicates overlapping results server-side.
+    """
+    _coerce_arg(arguments, "queries")
+    queries = arguments.get("queries", [])
+    if not queries:
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"error": "queries array is required"}))],
+            isError=True,
+        )
+
+    global_limit = arguments.get("limit", 10)
+    compact = arguments.get("compact", False)
+
+    seen_ids = set()
+    all_sections = []
+
+    for q in queries:
+        # Each query can be a string or an object with query/limit/types/about
+        if isinstance(q, str):
+            query_text = q
+            q_limit = global_limit
+            q_types = None
+            q_about = None
+            q_label = q
+        else:
+            query_text = q.get("query", "")
+            q_limit = q.get("limit", global_limit)
+            q_types = q.get("types")
+            q_about = q.get("about")
+            q_label = q.get("label", query_text)
+
+        if not query_text:
+            all_sections.append({"label": q_label, "results": [], "error": "empty query"})
+            continue
+
+        try:
+            results = recall(
+                query=query_text,
+                limit=q_limit,
+                memory_types=q_types,
+                about_entity=q_about,
+            )
+            section_results = []
+            for r in results:
+                if r.id in seen_ids:
+                    continue
+                seen_ids.add(r.id)
+                if compact:
+                    section_results.append({
+                        "id": r.id,
+                        "snippet": r.content[:80],
+                        "type": r.type,
+                        "score": round(r.score, 3),
+                        "entities": (r.entities or [])[:3],
+                    })
+                else:
+                    section_results.append({
+                        "id": r.id,
+                        "content": r.content,
+                        "type": r.type,
+                        "importance": r.importance,
+                        "score": round(r.score, 3),
+                        "entities": r.entities or [],
+                        "created_at": r.created_at,
+                        "source": r.source,
+                        "source_context": r.source_context,
+                    })
+            all_sections.append({"label": q_label, "count": len(section_results), "results": section_results})
+        except Exception as e:
+            logger.warning(f"multi_recall query '{q_label}' failed: {e}")
+            all_sections.append({"label": q_label, "results": [], "error": str(e)})
+
+    response = {
+        "queries": len(queries),
+        "total_unique": len(seen_ids),
+        "sections": all_sections,
+    }
+    text = json.dumps(response)
+    return CallToolResult(
+        content=[TextContent(type="text", text=_guard_response_size(text, "memory.multi_recall"))]
+    )
+
+
+@_handler("memory.deep_context")
+async def _handle_deep_context(arguments, db, config, logger, **ctx):
+    """Server-side deep context assembly. Replaces 6-8 sequential MCP calls with one.
+
+    Executes: entity lookup + semantic recall + connected entity pulls +
+    temporal sweep + episode search. Deduplicates by memory ID across all steps.
+    Returns a structured JSON object ready for synthesis.
+    """
+    target = _require(arguments, "target", "memory.deep_context")
+    entity_limit = arguments.get("entity_limit", 50)
+    recall_limit = arguments.get("recall_limit", 50)
+    connected_limit = arguments.get("connected_limit", 10)
+    max_connections = arguments.get("max_connections", 3)
+    temporal_limit = arguments.get("temporal_limit", 30)
+    episode_limit = arguments.get("episode_limit", 20)
+
+    seen_ids = set()
+    result = {
+        "target": target,
+        "entity": None,
+        "memories": [],
+        "relationships": [],
+        "connected_entities": [],
+        "temporal": [],
+        "episodes": [],
+        "stats": {},
+    }
+
+    def _dedup_results(recall_results):
+        """Filter out already-seen memory IDs and return new ones."""
+        new = []
+        for r in recall_results:
+            if r.id not in seen_ids:
+                seen_ids.add(r.id)
+                new.append({
+                    "id": r.id,
+                    "content": r.content,
+                    "type": r.type,
+                    "importance": r.importance,
+                    "score": round(r.score, 3) if r.score else 0,
+                    "entities": r.entities or [],
+                    "created_at": r.created_at,
+                    "source": r.source,
+                    "source_context": r.source_context,
+                })
+        return new
+
+    # Step 1: Entity core (recall_about)
+    try:
+        about_data = recall_about(target, limit=entity_limit)
+        if about_data.get("entity"):
+            entity_info = about_data["entity"]
+            result["entity"] = {
+                "name": entity_info.get("name"),
+                "type": entity_info.get("type"),
+                "description": entity_info.get("description"),
+                "importance": entity_info.get("importance"),
+                "created_at": entity_info.get("created_at"),
+                "updated_at": entity_info.get("updated_at"),
+            }
+            result["relationships"] = about_data.get("relationships", [])
+            # Process memories from about
+            about_memories = about_data.get("memories", [])
+            for m in about_memories:
+                if hasattr(m, "id") and m.id not in seen_ids:
+                    seen_ids.add(m.id)
+                    result["memories"].append({
+                        "id": m.id,
+                        "content": m.content,
+                        "type": m.type,
+                        "importance": m.importance,
+                        "score": round(m.score, 3) if m.score else 0,
+                        "entities": m.entities or [],
+                        "created_at": m.created_at,
+                        "source": getattr(m, "source", None),
+                        "source_context": getattr(m, "source_context", None),
+                    })
+    except Exception as e:
+        logger.warning(f"deep_context Step 1 (about) failed for '{target}': {e}")
+
+    # Step 2: Broad semantic recall
+    try:
+        broad_results = recall(query=target, limit=recall_limit)
+        new_memories = _dedup_results(broad_results)
+        result["memories"].extend(new_memories)
+    except Exception as e:
+        logger.warning(f"deep_context Step 2 (semantic recall) failed: {e}")
+
+    # Step 3: Connected entities (top N by relationship strength)
+    try:
+        rels = result.get("relationships", [])
+        # Sort by strength descending, take top N
+        sorted_rels = sorted(rels, key=lambda r: r.get("strength", 0) if isinstance(r, dict) else 0, reverse=True)
+        connected_names = []
+        for rel in sorted_rels[:max_connections]:
+            if isinstance(rel, dict):
+                # Get the "other" entity name
+                source_name = rel.get("source_name") or rel.get("source", "")
+                target_name = rel.get("target_name") or rel.get("target", "")
+                from ..extraction.entity_extractor import get_extractor as _get_ext
+                target_canonical = _get_ext().canonical_name(target)
+                other = target_name if _get_ext().canonical_name(source_name) == target_canonical else source_name
+                if other and other not in connected_names:
+                    connected_names.append(other)
+
+        for conn_name in connected_names:
+            try:
+                conn_about = recall_about(conn_name, limit=connected_limit)
+                conn_entry = {
+                    "name": conn_name,
+                    "entity": None,
+                    "memories": [],
+                }
+                if conn_about.get("entity"):
+                    ei = conn_about["entity"]
+                    conn_entry["entity"] = {
+                        "name": ei.get("name"),
+                        "type": ei.get("type"),
+                        "description": ei.get("description"),
+                    }
+                conn_memories = conn_about.get("memories", [])
+                for m in conn_memories:
+                    if hasattr(m, "id") and m.id not in seen_ids:
+                        seen_ids.add(m.id)
+                        conn_entry["memories"].append({
+                            "id": m.id,
+                            "content": m.content,
+                            "type": m.type,
+                            "importance": m.importance,
+                            "created_at": m.created_at,
+                        })
+                result["connected_entities"].append(conn_entry)
+            except Exception as e:
+                logger.warning(f"deep_context connected entity '{conn_name}' failed: {e}")
+    except Exception as e:
+        logger.warning(f"deep_context Step 3 (connections) failed: {e}")
+
+    # Step 4: Temporal sweep (observations, learnings, commitments)
+    try:
+        temporal_results = recall(
+            query=target,
+            limit=temporal_limit,
+            memory_types=["observation", "learning", "commitment"],
+        )
+        result["temporal"] = _dedup_results(temporal_results)
+    except Exception as e:
+        logger.warning(f"deep_context Step 4 (temporal) failed: {e}")
+
+    # Step 5: Episode context
+    try:
+        episodes = recall_episodes(query=f"session with {target}", limit=episode_limit)
+        result["episodes"] = [
+            {
+                "id": ep.get("id"),
+                "narrative": ep.get("narrative", "")[:500],
+                "started_at": ep.get("started_at"),
+                "turn_count": ep.get("turn_count"),
+            }
+            for ep in episodes
+        ]
+    except Exception as e:
+        logger.warning(f"deep_context Step 5 (episodes) failed: {e}")
+
+    # Stats
+    result["stats"] = {
+        "total_unique_memories": len(seen_ids),
+        "entity_found": result["entity"] is not None,
+        "relationships_count": len(result.get("relationships", [])),
+        "connected_entities_pulled": len(result.get("connected_entities", [])),
+        "temporal_items": len(result.get("temporal", [])),
+        "episodes_found": len(result.get("episodes", [])),
+    }
+
+    text = json.dumps(result)
+    return CallToolResult(
+        content=[TextContent(type="text", text=_guard_response_size(text, "memory.deep_context"))]
+    )
+
+
 @_handler("memory.briefing")
 async def _handle_briefing(arguments, db, config, logger, **ctx):
     briefing_text = _build_briefing()
@@ -2110,6 +2377,95 @@ async def list_tools() -> ListToolsResult:
                     },
                 },
                 "required": ["operations"],
+            },
+        ),
+        Tool(
+            name="memory.multi_recall",
+            title="Multi-Query Recall",
+            description=(
+                "Execute multiple recall queries in a single call. Returns deduplicated results "
+                "grouped by query. Use instead of calling memory.recall repeatedly when you need "
+                "to search across several dimensions (e.g., different topics, entity types, or "
+                "time-sensitive items). Saves round trips and deduplicates overlapping results "
+                "server-side. Each query can specify its own limit, types filter, and entity filter."
+            ),
+            annotations=ToolAnnotations(readOnlyHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "queries": {
+                        "type": "array",
+                        "description": (
+                            "Array of queries. Each can be a string (simple query) or an object "
+                            "with {query, limit, types, about, label} for fine-grained control."
+                        ),
+                        "items": {},
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Default limit per query (overridden by per-query limit)",
+                        "default": 10,
+                    },
+                    "compact": {
+                        "type": "boolean",
+                        "description": "Return compact results (id, snippet, type, score, top 3 entities)",
+                        "default": False,
+                    },
+                },
+                "required": ["queries"],
+            },
+        ),
+        Tool(
+            name="memory.deep_context",
+            title="Deep Context Assembly",
+            description=(
+                "Full-context deep analysis in a single call. Executes the complete deep-context "
+                "pipeline server-side: entity lookup, broad semantic recall, connected entity pulls, "
+                "temporal sweep (observations/learnings/commitments), and episode search. "
+                "Deduplicates by memory ID across all steps. Returns structured JSON ready for "
+                "synthesis. Use for meeting prep, relationship deep dives, or strategic analysis. "
+                "Replaces 6-8 sequential memory.about/memory.recall calls with one compound call."
+            ),
+            annotations=ToolAnnotations(readOnlyHint=True),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "type": "string",
+                        "description": "Entity name or topic to deep-dive on",
+                    },
+                    "entity_limit": {
+                        "type": "integer",
+                        "description": "Max memories from entity lookup (Step 1)",
+                        "default": 50,
+                    },
+                    "recall_limit": {
+                        "type": "integer",
+                        "description": "Max memories from broad semantic search (Step 2)",
+                        "default": 50,
+                    },
+                    "connected_limit": {
+                        "type": "integer",
+                        "description": "Max memories per connected entity (Step 3)",
+                        "default": 10,
+                    },
+                    "max_connections": {
+                        "type": "integer",
+                        "description": "How many connected entities to pull (Step 3)",
+                        "default": 3,
+                    },
+                    "temporal_limit": {
+                        "type": "integer",
+                        "description": "Max temporal items (Step 4)",
+                        "default": 30,
+                    },
+                    "episode_limit": {
+                        "type": "integer",
+                        "description": "Max episodes to search (Step 5)",
+                        "default": 20,
+                    },
+                },
+                "required": ["target"],
             },
         ),
         Tool(

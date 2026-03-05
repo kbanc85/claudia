@@ -18,54 +18,42 @@ Comprehensive deep analysis that leverages the full context window. Pulls memori
 
 ## The Deep Pull
 
-Execute these memory queries to build a comprehensive picture:
+Call the `memory.deep_context` MCP tool with the target entity or topic. This compound tool executes the full pipeline server-side in a single call:
 
-### Step 1: Entity Core (limit=50)
+1. **Entity core** (limit=50): Everything known about the target (memories, relationships, metadata)
+2. **Semantic recall** (limit=50): Broad search to catch indirect references and related topics
+3. **Connected entities** (top 3 by strength, limit=10 each): Network context around the target
+4. **Temporal sweep** (limit=30): Observations, learnings, and commitments for time-sensitive items
+5. **Episode context** (limit=20): Session narratives mentioning the target
 
-```
-claudia memory about "[target]" --limit 50 --project-dir "$PWD"
-```
+All results are deduplicated by memory ID across steps. The tool returns structured JSON with sections for each step plus aggregate stats.
 
-Get everything known about the primary entity (JSON output): memories, relationships, metadata, recent sessions.
+### Parameters
 
-### Step 2: Semantic Recall (limit=50)
+All limits are configurable via the tool's input:
 
-```
-claudia memory recall "[target + context]" --limit 50 --project-dir "$PWD"
-```
+| Parameter | Default | Purpose |
+|-----------|---------|---------|
+| `target` | (required) | Entity name or topic |
+| `entity_limit` | 50 | Max memories from entity lookup |
+| `recall_limit` | 50 | Max from broad semantic search |
+| `connected_limit` | 10 | Max per connected entity |
+| `max_connections` | 3 | How many connected entities to pull |
+| `temporal_limit` | 30 | Max temporal items |
+| `episode_limit` | 20 | Max episodes |
 
-Broad semantic search (JSON output) to catch memories that reference the entity indirectly or discuss related topics.
+### Fallback (when memory daemon is unavailable)
 
-### Step 3: Connected Entities (limit=10 each, top 3 connections)
+If the MCP tool is not available, execute these queries manually using `memory.about` and `memory.recall` MCP tools sequentially:
 
-From the relationships returned in Step 1, identify the top 3 connected entities (ranked by: relationship strength, then recency of last interaction, then number of shared memories) and pull context on each:
+1. `memory.about` with the target (limit=50)
+2. `memory.recall` with the target (limit=50)
+3. `memory.about` for each of the top 3 connected entities (limit=10)
+4. `memory.recall` with types=["observation","learning","commitment"] (limit=30)
+5. `memory.recall` for "session with [target]" (limit=20)
+6. Deduplicate by memory ID across all steps
 
-```
-For each of top 3 related entities:
-  claudia memory about "[connected]" --limit 10 --project-dir "$PWD"
-```
-
-This surfaces the network around the target: who they work with, what those people are doing, shared context.
-
-### Step 4: Temporal Sweep (limit=30)
-
-```
-claudia memory recall "[target]" --limit 30 --types "observation,learning,commitment" --project-dir "$PWD"
-```
-
-Pull time-sensitive items: observations that reveal trends, learnings that inform approach, commitments that need tracking.
-
-### Step 5: Episode Context
-
-```
-claudia memory recall "session with [target]" --limit 20 --project-dir "$PWD"
-```
-
-Find session narratives that mention the target to understand the arc of the relationship over time.
-
-### Step 6: Deduplicate
-
-Deduplicate results by memory ID across all steps before synthesis. If a memory appears in multiple steps, keep the instance with richer context (e.g., the one returned with entity relationships rather than a bare recall hit).
+If the memory daemon itself is down, fall back to reading `context/` files and `people/*.md` directly. Note degraded mode in output.
 
 ## Edge Cases
 

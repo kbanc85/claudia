@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.54.0 (2026-03-05)
+
+### The Compound Tools Release
+
+Two new MCP tools that collapse multiple sequential memory calls into single round trips, inspired by the programmatic tool calling pattern.
+
+- **`memory.multi_recall`** — Execute multiple recall queries in one call. Each query can have its own limit, type filter, and entity filter. Results are deduplicated server-side across queries. Replaces sequential `memory.recall` calls when searching across multiple dimensions.
+- **`memory.deep_context`** — Full deep-context pipeline in a single call: entity lookup + broad semantic recall + connected entity pulls (top N by strength) + temporal sweep + episode search. Deduplicates by memory ID across all 5 steps. Returns structured JSON ready for synthesis. Replaces 6-8 sequential `memory.about`/`memory.recall` calls.
+- Updated `deep-context` skill to use the new compound tool as primary method (with sequential fallback)
+- Updated `meeting-prep` skill to use `memory.deep_context` for one-call person context
+- Updated `morning-brief` skill to reference `memory.multi_recall` for follow-up queries
+- Added compound tools reference table to `memory-manager` skill documentation
+
 ## 1.53.4 (2026-03-04)
 
 ### The Skill Sharpening Release

@@ -19,8 +19,14 @@ Or naturally:
 
 ## What to Gather
 
+### Primary: Deep Context (one call)
+
+Call the `memory.deep_context` MCP tool with the person's name. This returns everything in one round trip: entity info, all memories, connected entities, temporal items (commitments, observations), and episode history. Use this data for all sections below.
+
+If deep_context is unavailable, fall back to sequential calls: `memory.about` for the entity, then `memory.recall` for broader context.
+
 ### 1. Person Context
-From `people/[person].md`:
+From `memory.deep_context` result (or `people/[person].md` as fallback):
 - Role and organization
 - Relationship history
 - Last contact and topics
@@ -28,17 +34,13 @@ From `people/[person].md`:
 - What matters to them
 
 ### 2. Open Items
+From the temporal section of deep_context results:
 - Commitments to them
 - Commitments from them
 - Waiting items
 
 ### 3. Recent Context
-
-Query for documents linked to this person:
-```
-claudia memory document search --entity "[person name]" --project-dir "$PWD"
-```
-This returns recent transcripts, emails, and files involving the person (JSON output). Include the most relevant (up to 3) in the briefing with their summaries.
+From the episodes section of deep_context results, plus linked documents.
 
 Also check:
 - Last meeting notes (if any)
