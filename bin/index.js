@@ -775,7 +775,6 @@ async function main() {
     // Configure .mcp.json with correct daemon path
     if (daemonOk) {
       ensureDaemonMcpConfig(targetPath, venvPython);
-      warnMultipleStdioServers(targetPath);
     }
 
     // Run preflight check to verify daemon can actually start
@@ -973,7 +972,6 @@ async function main() {
       { name: 'Personality & Skills', ok: true },
       { name: 'Memory Daemon', ok: memoryInstalled },
       { name: 'MCP Config', ok: mcpCheck.hasDaemon },
-      { name: 'Stdio Servers', ok: mcpCheck.stdioCount <= 1, warn: mcpCheck.stdioCount > 1 ? `${mcpCheck.stdioCount} active (only 1 reliable)` : null },
     ];
 
     console.log(` ${colors.bold}Components:${colors.reset}`);
@@ -1006,8 +1004,8 @@ async function main() {
  * Restore MCP servers that were moved to _disabled_mcpServers by earlier versions.
  * - claudia-memory: v1.51.13+ treated the daemon as legacy (replaced by CLI),
  *   but MCP is the primary memory interface as of v1.51.22.
- * - Gmail/Calendar are NOT restored: Claude Code bug #17962 means multiple stdio
- *   servers silently fail. Users should use Rube (HTTP) instead.
+ * - Gmail/Calendar: v1.53.1 disabled these due to Claude Code bug #17962,
+ *   but multiple stdio servers now work reliably. Restore them.
  */
 function restoreMcpServers(targetPath) {
   const mcpPath = join(targetPath, '.mcp.json');
@@ -1019,8 +1017,8 @@ function restoreMcpServers(targetPath) {
     if (!config._disabled_mcpServers) return;
     if (!config.mcpServers) config.mcpServers = {};
 
-    // Only restore claudia-memory, not gmail/google-calendar (multiple stdio bug #17962)
-    const toRestore = ['claudia-memory', 'claudia_memory'];
+    // Restore all previously disabled servers (memory, gmail, google-calendar)
+    const toRestore = ['claudia-memory', 'claudia_memory', 'gmail', 'google-calendar'];
     let changed = false;
     const restored = [];
 
@@ -1028,10 +1026,26 @@ function restoreMcpServers(targetPath) {
       if (config._disabled_mcpServers[key] && !config.mcpServers[key]) {
         const serverConfig = { ...config._disabled_mcpServers[key] };
         delete serverConfig._replaced_by;
+        delete serverConfig._warning;
         config.mcpServers[key] = serverConfig;
         delete config._disabled_mcpServers[key];
         changed = true;
         restored.push(key);
+      }
+    }
+
+    // Also rename _disabled_ prefixed keys in mcpServers itself
+    for (const key of Object.keys(config.mcpServers)) {
+      if (key.startsWith('_disabled_')) {
+        const realKey = key.replace('_disabled_', '');
+        if (['gmail', 'google-calendar'].includes(realKey) && !config.mcpServers[realKey]) {
+          const serverConfig = { ...config.mcpServers[key] };
+          delete serverConfig._warning;
+          config.mcpServers[realKey] = serverConfig;
+          delete config.mcpServers[key];
+          changed = true;
+          restored.push(realKey);
+        }
       }
     }
 
@@ -1113,29 +1127,6 @@ function checkMcpConfig(targetPath) {
   }
 }
 
-/**
- * Warn if multiple stdio MCP servers are active in .mcp.json.
- * Claude Code bug #17962: only one stdio server connects reliably.
- */
-function warnMultipleStdioServers(targetPath) {
-  const mcpPath = join(targetPath, '.mcp.json');
-  if (!existsSync(mcpPath)) return;
-  try {
-    const config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-    const servers = config.mcpServers || {};
-    const stdioServers = Object.entries(servers)
-      .filter(([key]) => !key.startsWith('_disabled') && !key.startsWith('_'))
-      .filter(([, val]) => !val._disabled && (!val.type || val.type === 'stdio'))
-      .map(([key]) => key);
-
-    if (stdioServers.length > 1) {
-      console.log('');
-      console.log(`  ${colors.boldYellow}⚠ Warning:${colors.reset} ${stdioServers.length} stdio MCP servers detected: ${stdioServers.join(', ')}`);
-      console.log(`  ${colors.dim}Claude Code can only reliably connect to one stdio server at a time (bug #17962).${colors.reset}`);
-      console.log(`  ${colors.dim}claudia-memory should be the only stdio server. Use Rube (HTTP) for Gmail/Calendar.${colors.reset}`);
-    }
-  } catch { /* ignore parse errors */ }
-}
 
 /**
  * Register (or update) the macOS LaunchAgent for the standalone daemon.

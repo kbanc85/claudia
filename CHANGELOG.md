@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.53.2 (2026-03-04)
+
+### Re-enable Gmail and Calendar MCPs
+
+Gmail and Calendar MCP servers were disabled in v1.53.1 as a workaround for Claude Code bug #17962 (multiple stdio servers). Multiple stdio servers now work reliably, so these are re-enabled.
+
+- **Gmail and Calendar enabled by default** -- `.mcp.json.example` ships `gmail` and `google-calendar` as active entries (no `_disabled_` prefix). Both require Google Cloud credentials (see Google Integration Setup in CLAUDE.md).
+- **Restore function re-enables Gmail/Calendar** -- `restoreMcpServers()` now also restores `gmail` and `google-calendar` from `_disabled_mcpServers` on upgrade. Additionally handles `_disabled_`-prefixed keys in `mcpServers` itself.
+- **Diagnose skill updated** -- Removed multiple-stdio warning (Step 1b) and the advice to disable Gmail/Calendar. Step 1b now simply lists active servers without warning about conflicts.
+- **Removed stdio_warning from config notes** -- `.mcp.json.example` no longer warns about multiple stdio servers or suggests disabling Gmail/Calendar.
+
 ## 1.53.1 (2026-03-04)
 
 ### The One-Stdio Fix: Memory Tools Actually Connect

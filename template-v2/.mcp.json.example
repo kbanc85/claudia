@@ -6,17 +6,15 @@
       "_description": "Claudia memory system with vector search",
       "_setup": "Auto-configured by the installer (npx get-claudia). The installer creates a Python venv at ~/.claudia/daemon/venv/ and sets the correct command path in .mcp.json automatically."
     },
-    "_disabled_gmail": {
+    "gmail": {
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-gmail-autoauth-mcp auth",
-      "_warning": "Enabling this adds a second stdio server. Claude Code bug #17962 may cause silent failures with multiple stdio servers. Consider using Rube (HTTP) for Gmail instead."
+      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-gmail-autoauth-mcp auth"
     },
-    "_disabled_google-calendar": {
+    "google-calendar": {
       "command": "npx",
       "args": ["-y", "@gongrzhe/server-calendar-autoauth-mcp"],
-      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth",
-      "_warning": "Enabling this adds a second stdio server. Claude Code bug #17962 may cause silent failures with multiple stdio servers. Consider using Rube (HTTP) for Gmail/Calendar instead."
+      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth"
     },
     "rube": {
       "type": "http",
@@ -30,16 +28,15 @@
   },
 
   "_notes": {
-    "stdio_warning": "Claude Code can only reliably connect to ONE stdio MCP server at a time (bug #17962). claudia-memory is the essential one. For Gmail/Calendar, use Rube (HTTP) instead of enabling individual stdio servers.",
     "memory": "Claudia's memory is powered by the claudia-memory daemon (Python MCP server). It provides ~33 tools for semantic search, pattern detection, and relationship tracking. The installer (npx get-claudia) automatically sets up the daemon in a Python venv at ~/.claudia/daemon/venv/ and configures .mcp.json.",
-    "gmail_and_calendar": "Gmail and Calendar are disabled by default to avoid the multiple-stdio bug. To use them: either enable them individually (rename _disabled_gmail to gmail) knowing only one stdio server is reliable, or connect them through Rube (HTTP, no conflict).",
-    "rube": "Rube (by Composio) connects 500+ apps through one HTTP MCP connection. No stdio conflict. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
+    "gmail_and_calendar": "Gmail and Calendar are enabled by default as stdio MCP servers. Each requires Google Cloud credentials (see Google Integration Setup in CLAUDE.md). Alternatively, connect them through Rube (HTTP) for a simpler setup.",
+    "rube": "Rube (by Composio) connects 500+ apps through one HTTP MCP connection. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
     "security": "Each user authenticates with their own accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",
       "web-search": "Claude Code has native WebSearch",
       "fetch": "Claude Code has native WebFetch"
     },
-    "adding_servers": "Add MCP servers here if needed. Find more at mcp.so or github.com/modelcontextprotocol/servers. Be aware that adding stdio servers alongside claudia-memory may cause connection issues."
+    "adding_servers": "Add MCP servers here if needed. Find more at mcp.so or github.com/modelcontextprotocol/servers."
   }
 }

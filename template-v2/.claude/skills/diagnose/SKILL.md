@@ -36,26 +36,23 @@ If the Python binary in the `command` field doesn't exist:
 ls -la ~/.claudia/daemon/venv/bin/python 2>/dev/null || echo "Daemon venv not found"
 ```
 
-### Step 1b: Check for Multiple Stdio Servers
+### Step 1b: Check Active MCP Servers
 
-Claude Code has a known bug (#17962) where multiple stdio MCP servers silently fail to connect.
-Count the active stdio servers (entries without `_disabled` prefix and without `type: "http"`):
+List all active MCP servers (entries without `_disabled` prefix):
 
 ```bash
 python3 -c "
 import json
 c = json.load(open('.mcp.json'))
 servers = c.get('mcpServers', {})
-stdio = [k for k, v in servers.items()
-         if not k.startswith('_') and v.get('type', 'stdio') == 'stdio']
-print(f'Active stdio servers ({len(stdio)}): {chr(44).join(stdio)}')
-if len(stdio) > 1:
-    print('WARNING: Multiple stdio servers detected. Only one is reliable.')
-    print('Keep claudia-memory, disable others or move them to Rube (HTTP).')
+active = [k for k, v in servers.items() if not k.startswith('_')]
+stdio = [k for k in active if servers[k].get('type', 'stdio') == 'stdio']
+http = [k for k in active if servers[k].get('type') == 'http']
+print(f'Active servers ({len(active)}): {chr(44).join(active)}')
+print(f'  stdio: {chr(44).join(stdio) or \"none\"}')
+print(f'  http: {chr(44).join(http) or \"none\"}')
 "
 ```
-
-If multiple stdio servers are detected, this is very likely the cause of missing tools. Fix by disabling extras (see Common Issues below).
 
 ### Step 2: Run Preflight Check
 
@@ -129,7 +126,7 @@ Format the diagnosis as:
 | Component | Status | Details |
 |-----------|--------|---------|
 | .mcp.json config | ✅/❌ | [daemon entry present/missing] |
-| Stdio server count | ✅/⚠️ | [1 = good / >1 = likely cause of issues] |
+| Active MCP servers | ✅/⚠️ | [list of active servers] |
 | Daemon Python binary | ✅/❌ | [path exists/missing] |
 | Preflight | ✅/❌ | [all passed / N failures] |
 | Session manifest | ✅/❌ | [running/died/never started] |
@@ -159,21 +156,11 @@ If preflight shows fixable issues, try auto-repair:
 ~/.claudia/daemon/venv/bin/python -m claudia_memory --repair --project-dir "$PWD"
 ```
 
-### Issue: Multiple stdio MCP servers (most common cause of missing tools)
-
-**Cause:** Claude Code bug #17962 means only one stdio server connects reliably. If `.mcp.json` has `claudia-memory`, `gmail`, and `google-calendar` all active as stdio servers, the daemon's tools silently vanish.
-
-**Fix:** Disable all stdio servers except `claudia-memory`. Prefix their keys with `_disabled_`:
-- `"gmail"` → `"_disabled_gmail"`
-- `"google-calendar"` → `"_disabled_google-calendar"`
-
-For Gmail/Calendar, use Rube (HTTP transport at `https://mcp.composio.dev`) instead of individual stdio servers. See the Rube section in CLAUDE.md.
-
 ### Issue: Tools not in palette but no error
 
-**Cause:** Daemon started but exited before Claude Code could handshake, Claude Code closed stdin too early, or multiple stdio servers are conflicting (check Step 1b above).
+**Cause:** Daemon started but exited before Claude Code could handshake, or Claude Code closed stdin too early.
 
-**Fix:** First check for multiple stdio servers (Step 1b). If that's not the issue, check the session manifest:
+**Fix:** Check the session manifest:
 ```bash
 cat ~/.claudia/daemon-session.json
 ```
