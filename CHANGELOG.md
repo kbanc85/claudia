@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.53.3 (2026-03-04)
+
+### Fix: Actually restore disabled MCP servers on upgrade
+
+v1.53.2 added restore logic for `_disabled_`-prefixed keys in `mcpServers`, but an early return (`if (!config._disabled_mcpServers) return`) prevented it from running. The function now handles both migration paths independently: the `_disabled_mcpServers` stash (Path 1) and `_disabled_*` prefixed keys directly in `mcpServers` (Path 2). Path 2 is now generic and renames any `_disabled_*` key, not just gmail/google-calendar.
+
 ## 1.53.2 (2026-03-04)
 
 ### Re-enable Gmail and Calendar MCPs

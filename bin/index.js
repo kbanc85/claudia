@@ -1014,31 +1014,38 @@ function restoreMcpServers(targetPath) {
   try {
     const raw = readFileSync(mcpPath, 'utf-8');
     const config = JSON.parse(raw);
-    if (!config._disabled_mcpServers) return;
     if (!config.mcpServers) config.mcpServers = {};
 
-    // Restore all previously disabled servers (memory, gmail, google-calendar)
-    const toRestore = ['claudia-memory', 'claudia_memory', 'gmail', 'google-calendar'];
     let changed = false;
     const restored = [];
 
-    for (const key of toRestore) {
-      if (config._disabled_mcpServers[key] && !config.mcpServers[key]) {
-        const serverConfig = { ...config._disabled_mcpServers[key] };
-        delete serverConfig._replaced_by;
-        delete serverConfig._warning;
-        config.mcpServers[key] = serverConfig;
-        delete config._disabled_mcpServers[key];
-        changed = true;
-        restored.push(key);
+    // Path 1: Restore from _disabled_mcpServers stash (older migration format)
+    if (config._disabled_mcpServers) {
+      const toRestore = ['claudia-memory', 'claudia_memory', 'gmail', 'google-calendar'];
+      for (const key of toRestore) {
+        if (config._disabled_mcpServers[key] && !config.mcpServers[key]) {
+          const serverConfig = { ...config._disabled_mcpServers[key] };
+          delete serverConfig._replaced_by;
+          delete serverConfig._warning;
+          config.mcpServers[key] = serverConfig;
+          delete config._disabled_mcpServers[key];
+          changed = true;
+          restored.push(key);
+        }
+      }
+
+      // Clean up _disabled_mcpServers if it's now empty
+      if (Object.keys(config._disabled_mcpServers).length === 0) {
+        delete config._disabled_mcpServers;
       }
     }
 
-    // Also rename _disabled_ prefixed keys in mcpServers itself
+    // Path 2: Rename _disabled_ prefixed keys in mcpServers itself
+    // This handles the case where keys like "_disabled_gmail" exist directly in mcpServers
     for (const key of Object.keys(config.mcpServers)) {
       if (key.startsWith('_disabled_')) {
         const realKey = key.replace('_disabled_', '');
-        if (['gmail', 'google-calendar'].includes(realKey) && !config.mcpServers[realKey]) {
+        if (!config.mcpServers[realKey]) {
           const serverConfig = { ...config.mcpServers[key] };
           delete serverConfig._warning;
           config.mcpServers[realKey] = serverConfig;
@@ -1049,14 +1056,9 @@ function restoreMcpServers(targetPath) {
       }
     }
 
-    // Clean up _disabled_mcpServers if it's now empty
-    if (config._disabled_mcpServers && Object.keys(config._disabled_mcpServers).length === 0) {
-      delete config._disabled_mcpServers;
-    }
-
     if (changed) {
       writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-      console.log(` ${colors.green}✓${colors.reset} Restored MCP servers: ${restored.join(', ')} (moved back from _disabled_mcpServers)`);
+      console.log(` ${colors.green}✓${colors.reset} Restored MCP servers: ${restored.join(', ')}`);
     }
   } catch {
     // Not valid JSON or can't read -- skip silently
