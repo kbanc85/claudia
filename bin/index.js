@@ -149,6 +149,7 @@ class ProgressRenderer {
       case 'error':   return `${colors.red}!${colors.reset}`;
       case 'active':  return `${colors.cyan}${this.spinnerChars[this.spinnerFrame]}${colors.reset}`;
       case 'skipped': return `${colors.dim}○${colors.reset}`;
+      case 'cascade': return `${colors.dim}·${colors.reset}`;
       default:        return `${colors.dim}░${colors.reset}`;
     }
   }
@@ -156,7 +157,7 @@ class ProgressRenderer {
   getCompletedCount() {
     return STEPS.filter(s => {
       const st = this.states[s.id].state;
-      return st === 'done' || st === 'warn' || st === 'skipped';
+      return st === 'done' || st === 'warn' || st === 'skipped' || st === 'cascade';
     }).length;
   }
 
@@ -175,7 +176,7 @@ class ProgressRenderer {
     for (const step of STEPS) {
       const { state, detail } = this.states[step.id];
       const icon = this.getIcon(state);
-      const label = state === 'skipped'
+      const label = (state === 'skipped' || state === 'cascade')
         ? `${colors.dim}${step.label}${colors.reset}`
         : step.label;
       const detailStr = detail
@@ -183,7 +184,7 @@ class ProgressRenderer {
         : '';
       // Pad label to 20 chars for alignment
       const paddedLabel = step.label.padEnd(20);
-      lines.push(` ${icon} ${state === 'skipped' ? colors.dim + paddedLabel + colors.reset : paddedLabel}${detailStr}`);
+      lines.push(` ${icon} ${(state === 'skipped' || state === 'cascade') ? colors.dim + paddedLabel + colors.reset : paddedLabel}${detailStr}`);
     }
 
     lines.push('');
@@ -209,10 +210,11 @@ class ProgressRenderer {
     if (supportsInPlace) return; // handled by render()
     const step = STEPS.find(s => s.id === stepId);
     if (!step) return;
-    if (state === 'done' || state === 'warn' || state === 'error' || state === 'skipped') {
+    if (state === 'done' || state === 'warn' || state === 'error' || state === 'skipped' || state === 'cascade') {
       const icon = state === 'done' ? '✓' :
                    state === 'warn' ? '○' :
-                   state === 'error' ? '!' : '-';
+                   state === 'error' ? '!' :
+                   state === 'cascade' ? '·' : '-';
       console.log(` ${icon} ${step.label}${detail ? '  ' + detail : ''}`);
     }
   }
@@ -275,6 +277,77 @@ async function installOllama() {
     proc.on('close', (code) => resolve(code === 0));
     proc.on('error', () => resolve(false));
   });
+}
+
+// ─── Python helpers ─────────────────────────────────────────────────────
+
+/** Check if Python 3.10+ is available. Returns the command name or null. */
+async function isPythonInstalled() {
+  for (const cmd of ['python3', 'python']) {
+    const ver = await new Promise((resolve) => {
+      const proc = spawn(cmd, ['--version'], { stdio: 'pipe', timeout: 5000 });
+      let stdout = '';
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.on('close', () => resolve(stdout.trim()));
+      proc.on('error', () => resolve(''));
+    });
+    const match = ver.match(/Python (\d+)\.(\d+)/);
+    if (match && (parseInt(match[1]) > 3 || (parseInt(match[1]) === 3 && parseInt(match[2]) >= 10))) {
+      return cmd;
+    }
+  }
+  return null;
+}
+
+/**
+ * Install Python automatically.
+ * macOS: uses brew if available
+ * Linux: tries apt, dnf, pacman
+ * Windows: skip (requires manual install from python.org)
+ */
+async function installPython() {
+  if (isWindows) return false;
+
+  if (process.platform === 'darwin') {
+    const hasBrew = await new Promise((resolve) => {
+      const proc = spawn('which', ['brew'], { stdio: 'pipe', timeout: 5000 });
+      proc.on('close', (code) => resolve(code === 0));
+      proc.on('error', () => resolve(false));
+    });
+    if (hasBrew) {
+      return new Promise((resolve) => {
+        const proc = spawn('brew', ['install', 'python@3.12'], {
+          stdio: 'pipe', timeout: 300000
+        });
+        proc.on('close', (code) => resolve(code === 0));
+        proc.on('error', () => resolve(false));
+      });
+    }
+    return false;
+  }
+
+  // Linux: try apt, dnf, pacman
+  for (const [pm, args] of [
+    ['apt-get', ['install', '-y', 'python3', 'python3-venv']],
+    ['dnf', ['install', '-y', 'python3']],
+    ['pacman', ['-S', '--noconfirm', 'python']],
+  ]) {
+    const hasPm = await new Promise((resolve) => {
+      const proc = spawn('which', [pm], { stdio: 'pipe', timeout: 5000 });
+      proc.on('close', (code) => resolve(code === 0));
+      proc.on('error', () => resolve(false));
+    });
+    if (hasPm) {
+      return new Promise((resolve) => {
+        const proc = spawn('sudo', [pm, ...args], {
+          stdio: 'pipe', timeout: 300000
+        });
+        proc.on('close', (code) => resolve(code === 0));
+        proc.on('error', () => resolve(false));
+      });
+    }
+  }
+  return false;
 }
 
 /**
@@ -548,6 +621,7 @@ async function main() {
 
   // Run CLI-based setup (no Python daemon needed)
   let memoryOk = false;
+  let rootCause = null;
 
   try {
     // Step 1: Environment -- check Node.js version, detect/install/start Ollama
@@ -689,30 +763,19 @@ async function main() {
       ? join(daemonVenvDir, 'Scripts', 'pip')
       : join(daemonVenvDir, 'bin', 'pip');
 
-    // Phase 1: Find Python 3.10+
-    let pythonCmd = null;
-    for (const cmd of ['python3', 'python']) {
-      const ver = await new Promise((resolve) => {
-        const proc = spawn(cmd, ['--version'], { stdio: 'pipe' });
-        let stdout = '';
-        proc.stdout.on('data', (d) => { stdout += d.toString(); });
-        proc.on('close', () => resolve(stdout.trim()));
-        proc.on('error', () => resolve(''));
-      });
-      const match = ver.match(/Python (\d+)\.(\d+)/);
-      if (match) {
-        const major = parseInt(match[1], 10);
-        const minor = parseInt(match[2], 10);
-        if (major > 3 || (major === 3 && minor >= 10)) {
-          pythonCmd = cmd;
-          break;
-        }
-      }
+    // Phase 1: Find Python 3.10+ (auto-install if missing)
+    let pythonCmd = await isPythonInstalled();
+
+    if (!pythonCmd) {
+      renderer.update('daemon', 'active', 'installing Python...');
+      const installed = await installPython();
+      if (installed) pythonCmd = await isPythonInstalled();
     }
 
     if (!pythonCmd) {
       renderer.update('daemon', 'warn', 'Python 3.10+ not found');
       if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'Python 3.10+ not found');
+      rootCause = { step: 'daemon', issue: 'python' };
     } else {
       // Phase 2: Create venv if it doesn't exist
       if (!existsSync(venvPython)) {
@@ -726,6 +789,7 @@ async function main() {
         if (!venvCreated) {
           renderer.update('daemon', 'warn', 'venv creation failed');
           if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'venv creation failed');
+          rootCause = rootCause || { step: 'daemon', issue: 'venv' };
         }
       }
 
@@ -746,6 +810,7 @@ async function main() {
         } else {
           renderer.update('daemon', 'warn', 'pip install failed');
           if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'pip install failed');
+          rootCause = rootCause || { step: 'daemon', issue: 'pip' };
         }
       }
 
@@ -763,6 +828,7 @@ async function main() {
           daemonOk = false;
           renderer.update('daemon', 'warn', 'daemon import failed');
           if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'import failed');
+          rootCause = rootCause || { step: 'daemon', issue: 'import' };
         }
       }
 
@@ -820,59 +886,71 @@ async function main() {
     }
 
     // MCP Config step: verify .mcp.json is correct and check stdio server count
-    renderer.update('mcp', 'active', 'checking .mcp.json...');
-    const mcpCheckResult = checkMcpConfig(targetPath);
-    if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount <= 1) {
-      renderer.update('mcp', 'done', `claudia-memory configured${mcpCheckResult.stdioCount === 1 ? '' : ' (no stdio servers?)'}`);
-      if (!supportsInPlace) renderer.appendLine('mcp', 'done', 'claudia-memory configured');
-    } else if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount > 1) {
-      renderer.update('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers (only 1 reliable)`);
-      if (!supportsInPlace) renderer.appendLine('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers`);
+    if (rootCause?.step === 'daemon') {
+      const cascadeMsg = rootCause.issue === 'python' ? 'needs Python first' : 'needs daemon first';
+      renderer.update('mcp', 'cascade', cascadeMsg);
+      if (!supportsInPlace) renderer.appendLine('mcp', 'cascade', cascadeMsg);
     } else {
-      renderer.update('mcp', 'warn', 'claudia-memory not in .mcp.json');
-      if (!supportsInPlace) renderer.appendLine('mcp', 'warn', 'daemon not configured');
+      renderer.update('mcp', 'active', 'checking .mcp.json...');
+      const mcpCheckResult = checkMcpConfig(targetPath);
+      if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount <= 1) {
+        renderer.update('mcp', 'done', `claudia-memory configured${mcpCheckResult.stdioCount === 1 ? '' : ' (no stdio servers?)'}`);
+        if (!supportsInPlace) renderer.appendLine('mcp', 'done', 'claudia-memory configured');
+      } else if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount > 1) {
+        renderer.update('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers (only 1 reliable)`);
+        if (!supportsInPlace) renderer.appendLine('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers`);
+      } else {
+        renderer.update('mcp', 'warn', 'claudia-memory not in .mcp.json');
+        if (!supportsInPlace) renderer.appendLine('mcp', 'warn', 'daemon not configured');
+      }
     }
 
     // Vault step: handled below
 
     // Health Check: check daemon health endpoint or verify daemon can import
-    renderer.update('health', 'active', 'verifying...');
-    let healthOk = false;
-
-    // Try the standalone daemon's health endpoint first (port 3848)
-    try {
-      const healthResp = await fetch('http://localhost:3848/status', {
-        signal: AbortSignal.timeout(3000),
-      });
-      if (healthResp.ok) {
-        const healthData = await healthResp.json();
-        healthOk = healthData.status === 'healthy' || healthData.status === 'degraded';
-      }
-    } catch {
-      // Standalone daemon not running -- that's OK, check daemon importability instead
-    }
-
-    // Fallback: verify the daemon can at least be imported
-    if (!healthOk && daemonOk && existsSync(venvPython)) {
-      healthOk = await new Promise((resolve) => {
-        const proc = spawn(venvPython, ['-c', 'from claudia_memory.database import Database; print("ok")'], {
-          stdio: 'pipe',
-          timeout: 10000
-        });
-        proc.on('close', (code) => resolve(code === 0));
-        proc.on('error', () => resolve(false));
-      });
-    }
-
-    if (healthOk) {
-      renderer.update('health', 'done', 'system healthy');
-      if (!supportsInPlace) renderer.appendLine('health', 'done', 'system healthy');
-    } else if (daemonOk) {
-      renderer.update('health', 'warn', 'daemon installed, standalone not running');
-      if (!supportsInPlace) renderer.appendLine('health', 'warn', 'standalone not running');
+    if (rootCause?.step === 'daemon') {
+      const cascadeMsg = rootCause.issue === 'python' ? 'needs Python first' : 'needs daemon first';
+      renderer.update('health', 'cascade', cascadeMsg);
+      if (!supportsInPlace) renderer.appendLine('health', 'cascade', cascadeMsg);
     } else {
-      renderer.update('health', 'warn', 'check CLAUDE.md for troubleshooting');
-      if (!supportsInPlace) renderer.appendLine('health', 'warn', 'check manually');
+      renderer.update('health', 'active', 'verifying...');
+      let healthOk = false;
+
+      // Try the standalone daemon's health endpoint first (port 3848)
+      try {
+        const healthResp = await fetch('http://localhost:3848/status', {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (healthResp.ok) {
+          const healthData = await healthResp.json();
+          healthOk = healthData.status === 'healthy' || healthData.status === 'degraded';
+        }
+      } catch {
+        // Standalone daemon not running -- that's OK, check daemon importability instead
+      }
+
+      // Fallback: verify the daemon can at least be imported
+      if (!healthOk && daemonOk && existsSync(venvPython)) {
+        healthOk = await new Promise((resolve) => {
+          const proc = spawn(venvPython, ['-c', 'from claudia_memory.database import Database; print("ok")'], {
+            stdio: 'pipe',
+            timeout: 10000
+          });
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        });
+      }
+
+      if (healthOk) {
+        renderer.update('health', 'done', 'system healthy');
+        if (!supportsInPlace) renderer.appendLine('health', 'done', 'system healthy');
+      } else if (daemonOk) {
+        renderer.update('health', 'warn', 'daemon installed, standalone not running');
+        if (!supportsInPlace) renderer.appendLine('health', 'warn', 'standalone not running');
+      } else {
+        renderer.update('health', 'warn', 'check CLAUDE.md for troubleshooting');
+        if (!supportsInPlace) renderer.appendLine('health', 'warn', 'check manually');
+      }
     }
 
     memoryOk = daemonOk || hasExistingDb;
@@ -891,7 +969,7 @@ async function main() {
   // Vault step, then completion
   runVaultStep(renderer, () => {
     renderer.render();
-    showCompletion(targetDir, isCurrentDir, memoryOk);
+    showCompletion(targetDir, isCurrentDir, memoryOk, rootCause);
   });
 
   // ── Vault step ──
@@ -951,8 +1029,8 @@ async function main() {
       renderer.update('vault', 'done', 'configured');
       if (!supportsInPlace) renderer.appendLine('vault', 'done', 'configured');
     } else {
-      renderer.update('vault', 'warn', 'Obsidian not found (optional)');
-      if (!supportsInPlace) renderer.appendLine('vault', 'warn', 'Obsidian not found (optional)');
+      renderer.update('vault', 'skipped', 'Obsidian not installed (optional)');
+      if (!supportsInPlace) renderer.appendLine('vault', 'skipped', 'Obsidian not installed (optional)');
     }
 
     callback(obsidianDetected);
@@ -960,41 +1038,66 @@ async function main() {
 
   // ── Completion block ──
 
-  function showCompletion(targetDir, isCurrentDir, memoryInstalled) {
-    const cdCmd = isCurrentDir ? '' : `cd ${targetDir} && `;
+  function showCompletion(targetDir, isCurrentDir, memoryInstalled, failureCause) {
+    const rerunCmd = isCurrentDir ? 'npx get-claudia .' : `cd ${targetDir} && npx get-claudia .`;
+    const launchCmd = isCurrentDir ? 'claude' : `cd ${targetDir} && claude`;
 
     console.log('');
     console.log(`${colors.dim}${'━'.repeat(46)}${colors.reset}`);
 
-    // Post-install component summary
-    const mcpCheck = checkMcpConfig(targetPath);
-    const components = [
-      { name: 'Personality & Skills', ok: true },
-      { name: 'Memory Daemon', ok: memoryInstalled },
-      { name: 'MCP Config', ok: mcpCheck.hasDaemon },
-    ];
+    if (memoryInstalled && !failureCause) {
+      // Everything worked
+      console.log('');
+      console.log(` ${colors.green}Ready to go!${colors.reset}`);
+      console.log('');
+      console.log(` ${colors.bold}Next:${colors.reset} Open Claude Code:`);
+      console.log(`   ${colors.cyan}${launchCmd}${colors.reset}`);
+      console.log('');
+      return;
+    }
 
-    console.log(` ${colors.bold}Components:${colors.reset}`);
-    for (const c of components) {
-      if (c.ok && !c.warn) {
-        console.log(`   ${colors.green}✓${colors.reset} ${c.name}`);
-      } else if (c.warn) {
-        console.log(`   ${colors.yellow}⚠${colors.reset} ${c.name} ${colors.dim}${c.warn}${colors.reset}`);
+    // Something needs fixing
+    console.log('');
+    console.log(` ${colors.boldYellow}Almost there!${colors.reset} One thing to fix:`);
+    console.log('');
+
+    if (failureCause?.issue === 'python') {
+      console.log(` ${colors.bold}→ Install Python 3.10+:${colors.reset}`);
+      if (process.platform === 'darwin') {
+        const hasBrew = existsSync('/opt/homebrew/bin/brew') || existsSync('/usr/local/bin/brew');
+        if (hasBrew) {
+          console.log(`   ${colors.cyan}brew install python@3.12${colors.reset}`);
+        } else {
+          console.log(`   ${colors.dim}Install Homebrew first:${colors.reset}`);
+          console.log(`   ${colors.cyan}/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"${colors.reset}`);
+          console.log('');
+          console.log(`   ${colors.dim}Then:${colors.reset}`);
+          console.log(`   ${colors.cyan}brew install python@3.12${colors.reset}`);
+        }
+      } else if (isWindows) {
+        console.log(`   ${colors.cyan}https://www.python.org/downloads/${colors.reset}`);
       } else {
-        console.log(`   ${colors.yellow}○${colors.reset} ${c.name} ${colors.dim}(not ready)${colors.reset}`);
+        console.log(`   ${colors.cyan}sudo apt install python3 python3-venv${colors.reset}  ${colors.dim}(Debian/Ubuntu)${colors.reset}`);
+        console.log(`   ${colors.cyan}sudo dnf install python3${colors.reset}              ${colors.dim}(Fedora/RHEL)${colors.reset}`);
       }
+    } else if (failureCause?.issue === 'venv') {
+      console.log(` ${colors.bold}→ Python venv creation failed.${colors.reset}`);
+      console.log(`   ${colors.dim}Try: python3 -m ensurepip && python3 -m venv ~/.claudia/daemon/venv${colors.reset}`);
+    } else if (failureCause?.issue === 'pip') {
+      console.log(` ${colors.bold}→ Daemon package install failed.${colors.reset}`);
+      console.log(`   ${colors.dim}Check your internet connection and try again.${colors.reset}`);
+    } else if (failureCause?.issue === 'import') {
+      console.log(` ${colors.bold}→ Daemon installed but won't load.${colors.reset}`);
+      console.log(`   ${colors.dim}Try: rm -rf ~/.claudia/daemon/venv && re-run setup.${colors.reset}`);
+    } else {
+      console.log(` ${colors.bold}→ Memory daemon not ready.${colors.reset}`);
     }
 
     console.log('');
-    console.log(` ${colors.bold}Next:${colors.reset} Open Claude Code:`);
-    console.log(`   ${colors.cyan}${cdCmd}claude${colors.reset}`);
-
-    if (!memoryInstalled) {
-      console.log('');
-      console.log(` ${colors.dim}Memory requires Python 3.10+, the claudia-memory daemon, and Ollama.${colors.reset}`);
-      console.log(` ${colors.dim}Re-run setup after installing Python and Ollama.${colors.reset}`);
-    }
-
+    console.log(` ${colors.bold}Then finish setup:${colors.reset}`);
+    console.log(`   ${colors.cyan}${rerunCmd}${colors.reset}`);
+    console.log('');
+    console.log(` ${colors.dim}Stuck? Copy this message into any AI chat and ask for help.${colors.reset}`);
     console.log('');
   }
 }
