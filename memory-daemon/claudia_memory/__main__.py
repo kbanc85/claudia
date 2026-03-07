@@ -790,6 +790,12 @@ def main():
              "Writes results to ~/.claudia/daemon-preflight.json and exits.",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="With --preflight: print the result as JSON to stdout in addition to "
+             "the human-readable summary. The installer uses this for structured parsing.",
+    )
+    parser.add_argument(
         "--repair",
         action="store_true",
         help="Auto-fix common issues found by preflight (missing tables, stale WAL, etc.)",
@@ -818,6 +824,12 @@ def main():
 
     if args.preflight:
         preflight = run_preflight(project_id=project_id, debug=args.debug)
+        if args.json:
+            import json as _json
+            # Sentinel lets the installer find where JSON begins even if
+            # there are stray print() calls earlier in startup.
+            print("PREFLIGHT_JSON_BEGIN")
+            print(_json.dumps(preflight))
         sys.exit(0 if preflight["ok"] else 1)
 
     if args.repair:

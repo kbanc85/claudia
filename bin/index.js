@@ -843,25 +843,33 @@ async function main() {
       ensureDaemonMcpConfig(targetPath, venvPython);
     }
 
-    // Run preflight check to verify daemon can actually start
+    // Run preflight check to verify daemon can actually start.
+    // Pass --json so the daemon emits a machine-readable result after a sentinel
+    // line (PREFLIGHT_JSON_BEGIN), giving structured failures instead of grepping text.
     if (daemonOk && existsSync(venvPython)) {
       renderer.update('daemon', 'active', 'running preflight...');
       const preflightOk = await new Promise((resolve) => {
         const proc = spawn(venvPython, [
-          '-m', 'claudia_memory', '--preflight', '--project-dir', targetPath
+          '-m', 'claudia_memory', '--preflight', '--json', '--project-dir', targetPath
         ], { stdio: 'pipe', timeout: 30000 });
         let stdout = '';
-        let stderr = '';
         proc.stdout.on('data', (d) => { stdout += d.toString(); });
-        proc.stderr.on('data', (d) => { stderr += d.toString(); });
         proc.on('close', (code) => {
-          if (code === 0) {
-            resolve({ ok: true });
-          } else {
-            // Extract failure details from stdout
-            const lines = stdout.split('\n').filter(l => l.includes('[FAIL]'));
-            resolve({ ok: false, failures: lines.map(l => l.trim()) });
+          // Try structured JSON output first
+          const sentinelIdx = stdout.indexOf('PREFLIGHT_JSON_BEGIN\n');
+          if (sentinelIdx !== -1) {
+            try {
+              const jsonStr = stdout.slice(sentinelIdx + 'PREFLIGHT_JSON_BEGIN\n'.length).trim();
+              const result = JSON.parse(jsonStr);
+              const failures = (result.checks || [])
+                .filter(c => !c.ok && c.critical)
+                .map(c => `[FAIL] ${c.name}: ${c.detail}${c.fix ? ` — Fix: ${c.fix}` : ''}`);
+              return resolve({ ok: result.ok === true, failures });
+            } catch { /* fall through */ }
           }
+          // Fallback: scan human-readable output for [FAIL] lines
+          const lines = stdout.split('\n').filter(l => l.includes('[FAIL]'));
+          resolve({ ok: code === 0, failures: lines.map(l => l.trim()) });
         });
         proc.on('error', () => resolve({ ok: false, failures: ['preflight process failed to start'] }));
       });
