@@ -497,8 +497,9 @@ async function main() {
   // Determine target directory and flags
   const args = process.argv.slice(2);
 
-  const skipMemory = args.includes('--no-memory');
-  const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--yes' && a !== '-y');
+  // --skip-memory is the documented flag; --no-memory kept for backward compatibility.
+  const skipMemory = args.includes('--no-memory') || args.includes('--skip-memory');
+  const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--skip-memory' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
 
   // Support "." or "upgrade" for current directory
