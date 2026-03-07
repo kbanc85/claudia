@@ -1178,6 +1178,7 @@ function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
   if (!existsSync(venvPythonPath)) return;
 
   const mcpPath = join(targetPath, '.mcp.json');
+  const mcpTmp = mcpPath + '.tmp';
 
   const daemonConfig = {
     command: venvPythonPath,
@@ -1190,10 +1191,17 @@ function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
     try {
       config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
     } catch {
-      return; // Malformed JSON -- don't touch
+      // Malformed JSON: back it up so the user can recover their edits,
+      // then start fresh so the daemon gets configured rather than silently skipping.
+      const backupPath = mcpPath + '.bak';
+      try { renameSync(mcpPath, backupPath); } catch { /* ignore */ }
+      console.warn(`\n  .mcp.json was malformed — backed up to .mcp.json.bak and recreated.`);
+      config = null;
     }
-  } else {
-    // Fresh install: create minimal .mcp.json
+  }
+
+  if (!config) {
+    // Fresh install or recovered from corrupt file
     config = {
       mcpServers: {},
       _notes: {
@@ -1206,9 +1214,14 @@ function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
     };
   }
 
+  // Merge: only touch the claudia-memory key, preserve all other servers and keys.
   if (!config.mcpServers) config.mcpServers = {};
   config.mcpServers['claudia-memory'] = daemonConfig;
-  writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+
+  // Atomic write: write to .tmp then rename so a crash mid-write never leaves
+  // a half-written (and therefore unreadable) .mcp.json.
+  writeFileSync(mcpTmp, JSON.stringify(config, null, 2) + '\n');
+  renameSync(mcpTmp, mcpPath);
 }
 
 /**
