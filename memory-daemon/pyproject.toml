@@ -9,13 +9,16 @@ description = "Superhuman memory system for Claudia - never forget, always learn
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Kamil Banc"}
+    {name = "Kamil Banc", email = "kamil@banc.dev"}
 ]
+keywords = ["mcp", "memory", "claude", "ai-assistant", "sqlite", "vector-search"]
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -50,6 +53,8 @@ claudia-brain = "claudia_memory.tui.app:run_brain_monitor"
 [project.urls]
 Homepage = "https://github.com/kbanc85/claudia"
 Repository = "https://github.com/kbanc85/claudia"
+Issues = "https://github.com/kbanc85/claudia/issues"
+Changelog = "https://github.com/kbanc85/claudia/releases"
 
 [tool.setuptools.packages.find]
 where = ["."]
