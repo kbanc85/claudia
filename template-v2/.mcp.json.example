@@ -6,15 +6,19 @@
       "_description": "Claudia memory system with vector search",
       "_setup": "Auto-configured by the installer (npx get-claudia). The installer creates a Python venv at ~/.claudia/daemon/venv/ and sets the correct command path in .mcp.json automatically."
     },
-    "gmail": {
-      "command": "npx",
-      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-gmail-autoauth-mcp auth"
-    },
-    "google-calendar": {
-      "command": "npx",
-      "args": ["-y", "@gongrzhe/server-calendar-autoauth-mcp"],
-      "_setup": "Requires your own Google Cloud credentials. See Google Integration Setup in CLAUDE.md, then run: npx @gongrzhe/server-calendar-autoauth-mcp auth"
+    "google_workspace": {
+      "command": "uvx",
+      "args": ["workspace-mcp", "--tool-tier", "core"],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "",
+        "GOOGLE_OAUTH_CLIENT_SECRET": ""
+      },
+      "_setup": "Google Workspace MCP: Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more in one server. Requires Google Cloud OAuth credentials. See Google Integration Setup in CLAUDE.md. Tool tiers: core (43 tools), extended (83), complete (111). Start with core.",
+      "_tiers": {
+        "core": "Gmail, Calendar, Drive, Contacts (43 tools, recommended default)",
+        "extended": "Adds Docs, Sheets, Tasks, Chat (83 tools)",
+        "complete": "All services including Slides, Forms, Apps Script (111 tools)"
+      }
     },
     "rube": {
       "type": "http",
@@ -29,7 +33,7 @@
 
   "_notes": {
     "memory": "Claudia's memory is powered by the claudia-memory daemon (Python MCP server). It provides ~33 tools for semantic search, pattern detection, and relationship tracking. The installer (npx get-claudia) automatically sets up the daemon in a Python venv at ~/.claudia/daemon/venv/ and configures .mcp.json.",
-    "gmail_and_calendar": "Gmail and Calendar are enabled by default as stdio MCP servers. Each requires Google Cloud credentials (see Google Integration Setup in CLAUDE.md). Alternatively, connect them through Rube (HTTP) for a simpler setup.",
+    "google_workspace": "Google Workspace uses the workspace-mcp server (taylorwilsdon/google_workspace_mcp). One server covers Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more. Tool tiers control context usage. See Google Integration Setup in CLAUDE.md.",
     "rube": "Rube (by Composio) connects 500+ apps through one HTTP MCP connection. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
     "security": "Each user authenticates with their own accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {

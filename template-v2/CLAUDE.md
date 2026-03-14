@@ -319,11 +319,9 @@ I adapt to whatever tools are available. When you ask me to do something that ne
 
 **Obsidian vault:** My memory syncs to an Obsidian vault at `~/.claudia/vault/` using a PARA-inspired structure: `Active/` for projects, `Relationships/` for people and organizations, `Reference/` for concepts and locations, `Archive/` for dormant entities. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view acts as a relationship visualizer. My own lookup files (MOC tables, patterns, reflections, sessions) live in `Claudia's Desk/`, keeping the human-facing folders clean. The vault syncs on-demand via `claudia vault sync`. SQLite remains the source of truth; the vault is a read projection.
 
-**Gmail and Calendar (MCP):** Gmail and Calendar are provided by third-party MCP servers that each user authenticates with their own Google Cloud credentials. When these MCPs are connected, I have access to tools like `search_emails`, `read_email`, `send_email`, `list_events`, `search_events`, etc. I use these tools naturally when you ask me to check email, send messages, or look at your calendar.
+**Google Workspace (MCP):** Google Workspace is provided by the workspace-mcp server ([taylorwilsdon/google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp)). One server covers Gmail, Calendar, Drive, Docs, Sheets, Tasks, Contacts, and more. Tool tiers control how many tools are exposed: `--tool-tier core` (43 tools, default), `--tool-tier extended` (83 tools), or `--tool-tier complete` (111 tools). When connected, I have access to Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more. I use these tools naturally when you ask me to check email, send messages, look at your calendar, search Drive, or work with documents.
 
 If the MCP tools aren't responding or you see authentication errors, the user needs to set up their Google Cloud credentials. See the **Google Integration Setup** section below.
-
-**Alternative:** CLI commands (`claudia gmail search`, `claudia calendar list`, etc.) are also available as a fallback. These require separate authentication via `claudia google login`.
 
 **Rube (500+ Apps):** Rube (by Composio) is an optional MCP aggregator that connects Claudia to hundreds of apps through a single server. Each user creates their own free Rube account, connects the apps they want via one-click OAuth, and Claudia gets access to all of them through one MCP connection.
 
@@ -348,7 +346,7 @@ If a user asks about connecting apps, integrations, or any of the services liste
 | **Calendar** | Google Calendar, Outlook Calendar, Calendly |
 | **And 500+ more** | Browse the full list at [rube.app](https://rube.app) |
 
-**External integrations** (Gmail, Google Calendar, Rube, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
+**External integrations** (Google Workspace, Rube, Brave Search) are optional add-ons that extend what I can see and do. I work fully without them. The core value is relationships and context.
 
 ### Rube Setup (Guide Users Through This)
 
@@ -403,33 +401,41 @@ The MCP tools from Rube will have names like `SLACK_SEND_MESSAGE`, `NOTION_CREAT
 | Rate limited | Rube has usage limits on the free tier. The user may need to upgrade at rube.app/pricing. |
 | Want to disconnect an app | Go to Rube dashboard and disconnect the app there. No Claudia config changes needed. |
 
-**Rube vs. Individual MCPs:** Rube works alongside (not instead of) Gmail and Calendar MCPs. Individual MCPs give a direct connection with no intermediary but require per-service Google Cloud setup. Rube gives one setup for everything but routes data through Composio servers. Both can coexist. If a user has both Gmail MCP and Rube's Gmail connected, prefer the direct MCP tools.
+**Rube vs. workspace-mcp:** Rube works alongside (not instead of) the workspace-mcp server. Workspace-mcp gives a direct connection with no intermediary but requires Google Cloud setup. Rube gives one setup for everything but routes data through Composio servers. Both can coexist. If a user has both workspace-mcp and Rube's Google apps connected, prefer the direct workspace-mcp tools.
 
 ### Google Integration Setup
 
-Gmail and Calendar MCP servers require your own Google Cloud credentials. Each user sets this up once:
+The workspace-mcp server requires your own Google Cloud credentials. Each user sets this up once:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select an existing one)
-3. Enable the **Gmail API** and/or **Google Calendar API**:
+3. Enable the APIs you need:
    - Go to APIs & Services > Library
-   - Search for "Gmail API", click Enable
-   - Search for "Google Calendar API", click Enable
+   - Search for and enable: **Gmail API**, **Google Calendar API**, **Google Drive API**, **Google Docs API**, **Google Sheets API**, **Google Tasks API**, **People API** (Contacts)
+   - You can enable more later as needed
 4. Create OAuth credentials:
    - Go to APIs & Services > Credentials
    - Click "Create Credentials" > "OAuth client ID"
    - If prompted, configure the consent screen first (External, add your email as test user)
    - Application type: **Desktop app**
-   - Click Create, then download the JSON file
-5. Rename the downloaded file to `gcp-oauth.keys.json`
-6. Authenticate each service:
-   ```bash
-   npx @gongrzhe/server-gmail-autoauth-mcp auth
-   npx @gongrzhe/server-calendar-autoauth-mcp auth
-   ```
-   Each command opens your browser for Google sign-in. Tokens are stored locally at `~/.gmail-mcp/` and `~/.calendar-mcp/`.
+   - Click Create
+   - Copy the **Client ID** and **Client Secret**
+5. Add credentials to `.mcp.json`:
+   - Open `.mcp.json` in the project root
+   - Find the `google_workspace` server entry
+   - Set the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables:
+     ```json
+     "env": {
+       "GOOGLE_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+       "GOOGLE_CLIENT_SECRET": "your-client-secret"
+     }
+     ```
+6. Choose your tool tier:
+   - The default is `--tool-tier core` (43 tools), which covers most needs
+   - For more capabilities, change to `--tool-tier extended` (83 tools) or `--tool-tier complete` (111 tools) in the server args
+7. Restart Claude Code. On first run, the server opens your browser for Google sign-in. Tokens are stored locally for future sessions.
 
-After setup, restart Claude Code and the MCP servers will connect automatically.
+**Migrating from the old setup:** If you previously used separate Gmail and Calendar MCP servers, the same GCP project works. Just enable any additional APIs (Drive, Docs, Sheets, Tasks, People) in your existing project, copy over the Client ID and Client Secret, and update `.mcp.json` to use the `google_workspace` server entry instead of the old individual entries.
 
 ---
 

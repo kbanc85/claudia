@@ -1124,7 +1124,7 @@ function restoreMcpServers(targetPath) {
 
     // Path 1: Restore from _disabled_mcpServers stash (older migration format)
     if (config._disabled_mcpServers) {
-      const toRestore = ['claudia-memory', 'claudia_memory', 'gmail', 'google-calendar'];
+      const toRestore = ['claudia-memory', 'claudia_memory'];
       for (const key of toRestore) {
         if (config._disabled_mcpServers[key] && !config.mcpServers[key]) {
           const serverConfig = { ...config._disabled_mcpServers[key] };
