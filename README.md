@@ -15,10 +15,10 @@ Remembers your people. Catches your commitments. Learns how you work.
 </p>
 
 <p align="center">
-<a href="#try-it-in-30-seconds"><strong>Try the Demo</strong></a> ·
+<a href="#quick-start"><strong>Install</strong></a> ·
 <a href="#what-makes-claudia-different">Why Claudia</a> ·
 <a href="#how-her-mind-works">Her Mind</a> ·
-<a href="#quick-start">Install</a> ·
+<a href="#integrations">Integrations</a> ·
 <a href="#how-it-works">How It Works</a>
 </p>
 
@@ -112,19 +112,32 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 
 ## Quick Start
 
+**1. Install**
 ```bash
 npx get-claudia
+```
+
+**2. Start**
+```bash
 cd claudia
 claude
 ```
+
+**3. Say hi.** She'll introduce herself, learn about you through a natural conversation, and generate a personalized workspace.
 
 <p align="center">
 <img src="assets/claudia-install.gif" alt="Installing Claudia" width="600">
 </p>
 
-Say hi. She'll introduce herself, learn about you in a natural conversation, and generate a personalized workspace within a few sessions.
+**What's next:**
+- `/morning-brief` to see what needs attention
+- Tell her about a person and she'll create a relationship file
+- Share meeting notes and she'll extract action items
+- `npx get-claudia google` to connect Gmail, Calendar, Drive, and more
 
 **Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 18+, Python 3.10+ (for memory), [Ollama](https://ollama.com) (for embeddings)
+
+> **Embeddings model:** After installing Ollama, pull the required model: `ollama pull all-minilm:l6-v2`
 
 <details>
 <summary><strong>Template-only install (no memory system)</strong></summary>
@@ -253,7 +266,7 @@ Claudia detects your work style and generates structure that fits:
 | `/memory-audit` | See everything Claudia knows, with source chains |
 
 <details>
-<summary><strong>All commands (43 skills)</strong></summary>
+<summary><strong>All commands (41 skills)</strong></summary>
 
 | Command | What It Does |
 |---------|--------------|
@@ -277,13 +290,62 @@ Plus ~30 proactive skills (commitment detection, pattern recognition, judgment a
 
 ---
 
+## Brain Visualizer
+
+Launch with `/brain` to see your memory as a 3D network graph. Entities are nodes, relationships are edges, and everything is interactive: click to inspect, filter by type, search by name.
+
+<p align="center">
+<img src="assets/brain-visualizer.png" alt="Claudia Brain Visualizer" width="700">
+</p>
+
+---
+
+## Integrations
+
+Claudia works fully on her own, but integrations let her see further.
+
+### Google Workspace
+
+Connect Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more with a single setup command:
+
+```bash
+npx get-claudia google
+```
+
+This generates a one-click URL to enable all required Google APIs and walks you through OAuth setup. Three tiers available:
+
+| Tier | Tools | What You Get |
+|------|-------|-------------|
+| **Core** | 43 | Gmail, Calendar, Drive, Contacts |
+| **Extended** | 83 | Core + Docs, Sheets, Tasks, Chat |
+| **Complete** | 111 | Extended + Slides, Forms, Apps Script |
+
+### 500+ Apps via Rube
+
+[Rube](https://rube.app) (by Composio) connects Claudia to Slack, Notion, Jira, GitHub, Linear, HubSpot, Stripe, Figma, and hundreds more through one-click OAuth. No per-app MCP setup needed.
+
+| Category | Examples |
+|----------|----------|
+| **Communication** | Slack, Discord, Teams, Telegram |
+| **Project Management** | Jira, Linear, Asana, Trello, Monday.com |
+| **Knowledge & Docs** | Notion, Confluence, Google Docs, Coda |
+| **Code & Dev** | GitHub, GitLab, Bitbucket |
+| **CRM & Sales** | HubSpot, Salesforce, Pipedrive |
+| **And 500+ more** | [Browse the full list](https://rube.app) |
+
+### Obsidian Vault
+
+Memory auto-syncs to an Obsidian vault at `~/.claudia/vault/` using PARA structure. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view maps your network. SQLite is the source of truth; the vault is a read-only projection you can browse and search.
+
+---
+
 ## How It Works
 
-**59 skills · 33 MCP tools · 500+ tests**
+**41 skills · 33 MCP tools · 500+ tests**
 
 Claudia has two layers:
 
-**Template layer** (markdown) defines who she is. 59 skills, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`). Workspace templates let you spin up new projects with `/new-workspace [name]`.
+**Template layer** (markdown) defines who she is. 41 skills, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`). Workspace templates let you spin up new projects with `/new-workspace [name]`.
 
 **Memory system** (Python) defines what she remembers. Two daemon modes share the same SQLite database:
 
@@ -360,6 +422,8 @@ For full architecture diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Without the memory system, Claudia still works using markdown files. With it, she gains semantic search, pattern detection, and relationship tracking.
 
+> **Ollama model:** Run `ollama pull all-minilm:l6-v2` after installing Ollama. This is the embedding model used for semantic search.
+
 **Platforms:** macOS, Linux, Windows
 
 ---
@@ -393,6 +457,13 @@ ollama serve            # Linux
 **Pull models manually:**
 ```bash
 ollama pull all-minilm:l6-v2    # Embeddings (required)
+```
+
+**Google Workspace not working after enabling new APIs?**
+Delete the cached token and restart to re-authenticate with updated scopes:
+```bash
+rm ~/.workspace-mcp/token.json
+# Restart Claude Code
 ```
 
 **Broken install? Re-run setup:**
