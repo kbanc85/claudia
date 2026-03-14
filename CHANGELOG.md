@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.54.4 (2026-03-14)
+
+### The One-Click Setup Release
+
+Google Workspace setup went from 15 minutes to 2. Real user testing revealed painful friction in API enablement, broken OAuth URLs, missing API documentation, and a config typo that silently broke auth for new installs.
+
+- **One-click API enablement** -- `npx get-claudia google` now generates a single URL that enables all required APIs for your chosen tier (4/8/11 APIs) in one browser page. No more visiting each API individually.
+- **Tiered API reference** -- New `TIER_APIS` mapping in `google-setup.js` with `extractProjectNumber()` and `buildApiEnableUrl()` exports. Project number is auto-extracted from the Client ID.
+- **Re-auth documentation** -- All setup docs now include step 9: if you enable new APIs after initial sign-in, delete `~/.workspace-mcp/token.json` and restart Claude Code.
+- **BUG FIX: env var mismatch** -- `template-v2/CLAUDE.md` referenced `GOOGLE_CLIENT_ID` instead of `GOOGLE_OAUTH_CLIENT_ID`. New users following docs would get silent auth failures. Fixed.
+- **Principle 15: URL Integrity** -- New principle across all three `claudia-principles.md` copies: never modify, reformat, or line-wrap URLs. Prevents Claudia from corrupting OAuth URLs.
+- **Complete API list** -- Docs now list all 11 APIs across tiers (added Slides, Forms, Apps Script, Chat, People API) instead of a vague "and any others you want."
+- **12 new tests** -- `extractProjectNumber` (4 tests), `buildApiEnableUrl` (4 tests), `TIER_APIS` structure (4 tests). All 26 google-setup tests pass.
+
 ## 1.54.0 (2026-03-05)
 
 ### The Compound Tools Release

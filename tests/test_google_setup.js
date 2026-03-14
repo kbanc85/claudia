@@ -12,17 +12,23 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // We'll import these from bin/google-setup.js (extracted module)
-let setupGoogleWorkspace, detectOldGoogleMcp;
+let setupGoogleWorkspace, detectOldGoogleMcp, extractProjectNumber, buildApiEnableUrl, TIER_APIS;
 
 // Dynamic import since the module doesn't exist yet (TDD: test first)
 try {
   const mod = await import('../bin/google-setup.js');
   setupGoogleWorkspace = mod.setupGoogleWorkspace;
   detectOldGoogleMcp = mod.detectOldGoogleMcp;
+  extractProjectNumber = mod.extractProjectNumber;
+  buildApiEnableUrl = mod.buildApiEnableUrl;
+  TIER_APIS = mod.TIER_APIS;
 } catch {
   // Expected to fail until we implement the module
   setupGoogleWorkspace = null;
   detectOldGoogleMcp = null;
+  extractProjectNumber = null;
+  buildApiEnableUrl = null;
+  TIER_APIS = null;
 }
 
 // ─── Test helpers ────────────────────────────────────────────────────────────
@@ -251,6 +257,113 @@ describe('detectOldGoogleMcp', () => {
     assert.equal(result.hasOldGmail, true);
     assert.equal(result.hasOldCalendar, true);
     assert.equal(result.hasWorkspace, true);
+  });
+});
+
+// ─── extractProjectNumber ────────────────────────────────────────────────────
+
+describe('extractProjectNumber', () => {
+  it('extracts number from standard Client ID format', () => {
+    if (!extractProjectNumber) return assert.fail('Module not yet implemented');
+
+    const result = extractProjectNumber('561758721404-abc123def.apps.googleusercontent.com');
+    assert.equal(result, '561758721404');
+  });
+
+  it('returns null for non-standard ID without leading digits', () => {
+    if (!extractProjectNumber) return assert.fail('Module not yet implemented');
+
+    const result = extractProjectNumber('not-a-numeric-prefix.apps.googleusercontent.com');
+    assert.equal(result, null);
+  });
+
+  it('returns null for empty string', () => {
+    if (!extractProjectNumber) return assert.fail('Module not yet implemented');
+
+    assert.equal(extractProjectNumber(''), null);
+  });
+
+  it('returns null for null/undefined', () => {
+    if (!extractProjectNumber) return assert.fail('Module not yet implemented');
+
+    assert.equal(extractProjectNumber(null), null);
+    assert.equal(extractProjectNumber(undefined), null);
+  });
+});
+
+// ─── buildApiEnableUrl ───────────────────────────────────────────────────────
+
+describe('buildApiEnableUrl', () => {
+  it('builds core-tier URL with project number', () => {
+    if (!buildApiEnableUrl) return assert.fail('Module not yet implemented');
+
+    const url = buildApiEnableUrl('561758721404', 'core');
+    assert.ok(url.includes('flows/enableapi'), 'uses flows/enableapi path');
+    assert.ok(url.includes('project=561758721404'), 'includes project number');
+    assert.ok(url.includes('gmail.googleapis.com'), 'includes Gmail API');
+    assert.ok(url.includes('calendar-json.googleapis.com'), 'includes Calendar API');
+  });
+
+  it('builds complete-tier URL with all 11 APIs', () => {
+    if (!buildApiEnableUrl || !TIER_APIS) return assert.fail('Module not yet implemented');
+
+    const url = buildApiEnableUrl('12345', 'complete');
+    assert.ok(url.includes('slides.googleapis.com'), 'includes Slides API');
+    assert.ok(url.includes('forms.googleapis.com'), 'includes Forms API');
+    assert.ok(url.includes('script.googleapis.com'), 'includes Apps Script API');
+  });
+
+  it('returns generic library URL when project number is null', () => {
+    if (!buildApiEnableUrl) return assert.fail('Module not yet implemented');
+
+    const url = buildApiEnableUrl(null, 'core');
+    assert.equal(url, 'https://console.cloud.google.com/apis/library');
+  });
+
+  it('falls back to core for unknown tier', () => {
+    if (!buildApiEnableUrl || !TIER_APIS) return assert.fail('Module not yet implemented');
+
+    const url = buildApiEnableUrl('12345', 'nonexistent');
+    const coreUrl = buildApiEnableUrl('12345', 'core');
+    assert.equal(url, coreUrl, 'unknown tier should produce same URL as core');
+  });
+});
+
+// ─── TIER_APIS ───────────────────────────────────────────────────────────────
+
+describe('TIER_APIS', () => {
+  it('has correct counts per tier', () => {
+    if (!TIER_APIS) return assert.fail('Module not yet implemented');
+
+    assert.equal(TIER_APIS.core.length, 4);
+    assert.equal(TIER_APIS.extended.length, 8);
+    assert.equal(TIER_APIS.complete.length, 11);
+  });
+
+  it('extended is a superset of core', () => {
+    if (!TIER_APIS) return assert.fail('Module not yet implemented');
+
+    for (const api of TIER_APIS.core) {
+      assert.ok(TIER_APIS.extended.includes(api), `extended should include ${api}`);
+    }
+  });
+
+  it('complete is a superset of extended', () => {
+    if (!TIER_APIS) return assert.fail('Module not yet implemented');
+
+    for (const api of TIER_APIS.extended) {
+      assert.ok(TIER_APIS.complete.includes(api), `complete should include ${api}`);
+    }
+  });
+
+  it('all API IDs end with .googleapis.com', () => {
+    if (!TIER_APIS) return assert.fail('Module not yet implemented');
+
+    for (const tier of Object.keys(TIER_APIS)) {
+      for (const api of TIER_APIS[tier]) {
+        assert.ok(api.endsWith('.googleapis.com'), `${api} should end with .googleapis.com`);
+      }
+    }
   });
 });
 

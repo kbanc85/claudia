@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
-import { setupGoogleWorkspace, detectOldGoogleMcp } from './google-setup.js';
+import { setupGoogleWorkspace, detectOldGoogleMcp, extractProjectNumber, buildApiEnableUrl, TIER_APIS } from './google-setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1391,13 +1391,13 @@ See the memory-manager skill for the full tool reference.`;
       // skill-index.json not found, skip skills section
     }
 
-    const googleSection = `## Google Workspace Integration (New!)
+    const googleSection = `## Google Workspace Integration
 
-Claudia can now connect to your full Google Workspace: Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more through one server.
+Claudia connects to your full Google Workspace: Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more through one server.
 
-**Quick setup:** Run \`npx get-claudia google\` to configure it interactively.
+**Quick setup:** Run \`npx get-claudia google\` to configure it interactively. It will generate a one-click URL to enable all required APIs at once.
 
-Or see the Google Integration Setup section in CLAUDE.md for manual configuration.`;
+Or see the Google Integration Setup section in CLAUDE.md for manual configuration. If you enable new APIs later, remember to re-authenticate (delete ~/.workspace-mcp/token.json and restart Claude Code).`;
 
     const content = `# Updated to v${version} (${date})
 
@@ -1509,12 +1509,26 @@ async function runGoogleSetup() {
     console.log(` ${colors.green}✓${colors.reset} Old Gmail/Calendar entries removed`);
   }
 
+  // Build one-click API enablement URL
+  const projectNumber = extractProjectNumber(clientId);
+  const apiUrl = buildApiEnableUrl(projectNumber, tier);
+  const apiCount = (TIER_APIS[tier] || TIER_APIS.core).length;
+
   console.log('');
   console.log(` ${colors.boldYellow}Next steps:${colors.reset}`);
-  console.log(`   1. Enable APIs in your GCP project: Gmail, Calendar, Drive, etc.`);
-  console.log(`      ${colors.dim}https://console.cloud.google.com/apis/library${colors.reset}`);
-  console.log(`   2. Restart Claude Code`);
-  console.log(`   3. First run will open your browser for Google sign-in`);
+  console.log('');
+  if (projectNumber) {
+    console.log(`   1. ${colors.bold}Enable all ${apiCount} APIs at once${colors.reset} (one click):`);
+    console.log(`      ${colors.cyan}${apiUrl}${colors.reset}`);
+  } else {
+    console.log(`   1. ${colors.bold}Enable APIs${colors.reset} in your GCP project:`);
+    console.log(`      ${colors.cyan}${apiUrl}${colors.reset}`);
+    console.log(`      ${colors.dim}Enable: ${(TIER_APIS[tier] || TIER_APIS.core).join(', ')}${colors.reset}`);
+  }
+  console.log(`   2. ${colors.bold}Restart Claude Code${colors.reset} for the new MCP server to connect`);
+  console.log(`   3. First run will open your browser for ${colors.bold}Google sign-in${colors.reset}`);
+  console.log(`   4. ${colors.dim}If you enable more APIs later, sign out and re-authenticate${colors.reset}`);
+  console.log(`      ${colors.dim}(delete ~/.workspace-mcp/token.json and restart Claude Code)${colors.reset}`);
   console.log('');
   console.log(` ${colors.dim}Try: "check my inbox", "what's on my calendar", "search my Drive for..."${colors.reset}`);
   console.log('');

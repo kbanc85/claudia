@@ -405,13 +405,21 @@ The MCP tools from Rube will have names like `SLACK_SEND_MESSAGE`, `NOTION_CREAT
 
 ### Google Integration Setup
 
-The Google Workspace MCP server requires your own Google Cloud credentials. Each user sets this up once:
+**Recommended:** Run `npx get-claudia google` for a guided setup that generates a one-click API enablement URL.
+
+The workspace-mcp server requires your own Google Cloud credentials. Each user sets this up once:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select an existing one)
-3. Enable the APIs you need:
-   - Go to APIs & Services > Library
-   - Search for and enable: **Gmail API**, **Google Calendar API**, **Google Drive API**, **Google Docs API**, **Google Sheets API**, **Tasks API**, and any others you want
+3. Enable the APIs for your chosen tier:
+
+   | Tier | APIs to enable |
+   |------|---------------|
+   | **core** (43 tools) | Gmail API, Google Calendar API, Google Drive API, People API |
+   | **extended** (83 tools) | Core + Google Docs API, Google Sheets API, Tasks API, Google Chat API |
+   | **complete** (111 tools) | Extended + Google Slides API, Google Forms API, Apps Script API |
+
+   Go to APIs & Services > Library and enable each API. You can also use the one-click URL from `npx get-claudia google` to enable them all at once.
 4. Create OAuth credentials:
    - Go to APIs & Services > Credentials
    - Click "Create Credentials" > "OAuth client ID"
@@ -427,8 +435,9 @@ The Google Workspace MCP server requires your own Google Cloud credentials. Each
    }
    ```
    See `.mcp.json.example` for the full config, including `--tool-tier` selection.
-7. **Tool tier selection:** The default is `--tool-tier core` (43 tools), which covers Gmail, Calendar, Drive, Docs, Sheets, and Tasks. Upgrade to `--tool-tier extended` (83 tools) or `--tool-tier complete` (111 tools) as needed by editing the `args` in `.mcp.json`.
+7. **Tool tier selection:** The default is `--tool-tier core` (43 tools), which covers Gmail, Calendar, Drive, and Contacts. Upgrade to `--tool-tier extended` (83 tools) or `--tool-tier complete` (111 tools) as needed by editing the `args` in `.mcp.json`.
 8. Restart Claude Code. On first run, the server will open your browser for Google sign-in.
+9. **Re-authentication after enabling new APIs:** If you enable additional APIs after your initial sign-in, you must re-authenticate. Delete `~/.workspace-mcp/token.json` and restart Claude Code to trigger a new sign-in with the updated scopes.
 
 **Migrating from old servers:** If you previously used separate Gmail and Calendar MCP servers, the same GCP project works. Open your downloaded JSON credentials file, copy the `client_id` and `client_secret` values, and paste them into `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` in `.mcp.json`. No need to create new credentials.
 
