@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
+import { setupGoogleWorkspace, detectOldGoogleMcp } from './google-setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -500,6 +501,12 @@ async function main() {
   const skipMemory = args.includes('--no-memory');
   const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
+
+  // ─── Subcommand: get-claudia google ─────────────────────────────────────
+  if (arg === 'google') {
+    await runGoogleSetup();
+    process.exit(0);
+  }
 
   // Support "." or "upgrade" for current directory
   const isCurrentDir = arg === '.' || arg === 'upgrade';
@@ -1384,11 +1391,21 @@ See the memory-manager skill for the full tool reference.`;
       // skill-index.json not found, skip skills section
     }
 
+    const googleSection = `## Google Workspace Integration (New!)
+
+Claudia can now connect to your full Google Workspace: Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more through one server.
+
+**Quick setup:** Run \`npx get-claudia google\` to configure it interactively.
+
+Or see the Google Integration Setup section in CLAUDE.md for manual configuration.`;
+
     const content = `# Updated to v${version} (${date})
 
 ## What's New
 
 ${changelogSection}
+
+${googleSection}
 
 ${skillSections}
 
@@ -1401,6 +1418,106 @@ _Surface this update in your first greeting, then delete this file._
     // Non-fatal
     process.stderr.write(`${colors.dim}  Could not write whats-new.md: ${err.message}${colors.reset}\n`);
   }
+}
+
+// ─── Google Workspace Setup Command ──────────────────────────────────────────
+
+function prompt(question) {
+  if (!isTTY) return Promise.resolve('');
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(` ${question} `, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+async function runGoogleSetup() {
+  const targetPath = process.cwd();
+
+  console.log('');
+  console.log(` ${colors.boldCyan}Google Workspace Setup${colors.reset}`);
+  console.log(` ${colors.dim}Connect Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more${colors.reset}`);
+  console.log('');
+
+  // Check for uvx using spawn (safe, no shell injection)
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawn('uvx', ['--version'], { stdio: 'ignore' });
+      child.on('close', (code) => code === 0 ? resolve() : reject());
+      child.on('error', reject);
+    });
+  } catch {
+    console.log(` ${colors.red}!${colors.reset}  uvx is not installed. Install it first:`);
+    console.log(`   ${colors.cyan}pip install uv${colors.reset}  or  ${colors.cyan}brew install uv${colors.reset}`);
+    process.exit(1);
+  }
+
+  // Detect existing state
+  const state = detectOldGoogleMcp(targetPath);
+
+  if (state.hasOldGmail || state.hasOldCalendar) {
+    console.log(` ${colors.yellow}→${colors.reset} Found old Gmail/Calendar MCP servers. These will be replaced.`);
+    console.log(`   ${colors.dim}Same GCP credentials work with the new server.${colors.reset}`);
+    console.log('');
+  }
+
+  if (state.hasWorkspace) {
+    const overwrite = await confirm('Google Workspace MCP is already configured. Reconfigure?');
+    if (!overwrite) {
+      console.log(` ${colors.dim}Keeping existing config.${colors.reset}`);
+      return;
+    }
+  }
+
+  // Get credentials
+  console.log(` ${colors.dim}You need a Google Cloud OAuth client (Desktop type).${colors.reset}`);
+  console.log(` ${colors.dim}Create one at: https://console.cloud.google.com/apis/credentials${colors.reset}`);
+  console.log('');
+
+  const clientId = await prompt(`${colors.cyan}Client ID:${colors.reset}`);
+  if (!clientId) {
+    console.log(` ${colors.red}!${colors.reset}  Client ID is required.`);
+    process.exit(1);
+  }
+
+  const clientSecret = await prompt(`${colors.cyan}Client Secret:${colors.reset}`);
+  if (!clientSecret) {
+    console.log(` ${colors.red}!${colors.reset}  Client Secret is required.`);
+    process.exit(1);
+  }
+
+  // Pick tier
+  console.log('');
+  console.log(` ${colors.boldCyan}Tool tiers:${colors.reset}`);
+  console.log(`   ${colors.green}core${colors.reset}      43 tools  Gmail, Calendar, Drive, Contacts ${colors.dim}(recommended)${colors.reset}`);
+  console.log(`   ${colors.yellow}extended${colors.reset}  83 tools  + Docs, Sheets, Tasks, Chat`);
+  console.log(`   ${colors.magenta}complete${colors.reset} 111 tools  + Slides, Forms, Apps Script`);
+  console.log('');
+
+  const tierInput = await prompt(`${colors.cyan}Tier${colors.reset} ${colors.dim}(core/extended/complete, default: core):${colors.reset}`);
+  const tier = ['core', 'extended', 'complete'].includes(tierInput) ? tierInput : 'core';
+
+  // Write config
+  setupGoogleWorkspace(targetPath, clientId, clientSecret, tier);
+
+  console.log('');
+  console.log(` ${colors.green}✓${colors.reset} Google Workspace MCP configured (${colors.bold}${tier}${colors.reset} tier)`);
+
+  if (state.hasOldGmail || state.hasOldCalendar) {
+    console.log(` ${colors.green}✓${colors.reset} Old Gmail/Calendar entries removed`);
+  }
+
+  console.log('');
+  console.log(` ${colors.boldYellow}Next steps:${colors.reset}`);
+  console.log(`   1. Enable APIs in your GCP project: Gmail, Calendar, Drive, etc.`);
+  console.log(`      ${colors.dim}https://console.cloud.google.com/apis/library${colors.reset}`);
+  console.log(`   2. Restart Claude Code`);
+  console.log(`   3. First run will open your browser for Google sign-in`);
+  console.log('');
+  console.log(` ${colors.dim}Try: "check my inbox", "what's on my calendar", "search my Drive for..."${colors.reset}`);
+  console.log('');
 }
 
 main();
