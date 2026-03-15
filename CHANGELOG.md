@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.7 (2026-03-15)
+
+### The Recall Recovery Release
+
+After v1.55 consolidation, recall could return zero results despite all memories existing. Three-layer fix restores recall for affected users automatically on next startup.
+
+- **FTS5 rebuild after consolidation** -- `merge_all_databases()` now rebuilds the FTS5 full-text index after merging. The migration's separate SQLite connection bypassed triggers that keep FTS5 in sync, leaving the index empty.
+- **LIKE fallback fix** -- `_keyword_search()` now falls through to SQL LIKE when FTS5 returns 0 rows (not just on exception). Previously, an empty-but-functional FTS5 table returned nothing and the LIKE fallback never activated.
+- **Startup index repair** -- New `_check_and_repair_indexes()` runs on every daemon startup (idempotent). Detects FTS5 and embedding gaps, rebuilds FTS5 instantly, and starts a background embedding backfill thread if Ollama is available.
+- **Background embedding backfill** -- Non-blocking thread generates missing vector embeddings in batches of 25. Tolerant of missing Ollama (logs warning, recall uses LIKE fallback). Progress logged to daemon.log.
+- **Embedding health in briefing** -- Session briefing now shows embedding coverage percentage when below 90%, so Claudia can inform the user about regeneration status.
+- **5 new tests** -- FTS rebuild after merge, recall works after merge, standalone FTS rebuild, LIKE fallback when FTS empty, FTS MATCH preferred when populated. All 613 tests pass.
+
 ## 1.55.6 (2026-03-15)
 
 - **Post-consolidation status report** -- After merging databases, Claudia's first greeting includes live database stats (memories, entities, relationships, episodes, reflections, patterns) and explains the backup schedule going forward. The whats-new file now contains a full status table and backup retention details.
