@@ -367,6 +367,10 @@ Your database is automatically backed up on a schedule (requires the standalone 
 
 All backups live in `~/.claudia/backups/`. Old backups are automatically cleaned up when they exceed retention limits.
 
+## Search index rebuild
+
+Your full-text search index has been rebuilt automatically. If Ollama is running, vector embeddings are being regenerated in the background (this takes a few minutes for large databases). Until embeddings finish, recall uses keyword search as a fallback.
+
 **What this means for the user:**
 - You remember everything from every project, always. No more fragmented memory.
 - Moving project directories no longer loses history.
@@ -379,6 +383,179 @@ _Surface this update in your first greeting with the database stats and backup e
         logger.info(f"Wrote consolidation notice to {whats_new}")
     except Exception as e:
         logger.debug(f"Could not write consolidation notice: {e}")
+
+
+def _check_and_repair_indexes(db_path: Path) -> None:
+    """Detect and repair empty FTS5 / embedding indexes after consolidation.
+
+    Runs on every daemon startup (idempotent). Handles three populations:
+    - Already broken (upgraded to v1.55.0-1.55.6): FTS empty, embeddings empty
+    - Fresh consolidation (upgrading now): FTS rebuilt in merge, embeddings backfilled here
+    - Normal startup (no issues): counts match, no-op
+
+    Stores '_meta["indexes_repaired"]' with timestamp when repairs happen.
+    """
+    from datetime import datetime as dt
+    from .migration import rebuild_fts_index
+
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10)
+        conn.row_factory = sqlite3.Row
+
+        # Count memories
+        mem_row = conn.execute("SELECT COUNT(*) as c FROM memories WHERE invalidated_at IS NULL").fetchone()
+        mem_count = mem_row["c"] if mem_row else 0
+
+        if mem_count == 0:
+            conn.close()
+            return  # No memories, nothing to repair
+
+        # Check FTS5 index
+        fts_count = 0
+        try:
+            fts_row = conn.execute("SELECT COUNT(*) as c FROM memories_fts").fetchone()
+            fts_count = fts_row["c"] if fts_row else 0
+        except Exception:
+            pass  # FTS5 table might not exist
+
+        # Check embeddings
+        emb_count = 0
+        try:
+            emb_row = conn.execute("SELECT COUNT(*) as c FROM memory_embeddings").fetchone()
+            emb_count = emb_row["c"] if emb_row else 0
+        except Exception:
+            pass  # Vec0 table might not exist
+
+        conn.close()
+
+        fts_gap = mem_count - fts_count
+        emb_gap = mem_count - emb_count
+        fts_threshold = max(10, int(mem_count * 0.1))  # 10% or at least 10
+        emb_threshold = max(10, int(mem_count * 0.1))
+
+        repaired = []
+
+        # Repair FTS5 if significantly fewer entries than memories
+        if fts_gap > fts_threshold:
+            logger.warning(
+                f"FTS5 index gap detected: {fts_count} indexed vs {mem_count} memories. "
+                f"Rebuilding FTS5 index..."
+            )
+            indexed = rebuild_fts_index(db_path)
+            repaired.append(f"fts5: {fts_count}->{indexed}")
+            logger.info(f"FTS5 repair complete: {indexed} rows indexed")
+
+        # Trigger embedding backfill if significantly fewer embeddings
+        if emb_gap > emb_threshold:
+            logger.warning(
+                f"Embedding gap detected: {emb_count} embeddings vs {mem_count} memories. "
+                f"Starting background backfill..."
+            )
+            _auto_backfill_embeddings(db_path, mem_count, emb_count)
+            repaired.append(f"embeddings: {emb_count}/{mem_count} (backfill started)")
+
+        # Record repair timestamp
+        if repaired:
+            try:
+                rc = sqlite3.connect(str(db_path), timeout=10)
+                rc.execute(
+                    "INSERT OR REPLACE INTO _meta (key, value, updated_at) "
+                    "VALUES ('indexes_repaired', ?, ?)",
+                    (", ".join(repaired), dt.now().isoformat()),
+                )
+                rc.commit()
+                rc.close()
+            except Exception:
+                pass
+        else:
+            logger.debug(
+                f"Index health OK: FTS5={fts_count}/{mem_count}, "
+                f"embeddings={emb_count}/{mem_count}"
+            )
+
+    except Exception as e:
+        # Non-fatal: log and continue
+        logger.error(f"Index repair check failed (non-fatal): {e}")
+
+
+def _auto_backfill_embeddings(db_path: Path, mem_count: int, emb_count: int) -> None:
+    """Start background thread to generate missing embeddings.
+
+    Non-blocking: the MCP server starts immediately while this runs.
+    Tolerant: if Ollama isn't running, logs a warning and exits.
+    Batched: processes 25 at a time with progress logging.
+    Idempotent: LEFT JOIN ensures only missing embeddings are generated.
+    """
+    import json as _json
+    import threading
+
+    def _backfill_worker():
+        try:
+            from .embeddings import get_embedding_service
+
+            svc = get_embedding_service()
+            if not svc.is_available_sync():
+                logger.warning(
+                    "Ollama not available for embedding backfill. "
+                    "Recall will use LIKE fallback until embeddings are generated. "
+                    "Start Ollama and restart the daemon, or run --backfill-embeddings."
+                )
+                return
+
+            conn = sqlite3.connect(str(db_path), timeout=30)
+            conn.row_factory = sqlite3.Row
+
+            # Find memories missing embeddings
+            missing = conn.execute(
+                "SELECT m.id, m.content FROM memories m "
+                "LEFT JOIN memory_embeddings me ON m.id = me.memory_id "
+                "WHERE me.memory_id IS NULL AND m.invalidated_at IS NULL"
+            ).fetchall()
+
+            if not missing:
+                logger.info("Embedding backfill: no missing embeddings found")
+                conn.close()
+                return
+
+            total = len(missing)
+            logger.info(f"Embedding backfill: generating embeddings for {total} memories...")
+
+            success = 0
+            failed = 0
+            batch_size = 25
+
+            for i, row in enumerate(missing, 1):
+                try:
+                    embedding = svc.embed_sync(row["content"])
+                    if embedding:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
+                            (row["id"], _json.dumps(embedding)),
+                        )
+                        success += 1
+                        if success % batch_size == 0:
+                            conn.commit()
+                    else:
+                        failed += 1
+                except Exception as e:
+                    failed += 1
+                    if failed <= 3:
+                        logger.debug(f"Embedding failed for memory {row['id']}: {e}")
+
+                if i % batch_size == 0 or i == total:
+                    logger.info(f"Embedding backfill progress: {i}/{total} (success={success}, failed={failed})")
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"Embedding backfill complete: {success} generated, {failed} failed out of {total}")
+
+        except Exception as e:
+            logger.error(f"Embedding backfill thread failed: {e}")
+
+    thread = threading.Thread(target=_backfill_worker, name="embedding-backfill", daemon=True)
+    thread.start()
+    logger.info("Embedding backfill thread started in background")
 
 
 def _write_preflight_result(result: dict) -> Path:
@@ -789,6 +966,10 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
 
         # Auto-consolidate hash-named databases into unified claudia.db
         _auto_consolidate()
+
+        # Repair FTS5 and embeddings if they're out of sync with memories.
+        # Handles already-affected users (v1.55.0-1.55.6) and fresh consolidations.
+        _check_and_repair_indexes(Path(config.db_path))
 
         # Start health server and scheduler - ONLY in standalone mode.
         # MCP server processes are ephemeral and session-bound; the standalone

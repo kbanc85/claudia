@@ -3336,6 +3336,25 @@ def _build_briefing() -> str:
     except Exception as e:
         logger.debug(f"Briefing recent failed: {e}")
 
+    # 6. Embedding health check
+    try:
+        mem_total = db.execute("SELECT COUNT(*) as c FROM memories WHERE invalidated_at IS NULL", fetch=True)
+        emb_total = db.execute("SELECT COUNT(*) as c FROM memory_embeddings", fetch=True)
+        mem_c = mem_total[0]["c"] if mem_total else 0
+        emb_c = emb_total[0]["c"] if emb_total else 0
+        if mem_c > 0:
+            coverage = (emb_c / mem_c) * 100
+            if coverage < 90:
+                gap = mem_c - emb_c
+                lines.append(
+                    f"**Embedding coverage:** {emb_c}/{mem_c} ({coverage:.0f}%). "
+                    f"{gap} memories lack vector embeddings. "
+                    f"{'Backfill is running in background.' if coverage > 0 else 'Start Ollama and restart daemon to generate embeddings.'} "
+                    f"Recall uses keyword fallback for unembedded memories."
+                )
+    except Exception as e:
+        logger.debug(f"Briefing embedding health failed: {e}")
+
     if len(lines) <= 1:
         lines.append("No context available yet. This appears to be a fresh workspace.")
 

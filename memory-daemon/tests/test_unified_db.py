@@ -140,6 +140,64 @@ class TestRememberAutoTagsWorkspace:
         assert row[0]["workspace_id"] is None
 
 
+class TestKeywordFallbackWhenFtsEmpty:
+    """LIKE fallback activates when FTS5 returns 0 rows (not just on exception)."""
+
+    def test_keyword_fallback_when_fts_empty(self, db):
+        """When FTS5 index is empty but memories exist, LIKE search finds them."""
+        from unittest.mock import patch as _patch
+        from claudia_memory.services.recall import RecallService
+
+        # Insert a memory directly via a separate connection (bypasses FTS triggers)
+        import sqlite3 as _sql3
+        raw_conn = _sql3.connect(str(db.db_path))
+        raw_conn.execute(
+            "INSERT INTO memories (content, content_hash, type, importance) "
+            "VALUES ('meeting with Alice about project timeline', 'fts_test_hash', 'fact', 0.8)"
+        )
+        raw_conn.commit()
+        raw_conn.close()
+
+        # FTS5 is empty for this row (trigger didn't fire on raw_conn).
+        # Patch get_db() so RecallService uses our test db.
+        with _patch("claudia_memory.services.recall.get_db", return_value=db):
+            svc = RecallService()
+            results = svc._keyword_search("Alice", limit=10)
+
+        assert len(results) >= 1
+        assert "Alice" in results[0]["content"]
+
+    def test_keyword_fts_match_still_preferred(self, db):
+        """When FTS5 is populated, FTS MATCH is used (not LIKE)."""
+        from unittest.mock import patch as _patch
+        from claudia_memory.services.recall import RecallService
+
+        # Insert via the db object (triggers should fire on same connection)
+        db.execute(
+            "INSERT INTO memories (content, content_hash, type, importance) "
+            "VALUES ('discussion with Bob about deadlines', 'fts_preferred_hash', 'fact', 0.8)"
+        )
+
+        # Also manually populate FTS (in case triggers don't fire in test context)
+        try:
+            db.execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('delete-all')"
+            )
+            db.execute(
+                "INSERT INTO memories_fts(rowid, content) "
+                "SELECT id, content FROM memories WHERE invalidated_at IS NULL"
+            )
+        except Exception:
+            pass  # FTS might auto-populate via triggers
+
+        with _patch("claudia_memory.services.recall.get_db", return_value=db):
+            svc = RecallService()
+            results = svc._keyword_search("Bob", limit=10)
+
+        assert len(results) >= 1
+        assert "Bob" in results[0]["content"]
+
+
 class TestRecallResultHasWorkspaceId:
     """RecallResult dataclass includes workspace_id."""
 

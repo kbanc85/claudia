@@ -1255,7 +1255,40 @@ def merge_all_databases(
             logger.error(f"Failed to merge {source_path.name}: {e}")
             # Non-fatal: continue with other sources
 
+    # Rebuild FTS5 index after all merges (triggers don't fire on the
+    # separate connections used by migrate_legacy_database)
+    if not dry_run and totals["sources_merged"] > 0:
+        rebuild_fts_index(target_path)
+
     return totals
+
+
+def rebuild_fts_index(db_path: Path) -> int:
+    """Rebuild FTS5 index from memories table.
+
+    After consolidation, FTS5 triggers may not have fired for migrated rows
+    (the migration uses a separate connection that bypasses triggers).
+    This rebuilds the entire FTS index from scratch.
+
+    Returns the number of rows indexed.
+    """
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=30)
+        # Clear existing FTS data
+        conn.execute("INSERT INTO memories_fts(memories_fts) VALUES('delete-all')")
+        # Repopulate from memories table
+        conn.execute(
+            "INSERT INTO memories_fts(rowid, content) "
+            "SELECT id, content FROM memories WHERE invalidated_at IS NULL"
+        )
+        conn.commit()
+        count = conn.execute("SELECT COUNT(*) FROM memories_fts").fetchone()[0]
+        conn.close()
+        logger.info(f"Rebuilt FTS5 index: {count} rows indexed")
+        return count
+    except Exception as e:
+        logger.warning(f"Could not rebuild FTS5 index: {e}")
+        return 0
 
 
 def cleanup_old_databases(memory_dir: Path, source_dbs: List[Dict]) -> int:

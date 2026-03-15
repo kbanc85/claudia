@@ -11,6 +11,7 @@ from claudia_memory.database import Database, content_hash
 from claudia_memory.migration import (
     cleanup_old_databases,
     merge_all_databases,
+    rebuild_fts_index,
     scan_hash_databases,
     verify_consolidated_db,
 )
@@ -344,3 +345,95 @@ class TestAutoConsolidation:
             # Cleanup would remove them
             deleted = cleanup_old_databases(d, results)
             assert deleted >= 2
+
+
+class TestFtsRebuildAfterMerge:
+    """FTS5 index is rebuilt after merge_all_databases()."""
+
+    def test_fts_rebuilt_after_merge(self):
+        """After merge, memories_fts has rows matching merged memories."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            d = Path(tmpdir)
+            target_path = d / "claudia.db"
+            target = Database(target_path)
+            target.initialize()
+            target.close()
+
+            _create_hash_db(d, "aaaaaabbbbbb",
+                            memories=[{"content": "alpha memory one"}])
+            _create_hash_db(d, "ccccccdddddd",
+                            memories=[{"content": "beta memory two"}])
+
+            sources = [s for s in scan_hash_databases(d) if s["has_data"]]
+            merge_all_databases(target_path, sources)
+
+            # FTS5 should have been rebuilt by merge_all_databases
+            conn = sqlite3.connect(str(target_path))
+            conn.row_factory = sqlite3.Row
+            fts_count = conn.execute("SELECT COUNT(*) as c FROM memories_fts").fetchone()["c"]
+            mem_count = conn.execute("SELECT COUNT(*) as c FROM memories").fetchone()["c"]
+            conn.close()
+
+            assert mem_count >= 2
+            assert fts_count >= 2
+            assert fts_count == mem_count
+
+    def test_recall_works_after_merge(self):
+        """End-to-end: merge, then keyword search returns results."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            d = Path(tmpdir)
+            target_path = d / "claudia.db"
+            target = Database(target_path)
+            target.initialize()
+            target.close()
+
+            _create_hash_db(d, "aaaaaabbbbbb",
+                            memories=[{"content": "important meeting with Sarah about Q4 planning"}])
+            _create_hash_db(d, "ccccccdddddd",
+                            memories=[{"content": "follow up email to Bob about the proposal"}])
+
+            sources = [s for s in scan_hash_databases(d) if s["has_data"]]
+            merge_all_databases(target_path, sources)
+
+            # Verify FTS MATCH works
+            conn = sqlite3.connect(str(target_path))
+            conn.row_factory = sqlite3.Row
+            fts_results = conn.execute(
+                "SELECT m.content FROM memories_fts fts "
+                "JOIN memories m ON m.id = fts.rowid "
+                "WHERE memories_fts MATCH 'Sarah'"
+            ).fetchall()
+            conn.close()
+
+            assert len(fts_results) >= 1
+            assert "Sarah" in fts_results[0]["content"]
+
+    def test_rebuild_fts_index_standalone(self):
+        """rebuild_fts_index() repopulates FTS from memories table."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = Database(db_path)
+            db.initialize()
+
+            # Insert memories directly (bypassing FTS triggers by using a separate conn)
+            raw_conn = sqlite3.connect(str(db_path))
+            raw_conn.execute(
+                "INSERT INTO memories (content, content_hash, type) "
+                "VALUES ('orphaned memory', 'hash_orphan', 'fact')"
+            )
+            raw_conn.commit()
+            raw_conn.close()
+
+            # FTS should be empty for the new row (trigger didn't fire on raw_conn)
+            # Now rebuild
+            count = rebuild_fts_index(db_path)
+            assert count >= 1
+
+            # Verify FTS MATCH works
+            conn = sqlite3.connect(str(db_path))
+            result = conn.execute(
+                "SELECT COUNT(*) as c FROM memories_fts WHERE memories_fts MATCH 'orphaned'"
+            ).fetchone()
+            conn.close()
+            assert result[0] >= 1
+            db.close()

@@ -2429,6 +2429,8 @@ class RecallService:
             rows = self.db.execute(sql, tuple(params), fetch=True) or []
             if rows:
                 return rows
+            # FTS5 succeeded but returned 0 rows (empty index after migration).
+            # Fall through to LIKE instead of returning empty.
         except Exception:
             pass  # FTS5 not available, fall through to LIKE
 
