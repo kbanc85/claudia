@@ -750,8 +750,21 @@ async function main() {
     const hasExistingDb = existingDbs.length > 0;
 
     if (hasExistingDb) {
-      renderer.update('memory', 'done', `${existingDbs.length} database(s) found`);
-      if (!supportsInPlace) renderer.appendLine('memory', 'done', `${existingDbs.length} database(s) found`);
+      // Show a quick count via sqlite3 if available
+      let quickMemCount = 0;
+      const mainDb = join(memoryDir, 'claudia.db');
+      if (existsSync(mainDb)) {
+        try {
+          quickMemCount = parseInt(execFileSync('sqlite3', [mainDb, 'SELECT COUNT(*) FROM memories;'], {
+            encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'],
+          }).trim(), 10) || 0;
+        } catch { /* sqlite3 CLI not available */ }
+      }
+      const memoryLabel = quickMemCount > 0
+        ? `${quickMemCount.toLocaleString()} memories in claudia.db`
+        : `${existingDbs.length} database files found`;
+      renderer.update('memory', 'done', memoryLabel);
+      if (!supportsInPlace) renderer.appendLine('memory', 'done', memoryLabel);
     } else {
       renderer.update('memory', 'done', 'Directories ready (new install)');
       if (!supportsInPlace) renderer.appendLine('memory', 'done', 'Directories ready');
@@ -901,12 +914,15 @@ async function main() {
     } else {
       renderer.update('mcp', 'active', 'checking .mcp.json...');
       const mcpCheckResult = checkMcpConfig(targetPath);
-      if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount <= 1) {
-        renderer.update('mcp', 'done', `claudia-memory configured${mcpCheckResult.stdioCount === 1 ? '' : ' (no stdio servers?)'}`);
-        if (!supportsInPlace) renderer.appendLine('mcp', 'done', 'claudia-memory configured');
-      } else if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount > 1) {
-        renderer.update('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers (only 1 reliable)`);
-        if (!supportsInPlace) renderer.appendLine('mcp', 'warn', `${mcpCheckResult.stdioCount} stdio servers`);
+      if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount >= 1) {
+        const serverDetail = mcpCheckResult.stdioCount === 1
+          ? 'claudia-memory configured'
+          : `claudia-memory + ${mcpCheckResult.stdioCount - 1} other server${mcpCheckResult.stdioCount > 2 ? 's' : ''}`;
+        renderer.update('mcp', 'done', serverDetail);
+        if (!supportsInPlace) renderer.appendLine('mcp', 'done', serverDetail);
+      } else if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount === 0) {
+        renderer.update('mcp', 'warn', 'claudia-memory configured (no stdio?)');
+        if (!supportsInPlace) renderer.appendLine('mcp', 'warn', 'claudia-memory configured (no stdio?)');
       } else {
         renderer.update('mcp', 'warn', 'claudia-memory not in .mcp.json');
         if (!supportsInPlace) renderer.appendLine('mcp', 'warn', 'daemon not configured');
@@ -1056,33 +1072,42 @@ async function main() {
     if (!dbScan) return;
     if (dbScan.totalMemories === 0 && dbScan.hashDbs.length === 0) return;
 
+    const withData = dbScan.hashDbs.filter(d => d.memories > 0 || d.entities > 0);
+    const empty = dbScan.hashDbs.filter(d => d.memories === 0 && d.entities === 0);
+
+    // Nothing interesting to show if unified DB has data and no legacy DBs
+    if (withData.length === 0 && empty.length === 0 && dbScan.unified.memories > 0) return;
+
+    const pl = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? '' : (word.endsWith('y') ? word.slice(0, -1) + 'ies' : word + 's')}`;
+    // Simpler: just handle the cases we need
+    const memLabel = (n) => n === 1 ? '1 memory' : `${n.toLocaleString()} memories`;
+    const entLabel = (n) => n === 1 ? '1 entity' : `${n.toLocaleString()} entities`;
+    const dbLabel = (n) => n === 1 ? '1 database' : `${n} databases`;
+
     console.log('');
     console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
     console.log(` ${colors.boldCyan}Memory Database Scan${colors.reset}`);
     console.log('');
 
     if (dbScan.unified.exists) {
-      console.log(` ${colors.green}●${colors.reset} claudia.db: ${colors.bold}${dbScan.unified.memories}${colors.reset} memories, ${colors.bold}${dbScan.unified.entities}${colors.reset} entities`);
+      console.log(` ${colors.green}●${colors.reset} claudia.db: ${colors.bold}${memLabel(dbScan.unified.memories)}${colors.reset}, ${colors.bold}${entLabel(dbScan.unified.entities)}${colors.reset}`);
     }
 
-    if (dbScan.hashDbs.length > 0) {
-      const withData = dbScan.hashDbs.filter(d => d.memories > 0 || d.entities > 0);
-      const empty = dbScan.hashDbs.filter(d => d.memories === 0 && d.entities === 0);
+    if (withData.length > 0) {
+      const totalMem = withData.reduce((s, d) => s + d.memories, 0);
+      const totalEnt = withData.reduce((s, d) => s + d.entities, 0);
 
-      if (withData.length > 0) {
-        console.log('');
-        console.log(` ${colors.yellow}Found ${withData.length} legacy database${withData.length !== 1 ? 's' : ''} to consolidate:${colors.reset}`);
-        for (const db of withData) {
-          console.log(`   ${colors.dim}${db.name}${colors.reset}: ${db.memories} memories, ${db.entities} entities`);
-        }
-        console.log('');
-        console.log(` ${colors.dim}These will be auto-merged into claudia.db on next startup.${colors.reset}`);
+      console.log('');
+      console.log(` ${colors.yellow}${dbLabel(withData.length)} to consolidate (${memLabel(totalMem)}, ${entLabel(totalEnt)}):${colors.reset}`);
+      for (const db of withData) {
+        console.log(`   ${colors.dim}${db.name}${colors.reset}  ${memLabel(db.memories)}, ${entLabel(db.entities)}`);
       }
-      if (empty.length > 0) {
-        console.log(` ${colors.dim}${empty.length} empty database${empty.length !== 1 ? 's' : ''} will be cleaned up automatically.${colors.reset}`);
-      }
-    } else if (dbScan.unified.exists && dbScan.unified.memories > 0) {
-      console.log(` ${colors.dim}Unified database, no legacy files to consolidate.${colors.reset}`);
+      console.log('');
+      console.log(` ${colors.dim}Auto-merged into claudia.db on next startup.${colors.reset}`);
+    }
+
+    if (empty.length > 0) {
+      console.log(` ${colors.dim}${dbLabel(empty.length)} empty, will be cleaned up.${colors.reset}`);
     }
 
     console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);

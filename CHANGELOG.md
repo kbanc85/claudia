@@ -2,6 +2,10 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.3 (2026-03-15)
+
+- **Installer polish** -- Memory System step shows memory count from claudia.db when available instead of raw file count. DB scan shows totals ("4 databases to consolidate (2,118 memories, 319 entities)") and fixes "1 memories" grammar. MCP Config no longer warns about multiple stdio servers (they work fine now).
+
 ## 1.55.2 (2026-03-15)
 
 - **BUG FIX: dbScan scope error** -- `dbScan` was declared inside the try block but referenced in the vault callback outside it. Moved declaration to outer scope.
