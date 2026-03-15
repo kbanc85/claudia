@@ -102,6 +102,23 @@ const STEPS = [
   { id: 'health',      label: 'Health Check' },
 ];
 
+// ─── Subtitles (shown under progress bar during install) ────────────────
+
+const SUBTITLES = [
+  'Wiring neurons...',
+  'Calibrating charm levels...',
+  'Teaching myself to be helpful...',
+  'Your memory, but better.',
+  'I never forget a face. Or a deadline.',
+  'Almost sentient. Mostly organized.',
+  'Building something that remembers...',
+  'Loading opinions...',
+  'Preparing to have preferences...',
+  'Indexing everything you will tell me...',
+  'Learning to listen...',
+  'Setting up your second brain...',
+];
+
 // ─── Progress Renderer ──────────────────────────────────────────────────
 
 class ProgressRenderer {
@@ -111,6 +128,14 @@ class ProgressRenderer {
     this.spinnerFrame = 0;
     this.spinnerChars = ['◐', '◓', '◑', '◒'];
     this.spinnerTimer = null;
+    this.subtitleIndex = Math.floor(Math.random() * SUBTITLES.length);
+    this.subtitleTicks = 0;   // counts render cycles; rotate every ~20 ticks (4s at 200ms)
+    this.eyesOpen = true;
+    this.eyeBlinkCountdown = 15 + Math.floor(Math.random() * 20); // ticks until next blink
+    // Lines between the banner's eyes line and the renderer's first output line.
+    // Banner after eyes: 8 lines (body, waist, legs, blank, CLAUDIA, byline, research, trailing)
+    // Confirm prompt: 1 line.  Blank line before renderer: 1 line.  Total = 10.
+    this.eyesOffsetAbove = 10;
 
     for (const step of STEPS) {
       this.states[step.id] = { state: 'pending', detail: '' };
@@ -132,6 +157,26 @@ class ProgressRenderer {
     if (!supportsInPlace) return;
     this.spinnerTimer = setInterval(() => {
       this.spinnerFrame = (this.spinnerFrame + 1) % this.spinnerChars.length;
+
+      // Rotate subtitle every ~4 seconds (20 ticks * 200ms)
+      this.subtitleTicks++;
+      if (this.subtitleTicks >= 20) {
+        this.subtitleTicks = 0;
+        this.subtitleIndex = (this.subtitleIndex + 1) % SUBTITLES.length;
+      }
+
+      // Eye blink logic: count down, blink briefly (2 ticks = 400ms), then reset
+      this.eyeBlinkCountdown--;
+      if (this.eyeBlinkCountdown <= 0) {
+        if (this.eyesOpen) {
+          this.eyesOpen = false;
+          this.eyeBlinkCountdown = 2;  // stay closed for 400ms
+        } else {
+          this.eyesOpen = true;
+          this.eyeBlinkCountdown = 15 + Math.floor(Math.random() * 25); // 3-8s until next blink
+        }
+      }
+
       this.render();
     }, 200);
   }
@@ -141,6 +186,7 @@ class ProgressRenderer {
       clearInterval(this.spinnerTimer);
       this.spinnerTimer = null;
     }
+    this.eyesOpen = true;
   }
 
   getIcon(state) {
@@ -171,15 +217,37 @@ class ProgressRenderer {
     return ` [${colors.green}${'█'.repeat(filled)}${colors.reset}${'░'.repeat(empty)}] ${done}/${total}`;
   }
 
+  getSubtitle() {
+    const text = SUBTITLES[this.subtitleIndex];
+    return ` ${colors.dim}"${text}"${colors.reset}`;
+  }
+
+  blinkEyes() {
+    if (!supportsInPlace || this.lastLineCount === 0) return;
+    const y = colors.yellow;
+    const w = colors.white;
+    const r = colors.reset;
+    // Build the eyes line based on current blink state
+    const eyesLine = this.eyesOpen
+      ? `${y}██${w}██${r}  ${w}██${r}  ${w}██${y}██${r}`
+      : `${y}██${w}▄▄${r}  ${w}▄▄${r}  ${w}▄▄${y}██${r}`;
+
+    // Save cursor, jump up to eyes line, redraw it, restore cursor
+    const linesUp = this.lastLineCount + this.eyesOffsetAbove;
+    process.stdout.write(
+      `\x1b[s` +                           // save cursor position
+      `\x1b[${linesUp}A` +                 // move up to eyes line
+      `\x1b[2K${eyesLine}` +               // clear line and write eyes
+      `\x1b[u`                              // restore cursor position
+    );
+  }
+
   render() {
     const lines = [];
 
     for (const step of STEPS) {
       const { state, detail } = this.states[step.id];
       const icon = this.getIcon(state);
-      const label = (state === 'skipped' || state === 'cascade')
-        ? `${colors.dim}${step.label}${colors.reset}`
-        : step.label;
       const detailStr = detail
         ? `${colors.dim}${detail}${colors.reset}`
         : '';
@@ -191,6 +259,11 @@ class ProgressRenderer {
     lines.push('');
     lines.push(this.getProgressBar());
 
+    // Show rotating subtitle while spinner is active
+    if (this.spinnerTimer) {
+      lines.push(this.getSubtitle());
+    }
+
     if (supportsInPlace) {
       // Move cursor up and clear previous render
       if (this.lastLineCount > 0) {
@@ -199,7 +272,18 @@ class ProgressRenderer {
       for (const line of lines) {
         process.stdout.write(`\x1b[2K${line}\n`);
       }
+      // Clear any leftover lines from previous render (e.g. subtitle removed)
+      if (lines.length < this.lastLineCount) {
+        for (let i = 0; i < this.lastLineCount - lines.length; i++) {
+          process.stdout.write(`\x1b[2K\n`);
+        }
+        // Move cursor back up to end of current output
+        process.stdout.write(`\x1b[${this.lastLineCount - lines.length}A`);
+      }
       this.lastLineCount = lines.length;
+
+      // Blink the eyes in the banner above
+      this.blinkEyes();
     } else {
       // Non-TTY: only print when a step changes to done/warn/error
       // (handled in update via appendLine)
@@ -616,7 +700,7 @@ async function main() {
     runVaultStep(renderer, () => {
       renderer.stopSpinner();
       renderer.render();
-      showCompletion(targetDir, isCurrentDir, false);
+      showCompletion(targetDir, isCurrentDir, false, undefined, isUpgrade);
     });
     return;
   }
@@ -999,7 +1083,7 @@ async function main() {
   runVaultStep(renderer, () => {
     renderer.render();
     showDbScanResults(dbScan);
-    showCompletion(targetDir, isCurrentDir, memoryOk, rootCause);
+    showCompletion(targetDir, isCurrentDir, memoryOk, rootCause, isUpgrade);
   });
 
   // ── Vault step ──
@@ -1113,7 +1197,7 @@ async function main() {
     console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
   }
 
-  function showCompletion(targetDir, isCurrentDir, memoryInstalled, failureCause) {
+  function showCompletion(targetDir, isCurrentDir, memoryInstalled, failureCause, isUpgrade) {
     const rerunCmd = isCurrentDir ? 'npx get-claudia .' : `cd ${targetDir} && npx get-claudia .`;
     const launchCmd = isCurrentDir ? 'claude' : `cd ${targetDir} && claude`;
 
@@ -1121,12 +1205,27 @@ async function main() {
     console.log(`${colors.dim}${'━'.repeat(46)}${colors.reset}`);
 
     if (memoryInstalled && !failureCause) {
-      // Everything worked
       console.log('');
-      console.log(` ${colors.green}Ready to go!${colors.reset}`);
-      console.log('');
-      console.log(` ${colors.bold}Next:${colors.reset} Open Claude Code:`);
-      console.log(`   ${colors.cyan}${launchCmd}${colors.reset}`);
+      if (isUpgrade) {
+        // Returning user: short and sweet
+        const version = getVersion();
+        console.log(` ${colors.green}Updated to v${version}.${colors.reset}`);
+        console.log('');
+        console.log(`   ${colors.cyan}${launchCmd}${colors.reset}`);
+        console.log('');
+        console.log(` ${colors.dim}What's new: /morning-brief · /inbox-check${colors.reset}`);
+      } else {
+        // Fresh install: build anticipation for the onboarding
+        console.log(` ${colors.green}Claudia is ready.${colors.reset} ${colors.dim}She's waiting to meet you.${colors.reset}`);
+        console.log('');
+        if (!isCurrentDir) {
+          console.log(`   ${colors.cyan}cd ${targetDir}${colors.reset}`);
+        }
+        console.log(`   ${colors.cyan}claude${colors.reset}`);
+        console.log('');
+        console.log(` ${colors.dim}She'll introduce herself and learn how you work.${colors.reset}`);
+        console.log(` ${colors.dim}Try: ${colors.reset}${colors.cyan}"Say hi"${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}/morning-brief${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}"Who do I know?"${colors.reset}`);
+      }
       console.log('');
       return;
     }

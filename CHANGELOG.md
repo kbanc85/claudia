@@ -2,6 +2,16 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.9 (2026-03-15)
+
+### The Personality Update
+
+The installer now has personality. Claudia blinks while she waits, shares thoughts during setup, and greets new users differently from returning ones.
+
+- **Blinking eyes** -- The portrait's eyes blink every 3-8 seconds during install. A small detail that makes the ASCII art feel alive. Resets to open when setup finishes.
+- **Rotating subtitles** -- A dim quoted line below the progress bar cycles through 12 messages during install ("Calibrating charm levels...", "Loading opinions...", "I never forget a face. Or a deadline."). Starts at a random position so repeat installs feel fresh.
+- **Context-aware completion** -- Fresh installs say "She's waiting to meet you" with onboarding hints. Upgrades show the new version number and suggest /morning-brief and /inbox-check. The `cd` command is only shown when needed (not when already in the Claudia folder).
+
 ## 1.55.8 (2026-03-15)
 
 ### The Vector Search Fix
