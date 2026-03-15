@@ -3183,6 +3183,32 @@ def _build_briefing() -> str:
         )
         is_unified = unified_row and unified_row[0]["value"] == "true" if unified_row else False
 
+        if is_unified:
+            # Check if consolidation just happened (within last 5 minutes)
+            try:
+                ts_row = db.execute(
+                    "SELECT updated_at FROM _meta WHERE key = 'unified_db'", fetch=True
+                )
+                if ts_row and ts_row[0]["updated_at"]:
+                    from datetime import datetime as _dt, timedelta as _td
+                    consolidated_at = _dt.fromisoformat(ts_row[0]["updated_at"][:19])
+                    if (_dt.utcnow() - consolidated_at) < _td(minutes=5):
+                        # Just consolidated, include stats
+                        mem_row = db.execute("SELECT COUNT(*) as c FROM memories", fetch=True)
+                        ent_row = db.execute("SELECT COUNT(*) as c FROM entities WHERE deleted_at IS NULL", fetch=True)
+                        rel_row = db.execute("SELECT COUNT(*) as c FROM relationships", fetch=True)
+                        mem_c = mem_row[0]["c"] if mem_row else 0
+                        ent_c = ent_row[0]["c"] if ent_row else 0
+                        rel_c = rel_row[0]["c"] if rel_row else 0
+                        lines.append(
+                            f"**✅ DATABASE CONSOLIDATED:** All memories unified into claudia.db. "
+                            f"Current state: {mem_c:,} memories, {ent_c:,} entities, {rel_c:,} relationships. "
+                            f"Include these stats in your greeting and explain that backups now run automatically "
+                            f"(daily at 2:30 AM, weekly on Sundays, kept in ~/.claudia/backups/)."
+                        )
+            except Exception:
+                pass
+
         if not is_unified:
             import re
             from pathlib import Path
@@ -3209,9 +3235,11 @@ def _build_briefing() -> str:
                     if dbs_with_data > 0:
                         lines.append(
                             f"**⚠️ PENDING CONSOLIDATION:** {dbs_with_data} legacy database{'s' if dbs_with_data != 1 else ''} "
-                            f"with {total_mem:,} memories found. These need to be merged into claudia.db. "
-                            f"Ask the user if they want to consolidate now (restart the daemon to trigger auto-merge, "
-                            f"or run `python -m claudia_memory --merge-databases` manually)."
+                            f"with {total_mem:,} memories waiting to be merged into claudia.db. "
+                            f"Tell the user about this and ask if they want to consolidate now. "
+                            f"To trigger: restart Claude Code (the daemon auto-merges on startup), "
+                            f"or run `python -m claudia_memory --merge-databases` from terminal. "
+                            f"Show them the counts so they know what data is at stake."
                         )
     except Exception as e:
         logger.debug(f"Briefing consolidation check failed: {e}")

@@ -2,6 +2,11 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.6 (2026-03-15)
+
+- **Post-consolidation status report** -- After merging databases, Claudia's first greeting includes live database stats (memories, entities, relationships, episodes, reflections, patterns) and explains the backup schedule going forward. The whats-new file now contains a full status table and backup retention details.
+- **Briefing consolidation awareness** -- The session briefing detects both pending consolidation (shows counts, asks user) and just-completed consolidation (shows final stats, explains backup schedule). Claudia surfaces this in her greeting regardless of what the user says first.
+
 ## 1.55.5 (2026-03-15)
 
 - **Consolidation alert in briefing** -- When legacy hash databases exist but haven't been merged yet, the session briefing surfaces a pending consolidation alert with memory counts. Claudia will ask the user if they want to consolidate rather than silently noting version numbers.

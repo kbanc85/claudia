@@ -292,6 +292,7 @@ def _set_unified_db_flag(db) -> None:
 def _write_consolidation_notice(merged_count: int, sources_count: int) -> None:
     """Write context/whats-new.md so Claudia mentions the upgrade in her greeting.
 
+    Includes live DB stats after merge and explains the backup schedule.
     Looks for context/ in the workspace path (set via --project-dir).
     Falls back silently if no workspace is configured.
     """
@@ -303,31 +304,76 @@ def _write_consolidation_notice(merged_count: int, sources_count: int) -> None:
         context_dir = Path(workspace_path) / "context"
         whats_new = context_dir / "whats-new.md"
 
-        # Overwrite installer's generic release notes with consolidation-specific notice
-        # The consolidation result is more actionable than changelog text
-
         if not context_dir.exists():
             return  # Not a Claudia workspace
 
         from datetime import datetime as dt
+
+        # Query live stats from the now-consolidated database
+        db = get_db()
+        stats = {}
+        for label, query in [
+            ("memories", "SELECT COUNT(*) as c FROM memories"),
+            ("entities", "SELECT COUNT(*) as c FROM entities WHERE deleted_at IS NULL"),
+            ("relationships", "SELECT COUNT(*) as c FROM relationships"),
+            ("episodes", "SELECT COUNT(*) as c FROM episodes"),
+            ("reflections", "SELECT COUNT(*) as c FROM reflections"),
+            ("patterns", "SELECT COUNT(*) as c FROM patterns WHERE is_active = 1"),
+        ]:
+            try:
+                rows = db.execute(query, fetch=True)
+                stats[label] = rows[0]["c"] if rows else 0
+            except Exception:
+                stats[label] = 0
+
         date = dt.now().strftime("%Y-%m-%d")
+        db_path = get_config().db_path
 
         content = f"""# Memory System Upgrade ({date})
 
-Your memory has been unified. Previously, each project directory got its own isolated database (hash-named files like `6af67351bcfa.db`). Now everything lives in one `~/.claudia/memory/claudia.db`.
+## IMPORTANT: Read this fully and include it in your first greeting regardless of what the user says.
 
-**What happened automatically:**
-- Consolidated {merged_count} memories from {sources_count} database{'s' if sources_count != 1 else ''} into a single unified database
+## What just happened
+
+Your memory has been unified. Previously, each project directory created its own isolated database (hash-named files like `6af67351bcfa.db`). Now everything lives in one place: `{db_path}`.
+
+**Consolidation results:**
+- Merged {merged_count:,} memories from {sources_count} legacy database{'s' if sources_count != 1 else ''}
 - Created a pre-merge backup at `~/.claudia/backups/`
 - Cleaned up old hash-named database files
+- All data deduplicated (same memory across databases = 1 copy)
 
-**What this means for you:**
-- I remember everything from every project, always. No more fragmented memory.
-- Moving project directories no longer loses your history.
-- New `workspace_id` on memories tracks where I learned each fact (provenance, not a wall).
+## Current database state
+
+| What | Count |
+|------|-------|
+| Memories | {stats['memories']:,} |
+| Entities (people, orgs, concepts) | {stats['entities']:,} |
+| Relationships | {stats['relationships']:,} |
+| Episodes (sessions) | {stats['episodes']:,} |
+| Reflections | {stats['reflections']:,} |
+| Active patterns | {stats['patterns']:,} |
+
+## How backups work going forward
+
+Your database is automatically backed up on a schedule (requires the standalone daemon via LaunchAgent/systemd):
+
+| When | What | Retention |
+|------|------|-----------|
+| Daily at 2:30 AM | `claudia-daily-YYYY-MM-DD.db` | 7 days |
+| Sundays at 2:45 AM | `claudia-weekly-YYYY-MM-DD.db` | 4 weeks |
+| Before migrations | `claudia-pre-migration-YYYY-MM-DD.db` | 4 copies |
+| Before consolidations | `claudia-pre-merge-YYYY-MM-DD.db` | 4 copies |
+
+All backups live in `~/.claudia/backups/`. Old backups are automatically cleaned up when they exceed retention limits.
+
+**What this means for the user:**
+- You remember everything from every project, always. No more fragmented memory.
+- Moving project directories no longer loses history.
+- Backups happen silently overnight. If something ever goes wrong, there's always a recent backup to restore from.
 
 ---
-_Surface this update in your first greeting, then delete this file._
+_Surface this update in your first greeting with the database stats and backup explanation, then delete this file._
 """
         whats_new.write_text(content)
         logger.info(f"Wrote consolidation notice to {whats_new}")
