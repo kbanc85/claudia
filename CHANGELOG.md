@@ -2,6 +2,11 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.11 (2026-03-15)
+
+- **Auto-repair corrupt claudia.db** -- Installer detects when `claudia.db` is empty or corrupt (no tables, malformed disk image) and removes it along with stale WAL/SHM files so the daemon can create a fresh one. Previously, a corrupt db with leftover SHM files caused "database disk image is malformed" on every startup, blocking the daemon and preventing database consolidation.
+- **Color scheme** -- Replaced all green in the installer with cyan/teal to match Claude's palette. The installer now only uses white, cyan, and yellow throughout.
+
 ## 1.55.10 (2026-03-15)
 
 ### The Personality Update

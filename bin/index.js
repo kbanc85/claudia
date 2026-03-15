@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execFileSync } from 'child_process';
@@ -193,7 +193,7 @@ class ProgressRenderer {
 
   getIcon(state) {
     switch (state) {
-      case 'done':    return `${colors.green}✓${colors.reset}`;
+      case 'done':    return `${colors.cyan}✓${colors.reset}`;
       case 'warn':    return `${colors.yellow}○${colors.reset}`;
       case 'error':   return `${colors.red}!${colors.reset}`;
       case 'active':  return `${colors.cyan}${this.spinnerChars[this.spinnerFrame]}${colors.reset}`;
@@ -216,7 +216,7 @@ class ProgressRenderer {
     const barWidth = 20;
     const filled = Math.round((done / total) * barWidth);
     const empty = barWidth - filled;
-    return ` [${colors.green}${'█'.repeat(filled)}${colors.reset}${'░'.repeat(empty)}] ${done}/${total}`;
+    return ` [${colors.cyan}${'█'.repeat(filled)}${colors.reset}${'░'.repeat(empty)}] ${done}/${total}`;
   }
 
   getSubtitle() {
@@ -646,7 +646,7 @@ async function main() {
     }
 
     console.log('');
-    console.log(` ${colors.green}✓${colors.reset} Framework updated (data preserved)`);
+    console.log(` ${colors.cyan}✓${colors.reset} Framework updated (data preserved)`);
   }
 
   // Restore MCP servers that earlier versions incorrectly disabled.
@@ -813,15 +813,50 @@ async function main() {
     const hasExistingDb = existingDbs.length > 0;
 
     if (hasExistingDb) {
+      // Health check: detect and remove corrupt/empty claudia.db with stale WAL/SHM files.
+      // This prevents "database disk image is malformed" from blocking daemon startup.
+      const mainDb = join(memoryDir, 'claudia.db');
+      if (existsSync(mainDb)) {
+        let dbHealthy = false;
+        try {
+          execFileSync('sqlite3', [mainDb, 'SELECT COUNT(*) FROM memories;'], {
+            encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'],
+          });
+          dbHealthy = true;
+        } catch {
+          // claudia.db exists but can't be queried (empty, corrupt, or stale WAL)
+          dbHealthy = false;
+        }
+
+        if (!dbHealthy) {
+          // Check if there are other databases with actual data to merge
+          const otherDbs = existingDbs.filter(f => f !== 'claudia.db' && f !== 'demo.db');
+          // Safe to remove: claudia.db is broken and there are other sources, OR it's truly empty
+          const dbSize = statSync(mainDb).size;
+          if (otherDbs.length > 0 || dbSize <= 8192) {
+            try {
+              // Remove corrupt db and stale WAL/SHM so daemon can create a fresh one.
+              // Stale SHM files cause "database disk image is malformed" on new connections.
+              const filesToRemove = [mainDb, mainDb + '-shm', mainDb + '-wal'];
+              for (const f of filesToRemove) {
+                try { if (existsSync(f)) unlinkSync(f); } catch {}
+              }
+              renderer.update('memory', 'active', 'repaired corrupt claudia.db');
+            } catch (e) {
+              // If removal fails, continue -- daemon will report the error
+            }
+          }
+        }
+      }
+
       // Show a quick count via sqlite3 if available
       let quickMemCount = 0;
-      const mainDb = join(memoryDir, 'claudia.db');
       if (existsSync(mainDb)) {
         try {
           quickMemCount = parseInt(execFileSync('sqlite3', [mainDb, 'SELECT COUNT(*) FROM memories;'], {
             encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'],
           }).trim(), 10) || 0;
-        } catch { /* sqlite3 CLI not available */ }
+        } catch { /* sqlite3 CLI not available or db just cleaned up */ }
       }
       const memoryLabel = quickMemCount > 0
         ? `${quickMemCount.toLocaleString()} memories in claudia.db`
@@ -1153,7 +1188,7 @@ async function main() {
     console.log('');
 
     if (dbScan.unified.exists) {
-      console.log(` ${colors.green}●${colors.reset} claudia.db: ${colors.bold}${memLabel(dbScan.unified.memories)}${colors.reset}, ${colors.bold}${entLabel(dbScan.unified.entities)}${colors.reset}`);
+      console.log(` ${colors.cyan}●${colors.reset} claudia.db: ${colors.bold}${memLabel(dbScan.unified.memories)}${colors.reset}, ${colors.bold}${entLabel(dbScan.unified.entities)}${colors.reset}`);
     }
 
     if (withData.length > 0) {
@@ -1188,14 +1223,14 @@ async function main() {
       if (isUpgrade) {
         // Returning user: short and sweet
         const version = getVersion();
-        console.log(` ${colors.green}Updated to v${version}.${colors.reset}`);
+        console.log(` ${colors.cyan}Updated to v${version}.${colors.reset}`);
         console.log('');
         console.log(`   ${colors.cyan}${launchCmd}${colors.reset}`);
         console.log('');
         console.log(` ${colors.dim}What's new: /morning-brief · /inbox-check${colors.reset}`);
       } else {
         // Fresh install: build anticipation for the onboarding
-        console.log(` ${colors.green}Claudia is ready.${colors.reset} ${colors.dim}She's waiting to meet you.${colors.reset}`);
+        console.log(` ${colors.cyan}Claudia is ready.${colors.reset} ${colors.dim}She's waiting to meet you.${colors.reset}`);
         console.log('');
         if (!isCurrentDir) {
           console.log(`   ${colors.cyan}cd ${targetDir}${colors.reset}`);
@@ -1314,7 +1349,7 @@ function restoreMcpServers(targetPath) {
 
     if (changed) {
       writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
-      console.log(` ${colors.green}✓${colors.reset} Restored MCP servers: ${restored.join(', ')}`);
+      console.log(` ${colors.cyan}✓${colors.reset} Restored MCP servers: ${restored.join(', ')}`);
     }
   } catch {
     // Not valid JSON or can't read -- skip silently
@@ -1711,7 +1746,7 @@ async function runGoogleSetup() {
   // Pick tier
   console.log('');
   console.log(` ${colors.boldCyan}Tool tiers:${colors.reset}`);
-  console.log(`   ${colors.green}core${colors.reset}      43 tools  Gmail, Calendar, Drive, Contacts ${colors.dim}(recommended)${colors.reset}`);
+  console.log(`   ${colors.cyan}core${colors.reset}      43 tools  Gmail, Calendar, Drive, Contacts ${colors.dim}(recommended)${colors.reset}`);
   console.log(`   ${colors.yellow}extended${colors.reset}  83 tools  + Docs, Sheets, Tasks, Chat`);
   console.log(`   ${colors.magenta}complete${colors.reset} 111 tools  + Slides, Forms, Apps Script`);
   console.log('');
@@ -1723,10 +1758,10 @@ async function runGoogleSetup() {
   setupGoogleWorkspace(targetPath, clientId, clientSecret, tier);
 
   console.log('');
-  console.log(` ${colors.green}✓${colors.reset} Google Workspace MCP configured (${colors.bold}${tier}${colors.reset} tier)`);
+  console.log(` ${colors.cyan}✓${colors.reset} Google Workspace MCP configured (${colors.bold}${tier}${colors.reset} tier)`);
 
   if (state.hasOldGmail || state.hasOldCalendar) {
-    console.log(` ${colors.green}✓${colors.reset} Old Gmail/Calendar entries removed`);
+    console.log(` ${colors.cyan}✓${colors.reset} Old Gmail/Calendar entries removed`);
   }
 
   // Build one-click API enablement URL
