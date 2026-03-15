@@ -69,7 +69,7 @@ function confirm(question) {
 // Compact portrait-only banner
 function getBanner(version) {
   if (!isTTY) {
-    return `\n CLAUDIA v${version}\n by Kamil Banc · github.com/kbanc85/claudia\n Research in AI that learns how you work\n`;
+    return `\n CLAUDIA v${version}\n by Kamil Banc · claudia.aiadopters.club\n Research in AI that learns how you work\n`;
   }
   const b = colors.cyan;
   const y = colors.yellow;
@@ -85,7 +85,7 @@ ${y}██${w}██${r}  ${w}██${r}  ${w}██${y}██${r}
     ${w}██${r}  ${w}██${r}
 
  ${colors.boldYellow}CLAUDIA${colors.reset} ${colors.yellow}v${version}${colors.reset}
- ${colors.boldCyan}by Kamil Banc${colors.reset} ${colors.cyan}· github.com/kbanc85/claudia${colors.reset}
+ ${colors.boldCyan}by Kamil Banc${colors.reset} ${colors.cyan}· claudia.aiadopters.club${colors.reset}
  ${colors.white}Research in AI that learns how you work${colors.reset}
 `;
 }
