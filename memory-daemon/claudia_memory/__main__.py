@@ -163,102 +163,177 @@ def _check_and_repair_database(db_path: Path) -> None:
         )
 
 
-def _auto_migrate_legacy() -> None:
-    """Auto-migrate data from legacy claudia.db if it exists.
+def _auto_consolidate() -> None:
+    """Auto-consolidate hash-named databases into the unified claudia.db.
 
-    When Claudia switched from a single claudia.db to project-hash naming
-    ({sha256[:12]}.db), no data migration was performed. This function
-    detects the orphaned legacy database and migrates its data into the
-    active project-specific database.
+    Detects hash-named databases (12-char hex filenames) in ~/.claudia/memory/
+    and merges them into claudia.db. This handles the upgrade from per-project
+    hash-based DB isolation to the unified database model.
 
     Properties:
-    - Idempotent: checks _meta flag, won't run twice
-    - Safe: backs up before touching anything, preserves original
+    - Idempotent: checks _meta['unified_db'] flag, won't run twice
+    - Safe: creates pre-merge backup before any changes
     - Non-fatal: catches all exceptions, logs, continues
+    - Cleans up: deletes hash DBs + WAL/SHM after successful merge
     """
     from .migration import (
-        check_legacy_database,
-        is_migration_completed,
-        mark_migration_completed,
-        migrate_legacy_database,
+        cleanup_old_databases,
+        merge_all_databases,
+        scan_hash_databases,
+        verify_consolidated_db,
     )
 
     try:
-        config = get_config()
-        legacy_path = Path.home() / ".claudia" / "memory" / "claudia.db"
-        active_path = Path(config.db_path)
-
-        # Skip if active db IS the legacy db (no project isolation active)
-        try:
-            if legacy_path.resolve() == active_path.resolve():
-                return
-        except OSError:
-            if str(legacy_path) == str(active_path):
-                return
-
-        # Skip if legacy database doesn't exist
-        if not legacy_path.exists():
-            return
-
-        # Skip if migration already completed (idempotent)
         db = get_db()
-        if is_migration_completed(db):
-            return
+        config = get_config()
+        memory_dir = Path(config.db_path).parent
 
-        # Check if legacy database has meaningful data
-        legacy_stats = check_legacy_database(legacy_path)
-        if not legacy_stats:
-            # Empty or unreadable legacy db -- mark complete so we don't check again
-            mark_migration_completed(db, {"skipped": "no_data"})
-            logger.info("Legacy claudia.db exists but has no data worth migrating")
-            return
-
-        logger.info(
-            f"Found legacy claudia.db with {legacy_stats.get('entities', 0)} entities "
-            f"and {legacy_stats.get('memories', 0)} memories"
-        )
-
-        # Create pre-migration backup of active database (if it has data)
-        if active_path.exists():
-            try:
-                backup_path = db.backup(label="pre-migration")
-                logger.info(f"Pre-migration backup created: {backup_path}")
-            except Exception as e:
-                logger.warning(f"Pre-migration backup failed: {e}")
-                # Continue anyway -- the migration is additive, not destructive
-
-        # Run the migration
-        logger.info(f"Starting legacy database migration: {legacy_path} -> {active_path}")
-        results = migrate_legacy_database(legacy_path, active_path)
-
-        # Mark migration as completed
-        mark_migration_completed(db, results)
-
-        # Rename the legacy database (preserve, don't delete)
-        from datetime import datetime as dt
-        date_suffix = dt.now().strftime("%Y-%m-%d")
-        migrated_path = legacy_path.with_suffix(f".db.migrated-{date_suffix}")
+        # Check if already consolidated
         try:
-            legacy_path.rename(migrated_path)
-            logger.info(f"Renamed legacy database: {legacy_path} -> {migrated_path}")
-        except OSError as e:
-            logger.warning(f"Could not rename legacy database: {e}")
+            rows = db.execute(
+                "SELECT value FROM _meta WHERE key = 'unified_db'",
+                fetch=True,
+            )
+            if rows and rows[0]["value"] == "true":
+                logger.debug("Database already unified, skipping consolidation")
+                return
+        except Exception:
+            pass  # _meta table might not exist yet
 
-        # Log summary
+        # Scan for hash-named databases
+        all_hash_dbs = scan_hash_databases(memory_dir)
+        if not all_hash_dbs:
+            # No hash DBs found: fresh install or already cleaned up
+            _set_unified_db_flag(db)
+            return
+
+        # Separate databases with data from empty ones
+        data_dbs = [d for d in all_hash_dbs if d["has_data"]]
+        empty_dbs = [d for d in all_hash_dbs if not d["has_data"]]
+
+        if not data_dbs and empty_dbs:
+            # Only empty hash DBs: clean them up and mark unified
+            logger.info(f"Found {len(empty_dbs)} empty hash databases, cleaning up")
+            cleanup_old_databases(memory_dir, empty_dbs)
+            _set_unified_db_flag(db)
+            return
+
+        if not data_dbs:
+            _set_unified_db_flag(db)
+            return
+
+        # Log what we found
+        total_memories = sum(d["stats"].get("memories", 0) for d in data_dbs)
+        total_entities = sum(d["stats"].get("entities", 0) for d in data_dbs)
         logger.info(
-            f"Legacy migration complete: "
-            f"{results.get('entities_created', 0)} entities created, "
-            f"{results.get('entities_mapped', 0)} mapped, "
-            f"{results.get('memories_migrated', 0)} memories migrated, "
-            f"{results.get('links_migrated', 0)} links migrated, "
-            f"{results.get('relationships_migrated', 0)} relationships migrated"
+            f"Found {len(data_dbs)} hash databases with data "
+            f"({total_memories} memories, {total_entities} entities). "
+            f"Consolidating into claudia.db..."
         )
+
+        # Create pre-merge backup
+        try:
+            backup_path = db.backup(label="pre-merge")
+            logger.info(f"Pre-merge backup created: {backup_path}")
+        except Exception as e:
+            logger.warning(f"Pre-merge backup failed: {e}")
+            # Continue anyway, the merge is additive
+
+        # Merge all hash databases into claudia.db
+        active_path = Path(config.db_path)
+        totals = merge_all_databases(active_path, data_dbs)
+
+        # Verify integrity after merge
+        if not verify_consolidated_db(active_path):
+            logger.error(
+                "Integrity check FAILED after consolidation. "
+                "Keeping hash databases for manual recovery."
+            )
+            return
+
+        # Clean up: delete hash DBs + WAL/SHM + orphan backups
+        deleted = cleanup_old_databases(memory_dir, all_hash_dbs)
+
+        # Set the unified_db flag
+        _set_unified_db_flag(db)
+
+        merged_count = totals.get('total_memories_migrated', 0)
+        sources_count = totals.get('sources_merged', 0)
+
+        logger.info(
+            f"Consolidated {merged_count} memories "
+            f"from {sources_count} databases into claudia.db. "
+            f"Cleaned up {deleted} old files."
+        )
+
+        # Write context/whats-new.md so Claudia surfaces the upgrade in-chat
+        _write_consolidation_notice(merged_count, sources_count)
 
     except Exception as e:
         # Non-fatal: log error and continue with whatever data we have
-        logger.error(f"Legacy migration failed (non-fatal): {e}")
+        logger.error(f"Auto-consolidation failed (non-fatal): {e}")
         logger.info("Daemon will continue with current database. "
-                     "Run --migrate-legacy manually to retry.")
+                     "Run --merge-databases manually to retry.")
+
+
+def _set_unified_db_flag(db) -> None:
+    """Set the _meta flag indicating this is a unified database."""
+    from datetime import datetime as dt
+    try:
+        db.execute(
+            "INSERT OR REPLACE INTO _meta (key, value, updated_at) "
+            "VALUES ('unified_db', 'true', ?)",
+            (dt.now().isoformat(),),
+        )
+    except Exception as e:
+        logger.warning(f"Could not set unified_db flag: {e}")
+
+
+def _write_consolidation_notice(merged_count: int, sources_count: int) -> None:
+    """Write context/whats-new.md so Claudia mentions the upgrade in her greeting.
+
+    Looks for context/ in the workspace path (set via --project-dir).
+    Falls back silently if no workspace is configured.
+    """
+    workspace_path = os.environ.get("CLAUDIA_WORKSPACE_PATH")
+    if not workspace_path:
+        return
+
+    try:
+        context_dir = Path(workspace_path) / "context"
+        whats_new = context_dir / "whats-new.md"
+
+        # Don't overwrite if installer already wrote one
+        if whats_new.exists():
+            return
+
+        if not context_dir.exists():
+            return  # Not a Claudia workspace
+
+        from datetime import datetime as dt
+        date = dt.now().strftime("%Y-%m-%d")
+
+        content = f"""# Memory System Upgrade ({date})
+
+Your memory has been unified. Previously, each project directory got its own isolated database (hash-named files like `6af67351bcfa.db`). Now everything lives in one `~/.claudia/memory/claudia.db`.
+
+**What happened automatically:**
+- Consolidated {merged_count} memories from {sources_count} database{'s' if sources_count != 1 else ''} into a single unified database
+- Created a pre-merge backup at `~/.claudia/backups/`
+- Cleaned up old hash-named database files
+
+**What this means for you:**
+- I remember everything from every project, always. No more fragmented memory.
+- Moving project directories no longer loses your history.
+- New `workspace_id` on memories tracks where I learned each fact (provenance, not a wall).
+
+---
+_Surface this update in your first greeting, then delete this file._
+"""
+        whats_new.write_text(content)
+        logger.info(f"Wrote consolidation notice to {whats_new}")
+    except Exception as e:
+        logger.debug(f"Could not write consolidation notice: {e}")
 
 
 def _write_preflight_result(result: dict) -> Path:
@@ -656,10 +731,19 @@ def run_daemon(mcp_mode: bool = True, debug: bool = False, project_id: str = Non
         # Initialize database
         db = get_db()
         db.initialize()
-        logger.info(f"Database initialized at {get_config().db_path}")
 
-        # Auto-migrate legacy claudia.db if it exists
-        _auto_migrate_legacy()
+        # Log database identity
+        try:
+            mem_count = db.execute(
+                "SELECT COUNT(*) as c FROM memories", fetch=True
+            )
+            count = mem_count[0]["c"] if mem_count else 0
+            logger.info(f"Using database: {get_config().db_path} ({count} memories)")
+        except Exception:
+            logger.info(f"Using database: {get_config().db_path}")
+
+        # Auto-consolidate hash-named databases into unified claudia.db
+        _auto_consolidate()
 
         # Start health server and scheduler - ONLY in standalone mode.
         # MCP server processes are ephemeral and session-bound; the standalone
@@ -736,7 +820,7 @@ def main():
     parser.add_argument(
         "--project-dir",
         type=str,
-        help="Project directory for database isolation (creates project-specific database)",
+        help="Project directory for workspace tagging (provenance on memories, not DB isolation)",
     )
     parser.add_argument(
         "--tui",
@@ -781,7 +865,12 @@ def main():
     parser.add_argument(
         "--migrate-legacy",
         action="store_true",
-        help="Manually migrate data from legacy claudia.db to project-specific database",
+        help="Manually migrate data from a legacy database into claudia.db",
+    )
+    parser.add_argument(
+        "--merge-databases",
+        action="store_true",
+        help="Manually merge all hash-named databases into unified claudia.db",
     )
     parser.add_argument(
         "--preflight",
@@ -1353,6 +1442,80 @@ def main():
             sys.exit(1)
 
         run_para_migration(vault_path, db=db, preview=args.preview)
+        return
+
+    if args.merge_databases:
+        # Manual consolidation of hash-named databases
+        setup_logging(debug=args.debug)
+        from .migration import (
+            cleanup_old_databases,
+            merge_all_databases,
+            scan_hash_databases,
+            verify_consolidated_db,
+        )
+
+        db = get_db()
+        db.initialize()
+        config = get_config()
+        memory_dir = Path(config.db_path).parent
+
+        hash_dbs = scan_hash_databases(memory_dir)
+        data_dbs = [d for d in hash_dbs if d["has_data"]]
+        empty_dbs = [d for d in hash_dbs if not d["has_data"]]
+
+        if not hash_dbs:
+            print("No hash-named databases found. Nothing to merge.")
+            return
+
+        print(f"\nFound {len(hash_dbs)} hash-named databases:")
+        for d in hash_dbs:
+            stats_str = ""
+            if d["has_data"]:
+                s = d["stats"]
+                stats_str = f"  {s.get('memories', 0)} memories, {s.get('entities', 0)} entities"
+            else:
+                stats_str = "  (empty)"
+            print(f"  {d['path'].name}{stats_str}")
+
+        print(f"\nTarget: {config.db_path}")
+        print(f"  {len(data_dbs)} with data, {len(empty_dbs)} empty")
+
+        if args.dry_run:
+            print("\nDry run mode: no changes will be made.\n")
+            if data_dbs:
+                totals = merge_all_databases(Path(config.db_path), data_dbs, dry_run=True)
+                print(f"\nWould merge:")
+                for key, val in totals.items():
+                    if val > 0:
+                        print(f"  {key}: {val}")
+            return
+
+        if data_dbs:
+            # Backup before merge
+            backup_path = db.backup(label="pre-merge")
+            print(f"\nBackup created: {backup_path}")
+
+            print("\nMerging...")
+            totals = merge_all_databases(Path(config.db_path), data_dbs)
+
+            if verify_consolidated_db(Path(config.db_path)):
+                print("Integrity check: PASSED")
+            else:
+                print("Integrity check: FAILED (keeping hash databases)")
+                return
+
+            print(f"\nResults:")
+            for key, val in totals.items():
+                if val > 0:
+                    print(f"  {key}: {val}")
+
+        # Clean up
+        deleted = cleanup_old_databases(memory_dir, hash_dbs)
+        print(f"\nCleaned up {deleted} old files.")
+
+        # Set unified_db flag
+        _set_unified_db_flag(db)
+        print("Unified database flag set.")
         return
 
     if args.migrate_legacy:

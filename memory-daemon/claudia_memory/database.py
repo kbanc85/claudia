@@ -1020,6 +1020,28 @@ class Database:
             conn.commit()
             logger.info("Applied migration 20: lifecycle tiers, sacred, close-circle, fact_id, chain")
 
+        if current_version < 21:
+            # Migration 21: Add workspace_id to memories for unified database provenance
+            try:
+                conn.execute("ALTER TABLE memories ADD COLUMN workspace_id TEXT")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    logger.warning(f"Migration 21 statement failed: {e}")
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memories_workspace ON memories(workspace_id)"
+                )
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Migration 21 index failed: {e}")
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description) "
+                "VALUES (21, 'Add workspace_id to memories for unified database provenance tracking')"
+            )
+            conn.commit()
+            logger.info("Applied migration 21: workspace_id for unified database")
+
         # FTS5 setup: ensure memories_fts exists regardless of migration path.
         # The FTS5 virtual table + triggers contain internal semicolons that the
         # schema.sql line-based parser can't handle, so we always check here.
@@ -1172,6 +1194,11 @@ class Database:
         if "entity_summaries" not in tables:
             logger.warning("Migration 19 incomplete: entity_summaries table missing")
             return 18
+
+        # Migration 21 added workspace_id to memories
+        if "workspace_id" not in memory_cols:
+            logger.warning("Migration 21 incomplete: memories missing workspace_id column")
+            return 20
 
         # Migration 20 added lifecycle_tier, fact_id to memories; close_circle to entities
         if "lifecycle_tier" not in memory_cols or "fact_id" not in memory_cols:
@@ -1351,9 +1378,15 @@ class Database:
     def backup(self, label: str = None) -> Path:
         """Create a backup of the database using SQLite's online backup API.
 
+        Backups are stored in ~/.claudia/backups/ with human-readable names:
+        - claudia-daily-2026-03-15.db
+        - claudia-pre-merge-2026-03-15.db
+        - claudia-manual-2026-03-15-143022.db
+
         Args:
             label: Optional label for categorized backups (e.g., "daily", "weekly",
-                   "pre-migration"). Labeled backups have independent retention counts.
+                   "pre-migration", "pre-merge"). Labeled backups have independent
+                   retention counts. If None, uses "manual" with timestamp.
 
         Returns:
             Path to the created backup file
@@ -1361,11 +1394,17 @@ class Database:
         import glob
 
         config = get_config()
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        backup_dir = config.backup_dir
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
         if label:
-            backup_path = Path(f"{self.db_path}.backup-{label}-{timestamp}.db")
+            # Labeled backups use date-only (one per day per label)
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            backup_path = backup_dir / f"claudia-{label}-{date_str}.db"
         else:
-            backup_path = Path(f"{self.db_path}.backup-{timestamp}.db")
+            # Manual backups include full timestamp
+            timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+            backup_path = backup_dir / f"claudia-manual-{timestamp}.db"
 
         # Create backup using SQLite's built-in backup API
         backup_conn = sqlite3.connect(str(backup_path))
@@ -1390,10 +1429,10 @@ class Database:
 
         # Rolling retention (per-label if labeled)
         if label:
-            pattern = f"{self.db_path}.backup-{label}-*.db"
+            pattern = str(backup_dir / f"claudia-{label}-*.db")
             retention = self._get_label_retention(label)
         else:
-            pattern = f"{self.db_path}.backup-*.db"
+            pattern = str(backup_dir / "claudia-manual-*.db")
             retention = config.backup_retention_count
 
         backups = sorted(glob.glob(pattern), key=os.path.getmtime)
@@ -1413,6 +1452,8 @@ class Database:
         retention_map = {
             "daily": config.backup_daily_retention,
             "weekly": config.backup_weekly_retention,
+            "pre-merge": 4,      # Keep pre-merge backups for ~1 month
+            "pre-migration": 4,  # Keep pre-migration backups for ~1 month
         }
         return retention_map.get(label, config.backup_retention_count)
 

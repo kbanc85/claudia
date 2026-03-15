@@ -118,17 +118,25 @@ class MemoryConfig:
     context_builder_token_budget: int = 8000  # Default token budget for CRE
     context_builder_max_facts: int = 30       # Max facts in CRE context window
 
+    # Workspace tracking (provenance, not partition)
+    workspace_id: Optional[str] = None  # Auto-set from --project-dir; tags memories with origin workspace
+
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
+
+    @property
+    def backup_dir(self) -> Path:
+        """Directory for human-readable backups."""
+        return Path.home() / ".claudia" / "backups"
 
     @classmethod
     def load(cls, project_id: Optional[str] = None) -> "MemoryConfig":
         """Load configuration from ~/.claudia/config.json, with defaults.
 
         Args:
-            project_id: Optional project identifier for database isolation.
-                        When provided, the database path is overridden to
-                        ~/.claudia/memory/{project_id}.db for per-project isolation.
+            project_id: Optional project identifier. Stored as workspace_id for
+                        provenance tagging on memories. Does NOT change the database
+                        path (unified DB at ~/.claudia/memory/claudia.db).
         """
         config_path = Path.home() / ".claudia" / "config.json"
         config = cls()
@@ -241,21 +249,16 @@ class MemoryConfig:
         # DEMO MODE: Use isolated demo database (never touches real data)
         # Set CLAUDIA_DEMO_MODE=1 in environment to use demo database
         elif os.environ.get("CLAUDIA_DEMO_MODE") == "1":
-            if project_id:
-                # Workspace-specific demo database
-                config.db_path = Path.home() / ".claudia" / "demo" / f"{project_id}.db"
-            else:
-                # Global demo database
-                config.db_path = Path.home() / ".claudia" / "demo" / "claudia-demo.db"
-            config.db_path.parent.mkdir(parents=True, exist_ok=True)
-        # Override database path for project isolation
-        # This ensures each project gets its own isolated database
-        elif project_id:
-            config.db_path = Path.home() / ".claudia" / "memory" / f"{project_id}.db"
+            config.db_path = Path.home() / ".claudia" / "demo" / "claudia-demo.db"
             config.db_path.parent.mkdir(parents=True, exist_ok=True)
         else:
-            # Default path
+            # Unified database: always ~/.claudia/memory/claudia.db
+            # project_id is stored as workspace_id for provenance, not DB isolation
             config.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Store project_id as workspace_id (provenance metadata, not a partition)
+        if project_id:
+            config.workspace_id = project_id
 
         # Ensure log directory exists
         config.log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -382,13 +385,13 @@ _project_id: Optional[str] = None
 
 
 def set_project_id(project_id: Optional[str]) -> None:
-    """Set the project ID for database isolation.
+    """Set the project ID for workspace tagging.
 
     This must be called before any access to get_config() to ensure
-    the correct project-specific database path is used.
+    the workspace_id is set for provenance tracking on memories.
 
     Args:
-        project_id: Hash of the project directory path, or None for global database.
+        project_id: Hash of the project directory path, or None.
     """
     global _config, _project_id
 
@@ -401,9 +404,8 @@ def set_project_id(project_id: Optional[str]) -> None:
 def get_config() -> MemoryConfig:
     """Get or load the global configuration.
 
-    The configuration is project-aware. If set_project_id() was called,
-    the database path will be project-specific. Otherwise, the global
-    claudia.db is used for backward compatibility.
+    Always uses the unified claudia.db. If set_project_id() was called,
+    the workspace_id is set for provenance tagging on memories.
     """
     global _config, _project_id
     if _config is None:

@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS memories (
     archived_at TEXT,  -- When this memory was archived
     fact_id TEXT UNIQUE,  -- UUID for human-friendly reference
     hash TEXT,  -- SHA-256 chain hash
-    prev_hash TEXT  -- Previous hash in chain (NULL for genesis)
+    prev_hash TEXT,  -- Previous hash in chain (NULL for genesis)
+    workspace_id TEXT  -- Origin workspace (provenance, not partition)
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
@@ -90,6 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_memories_deadline ON memories(deadline_at);
 CREATE INDEX IF NOT EXISTS idx_memories_verification ON memories(verification_status);
 CREATE INDEX IF NOT EXISTS idx_memories_lifecycle ON memories(lifecycle_tier);
 CREATE INDEX IF NOT EXISTS idx_memories_fact_id ON memories(fact_id);
+CREATE INDEX IF NOT EXISTS idx_memories_workspace ON memories(workspace_id);
 
 -- Junction table linking memories to entities
 CREATE TABLE IF NOT EXISTS memory_entities (
@@ -475,3 +477,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_dispatches_started ON agent_dispatches(star
 
 INSERT OR IGNORE INTO schema_migrations (version, description)
 VALUES (20, 'Add lifecycle tiers, sacred memories, close-circle entities, fact_id, SHA-256 chain');
+
+INSERT OR IGNORE INTO schema_migrations (version, description)
+VALUES (21, 'Add workspace_id to memories for unified database provenance tracking');

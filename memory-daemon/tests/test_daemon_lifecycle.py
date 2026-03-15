@@ -179,10 +179,10 @@ class TestBackupManagement:
     """Tests for database backup and rolling retention."""
 
     def test_creates_file(self, db):
-        """Backup should create a .backup-YYYY-MM-DD.db file."""
+        """Backup should create a claudia-manual-*.db file in backups/ dir."""
         backup_path = db.backup()
         assert backup_path.exists()
-        assert ".backup-" in backup_path.name
+        assert backup_path.name.startswith("claudia-manual-")
         assert backup_path.suffix == ".db"
 
     def test_is_valid_database(self, db):
@@ -212,23 +212,27 @@ class TestBackupManagement:
 
     def test_rolling_retention(self, db):
         """Old backups beyond retention count should be deleted."""
-        config = MemoryConfig()
-        config.backup_retention_count = 2
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            backup_dir = Path(tmpdir) / "backups"
+            backup_dir.mkdir()
 
-        with patch("claudia_memory.database.get_config", return_value=config):
-            # Create 3 backups with different timestamps
-            for i, date_str in enumerate(["2026-01-01", "2026-01-02", "2026-01-03"]):
-                # Manually create backup files to simulate history
-                fake_backup = Path(f"{db.db_path}.backup-{date_str}.db")
-                fake_backup.write_bytes(b"fake")
+            config = MemoryConfig()
+            config.backup_retention_count = 2
 
-            # Now do a real backup (will be 4th)
-            backup_path = db.backup()
+            with patch("claudia_memory.database.get_config", return_value=config), \
+                 patch.object(type(config), "backup_dir", new_callable=lambda: property(lambda self: backup_dir)):
+                # Create 3 manual backups to simulate history
+                for ts in ["2026-01-01-120000", "2026-01-02-120000", "2026-01-03-120000"]:
+                    fake_backup = backup_dir / f"claudia-manual-{ts}.db"
+                    fake_backup.write_bytes(b"fake")
 
-            # Check how many backups remain
-            pattern = f"{db.db_path}.backup-*.db"
-            remaining = sorted(glob.glob(pattern))
-            assert len(remaining) <= 2
+                # Now do a real backup (will be 4th)
+                db.backup()
+
+                # Check how many manual backups remain
+                remaining = list(backup_dir.glob("claudia-manual-*.db"))
+                assert len(remaining) <= 2
 
     def test_returns_path(self, db):
         """Backup should return the Path to the created backup."""

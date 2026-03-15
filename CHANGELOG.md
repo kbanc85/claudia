@@ -2,6 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.0 (2026-03-15)
+
+### The Unified Memory Release
+
+Claudia no longer fragments your memory across dozens of invisible database files. Every project, every session, one brain.
+
+- **Single database** -- All sessions now use `~/.claudia/memory/claudia.db` regardless of which project directory you're in. No more hash-named files like `6af67351bcfa.db` that nobody can identify or recover.
+- **Automatic consolidation** -- On first startup after upgrade, Claudia detects your existing hash-named databases, merges all their data into the unified `claudia.db`, and cleans up the old files. Zero manual steps.
+- **Workspace provenance** -- New `workspace_id` column on memories tracks which project directory created each memory. This is provenance metadata ("where did I learn this?"), not a filter wall. Recall stays global: Claudia remembers Sarah regardless of which project you're in.
+- **Human-readable backups** -- Backups now live in `~/.claudia/backups/` with clear names like `claudia-daily-2026-03-15.db` and `claudia-pre-merge-2026-03-15.db` instead of cryptic timestamps alongside the database file.
+- **Pre-merge safety net** -- Before any consolidation, a backup is created automatically. If anything goes wrong, your data is recoverable.
+- **DB identity logging** -- Every daemon startup logs exactly which database it's using and how many memories it contains. No more guessing.
+- **Manual merge CLI** -- `python -m claudia_memory --merge-databases` lets you preview (`--dry-run`) or manually trigger consolidation.
+- **Schema migration 21** -- Adds `workspace_id TEXT` column and index to memories table.
+- **39 new tests** -- Full coverage for unified DB, consolidation, backup naming, and workspace tagging. All 608 tests pass.
+
 ## 1.54.4 (2026-03-14)
 
 ### The One-Click Setup Release

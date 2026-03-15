@@ -1152,6 +1152,167 @@ def _migrate_reflections(
     logger.info(f"Reflections: {results['reflections_migrated']} migrated")
 
 
+# ── Unified Database Consolidation ───────────────────────────────────
+
+def scan_hash_databases(memory_dir: Path) -> List[Dict]:
+    """Scan ~/.claudia/memory/ for hash-named databases with data.
+
+    Returns a list of dicts with path, hash, and stats for each non-empty
+    hash-named database (12-char hex filenames like 6af67351bcfa.db).
+    """
+    import re
+
+    results = []
+    hash_pattern = re.compile(r"^[0-9a-f]{12}\.db$")
+
+    if not memory_dir.exists():
+        return results
+
+    for f in memory_dir.iterdir():
+        if not hash_pattern.match(f.name):
+            continue
+
+        db_hash = f.stem
+        stats = check_legacy_database(f)
+        results.append({
+            "path": f,
+            "hash": db_hash,
+            "has_data": stats is not None,
+            "stats": stats,
+        })
+
+    return results
+
+
+def merge_all_databases(
+    target_path: Path,
+    source_dbs: List[Dict],
+    dry_run: bool = False,
+) -> Dict[str, int]:
+    """Merge multiple hash-named databases into the unified claudia.db.
+
+    Each source DB's memories get tagged with workspace_id = source hash.
+    Deduplication uses content_hash for memories and (canonical_name, type)
+    for entities.
+
+    Args:
+        target_path: Path to the unified claudia.db
+        source_dbs: List of dicts from scan_hash_databases() (only those with data)
+        dry_run: If True, count what would be merged without making changes
+
+    Returns:
+        Dict with total migration counts across all sources
+    """
+    totals = {
+        "sources_merged": 0,
+        "total_entities_created": 0,
+        "total_entities_mapped": 0,
+        "total_memories_migrated": 0,
+        "total_memories_duplicate": 0,
+        "total_relationships_migrated": 0,
+        "total_links_migrated": 0,
+    }
+
+    for source in source_dbs:
+        source_path = source["path"]
+        source_hash = source["hash"]
+
+        logger.info(f"Merging {source_path.name} ({source['stats'].get('memories', 0)} memories, "
+                     f"{source['stats'].get('entities', 0)} entities)")
+
+        try:
+            results = migrate_legacy_database(
+                legacy_path=source_path,
+                active_path=target_path,
+                dry_run=dry_run,
+            )
+
+            # Tag merged memories with workspace_id = source hash
+            if not dry_run:
+                try:
+                    conn = sqlite3.connect(str(target_path), timeout=30)
+                    conn.execute(
+                        "UPDATE memories SET workspace_id = ? "
+                        "WHERE workspace_id IS NULL AND id IN ("
+                        "  SELECT id FROM memories WHERE workspace_id IS NULL"
+                        ")",
+                        (source_hash,),
+                    )
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    logger.warning(f"Could not tag workspace_id for {source_hash}: {e}")
+
+            totals["sources_merged"] += 1
+            totals["total_entities_created"] += results.get("entities_created", 0)
+            totals["total_entities_mapped"] += results.get("entities_mapped", 0)
+            totals["total_memories_migrated"] += results.get("memories_migrated", 0)
+            totals["total_memories_duplicate"] += results.get("memories_duplicate", 0)
+            totals["total_relationships_migrated"] += results.get("relationships_migrated", 0)
+            totals["total_links_migrated"] += results.get("links_migrated", 0)
+
+        except Exception as e:
+            logger.error(f"Failed to merge {source_path.name}: {e}")
+            # Non-fatal: continue with other sources
+
+    return totals
+
+
+def cleanup_old_databases(memory_dir: Path, source_dbs: List[Dict]) -> int:
+    """Delete hash-named databases and their WAL/SHM files after successful merge.
+
+    Args:
+        memory_dir: The ~/.claudia/memory/ directory
+        source_dbs: List of dicts from scan_hash_databases()
+
+    Returns:
+        Number of files deleted
+    """
+    deleted = 0
+
+    for source in source_dbs:
+        db_path = source["path"]
+
+        # Delete the database and its WAL/SHM companions
+        for suffix in ("", "-wal", "-shm"):
+            companion = Path(str(db_path) + suffix)
+            if companion.exists():
+                try:
+                    companion.unlink()
+                    deleted += 1
+                    logger.info(f"Deleted: {companion.name}")
+                except OSError as e:
+                    logger.warning(f"Could not delete {companion}: {e}")
+
+        # Delete any orphan backup files for this hash DB
+        import glob
+        orphan_pattern = str(db_path) + ".backup-*"
+        for orphan in glob.glob(orphan_pattern):
+            try:
+                Path(orphan).unlink()
+                deleted += 1
+                logger.info(f"Deleted orphan backup: {Path(orphan).name}")
+            except OSError as e:
+                logger.warning(f"Could not delete orphan backup {orphan}: {e}")
+
+    return deleted
+
+
+def verify_consolidated_db(db_path: Path) -> bool:
+    """Verify integrity of the consolidated database.
+
+    Returns True if the database passes PRAGMA integrity_check.
+    """
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn.close()
+        return result is not None and result[0] == "ok"
+    except Exception as e:
+        logger.error(f"Integrity check failed: {e}")
+        return False
+
+
 # ── Utilities ────────────────────────────────────────────────────────
 
 def _safe_json_parse(text: str, default: Any = None) -> Any:

@@ -30,9 +30,11 @@ def build_status_report(*, db=None) -> dict:
     Args:
         db: Optional database instance. If None, uses the global get_db() singleton.
     """
+    config = get_config()
     report = {
         "timestamp": datetime.utcnow().isoformat(),
         "status": "healthy",
+        "db_path": str(config.db_path),
         "schema_version": 0,
         "components": {},
         "scheduled_jobs": [],
@@ -54,6 +56,17 @@ def build_status_report(*, db=None) -> dict:
         except Exception:
             report["schema_version"] = 0
 
+        # Unified DB identity
+        try:
+            meta_rows = _db.execute(
+                "SELECT value FROM _meta WHERE key = 'unified_db'", fetch=True
+            )
+            report["unified_db"] = (
+                meta_rows[0]["value"] == "true" if meta_rows else False
+            )
+        except Exception:
+            report["unified_db"] = False
+
         # Counts
         for table, query in [
             ("memories", "SELECT COUNT(*) as c FROM memories"),
@@ -69,12 +82,16 @@ def build_status_report(*, db=None) -> dict:
             except Exception:
                 report["counts"][table] = -1
 
-        # Backup status
+        # Backup status (check both new backups/ dir and legacy alongside-DB location)
         try:
             import glob
-            db_path = str(get_config().db_path)
-            pattern = f"{db_path}.backup-*.db"
-            backups = sorted(glob.glob(pattern))
+            backup_dir = config.backup_dir
+            new_pattern = str(backup_dir / "claudia-*.db")
+            old_pattern = f"{config.db_path}.backup-*.db"
+            backups = sorted(
+                glob.glob(new_pattern) + glob.glob(old_pattern),
+                key=lambda p: Path(p).stat().st_mtime if Path(p).exists() else 0,
+            )
             if backups:
                 latest = Path(backups[-1])
                 report["backup"] = {

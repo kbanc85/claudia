@@ -251,6 +251,14 @@ class RememberService:
             insert_data["source_context"] = source_context
         if source_channel:
             insert_data["source_channel"] = source_channel
+        # Auto-tag workspace_id from config (provenance: which workspace created this memory)
+        try:
+            from ..config import get_config as _get_config
+            _ws_id = getattr(_get_config(), "workspace_id", None)
+            if _ws_id:
+                insert_data["workspace_id"] = _ws_id
+        except Exception:
+            pass
         if deadline_at:
             insert_data["deadline_at"] = deadline_at
         if temporal_markers_json:

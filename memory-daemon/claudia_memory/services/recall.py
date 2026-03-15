@@ -44,6 +44,8 @@ class RecallResult:
     origin_type: str = "inferred"  # user_stated, extracted, inferred, corrected
     # Channel tracking
     source_channel: Optional[str] = None  # Origin channel: claude_code, telegram, slack
+    # Workspace provenance
+    workspace_id: Optional[str] = None  # Origin workspace (project hash)
     # Lifecycle fields
     lifecycle_tier: Optional[str] = None  # sacred/active/cooling/archived
     fact_id: Optional[str] = None  # UUID for human-friendly reference
@@ -370,6 +372,9 @@ class RecallService:
         # Channel tracking (may not exist in older DBs)
         source_channel_val = row["source_channel"] if "source_channel" in row_keys else None
 
+        # Workspace provenance (may not exist in older DBs)
+        workspace_id_val = row["workspace_id"] if "workspace_id" in row_keys else None
+
         # Lifecycle fields (may not exist in older DBs)
         lifecycle_tier_val = row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None
         fact_id_val = row["fact_id"] if "fact_id" in row_keys else None
@@ -390,6 +395,7 @@ class RecallService:
             verification_status=verification_status_val,
             origin_type=origin_type_val,
             source_channel=source_channel_val,
+            workspace_id=workspace_id_val,
             lifecycle_tier=lifecycle_tier_val,
             fact_id=fact_id_val,
         )
@@ -858,6 +864,7 @@ class RecallService:
                     source=row["source"] if "source" in row_keys else None,
                     source_id=row["source_id"] if "source_id" in row_keys else None,
                     source_context=row["source_context"] if "source_context" in row_keys else None,
+                    workspace_id=row["workspace_id"] if "workspace_id" in row_keys else None,
                     lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
                     fact_id=row["fact_id"] if "fact_id" in row_keys else None,
                 )
@@ -1326,6 +1333,7 @@ class RecallService:
                     source=row["source"] if "source" in row_keys else None,
                     source_id=row["source_id"] if "source_id" in row_keys else None,
                     source_context=row["source_context"] if "source_context" in row_keys else None,
+                    workspace_id=row["workspace_id"] if "workspace_id" in row_keys else None,
                     lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
                     fact_id=row["fact_id"] if "fact_id" in row_keys else None,
                 )
@@ -2522,6 +2530,7 @@ class RecallService:
                 created_at=row["created_at"],
                 entities=entity_str.split(",") if entity_str else [],
                 metadata={"urgency": urgency, "deadline_at": deadline_str},
+                workspace_id=row["workspace_id"] if "workspace_id" in row_keys else None,
                 lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
                 fact_id=row["fact_id"] if "fact_id" in row_keys else None,
             ))
@@ -2791,6 +2800,7 @@ class RecallService:
             origin_type=row["origin_type"] if "origin_type" in row_keys else "inferred",
             confidence=row["confidence"] if "confidence" in row_keys else 1.0,
             source_channel=row["source_channel"] if "source_channel" in row_keys else None,
+            workspace_id=row["workspace_id"] if "workspace_id" in row_keys else None,
             lifecycle_tier=row["lifecycle_tier"] if "lifecycle_tier" in row_keys else None,
             fact_id=row["fact_id"] if "fact_id" in row_keys else None,
         )
