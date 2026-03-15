@@ -303,9 +303,8 @@ def _write_consolidation_notice(merged_count: int, sources_count: int) -> None:
         context_dir = Path(workspace_path) / "context"
         whats_new = context_dir / "whats-new.md"
 
-        # Don't overwrite if installer already wrote one
-        if whats_new.exists():
-            return
+        # Overwrite installer's generic release notes with consolidation-specific notice
+        # The consolidation result is more actionable than changelog text
 
         if not context_dir.exists():
             return  # Not a Claudia workspace

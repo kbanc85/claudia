@@ -3176,6 +3176,46 @@ def _build_briefing() -> str:
     lines = []
     lines.append("# Session Briefing\n")
 
+    # 0. Pending database consolidation alert
+    try:
+        unified_row = db.execute(
+            "SELECT value FROM _meta WHERE key = 'unified_db'", fetch=True
+        )
+        is_unified = unified_row and unified_row[0]["value"] == "true" if unified_row else False
+
+        if not is_unified:
+            import re
+            from pathlib import Path
+            memory_dir = Path(get_config().db_path).parent
+            if memory_dir.exists():
+                hash_pattern = re.compile(r"^[0-9a-f]{12}\.db$")
+                hash_dbs = [f for f in memory_dir.iterdir() if hash_pattern.match(f.name)]
+                if hash_dbs:
+                    # Quick count of total memories across hash DBs
+                    import sqlite3 as _sql3
+                    total_mem = 0
+                    dbs_with_data = 0
+                    for hdb in hash_dbs:
+                        try:
+                            conn = _sql3.connect(f"file:{hdb}?mode=ro", uri=True, timeout=2)
+                            row = conn.execute("SELECT COUNT(*) FROM memories").fetchone()
+                            cnt = row[0] if row else 0
+                            conn.close()
+                            if cnt > 0:
+                                total_mem += cnt
+                                dbs_with_data += 1
+                        except Exception:
+                            pass
+                    if dbs_with_data > 0:
+                        lines.append(
+                            f"**⚠️ PENDING CONSOLIDATION:** {dbs_with_data} legacy database{'s' if dbs_with_data != 1 else ''} "
+                            f"with {total_mem:,} memories found. These need to be merged into claudia.db. "
+                            f"Ask the user if they want to consolidate now (restart the daemon to trigger auto-merge, "
+                            f"or run `python -m claudia_memory --merge-databases` manually)."
+                        )
+    except Exception as e:
+        logger.debug(f"Briefing consolidation check failed: {e}")
+
     # 1. Active commitments count + stale count
     try:
         total_row = db.execute(

@@ -2,6 +2,15 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.5 (2026-03-15)
+
+- **Consolidation alert in briefing** -- When legacy hash databases exist but haven't been merged yet, the session briefing surfaces a pending consolidation alert with memory counts. Claudia will ask the user if they want to consolidate rather than silently noting version numbers.
+- **Consolidation notice overwrites installer release notes** -- After a successful merge, the whats-new file shows what actually happened (merged N memories from M databases) instead of generic changelog text.
+
+## 1.55.4 (2026-03-15)
+
+- **Installer URL** -- Banner now shows claudia.aiadopters.club instead of the GitHub URL.
+
 ## 1.55.3 (2026-03-15)
 
 - **Installer polish** -- Memory System step shows memory count from claudia.db when available instead of raw file count. DB scan shows totals ("4 databases to consolidate (2,118 memories, 319 entities)") and fixes "1 memories" grammar. MCP Config no longer warns about multiple stdio servers (they work fine now).
