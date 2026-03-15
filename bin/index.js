@@ -960,43 +960,10 @@ async function main() {
       }
     }
 
-    // Scan existing databases and show stats
+    // Scan existing databases (results shown after renderer finishes)
+    let dbScan = null;
     if (daemonOk) {
-      const dbScan = scanExistingDatabases();
-      if (dbScan.totalMemories > 0 || dbScan.hashDbs.length > 0) {
-        renderer.stopSpinner();
-        console.log('');
-        console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
-        console.log(` ${colors.boldCyan}Memory Database Scan${colors.reset}`);
-        console.log('');
-
-        if (dbScan.unified.exists) {
-          console.log(` ${colors.green}●${colors.reset} claudia.db: ${colors.bold}${dbScan.unified.memories}${colors.reset} memories, ${colors.bold}${dbScan.unified.entities}${colors.reset} entities`);
-        }
-
-        if (dbScan.hashDbs.length > 0) {
-          const withData = dbScan.hashDbs.filter(d => d.memories > 0 || d.entities > 0);
-          const empty = dbScan.hashDbs.filter(d => d.memories === 0 && d.entities === 0);
-
-          if (withData.length > 0) {
-            console.log('');
-            console.log(` ${colors.yellow}Found ${withData.length} legacy database${withData.length !== 1 ? 's' : ''} to consolidate:${colors.reset}`);
-            for (const db of withData) {
-              console.log(`   ${colors.dim}${db.name}${colors.reset}: ${db.memories} memories, ${db.entities} entities`);
-            }
-            console.log('');
-            console.log(` ${colors.dim}These will be auto-merged into claudia.db on next startup.${colors.reset}`);
-          }
-          if (empty.length > 0) {
-            console.log(` ${colors.dim}${empty.length} empty database${empty.length !== 1 ? 's' : ''} will be cleaned up automatically.${colors.reset}`);
-          }
-        } else if (dbScan.unified.exists && dbScan.unified.memories > 0) {
-          console.log(` ${colors.dim}Unified database, no legacy files to consolidate.${colors.reset}`);
-        }
-
-        console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
-        renderer.startSpinner();
-      }
+      dbScan = scanExistingDatabases();
     }
 
     memoryOk = daemonOk || hasExistingDb;
@@ -1015,6 +982,7 @@ async function main() {
   // Vault step, then completion
   runVaultStep(renderer, () => {
     renderer.render();
+    showDbScanResults(dbScan);
     showCompletion(targetDir, isCurrentDir, memoryOk, rootCause);
   });
 
@@ -1083,6 +1051,42 @@ async function main() {
   }
 
   // ── Completion block ──
+
+  function showDbScanResults(dbScan) {
+    if (!dbScan) return;
+    if (dbScan.totalMemories === 0 && dbScan.hashDbs.length === 0) return;
+
+    console.log('');
+    console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
+    console.log(` ${colors.boldCyan}Memory Database Scan${colors.reset}`);
+    console.log('');
+
+    if (dbScan.unified.exists) {
+      console.log(` ${colors.green}●${colors.reset} claudia.db: ${colors.bold}${dbScan.unified.memories}${colors.reset} memories, ${colors.bold}${dbScan.unified.entities}${colors.reset} entities`);
+    }
+
+    if (dbScan.hashDbs.length > 0) {
+      const withData = dbScan.hashDbs.filter(d => d.memories > 0 || d.entities > 0);
+      const empty = dbScan.hashDbs.filter(d => d.memories === 0 && d.entities === 0);
+
+      if (withData.length > 0) {
+        console.log('');
+        console.log(` ${colors.yellow}Found ${withData.length} legacy database${withData.length !== 1 ? 's' : ''} to consolidate:${colors.reset}`);
+        for (const db of withData) {
+          console.log(`   ${colors.dim}${db.name}${colors.reset}: ${db.memories} memories, ${db.entities} entities`);
+        }
+        console.log('');
+        console.log(` ${colors.dim}These will be auto-merged into claudia.db on next startup.${colors.reset}`);
+      }
+      if (empty.length > 0) {
+        console.log(` ${colors.dim}${empty.length} empty database${empty.length !== 1 ? 's' : ''} will be cleaned up automatically.${colors.reset}`);
+      }
+    } else if (dbScan.unified.exists && dbScan.unified.memories > 0) {
+      console.log(` ${colors.dim}Unified database, no legacy files to consolidate.${colors.reset}`);
+    }
+
+    console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
+  }
 
   function showCompletion(targetDir, isCurrentDir, memoryInstalled, failureCause) {
     const rerunCmd = isCurrentDir ? 'npx get-claudia .' : `cd ${targetDir} && npx get-claudia .`;
