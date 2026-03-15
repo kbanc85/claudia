@@ -2,6 +2,10 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.2 (2026-03-15)
+
+- **BUG FIX: dbScan scope error** -- `dbScan` was declared inside the try block but referenced in the vault callback outside it. Moved declaration to outer scope.
+
 ## 1.55.1 (2026-03-15)
 
 - **BUG FIX: installer DB scan display** -- The memory database scan output was being overwritten by the progress renderer's ANSI cursor movements. Moved scan results to print after the renderer finishes so all legacy database stats are visible.

@@ -629,6 +629,7 @@ async function main() {
   // Run CLI-based setup (no Python daemon needed)
   let memoryOk = false;
   let rootCause = null;
+  let dbScan = null;
 
   try {
     // Step 1: Environment -- check Node.js version, detect/install/start Ollama
@@ -961,7 +962,6 @@ async function main() {
     }
 
     // Scan existing databases (results shown after renderer finishes)
-    let dbScan = null;
     if (daemonOk) {
       dbScan = scanExistingDatabases();
     }
