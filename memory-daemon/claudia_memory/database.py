@@ -25,6 +25,73 @@ from .config import get_config
 logger = logging.getLogger(__name__)
 
 
+def load_sqlite_vec(conn: sqlite3.Connection) -> bool:
+    """Load the sqlite-vec extension on a connection.
+
+    Tries two methods:
+    1. sqlite_vec Python package (recommended, works everywhere including Python 3.13+)
+    2. Native extension loading (for systems with pre-installed sqlite-vec)
+
+    Returns True if vec0 is available, False otherwise. Never raises.
+    """
+    # Method 1: Try sqlite_vec Python package
+    try:
+        import sqlite_vec
+        if hasattr(conn, "enable_load_extension"):
+            conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        if hasattr(conn, "enable_load_extension"):
+            conn.enable_load_extension(False)
+        logger.debug("Loaded sqlite-vec via Python package")
+        return True
+    except ImportError:
+        logger.debug("sqlite_vec package not installed")
+    except Exception as e:
+        logger.warning(f"sqlite_vec package installed but load() failed: {e}")
+
+    # Method 2: Try native extension loading
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec_paths = ["vec0"]  # System-wide
+
+        if sys.platform == "win32":
+            try:
+                import sqlite_vec as _sv
+                pkg_dir = Path(_sv.__file__).parent
+                for dll in pkg_dir.rglob("vec0*"):
+                    if dll.suffix in (".dll", ".so"):
+                        sqlite_vec_paths.append(str(dll.with_suffix("")))
+            except ImportError:
+                pass
+            sqlite_vec_paths.extend([
+                str(Path(sys.executable).parent / "DLLs" / "vec0"),
+                str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
+            ])
+        else:
+            sqlite_vec_paths.extend([
+                "/usr/local/lib/sqlite-vec/vec0",
+                "/opt/homebrew/lib/sqlite-vec/vec0",
+                str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
+            ])
+
+        for path in sqlite_vec_paths:
+            try:
+                conn.load_extension(path)
+                logger.debug(f"Loaded sqlite-vec from {path}")
+                conn.enable_load_extension(False)
+                return True
+            except sqlite3.OperationalError:
+                continue
+
+        conn.enable_load_extension(False)
+    except AttributeError:
+        logger.debug("enable_load_extension not available (Python 3.13+)")
+    except Exception as e:
+        logger.debug(f"Extension loading failed: {e}")
+
+    return False
+
+
 class Database:
     """Thread-safe SQLite database with sqlite-vec support"""
 
@@ -51,72 +118,8 @@ class Database:
             # Recover any uncommitted WAL writes from a previous crashed daemon
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
-            # Try to load sqlite-vec for vector search
-            # Priority: sqlite_vec Python package first (works on Python 3.13+),
-            # then fall back to native extension loading
-            loaded = False
-
-            # Method 1: Try sqlite_vec Python package (recommended, works everywhere)
-            # Python 3.14+ requires explicit enable_load_extension() before any
-            # extension loading, even via the sqlite_vec helper package.
-            try:
-                import sqlite_vec
-                if hasattr(conn, "enable_load_extension"):
-                    conn.enable_load_extension(True)
-                sqlite_vec.load(conn)
-                if hasattr(conn, "enable_load_extension"):
-                    conn.enable_load_extension(False)
-                loaded = True
-                logger.debug("Loaded sqlite-vec via Python package")
-            except ImportError:
-                logger.debug("sqlite_vec package not installed")
-            except Exception as e:
-                logger.warning(f"sqlite_vec package installed but load() failed: {e}")
-
-            # Method 2: Try native extension loading (for systems with pre-installed sqlite-vec)
-            if not loaded:
-                try:
-                    conn.enable_load_extension(True)
-                    sqlite_vec_paths = ["vec0"]  # System-wide
-
-                    if sys.platform == "win32":
-                        # Try to find vec0.dll in the sqlite-vec package directory
-                        try:
-                            import sqlite_vec as _sv
-                            pkg_dir = Path(_sv.__file__).parent
-                            for dll in pkg_dir.rglob("vec0*"):
-                                if dll.suffix in (".dll", ".so"):
-                                    sqlite_vec_paths.append(str(dll.with_suffix("")))
-                        except ImportError:
-                            pass
-                        sqlite_vec_paths.extend([
-                            str(Path(sys.executable).parent / "DLLs" / "vec0"),
-                            str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
-                        ])
-                    else:
-                        sqlite_vec_paths.extend([
-                            "/usr/local/lib/sqlite-vec/vec0",
-                            "/opt/homebrew/lib/sqlite-vec/vec0",
-                            str(Path.home() / ".local" / "lib" / "sqlite-vec" / "vec0"),
-                        ])
-
-                    for path in sqlite_vec_paths:
-                        try:
-                            conn.load_extension(path)
-                            loaded = True
-                            logger.debug(f"Loaded sqlite-vec from {path}")
-                            break
-                        except sqlite3.OperationalError:
-                            continue
-
-                    conn.enable_load_extension(False)
-                except AttributeError:
-                    # Python 3.13+ may not have enable_load_extension
-                    logger.debug("enable_load_extension not available (Python 3.13+)")
-                except Exception as e:
-                    logger.debug(f"Extension loading failed: {e}")
-
-            if not loaded:
+            # Load sqlite-vec for vector search
+            if not load_sqlite_vec(conn):
                 if sys.platform == "win32":
                     logger.warning(
                         "sqlite-vec not available. Vector search will be disabled. "

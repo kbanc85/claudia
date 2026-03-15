@@ -20,7 +20,7 @@ from pathlib import Path
 from .config import get_config, set_project_id
 from .daemon.health import start_health_server, stop_health_server
 from .daemon.scheduler import start_scheduler, stop_scheduler
-from .database import get_db
+from .database import get_db, load_sqlite_vec
 from .mcp.server import run_server as run_mcp_server
 
 logger = logging.getLogger(__name__)
@@ -401,6 +401,7 @@ def _check_and_repair_indexes(db_path: Path) -> None:
     try:
         conn = sqlite3.connect(str(db_path), timeout=10)
         conn.row_factory = sqlite3.Row
+        load_sqlite_vec(conn)
 
         # Count memories
         mem_row = conn.execute("SELECT COUNT(*) as c FROM memories WHERE invalidated_at IS NULL").fetchone()
@@ -423,8 +424,13 @@ def _check_and_repair_indexes(db_path: Path) -> None:
         try:
             emb_row = conn.execute("SELECT COUNT(*) as c FROM memory_embeddings").fetchone()
             emb_count = emb_row["c"] if emb_row else 0
-        except Exception:
-            pass  # Vec0 table might not exist
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                pass  # Fresh install, vec0 tables not yet created
+            elif "no such module" in str(e):
+                logger.debug("sqlite_vec not loaded, cannot count embeddings")
+            else:
+                logger.warning(f"Unexpected error counting embeddings: {e}")
 
         conn.close()
 
@@ -504,6 +510,13 @@ def _auto_backfill_embeddings(db_path: Path, mem_count: int, emb_count: int) -> 
 
             conn = sqlite3.connect(str(db_path), timeout=30)
             conn.row_factory = sqlite3.Row
+            if not load_sqlite_vec(conn):
+                logger.warning(
+                    "sqlite_vec not available in backfill thread. "
+                    "Cannot write to vec0 tables. Skipping embedding backfill."
+                )
+                conn.close()
+                return
 
             # Find memories missing embeddings
             missing = conn.execute(

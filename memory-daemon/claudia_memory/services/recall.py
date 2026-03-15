@@ -145,9 +145,11 @@ class RecallService:
                 LEFT JOIN memory_entities me2 ON m.id = me2.memory_id
                 LEFT JOIN entities e ON me2.entity_id = e.id
                 WHERE me.embedding MATCH ?
+                AND k = ?
                 """
             )
             params.append(json.dumps(query_embedding))
+            params.append(limit * 2)
 
             self._apply_filters(sql_parts, params, memory_types, min_importance, date_after, date_before, about_entity, include_archived)
             sql_parts.append("GROUP BY m.id ORDER BY vector_score DESC LIMIT ?")
@@ -1368,11 +1370,12 @@ class RecallService:
                     FROM episode_embeddings ee
                     JOIN episodes e ON e.id = ee.episode_id
                     WHERE ee.embedding MATCH ?
+                    AND k = ?
                     AND e.is_summarized = 1
                     ORDER BY relevance DESC
                     LIMIT ?
                     """,
-                    (json.dumps(query_embedding), limit),
+                    (json.dumps(query_embedding), limit, limit),
                     fetch=True,
                 ) or []
             except Exception as e:
@@ -2286,8 +2289,9 @@ class RecallService:
                     JOIN reflections r ON r.id = re.reflection_id
                     LEFT JOIN entities e ON r.about_entity_id = e.id
                     WHERE re.embedding MATCH ?
+                    AND k = ?
                 """
-                params: list = [json.dumps(query_embedding)]
+                params: list = [json.dumps(query_embedding), limit]
 
                 if reflection_types:
                     placeholders = ", ".join(["?" for _ in reflection_types])

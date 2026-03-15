@@ -3346,10 +3346,25 @@ def _build_briefing() -> str:
             coverage = (emb_c / mem_c) * 100
             if coverage < 90:
                 gap = mem_c - emb_c
+                # Check _meta for backfill status to give accurate guidance
+                status_hint = "Start Ollama and restart daemon to generate embeddings."
+                try:
+                    repair_row = db.execute(
+                        "SELECT value FROM _meta WHERE key = 'indexes_repaired'",
+                        fetch=True,
+                    )
+                    if repair_row and repair_row[0]["value"]:
+                        repair_info = repair_row[0]["value"]
+                        if "backfill started" in repair_info:
+                            status_hint = "Backfill was started on this run. Check daemon logs for progress."
+                        elif coverage > 0:
+                            status_hint = "Partial embeddings exist. Restart daemon to trigger backfill for the rest."
+                except Exception:
+                    pass
                 lines.append(
                     f"**Embedding coverage:** {emb_c}/{mem_c} ({coverage:.0f}%). "
                     f"{gap} memories lack vector embeddings. "
-                    f"{'Backfill is running in background.' if coverage > 0 else 'Start Ollama and restart daemon to generate embeddings.'} "
+                    f"{status_hint} "
                     f"Recall uses keyword fallback for unembedded memories."
                 )
     except Exception as e:

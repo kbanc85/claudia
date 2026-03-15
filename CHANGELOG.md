@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.8 (2026-03-15)
+
+### The Vector Search Fix
+
+v1.55.7 fixed FTS5 recall but broke vector/semantic search for every user. Three raw `sqlite3.connect()` calls skipped loading the `sqlite_vec` extension, and three KNN queries lacked the required `k = ?` constraint for JOINs. Net effect: 0% embedding coverage and silent fallback to keyword matching.
+
+- **`load_sqlite_vec()` helper** -- Extracted the vec0 extension loading logic from `Database._get_connection()` into a standalone public function. Any raw connection that touches vec0 tables calls this one function. Eliminates the entire class of "forgot to load extension" bugs.
+- **Backfill worker fix** -- `_backfill_worker()` now loads sqlite_vec on its raw connection. Previously it crashed within 60ms of starting because it couldn't query or write to vec0 tables. Degrades gracefully if the extension isn't available.
+- **Index repair fix** -- `_check_and_repair_indexes()` now loads sqlite_vec on its raw connection. Previously it always reported 0 embeddings (triggering unnecessary backfill every startup). Improved exception handling distinguishes "no such table" from "no such module."
+- **KNN `k = ?` constraint** -- Added `AND k = ?` to all three `embedding MATCH` queries in recall.py (`recall()`, `recall_episodes()`, `search_reflections()`). vec0's KNN queries require this constraint when JOINs are present because SQLite's query planner can't push an outer `LIMIT` into the virtual table scan.
+- **Smarter briefing message** -- Embedding health check now reads `_meta['indexes_repaired']` to distinguish "backfill in progress" from "backfill never started." No longer tells users to "Start Ollama" when the real problem was a code bug.
+- **9 new tests** -- Helper extraction, Database integration, backfill/repair patterns, KNN constraint behavior (both success and documented failure without `k`). All 615 tests pass.
+
 ## 1.55.7 (2026-03-15)
 
 ### The Recall Recovery Release
