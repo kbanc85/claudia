@@ -2,15 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## 1.55.9 (2026-03-15)
+## 1.55.10 (2026-03-15)
 
 ### The Personality Update
 
-The installer now has personality. Claudia blinks while she waits, shares thoughts during setup, and greets new users differently from returning ones.
+The installer now has personality. A thinking wave pulses during setup, rotating subtitles add charm, and the completion message adapts to who you are.
 
-- **Blinking eyes** -- The portrait's eyes blink every 3-8 seconds during install. A small detail that makes the ASCII art feel alive. Resets to open when setup finishes.
-- **Rotating subtitles** -- A dim quoted line below the progress bar cycles through 12 messages during install ("Calibrating charm levels...", "Loading opinions...", "I never forget a face. Or a deadline."). Starts at a random position so repeat installs feel fresh.
-- **Context-aware completion** -- Fresh installs say "She's waiting to meet you" with onboarding hints. Upgrades show the new version number and suggest /morning-brief and /inbox-check. The `cd` command is only shown when needed (not when already in the Claudia folder).
+- **Thinking wave** -- A traveling pulse animation (`░▒▓█▓▒░`) appears under the progress bar during install. Smooth, subtle, and makes the wait feel alive.
+- **Rotating subtitles** -- A dim quoted line cycles through 12 messages during install ("Calibrating charm levels...", "Loading opinions...", "I never forget a face. Or a deadline."). Starts at a random position so repeat installs feel fresh.
+- **Context-aware completion** -- Fresh installs say "She's waiting to meet you" with onboarding hints and suggested first commands. Upgrades show the new version number and suggest /morning-brief and /inbox-check. The `cd` command is only shown when needed.
+- **Removed eye blink** -- The v1.55.9 blinking eyes corrupted the portrait by writing to the wrong terminal line. Replaced with the cleaner thinking wave.
+
+## 1.55.9 (2026-03-15)
+
+- **Blinking eyes** -- Portrait eyes blink during install. (Removed in 1.55.10 due to terminal rendering bug.)
+- **Rotating subtitles** -- First version of subtitle rotation.
+- **Context-aware completion** -- First version of adaptive completion messages.
 
 ## 1.55.8 (2026-03-15)
 

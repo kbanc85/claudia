@@ -119,6 +119,25 @@ const SUBTITLES = [
   'Setting up your second brain...',
 ];
 
+// ─── Thinking Wave (animated pulse under progress bar) ──────────────────
+
+const WAVE_WIDTH = 28;
+const WAVE_CHARS = ['░', '▒', '▓', '█', '▓', '▒', '░'];
+
+function getWaveFrame(tick) {
+  // Build a traveling pulse wave
+  const out = [];
+  for (let i = 0; i < WAVE_WIDTH; i++) {
+    const pos = (i - tick % WAVE_WIDTH + WAVE_WIDTH) % WAVE_WIDTH;
+    if (pos < WAVE_CHARS.length) {
+      out.push(WAVE_CHARS[pos]);
+    } else {
+      out.push(' ');
+    }
+  }
+  return ` ${colors.cyan}${out.join('')}${colors.reset}`;
+}
+
 // ─── Progress Renderer ──────────────────────────────────────────────────
 
 class ProgressRenderer {
@@ -130,12 +149,7 @@ class ProgressRenderer {
     this.spinnerTimer = null;
     this.subtitleIndex = Math.floor(Math.random() * SUBTITLES.length);
     this.subtitleTicks = 0;   // counts render cycles; rotate every ~20 ticks (4s at 200ms)
-    this.eyesOpen = true;
-    this.eyeBlinkCountdown = 15 + Math.floor(Math.random() * 20); // ticks until next blink
-    // Lines between the banner's eyes line and the renderer's first output line.
-    // Banner after eyes: 8 lines (body, waist, legs, blank, CLAUDIA, byline, research, trailing)
-    // Confirm prompt: 1 line.  Blank line before renderer: 1 line.  Total = 10.
-    this.eyesOffsetAbove = 10;
+    this.waveTick = 0;
 
     for (const step of STEPS) {
       this.states[step.id] = { state: 'pending', detail: '' };
@@ -157,24 +171,13 @@ class ProgressRenderer {
     if (!supportsInPlace) return;
     this.spinnerTimer = setInterval(() => {
       this.spinnerFrame = (this.spinnerFrame + 1) % this.spinnerChars.length;
+      this.waveTick++;
 
       // Rotate subtitle every ~4 seconds (20 ticks * 200ms)
       this.subtitleTicks++;
       if (this.subtitleTicks >= 20) {
         this.subtitleTicks = 0;
         this.subtitleIndex = (this.subtitleIndex + 1) % SUBTITLES.length;
-      }
-
-      // Eye blink logic: count down, blink briefly (2 ticks = 400ms), then reset
-      this.eyeBlinkCountdown--;
-      if (this.eyeBlinkCountdown <= 0) {
-        if (this.eyesOpen) {
-          this.eyesOpen = false;
-          this.eyeBlinkCountdown = 2;  // stay closed for 400ms
-        } else {
-          this.eyesOpen = true;
-          this.eyeBlinkCountdown = 15 + Math.floor(Math.random() * 25); // 3-8s until next blink
-        }
       }
 
       this.render();
@@ -186,7 +189,6 @@ class ProgressRenderer {
       clearInterval(this.spinnerTimer);
       this.spinnerTimer = null;
     }
-    this.eyesOpen = true;
   }
 
   getIcon(state) {
@@ -222,26 +224,6 @@ class ProgressRenderer {
     return ` ${colors.dim}"${text}"${colors.reset}`;
   }
 
-  blinkEyes() {
-    if (!supportsInPlace || this.lastLineCount === 0) return;
-    const y = colors.yellow;
-    const w = colors.white;
-    const r = colors.reset;
-    // Build the eyes line based on current blink state
-    const eyesLine = this.eyesOpen
-      ? `${y}██${w}██${r}  ${w}██${r}  ${w}██${y}██${r}`
-      : `${y}██${w}▄▄${r}  ${w}▄▄${r}  ${w}▄▄${y}██${r}`;
-
-    // Save cursor, jump up to eyes line, redraw it, restore cursor
-    const linesUp = this.lastLineCount + this.eyesOffsetAbove;
-    process.stdout.write(
-      `\x1b[s` +                           // save cursor position
-      `\x1b[${linesUp}A` +                 // move up to eyes line
-      `\x1b[2K${eyesLine}` +               // clear line and write eyes
-      `\x1b[u`                              // restore cursor position
-    );
-  }
-
   render() {
     const lines = [];
 
@@ -259,8 +241,9 @@ class ProgressRenderer {
     lines.push('');
     lines.push(this.getProgressBar());
 
-    // Show rotating subtitle while spinner is active
+    // Show thinking wave and rotating subtitle while spinner is active
     if (this.spinnerTimer) {
+      lines.push(getWaveFrame(this.waveTick));
       lines.push(this.getSubtitle());
     }
 
@@ -272,18 +255,14 @@ class ProgressRenderer {
       for (const line of lines) {
         process.stdout.write(`\x1b[2K${line}\n`);
       }
-      // Clear any leftover lines from previous render (e.g. subtitle removed)
+      // Clear any leftover lines from previous render (e.g. wave/subtitle removed)
       if (lines.length < this.lastLineCount) {
         for (let i = 0; i < this.lastLineCount - lines.length; i++) {
           process.stdout.write(`\x1b[2K\n`);
         }
-        // Move cursor back up to end of current output
         process.stdout.write(`\x1b[${this.lastLineCount - lines.length}A`);
       }
       this.lastLineCount = lines.length;
-
-      // Blink the eyes in the banner above
-      this.blinkEyes();
     } else {
       // Non-TTY: only print when a step changes to done/warn/error
       // (handled in update via appendLine)
