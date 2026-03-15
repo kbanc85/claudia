@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { setupGoogleWorkspace, detectOldGoogleMcp, extractProjectNumber, buildApiEnableUrl, TIER_APIS } from './google-setup.js';
@@ -960,6 +960,45 @@ async function main() {
       }
     }
 
+    // Scan existing databases and show stats
+    if (daemonOk) {
+      const dbScan = scanExistingDatabases();
+      if (dbScan.totalMemories > 0 || dbScan.hashDbs.length > 0) {
+        renderer.stopSpinner();
+        console.log('');
+        console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
+        console.log(` ${colors.boldCyan}Memory Database Scan${colors.reset}`);
+        console.log('');
+
+        if (dbScan.unified.exists) {
+          console.log(` ${colors.green}●${colors.reset} claudia.db: ${colors.bold}${dbScan.unified.memories}${colors.reset} memories, ${colors.bold}${dbScan.unified.entities}${colors.reset} entities`);
+        }
+
+        if (dbScan.hashDbs.length > 0) {
+          const withData = dbScan.hashDbs.filter(d => d.memories > 0 || d.entities > 0);
+          const empty = dbScan.hashDbs.filter(d => d.memories === 0 && d.entities === 0);
+
+          if (withData.length > 0) {
+            console.log('');
+            console.log(` ${colors.yellow}Found ${withData.length} legacy database${withData.length !== 1 ? 's' : ''} to consolidate:${colors.reset}`);
+            for (const db of withData) {
+              console.log(`   ${colors.dim}${db.name}${colors.reset}: ${db.memories} memories, ${db.entities} entities`);
+            }
+            console.log('');
+            console.log(` ${colors.dim}These will be auto-merged into claudia.db on next startup.${colors.reset}`);
+          }
+          if (empty.length > 0) {
+            console.log(` ${colors.dim}${empty.length} empty database${empty.length !== 1 ? 's' : ''} will be cleaned up automatically.${colors.reset}`);
+          }
+        } else if (dbScan.unified.exists && dbScan.unified.memories > 0) {
+          console.log(` ${colors.dim}Unified database, no legacy files to consolidate.${colors.reset}`);
+        }
+
+        console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
+        renderer.startSpinner();
+      }
+    }
+
     memoryOk = daemonOk || hasExistingDb;
 
   } catch (err) {
@@ -1174,6 +1213,80 @@ function restoreMcpServers(targetPath) {
     // Not valid JSON or can't read -- skip silently
   }
 }
+
+/**
+ * Scan ~/.claudia/memory/ for existing databases and return rough stats.
+ * Uses sqlite3 CLI (via execFileSync) to query each .db file safely.
+ * Returns { unified: { exists, memories, entities }, hashDbs: [...], totalMemories }
+ */
+function scanExistingDatabases() {
+  const memoryDir = join(homedir(), '.claudia', 'memory');
+  const result = {
+    unified: { exists: false, memories: 0, entities: 0 },
+    hashDbs: [],
+    totalMemories: 0,
+  };
+
+  if (!existsSync(memoryDir)) return result;
+
+  let files;
+  try {
+    files = readdirSync(memoryDir);
+  } catch {
+    return result;
+  }
+
+  const hashPattern = /^[0-9a-f]{12}\.db$/;
+
+  for (const file of files) {
+    if (!file.endsWith('.db')) continue;
+    // Skip WAL/SHM/backup files
+    if (file.includes('-wal') || file.includes('-shm') || file.includes('.backup')) continue;
+    const filePath = join(memoryDir, file);
+
+    try {
+      const stats = statSync(filePath);
+      if (stats.size < 4096) continue; // Too small to have data
+    } catch {
+      continue;
+    }
+
+    // Query using sqlite3 CLI (no shell, safe from injection)
+    let memories = 0;
+    let entities = 0;
+    try {
+      const memResult = execFileSync('sqlite3', [filePath, 'SELECT COUNT(*) FROM memories;'], {
+        encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      memories = parseInt(memResult, 10) || 0;
+    } catch { /* table may not exist */ }
+
+    try {
+      const entResult = execFileSync('sqlite3', [filePath, 'SELECT COUNT(*) FROM entities WHERE deleted_at IS NULL;'], {
+        encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      entities = parseInt(entResult, 10) || 0;
+    } catch {
+      try {
+        const entResult = execFileSync('sqlite3', [filePath, 'SELECT COUNT(*) FROM entities;'], {
+          encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'],
+        }).trim();
+        entities = parseInt(entResult, 10) || 0;
+      } catch { /* skip */ }
+    }
+
+    if (file === 'claudia.db') {
+      result.unified = { exists: true, memories, entities };
+    } else if (hashPattern.test(file)) {
+      result.hashDbs.push({ name: file, memories, entities });
+    }
+
+    result.totalMemories += memories;
+  }
+
+  return result;
+}
+
 
 /**
  * Ensure .mcp.json has a working claudia-memory daemon entry.
