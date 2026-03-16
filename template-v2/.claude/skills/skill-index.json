@@ -3,6 +3,21 @@
   "description": "Progressive loading index - lightweight metadata for all skills with trigger examples for contextual matching",
   "skills": [
     {
+      "name": "feedback",
+      "path": "feedback/SKILL.md",
+      "description": "Send feedback, ideas, or bug reports about Claudia via GitHub Discussions",
+      "invocation": "explicit",
+      "effort_level": "low",
+      "triggers": ["feedback", "suggestion", "bug report", "feature request", "idea", "report issue"],
+      "examples": [
+        "I have feedback",
+        "I want to suggest a feature",
+        "I found a bug",
+        "how do I report an issue",
+        "I have an idea for Claudia"
+      ]
+    },
+    {
       "name": "onboarding",
       "path": "onboarding.md",
       "description": "Guide new users through a conversational discovery flow to create a personalized Claudia setup",

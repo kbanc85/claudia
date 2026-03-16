@@ -1227,7 +1227,7 @@ async function main() {
         console.log('');
         console.log(`   ${colors.cyan}${launchCmd}${colors.reset}`);
         console.log('');
-        console.log(` ${colors.dim}What's new: /morning-brief · /inbox-check${colors.reset}`);
+        console.log(` ${colors.dim}What's new: /morning-brief · /inbox-check · /feedback${colors.reset}`);
       } else {
         // Fresh install: build anticipation for the onboarding
         console.log(` ${colors.cyan}Claudia is ready.${colors.reset} ${colors.dim}She's waiting to meet you.${colors.reset}`);
@@ -1240,6 +1240,7 @@ async function main() {
         console.log(` ${colors.dim}She'll introduce herself and learn how you work.${colors.reset}`);
         console.log(` ${colors.dim}Try: ${colors.reset}${colors.cyan}"Say hi"${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}/morning-brief${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}"Who do I know?"${colors.reset}`);
       }
+      console.log(` ${colors.dim}Feedback? Tell Claudia, or visit github.com/kbanc85/claudia/discussions${colors.reset}`);
       console.log('');
       return;
     }

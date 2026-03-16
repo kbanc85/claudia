@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.12 (2026-03-15)
+
+- **Feedback skill** -- New `/feedback` command lets users share bugs, ideas, or suggestions. Claudia collects system context (version, OS, memory count, daemon health), builds a pre-filled GitHub Discussion URL, and opens it in the browser. The user reviews and submits. No data is sent without their knowledge.
+- **GitHub Discussions enabled** -- Feedback and community discussion now live at github.com/kbanc85/claudia/discussions.
+- **Installer feedback hint** -- Completion message now mentions `/feedback` and links to Discussions.
+
 ## 1.55.11 (2026-03-15)
 
 - **Auto-repair corrupt claudia.db** -- Installer detects when `claudia.db` is empty or corrupt (no tables, malformed disk image) and removes it along with stale WAL/SHM files so the daemon can create a fresh one. Previously, a corrupt db with leftover SHM files caused "database disk image is malformed" on every startup, blocking the daemon and preventing database consolidation.
