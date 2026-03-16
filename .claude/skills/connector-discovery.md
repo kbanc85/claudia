@@ -73,33 +73,33 @@ Common tools and recommended approaches:
 
 | Service | Recommendation | Notes |
 |---------|----------------|-------|
-| Gmail | MCP: `workspace-mcp (taylorwilsdon/google_workspace_mcp)` | Gmail, Calendar, Drive, Docs, Sheets, Tasks in one server |
+| Gmail | MCP: `@gongrzhe/server-gmail-autoauth-mcp` | Read, draft, search emails |
 | Outlook | MCP: Check mcp.so | Microsoft Graph API |
 | Other | Browser assist | Last resort |
 
 **Plain language:**
-> "For Gmail, I'd connect through the Google Workspace server. One setup
-> gives me access to Gmail, Calendar, Drive, Docs, and more. Setup takes
-> about 5 minutes."
+> "For Gmail, I'd connect through Google's official channel. I can read
+> your emails, draft replies, and include email context in morning briefs.
+> Setup takes about 5 minutes-you'll approve access in your browser."
 
 ### Calendar
 
 | Service | Recommendation | Notes |
 |---------|----------------|-------|
-| Google Calendar | MCP: `workspace-mcp (same server as Gmail)` | Already covered if Google Workspace MCP is set up |
+| Google Calendar | MCP: `@gongrzhe/server-calendar-autoauth-mcp` | View events, scheduling |
 | Outlook Calendar | MCP: Check mcp.so | Microsoft Graph |
 | Apple Calendar | No good option | Explain limitation |
 
 **Plain language:**
-> "For Google Calendar, it's included in the Google Workspace server.
-> If you've set up Gmail, Calendar is already connected."
+> "For Google Calendar, I can see your schedule and include today's
+> meetings in your morning brief. One-time setup, about 5 minutes."
 
 ### Files
 
 | Service | Recommendation | Notes |
 |---------|----------------|-------|
 | Local files | MCP: `@anthropics/mcp-server-filesystem` | Specify allowed folders |
-| Google Drive | MCP: `workspace-mcp` (included in Google Workspace MCP) | Already covered if Google Workspace MCP is set up |
+| Google Drive | CLI: `rclone` (preferred) | Or MCP server |
 | Dropbox | CLI: `rclone` | Sync-based access |
 | OneDrive | CLI: `rclone` | Microsoft cloud |
 

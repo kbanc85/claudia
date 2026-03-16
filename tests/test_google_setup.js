@@ -132,7 +132,7 @@ describe('setupGoogleWorkspace', () => {
     assert.ok(config.mcpServers.google_workspace, 'google_workspace added');
   });
 
-  it('removes old gmail entry when present', () => {
+  it('keeps gmail and google-calendar entries when present', () => {
     if (!setupGoogleWorkspace) return assert.fail('Module not yet implemented');
 
     writeMcpJson(tmp, {
@@ -145,8 +145,8 @@ describe('setupGoogleWorkspace', () => {
     setupGoogleWorkspace(tmp, 'id', 'secret', 'core');
 
     const config = readMcpJson(tmp);
-    assert.equal(config.mcpServers.gmail, undefined, 'old gmail removed');
-    assert.equal(config.mcpServers['google-calendar'], undefined, 'old google-calendar removed');
+    assert.ok(config.mcpServers.gmail, 'gmail preserved');
+    assert.ok(config.mcpServers['google-calendar'], 'google-calendar preserved');
     assert.ok(config.mcpServers.google_workspace, 'google_workspace added');
   });
 
@@ -200,10 +200,12 @@ describe('detectOldGoogleMcp', () => {
     if (!detectOldGoogleMcp) return assert.fail('Module not yet implemented');
 
     const result = detectOldGoogleMcp(tmp);
-    assert.deepEqual(result, { hasOldGmail: false, hasOldCalendar: false, hasWorkspace: false });
+    assert.equal(result.hasGmail, false);
+    assert.equal(result.hasCalendar, false);
+    assert.equal(result.hasWorkspace, false);
   });
 
-  it('detects old gmail entry', () => {
+  it('detects gmail entry', () => {
     if (!detectOldGoogleMcp) return assert.fail('Module not yet implemented');
 
     writeMcpJson(tmp, {
@@ -213,10 +215,12 @@ describe('detectOldGoogleMcp', () => {
     });
 
     const result = detectOldGoogleMcp(tmp);
+    assert.equal(result.hasGmail, true);
+    // backward-compat alias still works
     assert.equal(result.hasOldGmail, true);
   });
 
-  it('detects old google-calendar entry', () => {
+  it('detects google-calendar entry', () => {
     if (!detectOldGoogleMcp) return assert.fail('Module not yet implemented');
 
     writeMcpJson(tmp, {
@@ -226,6 +230,8 @@ describe('detectOldGoogleMcp', () => {
     });
 
     const result = detectOldGoogleMcp(tmp);
+    assert.equal(result.hasCalendar, true);
+    // backward-compat alias still works
     assert.equal(result.hasOldCalendar, true);
   });
 
@@ -254,8 +260,8 @@ describe('detectOldGoogleMcp', () => {
     });
 
     const result = detectOldGoogleMcp(tmp);
-    assert.equal(result.hasOldGmail, true);
-    assert.equal(result.hasOldCalendar, true);
+    assert.equal(result.hasGmail, true);
+    assert.equal(result.hasCalendar, true);
     assert.equal(result.hasWorkspace, true);
   });
 });

@@ -962,6 +962,9 @@ async function main() {
       ensureDaemonMcpConfig(targetPath, venvPython);
     }
 
+    // Auto-detect and add Gmail/Calendar MCP entries if credentials exist
+    const googleMcpResult = ensureGoogleMcpEntries(targetPath);
+
     // Run preflight check to verify daemon can actually start
     if (daemonOk && existsSync(venvPython)) {
       renderer.update('daemon', 'active', 'running preflight...');
@@ -1013,9 +1016,15 @@ async function main() {
       renderer.update('mcp', 'active', 'checking .mcp.json...');
       const mcpCheckResult = checkMcpConfig(targetPath);
       if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount >= 1) {
-        const serverDetail = mcpCheckResult.stdioCount === 1
-          ? 'claudia-memory configured'
-          : `claudia-memory + ${mcpCheckResult.stdioCount - 1} other server${mcpCheckResult.stdioCount > 2 ? 's' : ''}`;
+        // Build detail string showing what's configured
+        const extras = [];
+        if (mcpCheckResult.stdioServers.includes('gmail')) extras.push('gmail');
+        if (mcpCheckResult.stdioServers.includes('google-calendar')) extras.push('calendar');
+        const otherCount = mcpCheckResult.stdioCount - 1 - extras.length;
+        const parts = ['claudia-memory'];
+        if (extras.length > 0) parts.push(extras.join(', '));
+        if (otherCount > 0) parts.push(`+${otherCount} more`);
+        const serverDetail = parts.join(' + ');
         renderer.update('mcp', 'done', serverDetail);
         if (!supportsInPlace) renderer.appendLine('mcp', 'done', serverDetail);
       } else if (mcpCheckResult.hasDaemon && mcpCheckResult.stdioCount === 0) {
@@ -1475,6 +1484,71 @@ function ensureDaemonMcpConfig(targetPath, venvPythonPath) {
 }
 
 /**
+ * Ensure gmail and google-calendar MCP entries exist in .mcp.json
+ * if the user has credentials at ~/.gmail-mcp/ and ~/.calendar-mcp/.
+ * Does not overwrite existing entries. Only adds if credentials are found.
+ * Returns { addedGmail, addedCalendar } indicating what was added.
+ */
+function ensureGoogleMcpEntries(targetPath) {
+  const mcpPath = join(targetPath, '.mcp.json');
+  const result = { addedGmail: false, addedCalendar: false };
+
+  let config;
+  if (existsSync(mcpPath)) {
+    try {
+      config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    } catch {
+      return result; // Malformed JSON -- don't touch
+    }
+  } else {
+    return result; // No .mcp.json yet (ensureDaemonMcpConfig creates it first)
+  }
+
+  if (!config.mcpServers) config.mcpServers = {};
+
+  const home = homedir();
+  let changed = false;
+
+  // Gmail: add if credentials exist and entry doesn't
+  const gmailOauthPath = join(home, '.gmail-mcp', 'gcp-oauth.keys.json');
+  const gmailCredsPath = join(home, '.gmail-mcp', 'credentials.json');
+  if (!config.mcpServers.gmail && existsSync(gmailOauthPath) && existsSync(gmailCredsPath)) {
+    config.mcpServers.gmail = {
+      command: 'npx',
+      args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp@latest'],
+      env: {
+        GMAIL_OAUTH_PATH: gmailOauthPath,
+        GMAIL_CREDENTIALS_PATH: gmailCredsPath,
+      },
+    };
+    result.addedGmail = true;
+    changed = true;
+  }
+
+  // Google Calendar: add if credentials exist and entry doesn't
+  const calOauthPath = join(home, '.calendar-mcp', 'gcp-oauth.keys.json');
+  const calCredsPath = join(home, '.calendar-mcp', 'credentials.json');
+  if (!config.mcpServers['google-calendar'] && existsSync(calOauthPath) && existsSync(calCredsPath)) {
+    config.mcpServers['google-calendar'] = {
+      command: 'npx',
+      args: ['-y', '@gongrzhe/server-calendar-autoauth-mcp@latest'],
+      env: {
+        CALENDAR_OAUTH_PATH: calOauthPath,
+        CALENDAR_CREDENTIALS_PATH: calCredsPath,
+      },
+    };
+    result.addedCalendar = true;
+    changed = true;
+  }
+
+  if (changed) {
+    writeFileSync(mcpPath, JSON.stringify(config, null, 2) + '\n');
+  }
+
+  return result;
+}
+
+/**
  * Check .mcp.json configuration and return status.
  * Returns { hasDaemon, stdioCount, stdioServers }.
  */
@@ -1713,9 +1787,9 @@ async function runGoogleSetup() {
   // Detect existing state
   const state = detectOldGoogleMcp(targetPath);
 
-  if (state.hasOldGmail || state.hasOldCalendar) {
-    console.log(` ${colors.yellow}→${colors.reset} Found old Gmail/Calendar MCP servers. These will be replaced.`);
-    console.log(`   ${colors.dim}Same GCP credentials work with the new server.${colors.reset}`);
+  if (state.hasGmail || state.hasCalendar) {
+    console.log(` ${colors.yellow}→${colors.reset} Found standalone Gmail/Calendar MCP servers. These will be kept.`);
+    console.log(`   ${colors.dim}Both options work side by side. Workspace MCP adds Drive, Docs, Sheets, and more.${colors.reset}`);
     console.log('');
   }
 
@@ -1761,8 +1835,8 @@ async function runGoogleSetup() {
   console.log('');
   console.log(` ${colors.cyan}✓${colors.reset} Google Workspace MCP configured (${colors.bold}${tier}${colors.reset} tier)`);
 
-  if (state.hasOldGmail || state.hasOldCalendar) {
-    console.log(` ${colors.cyan}✓${colors.reset} Old Gmail/Calendar entries removed`);
+  if (state.hasGmail || state.hasCalendar) {
+    console.log(` ${colors.cyan}✓${colors.reset} Standalone Gmail/Calendar MCP servers kept alongside Workspace`);
   }
 
   // Build one-click API enablement URL

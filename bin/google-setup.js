@@ -69,20 +69,27 @@ export function buildApiEnableUrl(projectNumber, tier) {
 }
 
 /**
- * Detect old Google MCP server entries in .mcp.json.
- * Returns { hasOldGmail, hasOldCalendar, hasWorkspace }.
+ * Detect Google MCP server entries in .mcp.json.
+ * Returns { hasGmail, hasCalendar, hasWorkspace }.
+ *
+ * gmail and google-calendar are valid standalone options (lightweight, focused),
+ * not legacy entries. They can coexist with google_workspace.
  */
 export function detectOldGoogleMcp(targetPath) {
   const mcpPath = join(targetPath, '.mcp.json');
-  const result = { hasOldGmail: false, hasOldCalendar: false, hasWorkspace: false };
+  const result = { hasGmail: false, hasCalendar: false, hasWorkspace: false,
+    // Keep backward-compat aliases for callers that check the old property names
+    get hasOldGmail() { return this.hasGmail; },
+    get hasOldCalendar() { return this.hasCalendar; },
+  };
 
   if (!existsSync(mcpPath)) return result;
 
   try {
     const config = JSON.parse(readFileSync(mcpPath, 'utf-8'));
     const servers = config.mcpServers || {};
-    result.hasOldGmail = !!servers.gmail;
-    result.hasOldCalendar = !!servers['google-calendar'];
+    result.hasGmail = !!servers.gmail;
+    result.hasCalendar = !!servers['google-calendar'];
     result.hasWorkspace = !!servers.google_workspace;
   } catch {
     // Malformed JSON
@@ -93,7 +100,7 @@ export function detectOldGoogleMcp(targetPath) {
 
 /**
  * Add or update the google_workspace entry in .mcp.json.
- * Removes old gmail and google-calendar entries if present.
+ * Keeps existing gmail and google-calendar entries (they are valid standalone options).
  * Creates .mcp.json if it doesn't exist.
  */
 export function setupGoogleWorkspace(targetPath, clientId, clientSecret, tier) {
@@ -113,9 +120,8 @@ export function setupGoogleWorkspace(targetPath, clientId, clientSecret, tier) {
 
   if (!config.mcpServers) config.mcpServers = {};
 
-  // Remove old entries
-  delete config.mcpServers.gmail;
-  delete config.mcpServers['google-calendar'];
+  // Note: gmail and google-calendar entries are kept if present.
+  // They are valid standalone options that can coexist with google_workspace.
 
   // Add/update google_workspace
   config.mcpServers.google_workspace = {

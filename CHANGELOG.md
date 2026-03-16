@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.13 (2026-03-16)
+
+- **Gmail & Calendar MCPs as standard options** -- The standalone `gmail` (`@gongrzhe/server-gmail-autoauth-mcp`) and `google-calendar` (`@gongrzhe/server-calendar-autoauth-mcp`) servers are now first-class options alongside workspace-mcp. Two paths for Google integration: Option A (lightweight, focused, fewer tools) and Option B (all-in-one workspace-mcp with Drive, Docs, Sheets, etc.). Both can coexist.
+- **Auto-detect Gmail/Calendar credentials** -- The installer now checks `~/.gmail-mcp/` and `~/.calendar-mcp/` for existing OAuth credentials. If found, it automatically adds `gmail` and `google-calendar` entries to `.mcp.json`. No manual config needed.
+- **Installer no longer removes standalone MCPs** -- Running `npx get-claudia google` (workspace-mcp setup) no longer deletes existing `gmail` or `google-calendar` entries. Both integration paths coexist safely.
+- **Completion message shows Google MCPs** -- The installer now lists detected Gmail and Calendar servers in the MCP config summary line.
+- **Updated docs** -- CLAUDE.md and .mcp.json.example files document both Google integration paths with setup instructions for each.
+
 ## 1.55.12 (2026-03-15)
 
 - **Feedback skill** -- New `/feedback` command lets users share bugs, ideas, or suggestions. Claudia collects system context (version, OS, memory count, daemon health), builds a pre-filled GitHub Discussion URL, and opens it in the browser. The user reviews and submits. No data is sent without their knowledge.
