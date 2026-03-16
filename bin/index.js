@@ -1004,7 +1004,7 @@ async function main() {
 
     // Register LaunchAgent for standalone daemon (macOS only)
     if (daemonOk && process.platform === 'darwin') {
-      await ensureLaunchAgent(venvPython, targetPath);
+      await ensureLaunchAgent(venvPython);
     }
 
     // MCP Config step: verify .mcp.json is correct and check stdio server count
@@ -1575,7 +1575,7 @@ function checkMcpConfig(targetPath) {
  * The standalone daemon runs 24/7 for scheduled jobs (consolidation, decay, vault sync).
  * This is separate from the MCP daemon that Claude Code spawns per-session.
  */
-async function ensureLaunchAgent(venvPythonPath, projectDir) {
+async function ensureLaunchAgent(venvPythonPath) {
   const plistDir = join(homedir(), 'Library', 'LaunchAgents');
   const plistPath = join(plistDir, 'com.claudia.memory.plist');
 
@@ -1591,8 +1591,6 @@ async function ensureLaunchAgent(venvPythonPath, projectDir) {
         <string>-m</string>
         <string>claudia_memory</string>
         <string>--standalone</string>
-        <string>--project-dir</string>
-        <string>${projectDir}</string>
     </array>
     <key>WorkingDirectory</key>
     <string>${join(homedir(), '.claudia', 'daemon')}</string>

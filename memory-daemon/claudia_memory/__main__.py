@@ -195,7 +195,16 @@ def _auto_consolidate() -> None:
                 fetch=True,
             )
             if rows and rows[0]["value"] == "true":
-                logger.debug("Database already unified, skipping consolidation")
+                # Unified. Clean up any empty hash DBs that stale daemon instances may have
+                # created (old standalone daemons running pre-unified-DB code create a fresh
+                # empty hash DB on startup if the original was deleted by consolidation).
+                all_hash_dbs = scan_hash_databases(memory_dir)
+                empty_dbs = [d for d in all_hash_dbs if not d["has_data"]]
+                if empty_dbs:
+                    logger.info(
+                        f"Removing {len(empty_dbs)} empty hash DB(s) left by stale standalone daemon"
+                    )
+                    cleanup_old_databases(memory_dir, empty_dbs)
                 return
         except Exception:
             pass  # _meta table might not exist yet

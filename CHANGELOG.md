@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.14 (2026-03-16)
+
+- **LaunchAgent no longer bakes in --project-dir** -- The standalone background daemon now starts without a `--project-dir` argument. This forces a plist content change for all existing installs, which triggers an automatic LaunchAgent reload on next `claudia setup`, picking up the current Python daemon code. Previously, the plist could be identical across updates, leaving old daemon code running indefinitely even after `pip install --upgrade`.
+- **Cleanup of orphaned empty hash databases** -- On each startup, if the database is already unified and empty hash-named DB files exist (created by stale old-code daemon processes), they are silently removed. Prevents phantom databases from accumulating in `~/.claudia/memory/`.
+- **Root cause:** After the v1.55 consolidation, users whose LaunchAgent was running old pre-unified-DB code would see scheduled jobs (consolidation, backups, decay) operating against an empty `6af67351bcfa.db` while all real memories lived in `claudia.db`. Health check showed `schema_version: 0` and `-1` counts.
+
 ## 1.55.13 (2026-03-16)
 
 - **Gmail & Calendar MCPs as standard options** -- The standalone `gmail` (`@gongrzhe/server-gmail-autoauth-mcp`) and `google-calendar` (`@gongrzhe/server-calendar-autoauth-mcp`) servers are now first-class options alongside workspace-mcp. Two paths for Google integration: Option A (lightweight, focused, fewer tools) and Option B (all-in-one workspace-mcp with Drive, Docs, Sheets, etc.). Both can coexist.
