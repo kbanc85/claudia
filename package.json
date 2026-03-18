@@ -1,6 +1,6 @@
 {
   "name": "get-claudia",
-  "version": "1.55.14",
+  "version": "1.55.15",
   "description": "An AI assistant who learns how you work.",
   "keywords": [
     "claudia",
@@ -16,7 +16,7 @@
     "adaptive"
   ],
   "author": "Kamil Banc",
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kbanc85/claudia.git"

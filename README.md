@@ -11,7 +11,7 @@ Remembers your people. Catches your commitments. Learns how you work.
 <p align="center">
   <a href="https://github.com/kbanc85/claudia/stargazers"><img src="https://img.shields.io/github/stars/kbanc85/claudia?style=flat-square" alt="GitHub stars"></a>
   <a href="https://www.npmjs.com/package/get-claudia"><img src="https://img.shields.io/npm/v/get-claudia?style=flat-square" alt="npm version"></a>
-  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/kbanc85/claudia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-purple?style=flat-square" alt="License"></a>
 </p>
 
 <p align="center">
@@ -479,7 +479,7 @@ This updates daemon code, skills, and rules while preserving your databases and 
 
 ## Contributing
 
-Claudia is open source under the Apache 2.0 License.
+Claudia is source-available under the PolyForm Noncommercial License 1.0.0.
 
 - **Template (skills, rules, identity):** `template-v2/`
 - **Memory daemon (Python):** `memory-daemon/` (tests: `cd memory-daemon && pytest tests/`)
@@ -491,9 +491,9 @@ Claudia is open source under the Apache 2.0 License.
 
 ## License
 
-[Apache License 2.0](LICENSE)
+[PolyForm Noncommercial 1.0.0](LICENSE)
 
-Open source. Free for personal and commercial use. Attribution required.
+Free for personal, research, educational, and nonprofit use. Commercial licensing: mail@kbanc.com
 
 ---
 

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..config import get_config
 from ..database import get_db
 from ..embeddings import embed_sync, get_embedding_service
+from ..utils import parse_naive
 from ..extraction.entity_extractor import get_extractor
 
 logger = logging.getLogger(__name__)
@@ -240,7 +241,7 @@ class RecallService:
                 row = vector_rows.get(mid)
                 if row:
                     try:
-                        created = datetime.fromisoformat(row["created_at"])
+                        created = parse_naive(row["created_at"])
                         recency_data[mid] = (now - created).total_seconds()
                     except (ValueError, TypeError):
                         recency_data[mid] = float("inf")
@@ -333,7 +334,7 @@ class RecallService:
         importance_score = row["importance"]
 
         # Recency score (configurable half-life decay)
-        created = datetime.fromisoformat(row["created_at"])
+        created = parse_naive(row["created_at"])
         days_old = (now - created).days
         recency_score = math.exp(-days_old / self.config.recency_half_life_days)
 
@@ -2122,8 +2123,8 @@ class RecallService:
             results = []
             now = datetime.utcnow()
             for row in rows:
-                source_last = datetime.fromisoformat(row["source_last_memory"])
-                target_last = datetime.fromisoformat(row["target_last_memory"])
+                source_last = parse_naive(row["source_last_memory"])
+                target_last = parse_naive(row["target_last_memory"])
                 most_recent = max(source_last, target_last)
                 days_dormant = (now - most_recent).days
 
@@ -2513,7 +2514,7 @@ class RecallService:
             urgency = "later"
             if deadline_str:
                 try:
-                    deadline_dt = datetime.fromisoformat(deadline_str)
+                    deadline_dt = parse_naive(deadline_str)
                     if deadline_dt < now:
                         urgency = "overdue"
                     elif deadline_dt < now + timedelta(days=1):
@@ -2705,12 +2706,9 @@ class RecallService:
             }
 
         try:
-            last_dt = datetime.strptime(last_contact, "%Y-%m-%d %H:%M:%S")
-        except (ValueError, TypeError):
-            try:
-                last_dt = datetime.fromisoformat(last_contact.replace("Z", "+00:00")).replace(tzinfo=None)
-            except Exception:
-                return {"entity": entity["name"], "status": "parse_error"}
+            last_dt = parse_naive(last_contact.replace("Z", "+00:00"))
+        except Exception:
+            return {"entity": entity["name"], "status": "parse_error"}
 
         now = datetime.utcnow()
         days_since = (now - last_dt).days

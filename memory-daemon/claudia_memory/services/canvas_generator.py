@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..database import get_db
+from ..utils import parse_naive
 
 logger = logging.getLogger(__name__)
 
@@ -418,7 +419,7 @@ class CanvasGenerator:
                 last = r["last_contact_at"]
                 if last:
                     try:
-                        days_ago = (datetime.utcnow() - datetime.fromisoformat(last[:19])).days
+                        days_ago = (datetime.utcnow() - parse_naive(last)).days
                         reconnect_lines.append(f"- [[{r['name']}]] ({trend}, {days_ago}d ago)")
                     except (ValueError, TypeError):
                         reconnect_lines.append(f"- [[{r['name']}]] ({trend})")

@@ -22,6 +22,7 @@ from mcp.types import (
 )
 
 from ..database import get_db
+from ..utils import parse_naive
 from ..services.consolidate import (
     get_consolidate_service,
     get_predictions,
@@ -3190,9 +3191,9 @@ def _build_briefing() -> str:
                     "SELECT updated_at FROM _meta WHERE key = 'unified_db'", fetch=True
                 )
                 if ts_row and ts_row[0]["updated_at"]:
-                    from datetime import datetime as _dt, timedelta as _td
-                    consolidated_at = _dt.fromisoformat(ts_row[0]["updated_at"][:19])
-                    if (_dt.utcnow() - consolidated_at) < _td(minutes=5):
+                    from datetime import timedelta as _td
+                    consolidated_at = parse_naive(ts_row[0]["updated_at"])
+                    if (datetime.utcnow() - consolidated_at) < _td(minutes=5):
                         # Just consolidated, include stats
                         mem_row = db.execute("SELECT COUNT(*) as c FROM memories", fetch=True)
                         ent_row = db.execute("SELECT COUNT(*) as c FROM entities WHERE deleted_at IS NULL", fetch=True)
@@ -3660,7 +3661,7 @@ def _build_morning_context() -> str:
         if stale:
             sections.append(f"## Stale Commitments ({len(stale)})\n")
             for c in stale:
-                days_old = (datetime.utcnow() - datetime.fromisoformat(c["created_at"])).days
+                days_old = (datetime.utcnow() - parse_naive(c["created_at"])).days
                 entities = c["entity_names"] or ""
                 prefix = f"[{entities}] " if entities else ""
                 sections.append(f"- {prefix}{c['content'][:100]} ({days_old}d old, importance: {c['importance']:.1f})")

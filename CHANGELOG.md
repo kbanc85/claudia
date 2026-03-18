@@ -2,6 +2,11 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.15 (2026-03-18)
+
+- **Fix mixed-timezone datetime crash** -- The memory daemon could crash with `can't subtract offset-naive and offset-aware datetimes` when recall or consolidation queries hit records with timezone suffixes (e.g., `+00:00` from email or transcript timestamps). Added a shared `parse_naive()` utility that strips timezone info on parse, applied across 14 locations in 5 files (recall.py, consolidate.py, server.py, vault_sync.py, canvas_generator.py). Replaces the older `[:19]` string truncation workaround. 615 tests pass.
+- **License updated to PolyForm Noncommercial 1.0.0** -- README, package.json, and ARCHITECTURE.md now reflect the license change from Apache 2.0 to PolyForm NC. Free for personal, research, educational, and nonprofit use. Commercial licensing available via mail@kbanc.com.
+
 ## 1.55.14 (2026-03-16)
 
 - **LaunchAgent no longer bakes in --project-dir** -- The standalone background daemon now starts without a `--project-dir` argument. This forces a plist content change for all existing installs, which triggers an automatic LaunchAgent reload on next `claudia setup`, picking up the current Python daemon code. Previously, the plist could be identical across updates, leaving old daemon code running indefinitely even after `pip install --upgrade`.

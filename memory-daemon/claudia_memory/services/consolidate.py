@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import get_config
 from ..database import get_db
+from ..utils import parse_naive
 
 logger = logging.getLogger(__name__)
 
@@ -366,7 +367,7 @@ class ConsolidateService:
             timestamps = []
             for r in rows:
                 try:
-                    timestamps.append(datetime.fromisoformat(r["created_at"]))
+                    timestamps.append(parse_naive(r["created_at"]))
                 except (ValueError, TypeError):
                     continue
 
@@ -538,7 +539,7 @@ class ConsolidateService:
             days_since = 0
             if entity["last_contact_at"]:
                 try:
-                    last_dt = datetime.fromisoformat(entity["last_contact_at"])
+                    last_dt = parse_naive(entity["last_contact_at"])
                     days_since = int((now - last_dt).total_seconds() / 86400)
                 except (ValueError, TypeError):
                     pass
@@ -671,7 +672,7 @@ class ConsolidateService:
         for row in rows:
             days_since = None
             if row["last_mention"]:
-                last_dt = datetime.fromisoformat(row["last_mention"])
+                last_dt = parse_naive(row["last_mention"])
                 days_since = (datetime.utcnow() - last_dt).days
 
             severity = "warning" if days_since and days_since > 60 else "observation"
@@ -1377,7 +1378,7 @@ class ConsolidateService:
         )
 
         for commitment in old_commitments:
-            created = datetime.fromisoformat(commitment["created_at"])
+            created = parse_naive(commitment["created_at"])
             days_old = (datetime.utcnow() - created).days
 
             if days_old > 3:
@@ -2302,7 +2303,7 @@ class ConsolidateService:
                 velocity_parts.append(f"tier: {entity['attention_tier']}")
             if entity["last_contact_at"]:
                 try:
-                    last_dt = datetime.fromisoformat(entity["last_contact_at"])
+                    last_dt = parse_naive(entity["last_contact_at"])
                     days_since = (datetime.utcnow() - last_dt).days
                     velocity_parts.append(f"last contact: {days_since} days ago")
                 except (ValueError, TypeError):

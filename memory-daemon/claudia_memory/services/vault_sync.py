@@ -42,6 +42,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import get_config
 from ..database import get_db
+from ..utils import parse_naive
 
 logger = logging.getLogger(__name__)
 
@@ -1234,7 +1235,7 @@ class VaultSyncService:
                 last = w["last_contact_at"]
                 if last:
                     try:
-                        days_ago = (datetime.utcnow() - datetime.fromisoformat(last[:19])).days
+                        days_ago = (datetime.utcnow() - parse_naive(last)).days
                         lines.append(f"- [[{w['name']}]] - {trend} ({days_ago}d)")
                     except (ValueError, TypeError):
                         lines.append(f"- [[{w['name']}]] - {trend}")
@@ -1599,7 +1600,7 @@ class VaultSyncService:
                 last_contact = p["last_contact_at"]
                 if last_contact:
                     try:
-                        dt = datetime.fromisoformat(last_contact[:19])
+                        dt = parse_naive(last_contact)
                         days_ago = (now - dt).days
                         last_str = f"{days_ago}d ago"
                     except (ValueError, TypeError):
