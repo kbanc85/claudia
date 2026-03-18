@@ -42,7 +42,7 @@ def validate_memory(
     Validate a memory before storage.
 
     Checks:
-    - Content length (warn >500, truncate >1000)
+    - Content length (warn >800, truncate >1000)
     - Commitment deadline detection via regex
     - Importance clamped to [0, 1]
     """
@@ -52,7 +52,7 @@ def validate_memory(
     if len(content) > 1000:
         result.warnings.append(f"Content truncated from {len(content)} to 1000 characters")
         result.adjustments["content"] = content[:1000]
-    elif len(content) > 500:
+    elif len(content) > 800:
         result.warnings.append(f"Long content ({len(content)} chars) -- consider breaking into multiple memories")
 
     # Importance clamping

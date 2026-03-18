@@ -2,6 +2,19 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.16 (2026-03-18)
+
+### Reliability Fixes
+
+Three fixes for issues surfaced from daemon logs. All backward-compatible, no schema changes.
+
+- **Overnight jobs now fire after sleep** -- APScheduler's `BackgroundScheduler` now has `misfire_grace_time=14400` (4 hours) and `coalesce=True`. Previously, the default 1-second grace time meant every scheduled job (decay, backup, consolidation, vault sync) was silently skipped when a Mac slept through the 2am-3:15am window. Now jobs fire immediately on wake if missed within the last 4 hours, with multiple missed runs collapsed into one execution.
+- **Reduced log noise from summary memories** -- The content length warning threshold was raised from 500 to 800 chars. Legitimate summary-type memories (550-850 chars) no longer trigger "Long content" warnings. Hard truncation at 1000 chars is unchanged.
+- **Fuzzy entity dedup on write** -- `_ensure_entity()` and `_find_or_create_entity()` now perform a fuzzy pre-check (SequenceMatcher > 0.90) before creating new entities. Name variants like "Kris Krisko" vs "Kris Krisco" (ratio ~0.92) match the existing entity instead of creating a duplicate. Only compares entities of the same type, skips deleted entities.
+- **Expanded STOP_WORDS** -- Added ~55 common English words that spaCy misidentifies as entities ("drawn", "overall", "recently", "several", etc.). Prevents ghost entities from cluttering the graph.
+- **Person entities require 2+ words** -- Regex-extracted person entities must have at least two words (e.g., "First Last"). Single-word extractions like "Metal" or "Drawn" are rejected. spaCy-identified entities are unaffected.
+- 637 tests pass, 0 regressions, 22 new tests across 4 new test files.
+
 ## 1.55.15 (2026-03-18)
 
 - **Fix mixed-timezone datetime crash** -- The memory daemon could crash with `can't subtract offset-naive and offset-aware datetimes` when recall or consolidation queries hit records with timezone suffixes (e.g., `+00:00` from email or transcript timestamps). Added a shared `parse_naive()` utility that strips timezone info on parse, applied across 14 locations in 5 files (recall.py, consolidate.py, server.py, vault_sync.py, canvas_generator.py). Replaces the older `[:19]` string truncation workaround. 615 tests pass.

@@ -27,8 +27,8 @@ class TestMemoryValidation:
         assert result.adjustments == {}
 
     def test_long_content_warning(self):
-        """Content >500 chars warns but does not truncate."""
-        content = "x" * 600
+        """Content >800 chars warns but does not truncate."""
+        content = "x" * 850
         result = validate_memory(content, "fact", 1.0)
         assert result.is_valid
         assert len(result.warnings) == 1

@@ -188,50 +188,33 @@ class EntityExtractor:
 
     # Common non-entity words to filter out
     STOP_WORDS = {
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-        "january",
-        "february",
-        "march",
-        "april",
-        "may",
-        "june",
-        "july",
-        "august",
-        "september",
-        "october",
-        "november",
-        "december",
-        "today",
-        "tomorrow",
-        "yesterday",
-        "morning",
-        "afternoon",
-        "evening",
-        "night",
-        "the",
-        "this",
-        "that",
-        "these",
-        "those",
-        "here",
-        "there",
-        "where",
-        "when",
-        "what",
-        "which",
-        "who",
-        "how",
-        "just",
-        "only",
-        "also",
-        "even",
-        "still",
+        # Days and months
+        "monday", "tuesday", "wednesday", "thursday", "friday",
+        "saturday", "sunday",
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+        # Temporal
+        "today", "tomorrow", "yesterday",
+        "morning", "afternoon", "evening", "night",
+        # Pronouns and determiners
+        "the", "this", "that", "these", "those",
+        "here", "there", "where", "when", "what", "which", "who", "how",
+        # Adverbs
+        "just", "only", "also", "even", "still",
+        "recently", "nearly", "almost", "already", "rather",
+        "somewhat", "perhaps", "quite", "likely", "enough",
+        # Quantifiers and adjectives
+        "several", "various", "another", "certain",
+        "much", "many", "some", "most", "both",
+        "each", "every", "other", "such", "same",
+        "new", "old", "big", "long", "last", "next",
+        "good", "well", "nice", "overall", "drawn",
+        # Common verbs (past tense / short forms spaCy misidentifies)
+        "done", "made", "said", "went", "got",
+        "set", "put", "run", "let", "get",
+        # Common nouns too generic to be entities
+        "work", "part", "plan", "team", "data",
+        "note", "time", "home", "call", "open",
     }
 
     def __init__(self):
@@ -296,12 +279,15 @@ class EntityExtractor:
         """Extract entities using regex patterns"""
         entities = []
 
-        # Extract persons
+        # Extract persons (require at least 2 words to avoid ghost entities)
         for pattern in self.PERSON_PATTERNS:
             for match in re.finditer(pattern, text):
                 name = match.group(1) if match.lastindex else match.group(0)
                 canonical = self.canonical_name(name)
-                if canonical and len(canonical) > 1 and canonical not in self.STOP_WORDS:
+                if (canonical
+                        and len(canonical) > 1
+                        and canonical not in self.STOP_WORDS
+                        and len(canonical.split()) >= 2):
                     entities.append(
                         ExtractedEntity(
                             name=name,

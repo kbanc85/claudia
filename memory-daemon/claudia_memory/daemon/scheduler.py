@@ -27,7 +27,9 @@ class MemoryScheduler:
     """Manages scheduled memory maintenance tasks"""
 
     def __init__(self):
-        self.scheduler = BackgroundScheduler()
+        self.scheduler = BackgroundScheduler(
+            job_defaults={"misfire_grace_time": 14400, "coalesce": True}
+        )
         self.config = get_config()
         self._started = False
 

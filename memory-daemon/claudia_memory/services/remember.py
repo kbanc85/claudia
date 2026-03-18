@@ -1697,6 +1697,11 @@ class RememberService:
         if alias_match:
             return alias_match["entity_id"]
 
+        # Fuzzy pre-check: find near-matches of the same type
+        fuzzy_match = self._fuzzy_find_entity(extracted.canonical_name, extracted.type)
+        if fuzzy_match:
+            return fuzzy_match
+
         # Create new entity
         return self.remember_entity(
             name=extracted.name,
@@ -1725,8 +1730,43 @@ class RememberService:
         if alias_match:
             return alias_match["entity_id"]
 
+        # Fuzzy pre-check: find near-matches of the same type
+        fuzzy_match = self._fuzzy_find_entity(canonical, entity_type)
+        if fuzzy_match:
+            return fuzzy_match
+
         # Create new
         return self.remember_entity(name=name, entity_type=entity_type)
+
+    def _fuzzy_find_entity(self, canonical: str, entity_type: str) -> Optional[int]:
+        """Find a near-match entity of the same type using fuzzy string matching.
+
+        Queries entities of the given type and returns the ID of the best match
+        if similarity > 0.90 (SequenceMatcher ratio). Returns None if no match.
+        """
+        from difflib import SequenceMatcher
+
+        candidates = self.db.execute(
+            "SELECT id, canonical_name FROM entities WHERE type = ? AND deleted_at IS NULL",
+            (entity_type,),
+            fetch=True,
+        ) or []
+
+        best_id = None
+        best_ratio = 0.0
+        for row in candidates:
+            ratio = SequenceMatcher(None, canonical, row["canonical_name"]).ratio()
+            if ratio > 0.90 and ratio > best_ratio:
+                best_ratio = ratio
+                best_id = row["id"]
+
+        if best_id is not None:
+            logger.info(
+                f"Fuzzy entity match: '{canonical}' matched existing entity id={best_id} "
+                f"(type={entity_type}, similarity={best_ratio:.2f})"
+            )
+
+        return best_id
 
     def _get_or_create_episode(self, source: Optional[str] = None) -> int:
         """Get current episode or create a new one"""
