@@ -914,10 +914,74 @@ async function main() {
       if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'Python 3.10+ not found');
       rootCause = { step: 'daemon', issue: 'python' };
     } else {
-      // Phase 2: Create venv if it doesn't exist
+      // Phase 2: Create venv (or rebuild if using Python 3.14)
+      if (existsSync(venvPython)) {
+        // Self-heal: check if existing venv uses Python 3.14+
+        const venvVer = await new Promise((resolve) => {
+          const proc = spawn(venvPython, ['-c', 'import sys; print(sys.version_info.minor)'], {
+            stdio: 'pipe', timeout: 5000
+          });
+          let out = '';
+          proc.stdout.on('data', (d) => { out += d.toString(); });
+          proc.on('close', () => resolve(out.trim()));
+          proc.on('error', () => resolve(''));
+        });
+        if (venvVer && parseInt(venvVer) >= 14 && pythonCmd !== venvPython) {
+          // Check if pythonCmd is < 3.14
+          const sysVer = await new Promise((resolve) => {
+            const proc = spawn(pythonCmd, ['-c', 'import sys; print(sys.version_info.minor)'], {
+              stdio: 'pipe', timeout: 5000
+            });
+            let out = '';
+            proc.stdout.on('data', (d) => { out += d.toString(); });
+            proc.on('close', () => resolve(out.trim()));
+            proc.on('error', () => resolve(''));
+          });
+          if (sysVer && parseInt(sysVer) < 14) {
+            renderer.update('daemon', 'active', `rebuilding venv (3.14→3.${sysVer})...`);
+            // Rebuild venv with better Python
+            await new Promise((resolve) => {
+              const proc = spawn(pythonCmd, ['-m', 'venv', '--clear', daemonVenvDir], {
+                stdio: 'pipe', timeout: 30000
+              });
+              proc.on('close', (code) => resolve(code === 0));
+              proc.on('error', () => resolve(false));
+            });
+          }
+        }
+      }
+
       if (!existsSync(venvPython)) {
         renderer.update('daemon', 'active', 'creating venv...');
         mkdirSync(join(homedir(), '.claudia', 'daemon'), { recursive: true });
+
+        // If pythonCmd is 3.14+ and we're on macOS with Homebrew, auto-install 3.12
+        if (process.platform === 'darwin') {
+          const cmdVer = await new Promise((resolve) => {
+            const proc = spawn(pythonCmd, ['-c', 'import sys; print(sys.version_info.minor)'], {
+              stdio: 'pipe', timeout: 5000
+            });
+            let out = '';
+            proc.stdout.on('data', (d) => { out += d.toString(); });
+            proc.on('close', () => resolve(out.trim()));
+            proc.on('error', () => resolve(''));
+          });
+          if (cmdVer && parseInt(cmdVer) >= 14) {
+            renderer.update('daemon', 'active', 'installing Python 3.12...');
+            const installed312 = await new Promise((resolve) => {
+              const proc = spawn('brew', ['install', 'python@3.12'], {
+                stdio: 'pipe', timeout: 300000
+              });
+              proc.on('close', (code) => resolve(code === 0));
+              proc.on('error', () => resolve(false));
+            });
+            if (installed312) {
+              // Re-detect best Python
+              pythonCmd = await isPythonInstalled() || pythonCmd;
+            }
+          }
+        }
+
         const venvCreated = await new Promise((resolve) => {
           const proc = spawn(pythonCmd, ['-m', 'venv', daemonVenvDir], { stdio: 'pipe' });
           proc.on('close', (code) => resolve(code === 0));
@@ -1020,9 +1084,54 @@ async function main() {
       }
     }
 
-    // Register LaunchAgent for standalone daemon (macOS only)
+    // Register LaunchAgent and verify standalone daemon is running (macOS only)
     if (daemonOk && process.platform === 'darwin') {
       await ensureLaunchAgent(venvPython);
+      // Verify daemon is actually running (self-heal for existing installs)
+      const daemonRunning = await new Promise((resolve) => {
+        const proc = spawn('launchctl', ['list', 'com.claudia.memory'], {
+          stdio: 'pipe', timeout: 5000
+        });
+        let out = '';
+        proc.stdout.on('data', (d) => { out += d.toString(); });
+        proc.on('close', (code) => {
+          // launchctl list returns PID in first column, or "-" if not running
+          const pid = out.trim().split(/\s+/)[0];
+          resolve(code === 0 && pid !== '-' && pid !== '');
+        });
+        proc.on('error', () => resolve(false));
+      });
+      if (!daemonRunning) {
+        // Force reload: unload then load
+        const plistPath = join(homedir(), 'Library', 'LaunchAgents', 'com.claudia.memory.plist');
+        if (existsSync(plistPath)) {
+          await new Promise((resolve) => {
+            const proc = spawn('launchctl', ['unload', plistPath], { stdio: 'pipe', timeout: 5000 });
+            proc.on('close', () => resolve());
+            proc.on('error', () => resolve());
+          });
+          await new Promise((resolve) => {
+            const proc = spawn('launchctl', ['load', plistPath], { stdio: 'pipe', timeout: 5000 });
+            proc.on('close', () => resolve());
+            proc.on('error', () => resolve());
+          });
+        }
+      }
+    }
+
+    // On Linux, verify systemd service is enabled and running
+    if (daemonOk && process.platform === 'linux') {
+      const serviceFile = join(homedir(), '.config', 'systemd', 'user', 'claudia-memory.service');
+      if (existsSync(serviceFile)) {
+        // Enable and start if not running
+        await new Promise((resolve) => {
+          const proc = spawn('systemctl', ['--user', 'enable', '--now', 'claudia-memory'], {
+            stdio: 'pipe', timeout: 10000
+          });
+          proc.on('close', () => resolve());
+          proc.on('error', () => resolve());
+        });
+      }
     }
 
     // MCP Config step: verify .mcp.json is correct and check stdio server count

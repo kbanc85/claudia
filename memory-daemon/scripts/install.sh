@@ -169,16 +169,31 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         _pick_homebrew_python "/usr/local/bin/python3" || true
     }
 
-    # If all Homebrew candidates are 3.14+, still use Homebrew for SQLite support
+    # If all Homebrew candidates are 3.14+, auto-install 3.12 for best compatibility
     if [ -z "$PYTHON" ]; then
-        if [ -x "/opt/homebrew/bin/python3" ]; then
-            PYTHON="/opt/homebrew/bin/python3"
-        elif [ -x "/usr/local/bin/python3" ]; then
-            PYTHON="/usr/local/bin/python3"
+        if command -v brew &>/dev/null; then
+            [ "$EMBEDDED" != "1" ] && echo -e "  ${YELLOW}!${NC} Only Python 3.14+ found. Installing 3.12 for compatibility..."
+            brew install python@3.12 2>/dev/null
+            # Retry the cascade after install
+            for _pyminor in 13 12 11; do
+                _pick_homebrew_python "/opt/homebrew/bin/python3.${_pyminor}" && break
+                _pick_homebrew_python "/usr/local/bin/python3.${_pyminor}" && break
+            done
+        fi
+
+        # Last resort: use 3.14+ (daemon works, just no spaCy)
+        if [ -z "$PYTHON" ]; then
+            if [ -x "/opt/homebrew/bin/python3" ]; then
+                PYTHON="/opt/homebrew/bin/python3"
+                [ "$EMBEDDED" != "1" ] && echo -e "  ${YELLOW}!${NC} Using Python 3.14+ (spaCy unavailable, regex extraction only)"
+            elif [ -x "/usr/local/bin/python3" ]; then
+                PYTHON="/usr/local/bin/python3"
+                [ "$EMBEDDED" != "1" ] && echo -e "  ${YELLOW}!${NC} Using Python 3.14+ (spaCy unavailable, regex extraction only)"
+            fi
         fi
     fi
 
-    if [ -n "$PYTHON" ]; then
+    if [ -n "$PYTHON" ] && [ -z "${_314_WARNING_SHOWN:-}" ]; then
         [ "$EMBEDDED" != "1" ] && echo -e "  ${GREEN}✓${NC} Using Homebrew Python (vector search supported)"
     fi
 fi
