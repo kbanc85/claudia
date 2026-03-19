@@ -11,6 +11,10 @@ import { setupGoogleWorkspace, detectOldGoogleMcp, extractProjectNumber, buildAp
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function getMemoryDaemonSrc() {
+  return join(__dirname, '..', 'memory-daemon');
+}
+
 const isWindows = process.platform === 'win32';
 
 // Resolve full PowerShell path on Windows (not always on PATH, e.g. Git Bash)
@@ -581,7 +585,10 @@ async function main() {
 
   // --skip-memory is the documented flag; --no-memory kept for backward compatibility.
   const skipMemory = args.includes('--no-memory') || args.includes('--skip-memory');
-  const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--skip-memory' && a !== '--yes' && a !== '-y');
+  // --dev: skip venv creation; load the daemon directly from the local source tree
+  // via PYTHONPATH. Useful when iterating on the daemon without `pip install -e`.
+  const devMode = args.includes('--dev');
+  const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--skip-memory' && a !== '--dev' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
 
   // ─── Subcommand: get-claudia google ─────────────────────────────────────
@@ -907,6 +914,8 @@ async function main() {
     // Step 4: Memory Daemon -- Python venv + claudia-memory package
     renderer.update('daemon', 'active', 'checking Python...');
     let daemonOk = false;
+    let preflightPython = null;   // set by whichever path succeeds (dev or venv)
+    let preflightEnv = undefined; // extra env for preflight spawn (dev mode sets PYTHONPATH)
     const daemonVenvDir = join(homedir(), '.claudia', 'daemon', 'venv');
     const venvPython = isWindows
       ? join(daemonVenvDir, 'Scripts', 'python.exe')
@@ -914,6 +923,52 @@ async function main() {
     const venvPip = isWindows
       ? join(daemonVenvDir, 'Scripts', 'pip')
       : join(daemonVenvDir, 'bin', 'pip');
+
+    // --dev: skip venv entirely; use system Python + PYTHONPATH pointing at the
+    // local source tree. Claude Code will spawn the daemon the same way.
+    if (devMode) {
+      const devPython = await isPythonInstalled();
+      const daemonSrc = getMemoryDaemonSrc();
+      if (devPython) {
+        renderer.update('daemon', 'active', 'dev mode: checking source import...');
+        const devImportOk = await new Promise((resolve) => {
+          const proc = spawn(devPython, ['-c', 'import claudia_memory; print("ok")'], {
+            stdio: 'pipe', timeout: 10000,
+            env: { ...process.env, PYTHONPATH: daemonSrc }
+          });
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        });
+        if (devImportOk) {
+          daemonOk = true;
+          preflightPython = devPython;
+          preflightEnv = { ...process.env, PYTHONPATH: daemonSrc };
+          renderer.update('daemon', 'done', 'dev mode: source import ok');
+          if (!supportsInPlace) renderer.appendLine('daemon', 'done', 'dev mode (PYTHONPATH)');
+          // Write .mcp.json with system python + PYTHONPATH env
+          const mcpPath = join(targetPath, '.mcp.json');
+          const mcpTmp = mcpPath + '.tmp';
+          let config = {};
+          if (existsSync(mcpPath)) { try { config = JSON.parse(readFileSync(mcpPath, 'utf-8')); } catch { config = {}; } }
+          if (!config.mcpServers) config.mcpServers = {};
+          config.mcpServers['claudia-memory'] = {
+            command: devPython,
+            args: ['-m', 'claudia_memory', '--project-dir', targetPath],
+            env: { PYTHONPATH: daemonSrc },
+            _description: 'Claudia memory (dev mode, no venv)'
+          };
+          writeFileSync(mcpTmp, JSON.stringify(config, null, 2) + '\n');
+          renameSync(mcpTmp, mcpPath);
+        } else {
+          renderer.update('daemon', 'warn', 'dev mode: import failed (check PYTHONPATH)');
+          if (!supportsInPlace) renderer.appendLine('daemon', 'warn', 'dev mode import failed');
+          rootCause = rootCause || { step: 'daemon', issue: 'import' };
+        }
+      } else {
+        renderer.update('daemon', 'warn', 'Python 3.10+ not found');
+        rootCause = { step: 'daemon', issue: 'python' };
+      }
+    } else {
 
     // Phase 1: Find Python 3.10+ (auto-install if missing)
     let pythonCmd = await isPythonInstalled();
@@ -1049,15 +1104,17 @@ async function main() {
       }
 
       if (daemonOk) {
+        preflightPython = venvPython;
         renderer.update('daemon', 'done', 'claudia-memory ready');
         if (!supportsInPlace) renderer.appendLine('daemon', 'done', 'claudia-memory ready');
       }
     }
 
-    // Configure .mcp.json with correct daemon path
-    if (daemonOk) {
+    // Configure .mcp.json with correct daemon path (venv mode only; dev mode writes its own)
+    if (daemonOk && !devMode) {
       ensureDaemonMcpConfig(targetPath, venvPython);
     }
+    } // end non-dev mode branch
 
     // Auto-detect and add Gmail/Calendar MCP entries if credentials exist
     const googleMcpResult = ensureGoogleMcpEntries(targetPath);
@@ -1065,12 +1122,12 @@ async function main() {
     // Run preflight check to verify daemon can actually start.
     // Pass --json so the daemon emits a machine-readable result after a sentinel
     // line (PREFLIGHT_JSON_BEGIN), giving structured failures instead of grepping text.
-    if (daemonOk && existsSync(venvPython)) {
+    if (daemonOk && preflightPython) {
       renderer.update('daemon', 'active', 'running preflight...');
       const preflightOk = await new Promise((resolve) => {
-        const proc = spawn(venvPython, [
+        const proc = spawn(preflightPython, [
           '-m', 'claudia_memory', '--preflight', '--json', '--project-dir', targetPath
-        ], { stdio: 'pipe', timeout: 30000 });
+        ], { stdio: 'pipe', timeout: 30000, env: preflightEnv });
         let stdout = '';
         proc.stdout.on('data', (d) => { stdout += d.toString(); });
         proc.on('close', (code) => {
