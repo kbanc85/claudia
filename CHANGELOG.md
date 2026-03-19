@@ -2,6 +2,29 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.21 (2026-03-19)
+
+### The Community Release
+
+First release with external contributor code. Seven PRs from @jonesrussell merged, plus one enhancement. Cleared the entire GitHub backlog: 0 open issues, 0 open PRs.
+
+#### Added
+- **`--dev` mode for contributors (#21)** -- `npx get-claudia --dev` skips venv creation and uses PYTHONPATH to load the daemon from the local source tree. Cuts daemon iteration time from minutes to seconds.
+- **`--skip-memory` alias (#17)** -- Documented alias for `--no-memory`. Both flags work.
+- **Dynamic alias specificity scoring (#27)** -- Alias overlap no longer uses a hard-coded 0.95 similarity score. Score is now computed from how many entities share each alias: rare aliases score higher, common ones lower. Multi-token aliases get a bonus. Formula: `0.70 + 0.25 / alias_count + multi_token_bonus`, clamped to [0.70, 0.95].
+- **Integration tests for preflight and health endpoint (#23)** -- ~34 new tests covering structured JSON preflight output and the /health probe.
+
+#### Fixed
+- **Machine-readable preflight JSON (#11)** -- The installer now passes `--json` to the daemon's preflight check and parses structured output via a `PREFLIGHT_JSON_BEGIN` sentinel, instead of grepping for `[FAIL]` lines.
+- **Atomic .mcp.json write (#15)** -- MCP config is now written to a temp file and atomically renamed. Malformed JSON from interrupted writes is auto-recovered.
+- **Health probe uses /health (#13)** -- The installer's liveness check now hits the lightweight `/health` endpoint instead of the expensive `/status` endpoint.
+- **Complete pyproject.toml metadata (#22)** -- Added author email, keywords, AI/framework classifiers, and Issues/Changelog URLs for PyPI discoverability.
+
+#### Stats
+- 756 tests pass, 0 regressions (~39 new tests)
+- 13 issues closed, 7 PRs merged
+- Contributors: @jonesrussell (7 PRs)
+
 ## 1.55.20 (2026-03-19)
 
 ### Community Fixes
