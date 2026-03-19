@@ -373,7 +373,7 @@ async def _handle_entities(arguments, db, config, logger, **ctx):
             )
         entity_id = remember_entity(
             name=name_val,
-            entity_type=arguments.get("type", "person"),
+            entity_type=arguments.get("type", ""),
             description=arguments.get("description"),
             aliases=arguments.get("aliases"),
         )
@@ -1136,7 +1136,7 @@ async def _handle_batch(arguments, db, config, logger, **ctx):
             if op_type == "entity":
                 entity_id = remember_entity(
                     name=op["name"],
-                    entity_type=op.get("type", "person"),
+                    entity_type=op.get("type", ""),
                     description=op.get("description"),
                     aliases=op.get("aliases"),
                     _precomputed_embedding=embeddings_map.get(i),
@@ -3248,14 +3248,14 @@ def _build_briefing() -> str:
     # 1. Active commitments count + stale count
     try:
         total_row = db.execute(
-            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1",
+            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1 AND invalidated_at IS NULL",
             fetch=True,
         )
         total_commitments = total_row[0]["cnt"] if total_row else 0
 
         stale_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
         stale_row = db.execute(
-            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1 AND created_at < ?",
+            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1 AND invalidated_at IS NULL AND created_at < ?",
             (stale_cutoff,),
             fetch=True,
         )
@@ -3274,6 +3274,7 @@ def _build_briefing() -> str:
             """
             SELECT COUNT(*) as cnt FROM entities
             WHERE type = 'person' AND importance > 0.3
+              AND deleted_at IS NULL
               AND updated_at < ?
             """,
             (cooling_cutoff,),

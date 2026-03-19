@@ -2503,49 +2503,105 @@ class ConsolidateService:
                             "method": "alias_overlap",
                             "shared_alias": row["alias"],
                         })
-
-            # Store top candidates as predictions for user review
-            now = datetime.utcnow()
-            for candidate in candidates[:10]:
-                content = (
-                    f"Possible duplicate entities: '{candidate['entity_1']['name']}' "
-                    f"and '{candidate['entity_2']['name']}' "
-                    f"({candidate['similarity']:.0%} similar via {candidate['method']}). "
-                    f"Consider merging with memory.merge_entities."
-                )
-                # Check for existing dedupe prediction
-                existing = self.db.execute(
-                    """
-                    SELECT id FROM predictions
-                    WHERE prediction_type = 'suggestion'
-                      AND metadata LIKE ?
-                      AND expires_at > ?
-                    LIMIT 1
-                    """,
-                    (f'%"dedupe_pair": [{candidate["entity_1"]["id"]}, {candidate["entity_2"]["id"]}]%',
-                     now.isoformat()),
-                    fetch=True,
-                )
-
-                if not existing:
-                    self.db.insert(
-                        "predictions",
-                        {
-                            "content": content,
-                            "prediction_type": "suggestion",
-                            "priority": 0.6 + 0.3 * candidate["similarity"],
-                            "expires_at": (now + timedelta(days=14)).isoformat(),
-                            "created_at": now.isoformat(),
-                            "metadata": json.dumps({
-                                "dedupe_pair": [candidate["entity_1"]["id"], candidate["entity_2"]["id"]],
-                                "similarity": candidate["similarity"],
-                                "method": candidate["method"],
-                            }),
-                        },
-                    )
-
         except Exception as e:
-            logger.warning(f"Auto dedupe failed: {e}")
+            logger.debug(f"Alias overlap dedupe failed: {e}")
+
+        # Method 3: Fuzzy name comparison (SequenceMatcher)
+        # Catches typo variants and prefix matches that embeddings and aliases miss.
+        # Runs even without sqlite-vec. Advisory only: never auto-merges.
+        try:
+            from difflib import SequenceMatcher
+
+            all_entities = self.db.execute(
+                """
+                SELECT id, name, canonical_name, type
+                FROM entities
+                WHERE deleted_at IS NULL AND importance > 0.05
+                ORDER BY type, canonical_name
+                """,
+                fetch=True,
+            ) or []
+
+            # Group by type for same-type comparison only
+            by_type: dict = {}
+            for ent in all_entities:
+                by_type.setdefault(ent["type"], []).append(ent)
+
+            for etype, group in by_type.items():
+                for i, e1 in enumerate(group):
+                    for e2 in group[i + 1:]:
+                        pair_key = (min(e1["id"], e2["id"]), max(e1["id"], e2["id"]))
+                        if pair_key in seen_pairs:
+                            continue
+
+                        cn1 = e1["canonical_name"]
+                        cn2 = e2["canonical_name"]
+
+                        # Fuzzy ratio check
+                        ratio = SequenceMatcher(None, cn1, cn2).ratio()
+                        if ratio >= threshold:
+                            seen_pairs.add(pair_key)
+                            candidates.append({
+                                "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
+                                "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},
+                                "similarity": round(ratio, 3),
+                                "method": "fuzzy_name",
+                            })
+                            continue
+
+                        # Prefix match: short name is prefix of longer name
+                        shorter, longer = (cn1, cn2) if len(cn1) <= len(cn2) else (cn2, cn1)
+                        if len(shorter) >= 3 and longer.startswith(shorter):
+                            if pair_key not in seen_pairs:
+                                seen_pairs.add(pair_key)
+                                candidates.append({
+                                    "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
+                                    "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},
+                                    "similarity": 0.80,
+                                    "method": "fuzzy_name_prefix",
+                                })
+        except Exception as e:
+            logger.debug(f"Fuzzy name dedupe failed: {e}")
+
+        # Store top candidates as predictions for user review
+        now = datetime.utcnow()
+        for candidate in candidates[:10]:
+            content = (
+                f"Possible duplicate entities: '{candidate['entity_1']['name']}' "
+                f"and '{candidate['entity_2']['name']}' "
+                f"({candidate['similarity']:.0%} similar via {candidate['method']}). "
+                f"Consider merging with memory.merge_entities."
+            )
+            # Check for existing dedupe prediction
+            existing = self.db.execute(
+                """
+                SELECT id FROM predictions
+                WHERE prediction_type = 'suggestion'
+                  AND metadata LIKE ?
+                  AND expires_at > ?
+                LIMIT 1
+                """,
+                (f'%"dedupe_pair": [{candidate["entity_1"]["id"]}, {candidate["entity_2"]["id"]}]%',
+                 now.isoformat()),
+                fetch=True,
+            )
+
+            if not existing:
+                self.db.insert(
+                    "predictions",
+                    {
+                        "content": content,
+                        "prediction_type": "suggestion",
+                        "priority": 0.6 + 0.3 * candidate["similarity"],
+                        "expires_at": (now + timedelta(days=14)).isoformat(),
+                        "created_at": now.isoformat(),
+                        "metadata": json.dumps({
+                            "dedupe_pair": [candidate["entity_1"]["id"], candidate["entity_2"]["id"]],
+                            "similarity": candidate["similarity"],
+                            "method": candidate["method"],
+                        }),
+                    },
+                )
 
         if candidates:
             logger.info(f"Found {len(candidates)} potential entity duplicates")

@@ -56,6 +56,47 @@ def _strip_private(content: str) -> str:
     return stripped if stripped else content
 
 
+def _infer_entity_type(name: str) -> str:
+    """Infer entity type from name keywords when no explicit type is provided.
+
+    Checks for organizational, project, concept, and location keywords.
+    Returns 'person' as fallback when no keywords match.
+    Conservative: only clear keyword signals trigger inference.
+    """
+    lower = name.lower()
+    words = lower.split()
+
+    # Location keywords (checked first: "Company HQ" is a location, not an org)
+    location_keywords = ["office", "hq", "headquarters", "campus", "building"]
+    for kw in location_keywords:
+        if kw in words:
+            return "location"
+
+    # Organization keywords (check as whole words)
+    org_keywords = [
+        "inc", "llc", "corp", "corporation", "foundation", "university",
+        "lab", "labs", "ltd", "gmbh", "company", "institute", "associates",
+        "group", "partners",
+    ]
+    for kw in org_keywords:
+        if kw in words:
+            return "organization"
+
+    # Project keywords
+    project_keywords = ["project", "sprint", "mvp", "initiative", "campaign"]
+    for kw in project_keywords:
+        if kw in words:
+            return "project"
+
+    # Concept keywords
+    concept_keywords = ["methodology", "framework", "theory", "protocol", "strategy"]
+    for kw in concept_keywords:
+        if kw in words:
+            return "concept"
+
+    return "person"
+
+
 class RememberService:
     """Store and manage memories"""
 
@@ -360,7 +401,7 @@ class RememberService:
     def remember_entity(
         self,
         name: str,
-        entity_type: str = "person",
+        entity_type: str = "",
         description: Optional[str] = None,
         aliases: Optional[List[str]] = None,
         metadata: Optional[Dict] = None,
@@ -379,6 +420,10 @@ class RememberService:
         Returns:
             Entity ID
         """
+        # Infer type from name keywords when no type is specified
+        if not entity_type or not entity_type.strip():
+            entity_type = _infer_entity_type(name)
+
         # Run deterministic guards
         existing_names = [
             row["canonical_name"]
@@ -1734,7 +1779,7 @@ class RememberService:
             entity_type=extracted.type,
         )
 
-    def _find_or_create_entity(self, name: str, entity_type: str = "person") -> Optional[int]:
+    def _find_or_create_entity(self, name: str, entity_type: str = "") -> Optional[int]:
         """Find entity by name or create if not exists"""
         canonical = self.extractor.canonical_name(name)
 

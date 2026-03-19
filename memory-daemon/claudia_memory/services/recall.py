@@ -971,9 +971,9 @@ class RecallService:
         Returns:
             List of matching entities
         """
-        canonical = self.extractor.canonical_name(query)
+        is_wildcard = not query or query.strip() in ("*", "")
 
-        # Try exact match first
+        # Base query with joins for counts
         sql = """
             SELECT e.*,
                    COUNT(DISTINCT me.memory_id) as memory_count,
@@ -983,9 +983,14 @@ class RecallService:
             LEFT JOIN memory_entities me ON e.id = me.entity_id
             LEFT JOIN memories m ON me.memory_id = m.id
             LEFT JOIN relationships r ON e.id = r.source_entity_id OR e.id = r.target_entity_id
-            WHERE e.canonical_name LIKE ? OR e.name LIKE ?
+            WHERE e.deleted_at IS NULL
         """
-        params = [f"%{canonical}%", f"%{query}%"]
+        params = []
+
+        if not is_wildcard:
+            canonical = self.extractor.canonical_name(query)
+            sql += " AND (e.canonical_name LIKE ? OR e.name LIKE ?)"
+            params.extend([f"%{canonical}%", f"%{query}%"])
 
         if entity_types:
             placeholders = ", ".join(["?" for _ in entity_types])
