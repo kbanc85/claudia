@@ -2488,6 +2488,23 @@ class ConsolidateService:
                 fetch=True,
             ) or []
 
+            # Build alias frequency map for specificity scoring (#27).
+            # Count how many live entities share each canonical alias.
+            alias_entity_counts: dict = {}
+            if alias_rows:
+                count_rows = self.db.execute(
+                    """
+                    SELECT a.canonical_alias, COUNT(DISTINCT a.entity_id) as cnt
+                    FROM entity_aliases a
+                    JOIN entities e ON a.entity_id = e.id AND e.deleted_at IS NULL
+                    GROUP BY a.canonical_alias
+                    HAVING cnt >= 2
+                    """,
+                    fetch=True,
+                ) or []
+                for cr in count_rows:
+                    alias_entity_counts[cr["canonical_alias"]] = cr["cnt"]
+
             for row in alias_rows:
                 pair_key = (row["eid1"], row["eid2"])
                 if pair_key not in seen_pairs:
@@ -2512,10 +2529,20 @@ class ConsolidateService:
                                 )
                                 continue
 
+                        # Dynamic specificity scoring (#27): rare aliases
+                        # score higher than common ones.
+                        alias_count = alias_entity_counts.get(shared, 2)
+                        specificity = 1.0 / alias_count
+                        score = 0.70 + 0.25 * specificity
+                        # Multi-token aliases are stronger evidence
+                        if " " in shared:
+                            score += 0.10
+                        score = max(0.70, min(0.95, score))
+
                         candidates.append({
                             "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
                             "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},
-                            "similarity": 0.95,
+                            "similarity": score,
                             "method": "alias_overlap",
                             "shared_alias": row["alias"],
                         })
