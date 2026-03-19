@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.18 (2026-03-19)
+
+### Data Quality & Python Compatibility
+
+Six fixes addressing two community discussions. All additive, no schema changes, no new pip dependencies.
+
+- **Briefing counts now exclude invalidated records** -- The `memory.briefing` MCP tool was counting soft-deleted commitments (58 shown when 14 active). Added `AND invalidated_at IS NULL` to both commitment count queries and `AND deleted_at IS NULL` to the cooling relationships query. The first numbers users see at session start are now accurate. (Discussion #25)
+- **Entity type inference from name keywords** -- New `_infer_entity_type()` function detects organizational keywords (Inc, LLC, Corp, University), project keywords (Project, Sprint, MVP), concept keywords (methodology, framework), and location keywords (Office, HQ) in entity names. "Acme Corp" now creates an organization entity, not a person. Only runs when creating new entities; explicit types and existing entities are never overridden. (Discussion #25)
+- **Consolidation fuzzy name dedup** -- Added Method 3 to overnight dedup: SequenceMatcher fuzzy name comparison across same-type entity pairs. Catches typo variants like "Kris Krisko" vs "Kris Krisco" (>= 0.90 similarity) and prefix matches like "Sarah" vs "Sarah Johnson". Advisory only: stores candidates in predictions table for user review, never auto-merges. Runs even without sqlite-vec. (Discussion #25)
+- **Wildcard entity search works** -- `memory.entities(query="*")` now returns all non-deleted entities instead of nothing. The `*` was being wrapped in `LIKE "%*%"`, matching the literal asterisk. Also added `AND deleted_at IS NULL` to all search paths. (Discussion #25)
+- **Installer prefers Python < 3.14** -- Both `install.sh` and `bin/index.js` now try Python 3.13, 3.12, and 3.11 before falling back to 3.14+. Previously, systems with only 3.12 and 3.14 installed (no 3.13) would get a 3.14 venv, causing spaCy to fail with a Pydantic V1 ConfigError. The daemon still works on 3.14 (graceful degradation to regex-only extraction), but prefers < 3.14 when available. (Discussion #29)
+- **Python version cap** -- `requires-python` in pyproject.toml now caps at `<3.14` until spaCy (blis wheels), pydantic-core (PyO3 ceiling), and numpy (cp314 wheels) ship 3.14 support.
+- 706 tests pass, 0 regressions, 46 new tests across 4 new test files.
+
 ## 1.55.17 (2026-03-18)
 
 ### The Quiet Observer
