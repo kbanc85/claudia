@@ -4,8 +4,12 @@ Background Scheduler for Claudia Memory System
 Runs scheduled consolidation tasks using APScheduler.
 """
 
+import json
 import logging
+import os
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -21,6 +25,148 @@ from ..services.consolidate import (
 from ..services.vault_sync import run_vault_sync
 
 logger = logging.getLogger(__name__)
+
+
+# Tools whose invocations are always relevant for Claudia's memory
+RELEVANT_TOOL_PREFIXES = {
+    "gmail", "google_workspace", "slack", "telegram",
+    "SLACK_", "GMAIL_", "NOTION_", "CALENDAR_",
+    "memory.file", "memory.remember",
+}
+
+COMMITMENT_RE = re.compile(
+    r"(?:by\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|end of|eod))"
+    r"|(?:I'?ll\s+(?:send|get|follow|draft|prepare|deliver|share|review))"
+    r"|(?:follow.?up|get back to|circle back|loop.?in|promised|committed)",
+    re.IGNORECASE,
+)
+
+CLAUDIA_PATH_RE = re.compile(r"(?:context/|people/|workspaces/|projects/)")
+
+
+def _is_relevant_observation(obs, config, known_entity_names=None):
+    """Check if an observation passes the relevance filter.
+
+    Returns True if at least one signal matches:
+    1. Tool name matches a relevant tool pattern
+    2. Input contains a Claudia file path
+    3. Content mentions a known entity
+    4. Content contains commitment language
+    """
+    if config.observation_capture_all:
+        return True
+
+    tool_name = obs.get("tool", "")
+    combined_text = f"{obs.get('input', '')} {obs.get('output', '')}"
+
+    # Check 1: Relevant tool
+    for prefix in RELEVANT_TOOL_PREFIXES:
+        if tool_name.startswith(prefix):
+            return True
+    for pattern in config.observation_relevant_tools:
+        if pattern in tool_name:
+            return True
+
+    # Check 2: Claudia file path in input
+    if CLAUDIA_PATH_RE.search(combined_text):
+        return True
+    for pattern in config.observation_relevant_paths:
+        if pattern in combined_text:
+            return True
+
+    # Check 3: Known entity mention
+    if known_entity_names:
+        combined_lower = combined_text.lower()
+        for name in known_entity_names:
+            if name.lower() in combined_lower:
+                return True
+
+    # Check 4: Commitment language
+    if COMMITMENT_RE.search(combined_text):
+        return True
+
+    return False
+
+
+def _ingest_observations(db, config):
+    """Poll ~/.claudia/observations.jsonl and ingest relevant entries.
+
+    Uses atomic rename to prevent race conditions with the hook writer.
+    Filters observations through the relevance filter before storing.
+    """
+    if not config.observation_capture_enabled:
+        return
+
+    obs_file = Path.home() / ".claudia" / "observations.jsonl"
+    processing_file = obs_file.with_suffix(".jsonl.processing")
+
+    if not obs_file.exists():
+        return
+
+    # Check file is non-empty
+    try:
+        if obs_file.stat().st_size == 0:
+            return
+    except OSError:
+        return
+
+    # Atomic rename to prevent race with hook writes
+    try:
+        os.rename(str(obs_file), str(processing_file))
+    except OSError:
+        return
+
+    # Load known entity names for relevance checking (cached per batch)
+    known_entity_names = set()
+    try:
+        rows = db.execute(
+            "SELECT canonical_name FROM entities WHERE deleted_at IS NULL",
+            fetch=True,
+        ) or []
+        known_entity_names = {row["canonical_name"] for row in rows}
+    except Exception:
+        pass
+
+    ingested = 0
+    try:
+        with open(processing_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obs = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                if not _is_relevant_observation(obs, config, known_entity_names):
+                    continue
+
+                # Ingest via buffer_turn
+                try:
+                    from ..services.remember import buffer_turn
+                    summary = f"[{obs.get('tool', 'unknown')}] {obs.get('input', '')}"
+                    if obs.get("output"):
+                        summary += f" -> {obs['output']}"
+                    buffer_turn(
+                        assistant_content=summary[:500],
+                        source="hook_capture",
+                    )
+                    ingested += 1
+                except Exception as e:
+                    logger.debug(f"Failed to ingest observation: {e}")
+
+    except Exception as e:
+        logger.debug(f"Error reading observations file: {e}")
+    finally:
+        # Clean up processing file
+        try:
+            processing_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    if ingested > 0:
+        logger.debug(f"Ingested {ingested} observations from hook capture")
 
 
 class MemoryScheduler:
@@ -92,6 +238,17 @@ class MemoryScheduler:
                 id="vault_sync",
                 name="Obsidian vault sync",
                 replace_existing=True,
+            )
+
+        # Every N seconds: Observation ingestion from PostToolUse hook
+        if self.config.observation_capture_enabled:
+            self.scheduler.add_job(
+                self._run_observation_ingest,
+                IntervalTrigger(seconds=self.config.observation_ingest_interval),
+                id="observation_ingest",
+                name="Observation ingestion",
+                replace_existing=True,
+                misfire_grace_time=60,
             )
 
         self.scheduler.start()
@@ -185,6 +342,14 @@ class MemoryScheduler:
             logger.info(f"Canvas regeneration complete: {canvas_result}")
         except Exception as e:
             logger.exception("Error in vault sync")
+
+    def _run_observation_ingest(self) -> None:
+        """Ingest observations from PostToolUse hook captures."""
+        try:
+            from ..database import get_db
+            _ingest_observations(get_db(), self.config)
+        except Exception as e:
+            logger.debug(f"Error in observation ingestion: {e}")
 
 
 # Global scheduler instance

@@ -71,6 +71,7 @@ class TestSchedulerConfiguration:
         expected = {
             "daily_decay", "pattern_detection", "full_consolidation",
             "daily_backup", "weekly_backup", "vault_sync",
+            "observation_ingest",
         }
         assert job_ids == expected, (
             f"Expected jobs {expected}, got: {job_ids}"

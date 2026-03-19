@@ -124,6 +124,13 @@ class MemoryConfig:
     # Daemon settings
     log_path: Path = field(default_factory=lambda: Path.home() / ".claudia" / "daemon.log")
 
+    # Observation capture settings (PostToolUse passive capture)
+    observation_capture_enabled: bool = True
+    observation_capture_all: bool = False
+    observation_relevant_tools: list = field(default_factory=list)
+    observation_relevant_paths: list = field(default_factory=list)
+    observation_ingest_interval: int = 30
+
     @property
     def backup_dir(self) -> Path:
         """Directory for human-readable backups."""
@@ -235,6 +242,16 @@ class MemoryConfig:
                     config.context_builder_token_budget = data["context_builder_token_budget"]
                 if "context_builder_max_facts" in data:
                     config.context_builder_max_facts = data["context_builder_max_facts"]
+                if "observation_capture_enabled" in data:
+                    config.observation_capture_enabled = data["observation_capture_enabled"]
+                if "observation_capture_all" in data:
+                    config.observation_capture_all = data["observation_capture_all"]
+                if "observation_relevant_tools" in data:
+                    config.observation_relevant_tools = data["observation_relevant_tools"]
+                if "observation_relevant_paths" in data:
+                    config.observation_relevant_paths = data["observation_relevant_paths"]
+                if "observation_ingest_interval" in data:
+                    config.observation_ingest_interval = data["observation_ingest_interval"]
 
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Could not load config from {config_path}: {e}. Using defaults.")
@@ -324,6 +341,9 @@ class MemoryConfig:
         if self.context_builder_max_facts < 5:
             logger.warning(f"context_builder_max_facts={self.context_builder_max_facts} too small, using 10")
             self.context_builder_max_facts = 10
+        if self.observation_ingest_interval < 10:
+            logger.warning(f"observation_ingest_interval={self.observation_ingest_interval} too low, using 10s minimum")
+            self.observation_ingest_interval = 10
 
     def save(self) -> None:
         """Save current configuration to ~/.claudia/config.json"""
