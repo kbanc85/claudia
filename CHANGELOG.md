@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.17 (2026-03-18)
+
+### The Quiet Observer
+
+Three features adapted from claude-mem research. All additive, no schema changes, no migrations, no new pip dependencies.
+
+- **Privacy tag filtering** -- Content wrapped in `<private>...</private>` tags is stripped before storage. Applied at all three entry points: `remember_fact()`, `remember_message()`, and `buffer_turn()`. Case-insensitive, multiline, non-greedy. If stripping would produce empty content, the original is preserved. Users can now share sensitive context with Claudia while keeping specific details out of the database.
+- **Session briefing injection** -- The SessionStart hook now also fetches `http://localhost:3848/briefing` (the daemon's existing HTTP endpoint) with a 3s timeout. When the daemon is running, the briefing data arrives in `additionalContext` before Claude's first response, eliminating the need for a separate `memory.briefing` MCP tool call. Graceful degradation when daemon is offline.
+- **Passive tool capture** -- New PostToolUse hook writes tool invocations to `~/.claudia/observations.jsonl` (~1ms per write, file append only). The daemon polls this file every 30s and ingests only relevant observations. Relevance filter checks 4 signals: tool name (gmail, slack, telegram, Rube apps), Claudia file paths (context/, people/, workspaces/), known entity mentions, and commitment language. Configurable via 5 new fields in `config.json` (`observation_capture_enabled`, `observation_capture_all`, `observation_relevant_tools`, `observation_relevant_paths`, `observation_ingest_interval`). Pure code operations are captured but filtered out during ingestion unless they mention known people or contain commitment language.
+- 660 tests pass, 0 regressions, 23 new tests across 2 new test files.
+
 ## 1.55.16 (2026-03-18)
 
 ### Reliability Fixes
