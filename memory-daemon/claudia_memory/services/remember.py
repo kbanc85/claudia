@@ -8,6 +8,7 @@ and auto-extracting entities and facts.
 import hashlib as _hashlib
 import json
 import logging
+import re
 import uuid
 import uuid as _uuid
 from datetime import datetime
@@ -42,6 +43,19 @@ def _compute_chain_hash(content: str, metadata, prev_hash) -> str:
     return _hashlib.sha256(payload.encode()).hexdigest()
 
 
+_PRIVATE_RE = re.compile(r'<private>.*?</private>', re.DOTALL | re.IGNORECASE)
+
+
+def _strip_private(content: str) -> str:
+    """Strip <private>...</private> blocks from content before storage.
+
+    Case-insensitive, handles multiline blocks. If stripping would produce
+    an empty string, the original content is preserved (never store empty).
+    """
+    stripped = _PRIVATE_RE.sub('', content).strip()
+    return stripped if stripped else content
+
+
 class RememberService:
     """Store and manage memories"""
 
@@ -69,6 +83,9 @@ class RememberService:
         Returns:
             Dict with message_id and any extracted entities/memories
         """
+        # Strip <private> tags before any processing
+        content = _strip_private(content)
+
         # Create episode if needed
         if episode_id is None:
             episode_id = self._get_or_create_episode()
@@ -175,6 +192,9 @@ class RememberService:
         Returns:
             Memory ID or None if duplicate
         """
+        # Strip <private> tags before any processing
+        content = _strip_private(content)
+
         # Check for duplicate
         mem_hash = content_hash(content)
         existing = self.db.get_one(
@@ -1173,6 +1193,12 @@ class RememberService:
         Returns:
             Dict with episode_id and turn_number
         """
+        # Strip <private> tags before storage
+        if user_content:
+            user_content = _strip_private(user_content)
+        if assistant_content:
+            assistant_content = _strip_private(assistant_content)
+
         if episode_id is None:
             episode_id = self._get_or_create_episode(source=source)
 
