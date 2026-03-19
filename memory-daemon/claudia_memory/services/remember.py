@@ -996,6 +996,9 @@ class RememberService:
         result["success"] = True
         logger.info(f"Merged entity {source_id} ({source['name']}) into {target_id} ({target['name']})")
 
+        # Expire dedupe predictions referencing the merged entity (#28)
+        self._expire_dedupe_predictions(source_id)
+
         # Audit log
         _audit_log(
             "entity_merge",
@@ -1048,6 +1051,9 @@ class RememberService:
 
         logger.info(f"Soft-deleted entity {entity_id} ({entity['name']}): {reason}")
 
+        # Expire dedupe predictions referencing the deleted entity (#28)
+        self._expire_dedupe_predictions(entity_id)
+
         # Audit log
         _audit_log(
             "entity_delete",
@@ -1062,6 +1068,28 @@ class RememberService:
             "name": entity["name"],
             "deleted_at": now,
         }
+
+    def _expire_dedupe_predictions(self, entity_id: int) -> None:
+        """Expire dedupe predictions that reference the given entity ID.
+
+        After merging or deleting an entity, stale dedupe suggestions should
+        not keep appearing in briefings. This expires (not deletes) any
+        prediction where the entity_id appears in the dedupe_pair metadata.
+        """
+        now = datetime.utcnow().isoformat()
+        try:
+            self.db.execute(
+                """
+                UPDATE predictions
+                SET expires_at = ?
+                WHERE prediction_type = 'suggestion'
+                  AND expires_at > ?
+                  AND (metadata LIKE ? OR metadata LIKE ?)
+                """,
+                (now, now, f'%"dedupe_pair": [{entity_id},%', f'%, {entity_id}]%'),
+            )
+        except Exception as e:
+            logger.debug(f"Failed to expire dedupe predictions for entity {entity_id}: {e}")
 
     def correct_memory(
         self,

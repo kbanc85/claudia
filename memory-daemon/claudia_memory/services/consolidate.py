@@ -2496,6 +2496,22 @@ class ConsolidateService:
                     e1 = self.db.get_one("entities", where="id = ?", where_params=(row["eid1"],))
                     e2 = self.db.get_one("entities", where="id = ?", where_params=(row["eid2"],))
                     if e1 and e2:
+                        shared = row["alias"].strip()
+
+                        # Single-token alias filter (#26): a shared first name
+                        # like "joel" is weak evidence when full names diverge.
+                        if " " not in shared:
+                            tokens1 = set(e1["name"].lower().split())
+                            tokens2 = set(e2["name"].lower().split())
+                            overlap = tokens1 & tokens2
+                            non_shared = (tokens1 | tokens2) - overlap
+                            if len(non_shared) >= 2 and len(overlap) <= 1:
+                                logger.debug(
+                                    f"Alias overlap skipped: '{e1['name']}' / '{e2['name']}' "
+                                    f"share only single-token alias '{shared}'"
+                                )
+                                continue
+
                         candidates.append({
                             "entity_1": {"id": e1["id"], "name": e1["name"], "type": e1["type"]},
                             "entity_2": {"id": e2["id"], "name": e2["name"], "type": e2["type"]},

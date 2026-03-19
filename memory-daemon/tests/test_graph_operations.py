@@ -655,7 +655,7 @@ class TestAutoDedupe:
     """Tests for auto_dedupe_entities in ConsolidateService."""
 
     def test_alias_overlap(self):
-        """Auto-dedupe detects entities sharing aliases."""
+        """Auto-dedupe detects entities sharing multi-token aliases."""
         db, tmpdir = _make_db()
         try:
             svc = _make_consolidate(db)
@@ -663,20 +663,22 @@ class TestAutoDedupe:
             alice1_id = _insert_entity(db, "Alice Chen")
             alice2_id = _insert_entity(db, "A. Chen")
 
+            # Use multi-token alias to avoid single-token filter (#26)
             db.insert("entity_aliases", {
                 "entity_id": alice1_id,
-                "alias": "alice",
-                "canonical_alias": "alice",
+                "alias": "alice chen",
+                "canonical_alias": "alice chen",
             })
             db.insert("entity_aliases", {
                 "entity_id": alice2_id,
-                "alias": "alice",
-                "canonical_alias": "alice",
+                "alias": "alice chen",
+                "canonical_alias": "alice chen",
             })
 
             candidates = svc.auto_dedupe_entities()
-            assert len(candidates) >= 1
-            pair = candidates[0]
+            alias_candidates = [c for c in candidates if c["method"] == "alias_overlap"]
+            assert len(alias_candidates) >= 1
+            pair = alias_candidates[0]
             ids = {pair["entity_1"]["id"], pair["entity_2"]["id"]}
             assert ids == {alice1_id, alice2_id}
             assert pair["method"] == "alias_overlap"

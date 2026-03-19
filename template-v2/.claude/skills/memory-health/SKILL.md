@@ -15,11 +15,32 @@ Provide a dashboard view of the memory system's health, including entity counts,
 - User says "how much do you remember?", "what's in your brain?"
 - Periodic self-check (weekly review, morning brief)
 
+## Schema Reference
+
+**Use these exact column names in all SQLite queries. Do NOT guess column names.**
+
+**entities** table: `id`, `name`, `type`, `canonical_name`, `description`, `importance` (REAL), `created_at`, `updated_at`, `metadata`, `last_contact_at`, `contact_frequency_days`, `contact_trend`, `attention_tier`, `close_circle` (BOOLEAN), `close_circle_reason`, `deleted_at`, `deleted_reason`
+
+**memories** table: `id`, `content`, `content_hash`, `type`, `importance` (REAL), `confidence` (REAL), `source`, `source_id`, `source_context`, `created_at`, `updated_at`, `last_accessed_at`, `access_count`, `verified_at`, `verification_status`, `metadata`, `source_channel`, `deadline_at`, `temporal_markers`, `lifecycle_tier`, `sacred_reason` (NOT `sacred`), `archived_at`, `fact_id`, `hash`, `prev_hash`, `workspace_id`, `corrected_at`, `corrected_from`, `invalidated_at`, `invalidated_reason`, `origin_type`
+
+**relationships** table: `id`, `source_entity_id`, `target_entity_id`, `relationship_type`, `strength` (REAL), `origin_type`, `direction`, `valid_at`, `invalid_at` (NOT `invalidated_at`), `created_at`, `updated_at`, `metadata`, `lifecycle_tier`
+
+**predictions** table: `id`, `content`, `prediction_type`, `priority` (REAL), `expires_at`, `is_shown`, `is_acted_on`, `created_at`, `shown_at`, `prediction_pattern_name`, `metadata`
+
+**Important distinctions:**
+- Embeddings are in SEPARATE tables (`entity_embeddings`, `memory_embeddings`), NOT columns on the main tables
+- `memories.sacred_reason` exists, but there is no column called `sacred` or `critical`
+- `relationships.invalid_at` (not `invalidated_at`) marks invalid relationships
+- `memories.invalidated_at` marks invalidated memories (different column name than relationships)
+- Always filter with `deleted_at IS NULL` on entities and `invalidated_at IS NULL` on memories
+
 ## Workflow
 
 ### Step 1: Gather Statistics
 
-Use the Claudia CLI to get current system state:
+Use the `memory.system_health` MCP tool or direct SQLite queries with the schema above.
+
+Alternatively, use the Claudia CLI to get current system state:
 
 ```bash
 claudia memory session context --scope full --project-dir "$PWD"

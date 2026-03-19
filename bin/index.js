@@ -667,6 +667,20 @@ async function main() {
     console.log(` ${colors.cyan}✓${colors.reset} Framework updated (data preserved)`);
   }
 
+  // Self-heal: strip CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS from settings (#24)
+  // This env var causes double-spawn crashes on Linux and some macOS setups
+  try {
+    const settingsPath = join(targetPath, '.claude', 'settings.local.json');
+    if (existsSync(settingsPath)) {
+      const raw = readFileSync(settingsPath, 'utf8');
+      const settings = JSON.parse(raw);
+      if (settings.env && settings.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS) {
+        delete settings.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
+        writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+      }
+    }
+  } catch { /* non-fatal */ }
+
   // Restore MCP servers that earlier versions incorrectly disabled.
   restoreMcpServers(targetPath);
 
