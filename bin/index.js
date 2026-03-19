@@ -1188,14 +1188,14 @@ async function main() {
       renderer.update('health', 'active', 'verifying...');
       let healthOk = false;
 
-      // Try the standalone daemon's health endpoint first (port 3848)
+      // Use /health (fast, no DB queries) rather than /status (full DB scan).
       try {
-        const healthResp = await fetch('http://localhost:3848/status', {
+        const healthResp = await fetch('http://localhost:3848/health', {
           signal: AbortSignal.timeout(3000),
         });
         if (healthResp.ok) {
           const healthData = await healthResp.json();
-          healthOk = healthData.status === 'healthy' || healthData.status === 'degraded';
+          healthOk = healthData.status === 'healthy';
         }
       } catch {
         // Standalone daemon not running -- that's OK, check daemon importability instead
