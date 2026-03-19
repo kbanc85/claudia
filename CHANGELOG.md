@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.19 (2026-03-19)
+
+### The Self-Healer
+
+Bulletproof installer for non-technical users. Existing installs auto-fix on the next `npx get-claudia`.
+
+- **Auto-rebuild Python 3.14 venvs** -- If your existing venv uses Python 3.14+ and a compatible Python (3.13/3.12/3.11) is available, the installer automatically rebuilds the venv. No user action needed.
+- **Auto-install Python 3.12** -- On macOS with Homebrew, if only Python 3.14 exists, the installer runs `brew install python@3.12` automatically before creating the venv.
+- **LaunchAgent verification** -- After registering the macOS LaunchAgent, the installer now verifies the standalone daemon is actually running via `launchctl list`. If not running, force-reloads the agent. On Linux, enables and starts the systemd user service. Fixes the silent failure where backups, consolidation, and decay never ran.
+- **Clear degradation messaging** -- When falling back to Python 3.14+ (no compatible version available), the installer now shows a yellow warning explaining that spaCy is unavailable and entity extraction will use regex only.
+
 ## 1.55.18 (2026-03-19)
 
 ### Data Quality & Python Compatibility
