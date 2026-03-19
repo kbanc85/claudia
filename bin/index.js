@@ -347,7 +347,21 @@ async function installOllama() {
 
 /** Check if Python 3.10+ is available. Returns the command name or null. */
 async function isPythonInstalled() {
-  for (const cmd of ['python3', 'python']) {
+  // Prefer Python < 3.14 (spaCy/pydantic-core don't support 3.14 yet)
+  // Try versioned binaries first (3.13, 3.12, 3.11), then unversioned python3
+  const candidates = [
+    'python3.13', 'python3.12', 'python3.11',  // Versioned: guaranteed < 3.14
+    'python3', 'python',                         // Unversioned: check version
+  ];
+  // On macOS, also check Homebrew paths explicitly
+  if (process.platform === 'darwin') {
+    candidates.unshift(
+      '/opt/homebrew/bin/python3.13', '/opt/homebrew/bin/python3.12', '/opt/homebrew/bin/python3.11',
+      '/usr/local/bin/python3.13', '/usr/local/bin/python3.12', '/usr/local/bin/python3.11',
+    );
+  }
+  let fallback314 = null;
+  for (const cmd of candidates) {
     const ver = await new Promise((resolve) => {
       const proc = spawn(cmd, ['--version'], { stdio: 'pipe', timeout: 5000 });
       let stdout = '';
@@ -356,11 +370,15 @@ async function isPythonInstalled() {
       proc.on('error', () => resolve(''));
     });
     const match = ver.match(/Python (\d+)\.(\d+)/);
-    if (match && (parseInt(match[1]) > 3 || (parseInt(match[1]) === 3 && parseInt(match[2]) >= 10))) {
-      return cmd;
+    if (match) {
+      const major = parseInt(match[1]);
+      const minor = parseInt(match[2]);
+      if (major === 3 && minor >= 10 && minor < 14) return cmd;
+      // Remember 3.14+ as fallback (daemon works, just no spaCy)
+      if (major === 3 && minor >= 14 && !fallback314) fallback314 = cmd;
     }
   }
-  return null;
+  return fallback314;
 }
 
 /**

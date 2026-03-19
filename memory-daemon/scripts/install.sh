@@ -149,20 +149,25 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         return 1
     }
 
-    # Try versioned 3.13 first (Homebrew keeps it alongside 3.14)
+    # Try versioned Pythons in descending order, skipping 3.14+
+    # (spaCy's Pydantic V1 dependency and pydantic-core wheels don't support 3.14 yet)
     # Check both symlinks and Cellar paths (symlinks may not exist for non-default versions)
-    _pick_homebrew_python "/opt/homebrew/bin/python3.13" ||
-    _pick_homebrew_python "/usr/local/bin/python3.13" ||
-    {
-        # Search Homebrew Cellar for python@3.13 (ARM and Intel paths)
-        for cellar_path in /opt/homebrew/Cellar/python@3.13/*/bin/python3.13 \
-                           /usr/local/Cellar/python@3.13/*/bin/python3.13; do
-            _pick_homebrew_python "$cellar_path" && break
+    for _pyminor in 13 12 11; do
+        _pick_homebrew_python "/opt/homebrew/bin/python3.${_pyminor}" && break
+        _pick_homebrew_python "/usr/local/bin/python3.${_pyminor}" && break
+        # Search Homebrew Cellar (ARM and Intel paths)
+        for cellar_path in /opt/homebrew/Cellar/python@3.${_pyminor}/*/bin/python3.${_pyminor} \
+                           /usr/local/Cellar/python@3.${_pyminor}/*/bin/python3.${_pyminor}; do
+            _pick_homebrew_python "$cellar_path" && break 2
         done
-    } ||
-    # Fall back to unversioned python3 even if 3.14+
-    _pick_homebrew_python "/opt/homebrew/bin/python3" ||
-    _pick_homebrew_python "/usr/local/bin/python3" || true
+    done
+
+    # Fall back to unversioned python3 (may be 3.14+, but _pick_homebrew_python
+    # rejects >= 3.14, so this only succeeds if python3 points to < 3.14)
+    [ -z "$PYTHON" ] && {
+        _pick_homebrew_python "/opt/homebrew/bin/python3" ||
+        _pick_homebrew_python "/usr/local/bin/python3" || true
+    }
 
     # If all Homebrew candidates are 3.14+, still use Homebrew for SQLite support
     if [ -z "$PYTHON" ]; then
