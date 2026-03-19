@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.55.20 (2026-03-19)
+
+### Community Fixes
+
+Four fixes from GitHub issues #24, #26, #28, #31.
+
+- **Fixed MCP double-spawn crash (#24)** -- Removed `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` from the template settings. This env var caused Claude Code to spawn the memory daemon twice on Linux, crashing both with BrokenPipeError. The installer now strips it from existing user settings on upgrade.
+- **Alias overlap false positives (#26)** -- Single-token aliases (common first names like "Joel") no longer flag unrelated entities as 95% similar. The filter checks if full entity names diverge beyond the shared alias. Multi-token aliases work normally.
+- **Stale dedupe predictions (#28)** -- After merging or deleting entities, dedupe predictions referencing them are now expired immediately instead of lingering for up to 14 days in briefings.
+- **Memory-health skill schema reference (#31)** -- Added complete column-name reference to the skill file. Documents `sacred_reason` (not `sacred`), `invalid_at` (not `invalidated_at` on relationships), and that embeddings live in separate tables.
+- 717 tests pass, 0 regressions, 11 new tests across 2 new test files.
+
 ## 1.55.19 (2026-03-19)
 
 ### The Self-Healer
