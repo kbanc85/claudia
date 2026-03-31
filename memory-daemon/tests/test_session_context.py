@@ -106,7 +106,7 @@ class TestSessionContext:
                 assert "Unsummarized Sessions (2)" in result
                 assert "Episode 1" in result
                 assert "Episode 2" in result
-                assert "memory.end_session" in result
+                assert "memory_end_session" in result
         finally:
             db.close()
 

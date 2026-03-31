@@ -158,17 +158,17 @@ def _guard_response_size(text: str, tool_name: str) -> str:
 # They return a CallToolResult directly.
 
 
-@_handler("memory.temporal", "memory.upcoming", "memory.since", "memory.timeline", "memory.morning_context")
+@_handler("memory_temporal", "memory_upcoming", "memory_since", "memory_timeline", "memory_morning_context")
 async def _handle_temporal(arguments, db, config, logger, **ctx):
     # Determine operation from merged tool or backward-compat alias
-    name = ctx.get("tool_name", "memory.temporal")
-    if name == "memory.upcoming":
+    name = ctx.get("tool_name", "memory_temporal")
+    if name == "memory_upcoming":
         op = "upcoming"
-    elif name == "memory.since":
+    elif name == "memory_since":
         op = "since"
-    elif name == "memory.timeline":
+    elif name == "memory_timeline":
         op = "timeline"
-    elif name == "memory.morning_context":
+    elif name == "memory_morning_context":
         op = "morning"
     else:
         op = arguments.get("operation", "upcoming")
@@ -240,18 +240,18 @@ async def _handle_temporal(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.graph", "memory.project_network", "memory.find_path", "memory.network_hubs", "memory.dormant_relationships", "memory.reconnections")
+@_handler("memory_graph", "memory_project_network", "memory_find_path", "memory_network_hubs", "memory_dormant_relationships", "memory_reconnections")
 async def _handle_graph(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.graph")
-    if name == "memory.project_network":
+    name = ctx.get("tool_name", "memory_graph")
+    if name == "memory_project_network":
         op = "network"
-    elif name == "memory.find_path":
+    elif name == "memory_find_path":
         op = "path"
-    elif name == "memory.network_hubs":
+    elif name == "memory_network_hubs":
         op = "hubs"
-    elif name == "memory.dormant_relationships":
+    elif name == "memory_dormant_relationships":
         op = "dormant"
-    elif name == "memory.reconnections":
+    elif name == "memory_reconnections":
         op = "reconnect"
     else:
         op = arguments.get("operation", "network")
@@ -347,18 +347,18 @@ async def _handle_graph(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.entities", "memory.entity", "memory.search_entities", "memory.merge_entities", "memory.delete_entity", "memory.entity_overview")
+@_handler("memory_entities", "memory_entity", "memory_search_entities", "memory_merge_entities", "memory_delete_entity", "memory_entity_overview")
 async def _handle_entities(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.entities")
-    if name == "memory.entity":
+    name = ctx.get("tool_name", "memory_entities")
+    if name == "memory_entity":
         op = "create"
-    elif name == "memory.search_entities":
+    elif name == "memory_search_entities":
         op = "search"
-    elif name == "memory.merge_entities":
+    elif name == "memory_merge_entities":
         op = "merge"
-    elif name == "memory.delete_entity":
+    elif name == "memory_delete_entity":
         op = "delete"
-    elif name == "memory.entity_overview":
+    elif name == "memory_entity_overview":
         op = "overview"
     else:
         op = arguments.get("operation", "search")
@@ -438,16 +438,16 @@ async def _handle_entities(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.vault", "memory.sync_vault", "memory.vault_status", "memory.generate_canvas", "memory.import_vault_edits")
+@_handler("memory_vault", "memory_sync_vault", "memory_vault_status", "memory_generate_canvas", "memory_import_vault_edits")
 async def _handle_vault(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.vault")
-    if name == "memory.sync_vault":
+    name = ctx.get("tool_name", "memory_vault")
+    if name == "memory_sync_vault":
         op = "sync"
-    elif name == "memory.vault_status":
+    elif name == "memory_vault_status":
         op = "status"
-    elif name == "memory.generate_canvas":
+    elif name == "memory_generate_canvas":
         op = "canvas"
-    elif name == "memory.import_vault_edits":
+    elif name == "memory_import_vault_edits":
         op = "import"
     else:
         op = arguments.get("operation", "status")
@@ -522,14 +522,14 @@ async def _handle_vault(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.modify", "memory.correct", "memory.invalidate", "memory.invalidate_relationship")
+@_handler("memory_modify", "memory_correct", "memory_invalidate", "memory_invalidate_relationship")
 async def _handle_modify(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.modify")
-    if name == "memory.correct":
+    name = ctx.get("tool_name", "memory_modify")
+    if name == "memory_correct":
         op = "correct"
-    elif name == "memory.invalidate":
+    elif name == "memory_invalidate":
         op = "invalidate"
-    elif name == "memory.invalidate_relationship":
+    elif name == "memory_invalidate_relationship":
         op = "invalidate_relationship"
     else:
         op = arguments.get("operation", "correct")
@@ -570,14 +570,14 @@ async def _handle_modify(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.session", "memory.buffer_turn", "memory.session_context", "memory.unsummarized")
+@_handler("memory_session", "memory_buffer_turn", "memory_session_context", "memory_unsummarized")
 async def _handle_session(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.session")
-    if name == "memory.buffer_turn":
+    name = ctx.get("tool_name", "memory_session")
+    if name == "memory_buffer_turn":
         op = "buffer"
-    elif name == "memory.session_context":
+    elif name == "memory_session_context":
         op = "context"
-    elif name == "memory.unsummarized":
+    elif name == "memory_unsummarized":
         op = "unsummarized"
     else:
         op = arguments.get("operation", "context")
@@ -614,14 +614,14 @@ async def _handle_session(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.document", "memory.file", "memory.documents", "memory.purge")
+@_handler("memory_document", "memory_file", "memory_documents", "memory_purge")
 async def _handle_document(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.document")
-    if name == "memory.file":
+    name = ctx.get("tool_name", "memory_document")
+    if name == "memory_file":
         op = "store"
-    elif name == "memory.documents":
+    elif name == "memory_documents":
         op = "search"
-    elif name == "memory.purge":
+    elif name == "memory_purge":
         op = "purge"
     else:
         op = arguments.get("operation", "search")
@@ -667,12 +667,12 @@ async def _handle_document(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.provenance", "memory.trace", "memory.audit_history")
+@_handler("memory_provenance", "memory_trace", "memory_audit_history")
 async def _handle_provenance(arguments, db, config, logger, **ctx):
-    name = ctx.get("tool_name", "memory.provenance")
-    if name == "memory.trace":
+    name = ctx.get("tool_name", "memory_provenance")
+    if name == "memory_trace":
         op = "trace"
-    elif name == "memory.audit_history":
+    elif name == "memory_audit_history":
         op = "audit"
     else:
         op = arguments.get("operation", "trace")
@@ -739,11 +739,11 @@ async def _handle_provenance(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.remember")
+@_handler("memory_remember")
 async def _handle_remember(arguments, db, config, logger, **ctx):
     _coerce_arg(arguments, "about")
     memory_id = remember_fact(
-        content=_require(arguments, "content", "memory.remember"),
+        content=_require(arguments, "content", "memory_remember"),
         memory_type=arguments.get("type", "fact"),
         about_entities=arguments.get("about"),
         importance=arguments.get("importance", 1.0),
@@ -774,7 +774,7 @@ async def _handle_remember(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.recall")
+@_handler("memory_recall")
 async def _handle_recall(arguments, db, config, logger, **ctx):
     _coerce_arg(arguments, "types")
     _coerce_arg(arguments, "ids")
@@ -802,7 +802,7 @@ async def _handle_recall(arguments, db, config, logger, **ctx):
                 ]
             }
         )
-        response_text = _guard_response_size(response_text, "memory.recall")
+        response_text = _guard_response_size(response_text, "memory_recall")
         return CallToolResult(
             content=[TextContent(type="text", text=response_text)]
         )
@@ -844,7 +844,7 @@ async def _handle_recall(arguments, db, config, logger, **ctx):
                 ]
             }
         )
-        response_text = _guard_response_size(response_text, "memory.recall")
+        response_text = _guard_response_size(response_text, "memory_recall")
         return CallToolResult(
             content=[TextContent(type="text", text=response_text)]
         )
@@ -869,17 +869,17 @@ async def _handle_recall(arguments, db, config, logger, **ctx):
             ]
         }
     )
-    response_text = _guard_response_size(response_text, "memory.recall")
+    response_text = _guard_response_size(response_text, "memory_recall")
     return CallToolResult(
         content=[TextContent(type="text", text=response_text)]
     )
 
 
-@_handler("memory.about")
+@_handler("memory_about")
 async def _handle_about(arguments, db, config, logger, **ctx):
     _coerce_int(arguments, "limit")
     result = recall_about(
-        entity_name=_require(arguments, "entity", "memory.about"),
+        entity_name=_require(arguments, "entity", "memory_about"),
         limit=arguments.get("limit", 20),
         include_historical=arguments.get("include_historical", False),
     )
@@ -901,18 +901,18 @@ async def _handle_about(arguments, db, config, logger, **ctx):
         ]
 
     response_text = json.dumps(result)
-    response_text = _guard_response_size(response_text, "memory.about")
+    response_text = _guard_response_size(response_text, "memory_about")
     return CallToolResult(
         content=[TextContent(type="text", text=response_text)]
     )
 
 
-@_handler("memory.relate")
+@_handler("memory_relate")
 async def _handle_relate(arguments, db, config, logger, **ctx):
     relationship_id = relate_entities(
-        source=_require(arguments, "source", "memory.relate"),
-        target=_require(arguments, "target", "memory.relate"),
-        relationship=_require(arguments, "relationship", "memory.relate"),
+        source=_require(arguments, "source", "memory_relate"),
+        target=_require(arguments, "target", "memory_relate"),
+        relationship=_require(arguments, "relationship", "memory_relate"),
         strength=arguments.get("strength", 1.0),
         valid_at=arguments.get("valid_at"),
         supersedes=arguments.get("supersedes", False),
@@ -929,7 +929,7 @@ async def _handle_relate(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.consolidate")
+@_handler("memory_consolidate")
 async def _handle_consolidate(arguments, db, config, logger, **ctx):
     result = run_full_consolidation()
     return CallToolResult(
@@ -942,7 +942,7 @@ async def _handle_consolidate(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.end_session")
+@_handler("memory_end_session")
 async def _handle_end_session(arguments, db, config, logger, **ctx):
     _coerce_int(arguments, "episode_id")
     # Coerce all array fields (LLMs may send JSON strings)
@@ -970,7 +970,7 @@ async def _handle_end_session(arguments, db, config, logger, **ctx):
 
     result = end_session(
         episode_id=episode_id,
-        narrative=_require(arguments, "narrative", "memory.end_session"),
+        narrative=_require(arguments, "narrative", "memory_end_session"),
         facts=arguments.get("facts"),
         commitments=arguments.get("commitments"),
         entities=arguments.get("entities"),
@@ -1003,7 +1003,7 @@ async def _handle_end_session(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.reflections")
+@_handler("memory_reflections")
 async def _handle_reflections(arguments, db, config, logger, **ctx):
     _coerce_int(arguments, "limit")
     _coerce_int(arguments, "reflection_id")
@@ -1097,7 +1097,7 @@ async def _handle_reflections(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.batch")
+@_handler("memory_batch")
 async def _handle_batch(arguments, db, config, logger, **ctx):
     _coerce_arg(arguments, "operations")
     operations = arguments.get("operations", [])
@@ -1225,11 +1225,11 @@ async def _handle_ingest(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.multi_recall")
+@_handler("memory_multi_recall")
 async def _handle_multi_recall(arguments, db, config, logger, **ctx):
     """Execute multiple recall queries in a single call and return deduplicated results.
 
-    This is the compound equivalent of calling memory.recall N times sequentially.
+    This is the compound equivalent of calling memory_recall N times sequentially.
     Saves N-1 model round trips and deduplicates overlapping results server-side.
     """
     _coerce_arg(arguments, "queries")
@@ -1309,11 +1309,11 @@ async def _handle_multi_recall(arguments, db, config, logger, **ctx):
     }
     text = json.dumps(response)
     return CallToolResult(
-        content=[TextContent(type="text", text=_guard_response_size(text, "memory.multi_recall"))]
+        content=[TextContent(type="text", text=_guard_response_size(text, "memory_multi_recall"))]
     )
 
 
-@_handler("memory.deep_context")
+@_handler("memory_deep_context")
 async def _handle_deep_context(arguments, db, config, logger, **ctx):
     """Server-side deep context assembly. Replaces 6-8 sequential MCP calls with one.
 
@@ -1321,7 +1321,7 @@ async def _handle_deep_context(arguments, db, config, logger, **ctx):
     temporal sweep + episode search. Deduplicates by memory ID across all steps.
     Returns a structured JSON object ready for synthesis.
     """
-    target = _require(arguments, "target", "memory.deep_context")
+    target = _require(arguments, "target", "memory_deep_context")
     entity_limit = arguments.get("entity_limit", 50)
     recall_limit = arguments.get("recall_limit", 50)
     connected_limit = arguments.get("connected_limit", 10)
@@ -1488,11 +1488,11 @@ async def _handle_deep_context(arguments, db, config, logger, **ctx):
 
     text = json.dumps(result)
     return CallToolResult(
-        content=[TextContent(type="text", text=_guard_response_size(text, "memory.deep_context"))]
+        content=[TextContent(type="text", text=_guard_response_size(text, "memory_deep_context"))]
     )
 
 
-@_handler("memory.briefing")
+@_handler("memory_briefing")
 async def _handle_briefing(arguments, db, config, logger, **ctx):
     briefing_text = _build_briefing()
     return CallToolResult(
@@ -1505,7 +1505,7 @@ async def _handle_briefing(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.summary")
+@_handler("memory_summary")
 async def _handle_summary(arguments, db, config, logger, **ctx):
     _coerce_int(arguments, "top_facts_limit")
     entity_names = arguments.get("entities", [])
@@ -1601,7 +1601,7 @@ async def _handle_summary(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.system_health")
+@_handler("memory_system_health")
 async def _handle_system_health(arguments, db, config, logger, **ctx):
     import urllib.request, urllib.error
     report = None
@@ -1626,7 +1626,7 @@ async def _handle_system_health(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.backup")
+@_handler("memory_backup")
 async def _handle_backup(arguments, db, config, logger, **ctx):
     import urllib.request, urllib.error
     result = None
@@ -1650,11 +1650,11 @@ async def _handle_backup(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.project_health")
+@_handler("memory_project_health")
 async def _handle_project_health(arguments, db, config, logger, **ctx):
     _coerce_int(arguments, "days_ahead")
     from ..services.recall import project_relationship_health
-    entity = _require(arguments, "entity", "memory.project_health")
+    entity = _require(arguments, "entity", "memory_project_health")
     days_ahead = arguments.get("days_ahead", 30)
     result = project_relationship_health(entity, days_ahead)
     return CallToolResult(
@@ -1662,13 +1662,13 @@ async def _handle_project_health(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.lifecycle")
+@_handler("memory_lifecycle")
 async def _handle_lifecycle(arguments, db, config, logger, **ctx):
-    op = _require(arguments, "operation", "memory.lifecycle")
+    op = _require(arguments, "operation", "memory_lifecycle")
 
     if op == "set":
-        fact_id = _require(arguments, "fact_id", "memory.lifecycle")
-        tier = _require(arguments, "tier", "memory.lifecycle")
+        fact_id = _require(arguments, "fact_id", "memory_lifecycle")
+        tier = _require(arguments, "tier", "memory_lifecycle")
         reason = arguments.get("reason", "manual")
         if tier == "sacred":
             db.execute(
@@ -1690,7 +1690,7 @@ async def _handle_lifecycle(arguments, db, config, logger, **ctx):
         )
 
     elif op == "protect":
-        entity_name = _require(arguments, "entity", "memory.lifecycle")
+        entity_name = _require(arguments, "entity", "memory_lifecycle")
         reason = arguments.get("reason", "user-designated")
         canonical = entity_name.strip().lower()
         row = db.execute(
@@ -1709,7 +1709,7 @@ async def _handle_lifecycle(arguments, db, config, logger, **ctx):
         )
 
     elif op == "archive":
-        fact_id = _require(arguments, "fact_id", "memory.lifecycle")
+        fact_id = _require(arguments, "fact_id", "memory_lifecycle")
         db.execute(
             "UPDATE memories SET lifecycle_tier = 'archived', archived_at = datetime('now'), updated_at = datetime('now') WHERE fact_id = ?",
             (fact_id,),
@@ -1719,7 +1719,7 @@ async def _handle_lifecycle(arguments, db, config, logger, **ctx):
         )
 
     elif op == "restore":
-        fact_id = _require(arguments, "fact_id", "memory.lifecycle")
+        fact_id = _require(arguments, "fact_id", "memory_lifecycle")
         db.execute(
             "UPDATE memories SET lifecycle_tier = 'active', archived_at = NULL, updated_at = datetime('now') WHERE fact_id = ?",
             (fact_id,),
@@ -1758,12 +1758,12 @@ async def _handle_lifecycle(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.context")
+@_handler("memory_context")
 async def _handle_context(arguments, db, config, logger, **ctx):
     from ..services.context_builder import build_context
     _coerce_int(arguments, "token_budget")
     result = build_context(
-        query=_require(arguments, "query", "memory.context"),
+        query=_require(arguments, "query", "memory_context"),
         token_budget=arguments.get("token_budget", 8000),
         include_sacred=arguments.get("include_sacred", True),
         entity=arguments.get("entity"),
@@ -1773,9 +1773,9 @@ async def _handle_context(arguments, db, config, logger, **ctx):
     )
 
 
-@_handler("memory.checkpoint")
+@_handler("memory_checkpoint")
 async def _handle_checkpoint(arguments, db, config, logger, **ctx):
-    op = _require(arguments, "operation", "memory.checkpoint")
+    op = _require(arguments, "operation", "memory_checkpoint")
 
     if op == "save":
         name = arguments.get("name", "manual")
@@ -1819,12 +1819,12 @@ async def _handle_checkpoint(arguments, db, config, logger, **ctx):
         )
 
 
-@_handler("memory.rollback")
+@_handler("memory_rollback")
 async def _handle_rollback(arguments, db, config, logger, **ctx):
-    op = _require(arguments, "operation", "memory.rollback")
+    op = _require(arguments, "operation", "memory_rollback")
 
     if op == "set":
-        ts = _require(arguments, "timestamp", "memory.rollback")
+        ts = _require(arguments, "timestamp", "memory_rollback")
         db.execute(
             "INSERT INTO _meta (key, value, updated_at) VALUES ('view_as_of', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')",
             (ts,),
@@ -1864,7 +1864,7 @@ async def list_tools() -> ListToolsResult:
     """List all available memory tools"""
     tools = [
         Tool(
-            name="memory.remember",
+            name="memory_remember",
             title="Store a Memory",
             description="Store information in Claudia's memory. Use for facts, preferences, observations, or learnings about people, projects, or the user.",
             annotations=ToolAnnotations(destructiveHint=False),
@@ -1920,7 +1920,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.recall",
+            name="memory_recall",
             title="Search Memory",
             description=(
                 "Search Claudia's memory for relevant information. Uses hybrid vector + full-text "
@@ -1967,7 +1967,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.about",
+            name="memory_about",
             title="Get Entity Context",
             description="Get all context about a specific person, project, or entity. Returns memories, relationships, and metadata.",
             annotations=ToolAnnotations(readOnlyHint=True),
@@ -1993,7 +1993,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.relate",
+            name="memory_relate",
             title="Create Relationship",
             description="Create or strengthen a relationship between two entities (people, projects, etc.)",
             annotations=ToolAnnotations(destructiveHint=False),
@@ -2041,7 +2041,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.consolidate",
+            name="memory_consolidate",
             title="Run Consolidation",
             description="Manually trigger memory consolidation (decay, merging, pattern detection). Usually runs automatically at 3 AM.",
             annotations=ToolAnnotations(destructiveHint=False),
@@ -2051,7 +2051,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.end_session",
+            name="memory_end_session",
             title="End Session",
             description=(
                 "Finalize a session with a narrative summary and structured extractions. "
@@ -2222,7 +2222,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.reflections",
+            name="memory_reflections",
             title="Manage Reflections",
             description=(
                 "Get or search persistent reflections (observations, patterns, learnings, questions) "
@@ -2273,14 +2273,14 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.batch",
+            name="memory_batch",
             title="Batch Memory Operations",
             description=(
                 "Execute multiple memory operations in a single call. Use this for mid-session "
                 "entity creation when processing a new person, meeting transcript, or topic that "
                 "requires entity creation, multiple memories, and relationships. Much more efficient "
-                "than calling memory.entity, memory.remember, and memory.relate separately. "
-                "For end-of-session summaries, use memory.end_session instead."
+                "than calling memory_entity, memory_remember, and memory_relate separately. "
+                "For end-of-session summaries, use memory_end_session instead."
             ),
             annotations=ToolAnnotations(destructiveHint=False),
             inputSchema={
@@ -2381,11 +2381,11 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.multi_recall",
+            name="memory_multi_recall",
             title="Multi-Query Recall",
             description=(
                 "Execute multiple recall queries in a single call. Returns deduplicated results "
-                "grouped by query. Use instead of calling memory.recall repeatedly when you need "
+                "grouped by query. Use instead of calling memory_recall repeatedly when you need "
                 "to search across several dimensions (e.g., different topics, entity types, or "
                 "time-sensitive items). Saves round trips and deduplicates overlapping results "
                 "server-side. Each query can specify its own limit, types filter, and entity filter."
@@ -2417,7 +2417,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.deep_context",
+            name="memory_deep_context",
             title="Deep Context Assembly",
             description=(
                 "Full-context deep analysis in a single call. Executes the complete deep-context "
@@ -2425,7 +2425,7 @@ async def list_tools() -> ListToolsResult:
                 "temporal sweep (observations/learnings/commitments), and episode search. "
                 "Deduplicates by memory ID across all steps. Returns structured JSON ready for "
                 "synthesis. Use for meeting prep, relationship deep dives, or strategic analysis. "
-                "Replaces 6-8 sequential memory.about/memory.recall calls with one compound call."
+                "Replaces 6-8 sequential memory_about/memory_recall calls with one compound call."
             ),
             annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
@@ -2470,13 +2470,13 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.briefing",
+            name="memory_briefing",
             title="Compact Briefing",
             description=(
                 "Compact session briefing (~500 tokens). Returns aggregate counts and highlights: "
                 "active commitments, cooling relationships, unread messages, top prediction, "
                 "recent activity. Call at session start instead of loading full context. "
-                "Use memory.recall or memory.about to drill into specifics during conversation."
+                "Use memory_recall or memory_about to drill into specifics during conversation."
             ),
             annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
@@ -2521,12 +2521,12 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.summary",
+            name="memory_summary",
             title="Entity Summaries",
             description=(
                 "Get a lightweight summary for one or more entities. Returns name, type, "
                 "importance, memory count, relationship count, last mentioned date, and "
-                "top facts. Cheaper than memory.about for quick overviews."
+                "top facts. Cheaper than memory_about for quick overviews."
             ),
             annotations=ToolAnnotations(readOnlyHint=True),
             inputSchema={
@@ -2547,7 +2547,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.system_health",
+            name="memory_system_health",
             title="System Health Check",
             description=(
                 "Get comprehensive system health: schema version, component status, "
@@ -2561,7 +2561,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.backup",
+            name="memory_backup",
             title="Trigger Database Backup",
             description=(
                 "Trigger an immediate backup of the memory database. Returns the path "
@@ -2574,7 +2574,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.project_health",
+            name="memory_project_health",
             title="Project Health Check",
             description=(
                 "Project when a relationship will go dormant based on contact velocity. "
@@ -2601,7 +2601,7 @@ async def list_tools() -> ListToolsResult:
         ),
         # ── Merged tools (8 composite tools with operation parameter) ──
         Tool(
-            name="memory.temporal",
+            name="memory_temporal",
             title="Temporal Queries",
             description=(
                 "Time-based memory queries: upcoming deadlines, recent changes, entity timelines, "
@@ -2645,7 +2645,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.graph",
+            name="memory_graph",
             title="Relationship Graph",
             description=(
                 "Explore the entity relationship graph: project networks, connection paths, "
@@ -2710,7 +2710,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.entities",
+            name="memory_entities",
             title="Entity Management",
             description=(
                 "Create, search, merge, delete, or overview entities (people, projects, orgs). "
@@ -2795,7 +2795,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.vault",
+            name="memory_vault",
             title="Obsidian Vault",
             description=(
                 "Manage the Obsidian vault integration: sync memory to vault, check status, "
@@ -2831,7 +2831,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.modify",
+            name="memory_modify",
             title="Modify Memories & Relationships",
             description=(
                 "Correct, invalidate, or end relationships. "
@@ -2877,7 +2877,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.session",
+            name="memory_session",
             title="Session Lifecycle",
             description=(
                 "Session management: buffer turns, load context, or check unsummarized sessions. "
@@ -2920,7 +2920,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.document",
+            name="memory_document",
             title="Document Storage",
             description=(
                 "Store or search documents (transcripts, emails, files). "
@@ -2986,7 +2986,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.provenance",
+            name="memory_provenance",
             title="Provenance & Audit",
             description=(
                 "Trace memory origins, get full audit trails, or verify hash chain integrity. "
@@ -3022,7 +3022,7 @@ async def list_tools() -> ListToolsResult:
         ),
         # ── Lifecycle / Sacred memory tools ──
         Tool(
-            name="memory.lifecycle",
+            name="memory_lifecycle",
             title="Memory Lifecycle",
             description="Manage memory lifecycle tiers (sacred/active/cooling/archived) and entity close-circle status.",
             inputSchema={
@@ -3058,7 +3058,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.context",
+            name="memory_context",
             title="Build Context Window",
             description="Build a token-budgeted context window with sacred facts always included. Uses the Context Relevance Engine (CRE).",
             inputSchema={
@@ -3085,7 +3085,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.checkpoint",
+            name="memory_checkpoint",
             title="Database Checkpoints",
             description="Save, list, or restore database checkpoints (labeled backups).",
             inputSchema={
@@ -3105,7 +3105,7 @@ async def list_tools() -> ListToolsResult:
             },
         ),
         Tool(
-            name="memory.rollback",
+            name="memory_rollback",
             title="Temporal Rollback",
             description="Set a temporal view filter so recall only returns memories created before a given timestamp. Non-destructive.",
             inputSchema={
@@ -3507,7 +3507,7 @@ def _build_session_context(token_budget: str = "normal") -> str:
         unsummarized = get_unsummarized_turns()
         if unsummarized:
             sections.append(f"## Unsummarized Sessions ({len(unsummarized)})\n")
-            sections.append("**Action needed:** Generate retroactive summaries using `memory.end_session` for each.\n")
+            sections.append("**Action needed:** Generate retroactive summaries using `memory_end_session` for each.\n")
             for session in unsummarized:
                 ep_id = session.get("episode_id", "?")
                 turn_count = session.get("turn_count", 0)
