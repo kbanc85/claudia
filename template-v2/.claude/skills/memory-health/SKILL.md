@@ -38,7 +38,7 @@ Provide a dashboard view of the memory system's health, including entity counts,
 
 ### Step 1: Gather Statistics
 
-Use the `memory.system_health` MCP tool or direct SQLite queries with the schema above.
+Use the `memory_system_health` MCP tool or direct SQLite queries with the schema above.
 
 Alternatively, use the Claudia CLI to get current system state:
 

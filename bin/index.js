@@ -1932,7 +1932,7 @@ ${contextual.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
 ${explicit.map(s => `- **/${s.name}** - ${s.description}`).join('\n')}
 
 ## Memory System
-Memory operations use MCP tools from the claudia-memory daemon (memory.recall, memory.remember, memory.about, etc.).
+Memory operations use MCP tools from the claudia-memory daemon (memory_recall, memory_remember, memory_about, etc.).
 The daemon provides ~33 tools for semantic search, pattern detection, and relationship tracking.
 See the memory-manager skill for the full tool reference.`;
     } catch {

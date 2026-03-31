@@ -13,7 +13,7 @@ A superhuman memory system for Claudia that:
 ┌─────────────────────────────────────────────────────────────────┐
 │  Claude Code (Terminal)                                         │
 │  - User talks to Claudia                                        │
-│  - Claudia calls memory.* MCP tools automatically              │
+│  - Claudia calls memory_* MCP tools automatically              │
 └─────────────────────────┬───────────────────────────────────────┘
                           │ MCP Protocol
 ┌─────────────────────────▼───────────────────────────────────────┐
@@ -75,14 +75,14 @@ Once installed, Claudia has access to these tools:
 
 | Tool | Description |
 |------|-------------|
-| `memory.remember` | Store facts, preferences, observations |
-| `memory.recall` | Semantic search across all memories |
-| `memory.about` | Get everything known about an entity |
-| `memory.relate` | Create relationships between entities |
-| `memory.predictions` | Get proactive suggestions |
-| `memory.consolidate` | Manual consolidation trigger |
-| `memory.entity` | Create/update entity information |
-| `memory.search_entities` | Search for people, projects, etc. |
+| `memory_remember` | Store facts, preferences, observations |
+| `memory_recall` | Semantic search across all memories |
+| `memory_about` | Get everything known about an entity |
+| `memory_relate` | Create relationships between entities |
+| `memory_predictions` | Get proactive suggestions |
+| `memory_consolidate` | Manual consolidation trigger |
+| `memory_entity` | Create/update entity information |
+| `memory_search_entities` | Search for people, projects, etc. |
 
 ## How It Works
 

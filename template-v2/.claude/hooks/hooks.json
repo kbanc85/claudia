@@ -15,13 +15,13 @@
         "on_missing_me": "trigger_onboarding",
         "memory_verification": {
           "step_1_check_cli": "BEFORE anything else, verify the `claudia` CLI is available by running `claudia system-health --project-dir \"$PWD\"` via Bash tool. This checks that the claudia-memory daemon is configured and responsive. If the command fails or is not found: (1) Do NOT fall back to plugin:episodic-memory, mcp__plugin_episodic-memory_*, or any other memory search tool as a substitute — these give inferior, unrelated results and mask the real problem. (2) Tell the user: 'My memory tools are not available. The claudia-memory daemon may not be running or may not be configured as an MCP server. Check that the daemon is listed in your .mcp.json and that it starts without errors. Your context files are preserved.' (3) Continue with context files only (context/me.md, etc.) until fixed.",
-          "step_2_load_context": "Call the `memory.session_context` MCP tool to get a formatted context block with recent memories, commitments, and unsummarized session alerts. If the MCP tool is not available, the daemon may not be properly configured. Suggest: 'The claudia-memory daemon may need to be configured in .mcp.json. Run claudia system-health for diagnostics.'",
+          "step_2_load_context": "Call the `memory_session_context` MCP tool to get a formatted context block with recent memories, commitments, and unsummarized session alerts. If the MCP tool is not available, the daemon may not be properly configured. Suggest: 'The claudia-memory daemon may need to be configured in .mcp.json. Run claudia system-health for diagnostics.'",
           "fallback": "If memory MCP tools are not available: (1) Do NOT use plugin:episodic-memory or any other memory search tool as a substitute. (2) Tell the user: 'My memory tools are not available. The claudia-memory daemon may not be configured as an MCP server.' (3) Read context files directly (context/me.md, context/commitments.md, context/learnings.md, context/patterns.md, context/waiting.md) as the fallback. Make clear to the user they are in degraded mode with no semantic search or cross-session learning."
         },
         "enhanced_memory": {
-          "context_load": "Call the `memory.session_context` MCP tool to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
-          "catch_up": "If unsummarized sessions are reported in the context block, review buffered turns and call the `memory.end_session` MCP tool with a retroactive narrative and structured extractions for each.",
-          "recall_context": "Use the loaded context for greeting. For deeper search on specific topics, call the `memory.recall` MCP tool with the relevant query."
+          "context_load": "Call the `memory_session_context` MCP tool to get a formatted context block with recent memories, commitments, and unsummarized session alerts.",
+          "catch_up": "If unsummarized sessions are reported in the context block, review buffered turns and call the `memory_end_session` MCP tool with a retroactive narrative and structured extractions for each.",
+          "recall_context": "Use the loaded context for greeting. For deeper search on specific topics, call the `memory_recall` MCP tool with the relevant query."
         },
         "proactive_surfacing": {
           "description": "Surface urgent items naturally in the greeting. Keep it to a brief mention, not a full report.",
@@ -30,12 +30,12 @@
             {
               "type": "overdue_commitments",
               "description": "Commitments older than 7 days without resolution",
-              "query_hint": "Call the `memory.recall` MCP tool with query about overdue commitments and check dates"
+              "query_hint": "Call the `memory_recall` MCP tool with query about overdue commitments and check dates"
             },
             {
               "type": "cooling_relationships",
               "description": "Important people not mentioned in >30 days",
-              "query_hint": "Call the `memory.search_entities` MCP tool with type: person and check last_mentioned dates"
+              "query_hint": "Call the `memory_search_entities` MCP tool with type: person and check last_mentioned dates"
             }
           ],
           "examples": [
@@ -58,7 +58,7 @@
         ],
         "save_mode": "merge",
         "enhanced_memory": {
-          "summarize": "Call the `memory.end_session` MCP tool with a narrative summary and structured extractions from the session's buffered turns. The narrative should enhance stored information with tone, context, unresolved threads, and nuance that structured fields cannot capture."
+          "summarize": "Call the `memory_end_session` MCP tool with a narrative summary and structured extractions from the session's buffered turns. The narrative should enhance stored information with tone, context, unresolved threads, and nuance that structured fields cannot capture."
         }
       }
     },
@@ -75,10 +75,10 @@
   "notes": {
     "implementation": "These hooks define intended behaviors. Claude Code will execute them as behavioral guidelines rather than traditional script execution.",
     "memory_verification": "CRITICAL: At session start, verify memory availability by running `claudia system-health --project-dir \"$PWD\"` BEFORE proceeding. If memory MCP tools are not available, do NOT use plugin:episodic-memory as a substitute. Tell the user the claudia-memory daemon may need to be configured. Fall back to context files only (context/me.md, etc.) in the meantime.",
-    "session_start": "At session start: (1) Verify claudia system-health passes, (2) Call the `memory.session_context` MCP tool, (3) Read context files, (4) Check for unsummarized sessions. If me.md is missing, trigger onboarding.",
-    "session_end": "Before session ends, Claudia should generate a session summary via the `memory.end_session` MCP tool (enhanced memory) or update context files (markdown fallback). The summary includes both a free-form narrative and structured extractions.",
+    "session_start": "At session start: (1) Verify claudia system-health passes, (2) Call the `memory_session_context` MCP tool, (3) Read context files, (4) Check for unsummarized sessions. If me.md is missing, trigger onboarding.",
+    "session_end": "Before session ends, Claudia should generate a session summary via the `memory_end_session` MCP tool (enhanced memory) or update context files (markdown fallback). The summary includes both a free-form narrative and structured extractions.",
     "first_run": "The absence of context/me.md signals a first-run scenario requiring onboarding.",
-    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via the `memory.buffer_turn` MCP tool. This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start.",
-    "source_filing": "CRITICAL: When processing transcripts, emails, or documents, ALWAYS call the `memory.file` MCP tool BEFORE extracting information. The Source Preservation principle (#12) is non-negotiable. Raw sources must be filed for provenance."
+    "turn_buffering": "During sessions with enhanced memory, Claudia buffers each meaningful conversation turn via the `memory_buffer_turn` MCP tool. This ensures nothing is lost even if the session ends abruptly. The buffered turns are summarized at session end or caught up at next session start.",
+    "source_filing": "CRITICAL: When processing transcripts, emails, or documents, ALWAYS call the `memory_file` MCP tool BEFORE extracting information. The Source Preservation principle (#12) is non-negotiable. Raw sources must be filed for provenance."
   }
 }

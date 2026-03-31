@@ -1345,7 +1345,7 @@ class RememberService:
         # Validate episode exists before any DB operations
         episode = self.db.get_one("episodes", where="id = ?", where_params=(episode_id,))
         if not episode:
-            result["error"] = f"Episode {episode_id} not found. Call memory.buffer_turn first to create an episode."
+            result["error"] = f"Episode {episode_id} not found. Call memory_buffer_turn first to create an episode."
             logger.warning(f"end_session called with non-existent episode_id={episode_id}")
             return result
 

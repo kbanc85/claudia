@@ -1855,6 +1855,15 @@ async def _handle_rollback(arguments, db, config, logger, **ctx):
         )
 
 
+# ── Backward compatibility: accept dot-notation names during transition ──
+# Users who haven't updated skills/hooks may still call memory.recall instead
+# of memory_recall. Register aliases so both work. list_tools() only advertises
+# underscore names; these aliases only affect call_tool() dispatch.
+# TODO: Remove after v1.58.0 (2 release cycles)
+_DOT_ALIASES = {k.replace("_", ".", 1): v for k, v in _TOOL_HANDLERS.items()
+                if k.startswith("memory_")}
+_TOOL_HANDLERS.update(_DOT_ALIASES)
+
 # Initialize the MCP server
 server = Server("claudia-memory")
 

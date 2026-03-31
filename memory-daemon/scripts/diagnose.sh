@@ -171,7 +171,7 @@ echo ""
 if [ $ISSUES_FOUND -eq 0 ]; then
     echo -e "${GREEN}${BOLD}All checks passed!${NC}"
     echo ""
-    echo -e "If memory.* tools still don't appear in Claude Code:"
+    echo -e "If memory_* tools still don't appear in Claude Code:"
     echo ""
     echo -e "  ${YELLOW}${BOLD}→ Close this terminal and run 'claude' in a NEW terminal${NC}"
     echo ""
