@@ -54,7 +54,7 @@ If the topic is clear and narrow, skip this and go straight to work.
 Before reaching for the web, check what Claudia already knows:
 
 ```
-memory.recall "[topic]":
+memory_recall "[topic]":
 ├── Fresh results (< 7 days) → Use them, offer to refresh
 │   "I have some context on this from [date]:
 │    [summary of stored facts]
@@ -145,7 +145,7 @@ Source: [URL] (fetched [date])
 ### 6. Store and Connect
 
 After presenting findings:
-- Store key facts via `memory.remember` with `source:web:` provenance
+- Store key facts via `memory_remember` with `source:web:` provenance
 - Update relevant entities if research revealed new information
 - Connect to existing relationships or projects where relevant
 

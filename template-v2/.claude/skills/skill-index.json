@@ -585,7 +585,7 @@
     {
       "name": "deep-context",
       "path": "deep-context/SKILL.md",
-      "description": "Full-context deep analysis using memory.deep_context compound tool (single call replaces 6-8 sequential calls) for comprehensive synthesis",
+      "description": "Full-context deep analysis using memory_deep_context compound tool (single call replaces 6-8 sequential calls) for comprehensive synthesis",
       "invocation": "contextual",
       "effort_level": "max",
       "triggers": ["deep dive", "full context", "everything about", "strategic analysis"],

@@ -21,12 +21,12 @@ Or naturally:
 
 ### Primary: Deep Context (one call)
 
-Call the `memory.deep_context` MCP tool with the person's name. This returns everything in one round trip: entity info, all memories, connected entities, temporal items (commitments, observations), and episode history. Use this data for all sections below.
+Call the `memory_deep_context` MCP tool with the person's name. This returns everything in one round trip: entity info, all memories, connected entities, temporal items (commitments, observations), and episode history. Use this data for all sections below.
 
-If deep_context is unavailable, fall back to sequential calls: `memory.about` for the entity, then `memory.recall` for broader context.
+If deep_context is unavailable, fall back to sequential calls: `memory_about` for the entity, then `memory_recall` for broader context.
 
 ### 1. Person Context
-From `memory.deep_context` result (or `people/[person].md` as fallback):
+From `memory_deep_context` result (or `people/[person].md` as fallback):
 - Role and organization
 - Relationship history
 - Last contact and topics

@@ -290,7 +290,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self.send_error(500, str(e))
 
     def _send_briefing_response(self):
-        """Send compact session briefing (same data as memory.briefing MCP tool).
+        """Send compact session briefing (same data as memory_briefing MCP tool).
 
         Lets session hooks call briefing data over HTTP before MCP tools register,
         providing a pre-MCP layer in the fallback chain.

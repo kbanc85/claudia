@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 RELEVANT_TOOL_PREFIXES = {
     "gmail", "google_workspace", "slack", "telegram",
     "SLACK_", "GMAIL_", "NOTION_", "CALENDAR_",
-    "memory.file", "memory.remember",
+    "memory_file", "memory_remember",
 }
 
 COMMITMENT_RE = re.compile(

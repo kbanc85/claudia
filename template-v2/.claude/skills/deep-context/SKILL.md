@@ -18,7 +18,7 @@ Comprehensive deep analysis that leverages the full context window. Pulls memori
 
 ## The Deep Pull
 
-Call the `memory.deep_context` MCP tool with the target entity or topic. This compound tool executes the full pipeline server-side in a single call:
+Call the `memory_deep_context` MCP tool with the target entity or topic. This compound tool executes the full pipeline server-side in a single call:
 
 1. **Entity core** (limit=50): Everything known about the target (memories, relationships, metadata)
 2. **Semantic recall** (limit=50): Broad search to catch indirect references and related topics
@@ -44,13 +44,13 @@ All limits are configurable via the tool's input:
 
 ### Fallback (when memory daemon is unavailable)
 
-If the MCP tool is not available, execute these queries manually using `memory.about` and `memory.recall` MCP tools sequentially:
+If the MCP tool is not available, execute these queries manually using `memory_about` and `memory_recall` MCP tools sequentially:
 
-1. `memory.about` with the target (limit=50)
-2. `memory.recall` with the target (limit=50)
-3. `memory.about` for each of the top 3 connected entities (limit=10)
-4. `memory.recall` with types=["observation","learning","commitment"] (limit=30)
-5. `memory.recall` for "session with [target]" (limit=20)
+1. `memory_about` with the target (limit=50)
+2. `memory_recall` with the target (limit=50)
+3. `memory_about` for each of the top 3 connected entities (limit=10)
+4. `memory_recall` with types=["observation","learning","commitment"] (limit=30)
+5. `memory_recall` for "session with [target]" (limit=20)
 6. Deduplicate by memory ID across all steps
 
 If the memory daemon itself is down, fall back to reading `context/` files and `people/*.md` directly. Note degraded mode in output.

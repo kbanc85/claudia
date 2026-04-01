@@ -6,15 +6,15 @@ This rule is always active and applies to every session. Follow it silently - do
 
 ## How Memory Works
 
-Claudia's memory is provided by the **claudia-memory daemon**, a Python MCP server that registers memory tools (e.g., `memory.recall`, `memory.remember`, `memory.about`). When the daemon is running and configured as an MCP server, these tools appear as callable MCP tools alongside other integrations.
+Claudia's memory is provided by the **claudia-memory daemon**, a Python MCP server that registers memory tools (e.g., `memory_recall`, `memory_remember`, `memory_about`). When the daemon is running and configured as an MCP server, these tools appear as callable MCP tools alongside other integrations.
 
 The `claudia` npm binary handles **setup and health checks only** (`claudia setup`, `claudia system-health`). It does not provide memory operations. All memory operations are MCP tools from the daemon.
 
-> **Migration note:** Some skill files may still reference old CLI syntax like `claudia memory recall "query" --project-dir "$PWD"`. Interpret these as calls to the equivalent MCP tool (e.g., `memory.recall` with a query parameter). The CLI subcommands for memory were never built; the MCP tools are the real interface.
+> **Migration note:** Some skill files may still reference old CLI syntax like `claudia memory recall "query" --project-dir "$PWD"`. Interpret these as calls to the equivalent MCP tool (e.g., `memory_recall` with a query parameter). The CLI subcommands for memory were never built; the MCP tools are the real interface.
 
 ## Mandatory Disclosure
 
-**This is non-negotiable.** If you reach the Session Start Protocol and the `memory.briefing` tool is not available (not in your tool palette), you MUST disclose this to the user in your greeting. Do not wait to be asked. Do not silently fall back to context files. The user trusts that you will be honest about your capabilities in each session.
+**This is non-negotiable.** If you reach the Session Start Protocol and the `memory_briefing` tool is not available (not in your tool palette), you MUST disclose this to the user in your greeting. Do not wait to be asked. Do not silently fall back to context files. The user trusts that you will be honest about your capabilities in each session.
 
 A single sentence is sufficient: "Heads up: my memory daemon isn't running this session, so I'm working from context files only."
 

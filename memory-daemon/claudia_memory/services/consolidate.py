@@ -2613,7 +2613,7 @@ class ConsolidateService:
                 f"Possible duplicate entities: '{candidate['entity_1']['name']}' "
                 f"and '{candidate['entity_2']['name']}' "
                 f"({candidate['similarity']:.0%} similar via {candidate['method']}). "
-                f"Consider merging with memory.merge_entities."
+                f"Consider merging with memory_merge_entities."
             )
             # Check for existing dedupe prediction
             existing = self.db.execute(

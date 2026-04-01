@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-SKIP_PREFIXES = ("memory.", "mcp__plugin_episodic", "cognitive.")
+SKIP_PREFIXES = ("memory_", "memory.", "mcp__plugin_episodic", "cognitive.")
 SKIP_NAMES = {"Read", "Glob", "Grep", "LS", "ListMcpResourcesTool", "ReadMcpResourceTool"}
 
 

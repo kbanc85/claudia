@@ -5,7 +5,7 @@ prompts:
   - prompt: "Here are my notes from a call with Sarah Chen about the Q4 roadmap. She mentioned they're moving to microservices, the migration is due by March 15. I promised to send her our API docs by Friday. Also met her colleague James Wright who leads the platform team."
     expectations:
       - "extracts at least one commitment (send API docs by Friday)"
-      - "files the source material via memory.file before extracting"
+      - "files the source material via memory_file before extracting"
       - "identifies Sarah Chen and James Wright as entities"
       - "detects the March 15 deadline"
       - "uses structured output format with emoji headers"

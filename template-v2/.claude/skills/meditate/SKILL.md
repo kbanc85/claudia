@@ -40,8 +40,8 @@ Silently retrieve:
 - Existing reflections to avoid duplication
 - Active commitments and relationship states
 
-- Call the `memory.reflections` MCP tool to see what already exists
-- Call the `memory.session_context` MCP tool for recent context (if available)
+- Call the `memory_reflections` MCP tool to see what already exists
+- Call the `memory_session_context` MCP tool for recent context (if available)
 
 ### Step 2: Generate Reflections
 
@@ -148,7 +148,7 @@ User responses:
 
 ### Step 5: Store and Close
 
-Call the `memory.end_session` MCP tool with:
+Call the `memory_end_session` MCP tool with:
 - `narrative`: Brief session summary
 - `reflections`: Array of approved reflections with type, content, and optional about fields
 - Other structured extractions (facts, commitments, entities) as needed
@@ -203,8 +203,8 @@ When similar reflections accumulate over time:
 ### Retrieval
 
 Reflections surface through:
-- The `memory.reflections` MCP tool for explicit retrieval
-- The `memory.session_context` MCP tool includes relevant reflections
+- The `memory_reflections` MCP tool for explicit retrieval
+- The `memory_session_context` MCP tool includes relevant reflections
 - Semantic search matches reflections to current context
 
 ---
@@ -236,8 +236,8 @@ User: "That thing you learned about me preferring bullet points -
        that's only for technical content, not conversations."
 
 Claudia:
-1. Call the `memory.reflections` MCP tool with query: "bullet points" to find the reflection
-2. Call the `memory.reflections` MCP tool with action: "update", id: <id>, content: "..." to update
+1. Call the `memory_reflections` MCP tool with query: "bullet points" to find the reflection
+2. Call the `memory_reflections` MCP tool with action: "update", id: <id>, content: "..." to update
 3. Confirm: "Updated. I'll keep that distinction in mind."
 ```
 
@@ -245,8 +245,8 @@ Claudia:
 User: "Delete the reflection about Monday mornings"
 
 Claudia:
-1. Search for the reflection via `memory.reflections` MCP tool
-2. Call the `memory.reflections` MCP tool with action: "delete", id: <id> to delete
+1. Search for the reflection via `memory_reflections` MCP tool
+2. Call the `memory_reflections` MCP tool with action: "delete", id: <id> to delete
 3. Confirm: "Done, I've removed that."
 ```
 
@@ -254,7 +254,7 @@ Claudia:
 User: "Show me all your reflections about me"
 
 Claudia:
-1. Call the `memory.reflections` MCP tool with limit: 50
+1. Call the `memory_reflections` MCP tool with limit: 50
 2. Format nicely with timeline info
 3. Offer to edit or delete any
 ```

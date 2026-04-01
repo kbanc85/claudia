@@ -8,7 +8,7 @@ prompts:
       - "generates reflections, not just a session summary"
       - "captures communication preferences observed during the session"
       - "extracts judgment rules from decisions (e.g., pricing approach)"
-      - "calls memory.end_session with narrative, facts, and reflections"
+      - "calls memory_end_session with narrative, facts, and reflections"
       - "narrative captures emotional tone (frustration about pricing)"
       - "identifies unresolved threads worth revisiting"
 
