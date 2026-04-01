@@ -2,6 +2,27 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.56.0 (2026-04-01)
+
+### Claude Desktop Compatibility
+
+MCP tool names migrated from dot notation (`memory.recall`) to underscore notation (`memory_recall`) to comply with the MCP spec's `^[a-zA-Z0-9_-]{1,64}$` requirement. Claude Code tolerated dots; Claude Desktop rejected them at registration, blocking Desktop users entirely.
+
+#### Fixed
+- **Tool names comply with MCP spec** -- All 33 memory tools renamed from `memory.xxx` to `memory_xxx` in the daemon server, scheduler, and test assertions (PR #32)
+- **Instructional references updated** -- ~200 tool name references renamed across CLAUDE.md, skills (memory-manager, morning-brief, deep-context, meditate, capture-meeting, meeting-prep, research), hooks (pre-compact, hooks.json, post-tool-capture), rules (memory-availability, claudia-principles), README, bin/index.js, and internal error messages
+- **template-v2/ mirrors synced** -- New installations get underscore names from day one
+
+#### Added
+- **Backward-compatible alias layer** -- The daemon registers dot-notation aliases (`memory.recall` resolves to the same handler as `memory_recall`) so users who haven't restarted their session or updated their skills keep working during the transition
+- **test_tool_name_compat.py** -- 6 new tests proving aliases are registered, `list_tools()` only advertises underscore names, and `cognitive.ingest` is unaffected
+
+#### Stats
+- 762 tests pass, 0 regressions (+6 new tests)
+- 30 files changed across 3 directory trees (root, claudia/, template-v2/)
+
+---
+
 ## 1.55.21 (2026-03-19)
 
 ### The Community Release
