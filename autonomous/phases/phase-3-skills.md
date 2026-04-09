@@ -1,6 +1,6 @@
 # Phase 3: Skills audit and porting
 
-**Status**: [ ] Not started
+**Status**: [~] In progress (analytical tasks 3.1 + 3.3 complete in parallel track)
 **Duration estimate**: 6-8 days
 **Critical path**: Yes (porting blocks 6 and 7)
 **Can parallelise with**: Phases 4 and 5 can start late in Phase 3. Tasks 3.1, 3.2, 3.3 (analytical) can start during Phase 2A.

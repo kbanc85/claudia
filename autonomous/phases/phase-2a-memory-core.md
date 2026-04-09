@@ -1,6 +1,6 @@
 # Phase 2A: Memory, core hybrid search
 
-**Status**: [ ] Not started
+**Status**: [~] In progress (2A.1 done; 2A.2 implementation starting)
 **Duration estimate**: 7-10 days (do not compress this — previous estimates at 4-7 days were wrong)
 **Critical path**: Yes
 **Can parallelise with**: Phase 3 analytical work (tasks 3.1, 3.2, 3.3)

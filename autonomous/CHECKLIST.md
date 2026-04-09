@@ -41,17 +41,19 @@ _The single view of everything. One box per phase. Click into the phase file for
   - → [phases/phase-1-rebrand-persona.md](phases/phase-1-rebrand-persona.md)
   - Tasks 1.2 (SOUL.md), 1.3 (migrate stub via C4), 1.4 (config defaults), 1.5 (README+THIRD-PARTY), 1.6 (model selector) done. 1.1 assets and 1.5 CONTRIBUTING rewrite deferred.
 
-- [ ] **Phase 2A — Memory, core hybrid search** _(7-10 days, critical path)_
+- [~] **Phase 2A — Memory, core hybrid search** _(7-10 days, critical path)_
   - Objective: Replace flat-file memory with Claudia's hybrid search as a pluggable v0.7.0 provider.
   - → [phases/phase-2a-memory-core.md](phases/phase-2a-memory-core.md)
+  - Task 2A.1 done (design doc at docs/decisions/memory-provider-design.md). 2A.2 implementation starting.
 
 - [ ] **Phase 2B — Memory, advanced features** _(5-7 days, critical path)_
   - Objective: Relationship graphs, commitment lifecycle, adaptive decay, cost governance, prompt budgets.
   - → [phases/phase-2b-memory-advanced.md](phases/phase-2b-memory-advanced.md)
 
-- [ ] **Phase 3 — Skills audit and porting** _(6-8 days, critical path; analytical subtasks can start during Phase 2A)_
+- [~] **Phase 3 — Skills audit and porting** _(6-8 days, critical path; analytical subtasks can start during Phase 2A)_
   - Objective: Port 12 core Claudia skills, verify cross-model compatibility.
   - → [phases/phase-3-skills.md](phases/phase-3-skills.md)
+  - Tasks 3.1 + 3.3 done (analytical parallel track). Skill audit at docs/decisions/skill-audit.md.
 
 - [ ] **Phase 4 — Proactive behaviour layer** _(4-5 days, parallel with Phase 5)_
   - Objective: Pre-LLM hooks, commitment detection, cron-triggered proactive tasks.
