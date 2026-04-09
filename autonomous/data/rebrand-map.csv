@@ -1,0 +1,31 @@
+original,replacement,scope,notes
+hermes,claudia,filename,Root CLI entry point script
+hermes_constants.py,claudia_constants.py,filename,16 lines API URLs
+hermes_state.py,claudia_state.py,filename,Session DB with FTS5 search
+hermes_time.py,claudia_time.py,filename,Timezone utilities
+hermes_cli/,claudia_cli/,filename,CLI package directory
+setup-hermes.sh,setup-claudia.sh,filename,Installer script
+RELEASE_v0.2.0.md,REMOVE,filename,Delete this file
+RELEASE_v0.3.0.md,REMOVE,filename,Delete this file
+AGENTS.md,REWRITE,filename,Rewrite for Claudia
+hermes-agent,claudia-autonomous,string,Package name and repo refs
+hermes_agent,claudia_autonomous,string,Python package references
+Hermes Agent,Claudia,string,Display name
+Hermes agent,Claudia,string,Display name variant
+hermes agent,claudia,string,Lowercase display
+HERMES_HOME,CLAUDIA_HOME,string,Environment variable
+~/.hermes,~/.claudia,string,Config directory
+hermes_cli,claudia_cli,string,Package import
+hermes_constants,claudia_constants,string,Module import
+hermes_state,claudia_state,string,Module import
+hermes_time,claudia_time,string,Module import
+hermes model,claudia model,string,CLI command ref in docs
+hermes gateway,claudia gateway,string,CLI command ref
+hermes setup,claudia setup,string,CLI command ref
+hermes update,claudia update,string,CLI command ref
+hermes tools,claudia tools,string,CLI command ref
+hermes doctor,claudia doctor,string,CLI command ref
+hermes claw,claudia migrate,string,Migration command rename
+NousResearch,kbanc85,string,Repo owner in URLs only
+Nous Research,Kamil Banc,string,Attribution where appropriate
+nousresearch.com,REMOVE_OR_REPLACE,string,Domain references
