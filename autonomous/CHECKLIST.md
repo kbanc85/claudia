@@ -36,9 +36,10 @@ _The single view of everything. One box per phase. Click into the phase file for
   - → [phases/phase-0-fork-security-tests.md](phases/phase-0-fork-security-tests.md)
   - All 5 tasks done. 0.5 dynamic run deferred to a real Python environment.
 
-- [ ] **Phase 1 — Visual rebrand and persona injection** _(4-5 days, critical path)_
+- [~] **Phase 1 — Visual rebrand and persona injection** _(4-5 days, critical path)_
   - Objective: 100% Claudia visuals, commands, and personality before touching logic.
   - → [phases/phase-1-rebrand-persona.md](phases/phase-1-rebrand-persona.md)
+  - Tasks 1.2 (SOUL.md), 1.3 (migrate stub via C4), 1.4 (config defaults), 1.5 (README+THIRD-PARTY), 1.6 (model selector) done. 1.1 assets and 1.5 CONTRIBUTING rewrite deferred.
 
 - [ ] **Phase 2A — Memory, core hybrid search** _(7-10 days, critical path)_
   - Objective: Replace flat-file memory with Claudia's hybrid search as a pluggable v0.7.0 provider.
