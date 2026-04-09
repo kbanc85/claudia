@@ -18,6 +18,41 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.2 C3: config dir + env vars + lowercase compounds
+
+**Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 3 of ~6
+**Worked on**: HERMES_HOME / ~/.hermes ecosystem + all lowercase `hermes_*` compound identifiers
+**Completed**:
+- Enumerated ~100 HERMES_* env vars (HERMES_HOME, HERMES_BIN, HERMES_CMD, HERMES_DIR, HERMES_LOG_LEVEL, HERMES_GATEWAY_TOKEN, and 90+ others) and ~100 lowercase `hermes_*` compound identifiers (hermes_home, hermes_dir, hermes_dotenv, hermes_now, hermes_md, hermes_root, hermes_version, hermes_test, etc.).
+- Verified that `hermes_agent` has no suffix compounds (no `hermes_agent_foo` anywhere), so the specific `hermes_agent → claudia_autonomous` replacement is safe before the broad `hermes_ → claudia_` sweep.
+- Applied four ordered sed passes in the submodule:
+  1. `hermes_agent` → `claudia_autonomous` (4 files)
+  2. `hermes_` → `claudia_` (190 files, catches all lowercase compounds)
+  3. `HERMES_` → `CLAUDIA_` (231 files, case-sensitive; catches all env vars)
+  4. `\.hermes` → `.claudia` (197 files, catches all config-dir path variants)
+- Verified each pattern returns zero hits after its pass.
+- Spot-checked `claudia_constants.py`: `get_claudia_home()`, `display_claudia_home()`, `get_claudia_dir()` all correctly renamed; `CLAUDIA_HOME` env var; `~/.claudia` paths. Cross-checked `cron/scheduler.py` imports resolve through the whole chain.
+- Submodule commit `4fadb16` (355 files changed, 3449 insertions/deletions), pushed.
+
+**Match count after C3**: **3,235 matches across 1,107 files** (down from 6,498 — biggest single-checkpoint reduction so far, **-3,263 matches**).
+
+**Known remaining (not C3 scope)**:
+- Standalone "Hermes" / "hermes" word in docstrings, comments, display strings
+- `hermes-agent` package name in pyproject.toml, extras, homebrew formula
+- `hermes-gateway` script filename (rename in C4 or C5)
+- `Hermes Agent` / `Hermes agent` display name
+- CLI command refs: `hermes model`, `hermes gateway`, `hermes setup`, etc.
+- `NousResearch` / `Nous Research` attribution
+- `.gitignore` glob `hermes-*/*`
+
+**Rollback point**: Revert this outer commit + force-push submodule to `ee2d6ef` (C2 state).
+
+**Next session should**: Proceed to C4 — package name rebrand (`hermes-agent` → `claudia-autonomous`, `hermes-gateway` → `claudia-gateway`, etc.) and CLI command refs (`hermes model` → `claudia model`, etc.).
+
+**Blockers**: None.
+
+---
+
 ## 2026-04-09 — Phase 0.2 C2: structural renames + imports
 
 **Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 2 of ~6
