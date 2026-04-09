@@ -1,6 +1,6 @@
 # Phase 0: Fork, security baseline, and test harness
 
-**Status**: [~] In progress (Tasks 0.1 and 0.2 done, 0.3-0.5 remain)
+**Status**: [~] In progress (Tasks 0.1, 0.2, 0.3 done, 0.4-0.5 remain)
 **Duration estimate**: 5 days
 **Critical path**: Yes
 **Can parallelise with**: Nothing (everything else depends on this)
@@ -55,16 +55,23 @@ Clean fork with no user-facing "hermes" references, known security baseline, and
     ```
   - **Reference**: See `../data/rebrand-map.csv`, `../data/rebrand-map.notes.md`, and session log entries 2026-04-09 C1-C6 for full detail.
 
-- [ ] **0.3 Security baseline audit**
-  - Files touched: `docs/decisions/security-baseline.md` (new)
-  - Audit unmodified fork (before changing any logic):
-    - [ ] Review `docs/user-guide/security` content
-    - [ ] Test command allowlists in `tools/approval.py`
-    - [ ] Verify DM pairing in gateway
-    - [ ] Check container isolation in Docker backend
-    - [ ] Test cron path guards (path-traversal fix from 2026-04-05)
-    - [ ] Review secret exfiltration blocking (new in v0.7.0)
-  - Success criteria: Written security baseline document covering each attack surface.
+- [x] **0.3 Security baseline audit** _(completed 2026-04-09, submodule commit `6d75631`)_
+  - Files touched: `docs/decisions/security-baseline.md` (new, 245 lines)
+  - Attack surfaces audited:
+    - [x] Dangerous command approval (`tools/approval.py`) — 30+ regex patterns, per-session state, smart approval LLM, persistent allowlist, self-termination protection
+    - [x] DM pairing (`gateway/pairing.py`) — OWASP/NIST SP 800-63-4 compliant, 8-char cryptographic codes, rate limits, attempt lockout, 0600 file perms
+    - [x] Docker backend container isolation (`tools/environments/docker.py`) — `cap-drop ALL`, `no-new-privileges`, `pids-limit 256`, env var allowlist with regex validation
+    - [x] Cron path guards (`cron/scheduler.py`) — all paths scoped to `get_claudia_home()`, no user-supplied path in filesystem operations. Path-traversal fix commit not verifiable (history stripped) but the pattern is sound.
+    - [x] Secret exfiltration blocking (`agent/redact.py` + `tools/browser_tool.py`) — import-time kill-switch capture, URL-embedded secret blocking, regex coverage for OpenAI/Anthropic/GitHub/Slack/Google key formats
+    - [x] Additional surfaces discovered: credential pool (`agent/credential_pool.py`), pre-exec content scanning (`tools/tirith_security.py` with SHA-256 + cosign provenance), credential file passthrough (`tools/credential_files.py`), gateway flood control (every platform module)
+  - Discrepancy from roadmap: `docs/user-guide/security` directory does NOT exist in v0.7.0 — the roadmap listed it as a review target but it was never created. Noted in the audit document.
+  - Success criteria: ✅ Written security baseline document at `docs/decisions/security-baseline.md` covering each attack surface plus follow-ups.
+  - 10 consolidated gaps logged for Phase 0.4 (test harness verification) and later phases. Key items:
+    - **G2**: cron path-traversal fix not verified against original CVE (can't inspect upstream commit)
+    - **G3**: `tirith` `fail_open` default should be forced false in cli-config.yaml.example
+    - **G7**: `agent/anthropic_adapter.py:1266` sanitizer was partially corrupted by my Phase 0.2 C4 broad sed — Phase 1.2 must review and likely remove
+    - **G10**: auxiliary-LLM "smart approval" in `tools/approval.py` is itself a prompt-injection surface
+  - Verdict: **v0.7.0 security baseline holds for Claudia Autonomous.** No blocker on proceeding to Phase 0.4.
 
 - [ ] **0.4 Define test harness**
   - Files touched: `tests/`, `.github/workflows/test.yml`

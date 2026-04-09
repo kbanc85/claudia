@@ -18,6 +18,42 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.3 COMPLETE: security baseline audit
+
+**Phase**: Phase 0 Task 0.3 — Security baseline audit (C7 checkpoint)
+**Worked on**: Static-analysis audit of every security-relevant surface in the fork
+**Completed**:
+- Inventoried security-relevant files:
+  - `tools/approval.py` (dangerous command detection)
+  - `gateway/pairing.py` (DM pairing)
+  - `tools/environments/docker.py` (Docker isolation)
+  - `cron/scheduler.py` + `cron/jobs.py` (cron scoping)
+  - `agent/redact.py` (secret redaction)
+  - `agent/credential_pool.py` (credential failover)
+  - `tools/credential_files.py` (sandbox mount registry)
+  - `tools/tirith_security.py` (pre-exec content scanner)
+  - `tests/tools/test_browser_secret_exfil.py` + related (existing test coverage)
+- Discrepancy found vs roadmap: the roadmap said "Review `docs/user-guide/security` content" but that directory does not exist in v0.7.0. Documented in the audit.
+- Wrote `docs/decisions/security-baseline.md` in the submodule (245 lines) covering 9 attack surfaces plus consolidated gaps and Claudia-specific considerations. Surfaces: dangerous command approval, DM pairing, Docker isolation, cron scoping, secret handling (redaction + exfiltration blocking), credential pool, Tirith content scanning, credential file passthrough, gateway rate limiting.
+- 10 gaps logged with explicit phase assignments:
+  - G1-G4, G8: Phase 0.4 test harness (dynamic verification)
+  - G5: Phase 3 (skill trust boundary)
+  - G7: Phase 1.2 (anthropic_adapter sanitizer, my Phase 0.2 C4 sed partially corrupted it)
+  - G9, G10: Phase 4/8 (defense in depth improvements)
+- Submodule commit `6d75631`, pushed.
+
+**Key finding**: The v0.7.0 security baseline is genuinely strong. The `approval.py` + `pairing.py` + `docker.py` + `redact.py` + `tirith_security.py` stack is well-engineered. Phase 0.2's rebrand was pure string substitution — no control weakened. The roadmap's assumption that Claudia Autonomous inherits Hermes's security posture holds.
+
+**Notable Phase 0.2 fallout documented in the audit**: Phase 0.2 C4's broad `Hermes → Claudia` sed partially corrupted the sanitizer code at `agent/anthropic_adapter.py:1266`. The intent was to hide Hermes's identity when wrapping Anthropic models, but after the sed, the sanitizer replaces `"Claudia"` → `"Claude Code"` which is semantically nonsense (the model output would still say "Hermes" if the model knew its origin). Phase 1.2 SOUL.md work should review and likely remove this whole sanitizer block — Claudia has no reason to impersonate Claude Code.
+
+**Rollback point**: Revert this outer commit + force-push submodule to `7bede11` (Phase 0.2 C5 state). Does not affect the Phase 0.2 rebrand — only adds the audit document.
+
+**Next**: Task 0.4 — test harness (unit/integration/E2E tiers + CI workflow).
+
+**Blockers**: None.
+
+---
+
 ## 2026-04-09 — Phase 0.2 COMPLETE (C6 final verification)
 
 **Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 6 of 6 (final)
