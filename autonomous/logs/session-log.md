@@ -18,6 +18,35 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.2 C5: Nous Research attribution cleanup
+
+**Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 5 of ~6
+**Worked on**: Nous Research attribution rebrand with MIT/sanitizer exclusions
+**Completed**:
+- Applied three targeted sed passes with deliberate exclusions:
+  1. `NousResearch/` → `kbanc85/` (34 files) — GitHub URL refs only; doesn't touch `discord.gg/NousResearch`
+  2. `nousresearch.com` → `example.com` (26 files) — placeholder for Phase 1.5 docs rewrite
+  3. `Nous Research` → `Kamil Banc` (25 files) — EXCLUDED `LICENSE` (MIT copyright, required) and `agent/anthropic_adapter.py` (sanitizer that replaces model output strings; Hermes-specific legacy code needing Phase 1.2 review)
+- Reverted the "Kamil Banc Discord" labels back to "Nous Research Discord" in `.github/ISSUE_TEMPLATE/config.yml`, `setup_help.yml`, `CONTRIBUTING.md` to keep label ↔ URL consistency (the URLs still point at the real Nous Research Discord)
+- Fixed one edge case: `from:NousResearch` → `from:anthropic` in `skills/social-media/xitter/SKILL.md` (x-cli example command)
+
+**Deliberately left alone (Phase 1.5 cleanup)**:
+- `scripts/release.py:101` — `"claudia@example.com": "NousResearch"` dead committer map entry
+- All discord URL labels still reference Nous Research community (Claudia has none yet)
+- LICENSE `Copyright (c) 2025 Nous Research` (MIT requires attribution)
+- `agent/anthropic_adapter.py` sanitizer (semantic Hermes-specific legacy)
+
+**Submodule commit `7bede11`**, 70 files changed, pushed.
+
+**Match count**: still 0 hermes (unchanged from C4).
+**Nous Research remaining**: 2 (LICENSE + sanitizer — both intentional).
+
+**Rollback point**: Revert outer commit + force-push submodule to `de4c048` (C4 state).
+
+**Next**: C6 — final verification run + mark Task 0.2 complete in the phase file.
+
+---
+
 ## 2026-04-09 — Phase 0.2 C4: package/display/CLI/files — success criterion MET
 
 **Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 4 of ~6
