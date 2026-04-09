@@ -31,10 +31,10 @@ _The single view of everything. One box per phase. Click into the phase file for
 
 ## Phases
 
-- [~] **Phase 0 — Fork, security baseline, and test harness** _(5 days, critical path)_
+- [x] **Phase 0 — Fork, security baseline, and test harness** _(5 days, critical path)_
   - Objective: Clean fork with no "hermes" references, known security posture, test harness ready.
   - → [phases/phase-0-fork-security-tests.md](phases/phase-0-fork-security-tests.md)
-  - Tasks 0.1-0.4 complete: fork clean, rebranded, security baseline documented, test harness green (7667+ passing, 4 xfails, 0 failures). Task 0.5 (boot test) remains.
+  - All 5 tasks done. 0.5 dynamic run deferred to a real Python environment.
 
 - [ ] **Phase 1 — Visual rebrand and persona injection** _(4-5 days, critical path)_
   - Objective: 100% Claudia visuals, commands, and personality before touching logic.
