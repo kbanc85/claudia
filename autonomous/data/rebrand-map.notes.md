@@ -11,10 +11,26 @@ The `grep` sweep in Phase 0 Task 0.2 will turn up these, and they must be skippe
 - **Binary files** (`.png`, `.gif`, `.jpg`, etc.) — never run `sed` on binaries. If a binary has `hermes` in metadata, replace the whole file from the Claudia `assets/` set.
 - **Lock files** (`package-lock.json`, `pnpm-lock.yaml`, `uv.lock`, `Cargo.lock`, etc.) — do not hand-edit. Regenerate after the source files are updated.
 
+## Keep-as-is decisions (do NOT rename or rebrand)
+
+These files/names contain `hermes` but refer to something other than Hermes Agent. Flagged during the C1 inventory; keep untouched in all rebrand passes.
+
+- _(none at present; `environments/tool_call_parsers/hermes_parser.py` was initially flagged as a keep-candidate because "Hermes" is also a public tool-call format name from Nous Research's Hermes-2-Pro models, but the entire `environments/` directory was subsequently deleted as Atropos RL research tooling, so this is moot.)_
+
+## Scope deletions (not rebrand, out of scope for Claudia)
+
+These were deleted in C1 because they're research tooling unrelated to Claudia's chief-of-staff purpose, not because of naming:
+
+- **`environments/`** — Atropos RL training infrastructure (per the directory's own README). The real execution backends Claudia actually uses live at `tools/environments/` (`local.py`, `docker.py`, `modal.py`, `ssh.py`, `daytona.py`, `singularity.py`). The roadmap's "keep environments/" list conflated the two paths.
+- **`optional-skills/mlops/hermes-atropos-environments/`** — skill documenting Atropos usage, with nothing to document after the deletion above.
+- **`mini_swe_runner.py`** — SWE-Bench runner orphaned from the removed `mini-swe-agent/` submodule.
+- **`RELEASE_v0.4.0.md` through `v0.7.0.md`** — historical Hermes release notes beyond the roadmap's listed v0.2/v0.3. Claudia starts its own release history at v0.1.0-beta.
+- **Atropos-dependent tests**: `tests/test_agent_loop.py`, `test_agent_loop_tool_calling.py`, `test_agent_loop_vllm.py`, `test_managed_server_tool_support.py`, `test_tool_call_parsers.py`.
+
 ## Per-row notes
 
-### `RELEASE_v0.2.0.md` and `RELEASE_v0.3.0.md`
-These are historical Hermes release notes. Delete outright — Claudia Autonomous will start its own release note history at `v0.1.0-beta`.
+### `RELEASE_v0.2.0.md` through `RELEASE_v0.7.0.md`
+Historical Hermes release notes. Deleted in C1. Claudia Autonomous starts its own release note history at `v0.1.0-beta` in Phase 7.
 
 ### `AGENTS.md`
 This is Hermes's "agent definition" file. It must be fully rewritten for Claudia, not just find/replaced. Track the rewrite as part of Task 1.5 (docs rewrite).

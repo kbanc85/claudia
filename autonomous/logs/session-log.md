@@ -18,6 +18,40 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.2 C1: scope deletions
+
+**Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 1 of ~6
+**Worked on**: Inventory + out-of-scope deletions (no rebranding yet)
+**Completed**:
+- Ran grep sweep across `autonomous/fork/` to inventory "hermes" matches. Starting state: **9,482 matches across 1,166 files**, including 440 .py files (6,614 matches) and 152 .md files (2,224 matches).
+- Discovered that the roadmap's "environments/ = execution backends" keep-decision was **wrong**. Verified by reading `environments/README.md`: the directory is entirely Atropos RL training infrastructure (HermesAgentBaseEnv, HermesSweEnv, benchmark envs, tool_call_parsers used only in RL training). The actual execution backends (local, Docker, SSH, Modal, Daytona, Singularity) live at `tools/environments/` and are untouched.
+- Determined that `environments/tool_call_parsers/hermes_parser.py` — initially flagged for keep because "Hermes" is a public tool-call format name — is used only in Atropos RL (raw token parsing, "Phase 2 VLLM/generate"). Claudia uses OpenAI-compat SDKs, not raw token streams. Dropped with the rest of `environments/`.
+- Deleted (59 files):
+  - `RELEASE_v0.2.0.md` through `v0.7.0.md` (6 files). Original roadmap only listed v0.2/v0.3; v0.4-v0.7 also exist and also need to go.
+  - `mini_swe_runner.py` (SWE benchmark orphan from the already-removed `mini-swe-agent/` submodule)
+  - Entire `environments/` directory (~40 files, Atropos RL infra)
+  - `optional-skills/mlops/hermes-atropos-environments/` (skill documenting the deleted environments)
+  - 5 tests depending on environments/: `test_agent_loop.py`, `test_agent_loop_tool_calling.py`, `test_agent_loop_vllm.py`, `test_managed_server_tool_support.py`, `test_tool_call_parsers.py`
+- Verified no orphaned imports after deletion: `git grep "from environments|hermes_base_env|HermesAgentBaseEnv|hermes_swe_env|HermesSweEnv"` returns zero hits in the surviving codebase.
+- Committed in the submodule: `f5cd89f` and pushed to `kbanc85/claudia-autonomous`.
+- Expanded `autonomous/data/rebrand-map.csv` with all the new C1 removals, all the additional filename renames I spotted during inventory (packaging/homebrew/, scripts/hermes-gateway, tests/hermes_cli/, etc.), and the `hermes-gateway` string pattern.
+- Expanded `autonomous/data/rebrand-map.notes.md` with "Scope deletions" and "Keep-as-is decisions" sections documenting the reasoning.
+- Advanced submodule pointer in claudia repo from `ceaa495` → `f5cd89f`.
+
+**Match count after C1**: 7,987 matches across 1,107 files (1,495 matches removed, 59 files gone). Biggest single reduction will come from C4 (display name rebrand affecting README.md, CONTRIBUTING.md, all user-facing docs).
+
+**Decisions**: No new ADRs. The `environments/` deletion is a scope decision rather than an architectural one, documented in the commit message + session log + rebrand-map.notes.md. If this turns out to be wrong, recovery is `git revert f5cd89f` in the submodule.
+
+**Risks triggered or updated**: R3 (rebrand misses) is now more tractable — 9482 → 7987 matches, and the highest-concentration files (RELEASE notes at 100-300 matches each) are gone. R4 (run_agent.py too large) unchanged; that file wasn't touched.
+
+**Next session should**: Continue with C2 — structural file renames (hermes_*.py → claudia_*.py, hermes_cli/ → claudia_cli/, setup-hermes.sh → setup-claudia.sh, hermes root script → claudia) + immediate fix of all imports that reference those renamed files. Do NOT attempt string replacements in C2; those come in C3.
+
+**Blockers**: None.
+
+**Rollback point**: outer commit prior to this section + submodule commit `ceaa495`. If C1 is wrong, `cd autonomous/fork && git reset --hard ceaa495 && git push --force` then `cd ../.. && git checkout <prior-sha> -- autonomous/fork` (or just revert the outer commit).
+
+---
+
 ## 2026-04-09 — Phase 0.1 executed end-to-end
 
 **Phase**: Phase 0 — Fork, security baseline, and test harness

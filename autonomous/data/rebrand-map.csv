@@ -5,9 +5,29 @@ hermes_state.py,claudia_state.py,filename,Session DB with FTS5 search
 hermes_time.py,claudia_time.py,filename,Timezone utilities
 hermes_cli/,claudia_cli/,filename,CLI package directory
 setup-hermes.sh,setup-claudia.sh,filename,Installer script
-RELEASE_v0.2.0.md,REMOVE,filename,Delete this file
-RELEASE_v0.3.0.md,REMOVE,filename,Delete this file
-AGENTS.md,REWRITE,filename,Rewrite for Claudia
+RELEASE_v0.2.0.md,REMOVE,filename,Historical Hermes release note (removed C1)
+RELEASE_v0.3.0.md,REMOVE,filename,Historical Hermes release note (removed C1)
+RELEASE_v0.4.0.md,REMOVE,filename,Historical Hermes release note (removed C1; not in original roadmap)
+RELEASE_v0.5.0.md,REMOVE,filename,Historical Hermes release note (removed C1; not in original roadmap)
+RELEASE_v0.6.0.md,REMOVE,filename,Historical Hermes release note (removed C1; not in original roadmap)
+RELEASE_v0.7.0.md,REMOVE,filename,Historical Hermes release note (removed C1; not in original roadmap)
+mini_swe_runner.py,REMOVE,filename,SWE benchmark runner orphaned from removed mini-swe-agent submodule (removed C1)
+environments/,REMOVE,directory,Atropos RL training infrastructure - entire directory removed in C1. Not execution backends; those live at tools/environments/
+optional-skills/mlops/hermes-atropos-environments/,REMOVE,directory,Atropos RL skill - removed in C1 since it documented the deleted environments/ directory
+tests/test_agent_loop.py,REMOVE,filename,Test for Atropos agent loop (removed C1)
+tests/test_agent_loop_tool_calling.py,REMOVE,filename,Test for Atropos agent loop (removed C1)
+tests/test_agent_loop_vllm.py,REMOVE,filename,Test for Atropos agent loop (removed C1)
+tests/test_managed_server_tool_support.py,REMOVE,filename,Test for atroposlib ManagedServer integration (removed C1)
+tests/test_tool_call_parsers.py,REMOVE,filename,Test for environments/tool_call_parsers (removed C1)
+AGENTS.md,REWRITE,filename,Rewrite for Claudia (Phase 1 Task 1.5)
+README.md,REWRITE,filename,Rewrite for Claudia (Phase 1 Task 1.5)
+CONTRIBUTING.md,REWRITE,filename,Rewrite for Claudia (Phase 1 Task 1.5)
+tests/hermes_cli/,tests/claudia_cli/,directory,Test directory following hermes_cli rename
+tests/test_hermes_state.py,tests/test_claudia_state.py,filename,Test file following hermes_state.py rename
+packaging/homebrew/hermes-agent.rb,packaging/homebrew/claudia-autonomous.rb,filename,Homebrew formula rename
+scripts/hermes-gateway,scripts/claudia-gateway,filename,Gateway launcher script rename
+skills/autonomous-ai-agents/hermes-agent/,skills/autonomous-ai-agents/claudia-autonomous/,directory,Self-referencing skill directory rename
+optional-skills/migration/openclaw-migration/scripts/openclaw_to_hermes.py,optional-skills/migration/openclaw-migration/scripts/openclaw_to_claudia.py,filename,Migration script rename
 hermes-agent,claudia-autonomous,string,Package name and repo refs
 hermes_agent,claudia_autonomous,string,Python package references
 Hermes Agent,Claudia,string,Display name
@@ -26,6 +46,8 @@ hermes update,claudia update,string,CLI command ref
 hermes tools,claudia tools,string,CLI command ref
 hermes doctor,claudia doctor,string,CLI command ref
 hermes claw,claudia migrate,string,Migration command rename
+hermes-gateway,claudia-gateway,string,Gateway script name
 NousResearch,kbanc85,string,Repo owner in URLs only
-Nous Research,Kamil Banc,string,Attribution where appropriate
+Nous Research,Kamil Banc,string,Attribution where appropriate (review manually)
 nousresearch.com,REMOVE_OR_REPLACE,string,Domain references
+openclaw_to_hermes,openclaw_to_claudia,string,Migration script module name
