@@ -18,6 +18,40 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Fork repo created, Phase 0.1 unblocked
+
+**Phase**: Phase 0 — setup
+**Worked on**: External prerequisite for Phase 0.1 (repo creation on GitHub)
+**Completed**:
+- Created `kbanc85/claudia-autonomous` on GitHub as an empty private repo via `gh repo create`.
+- Repo URL: https://github.com/kbanc85/claudia-autonomous
+- Visibility: **private** (flips to public around the v0.1.0-beta tag in Phase 7)
+- State: empty (no README, no license, no .gitignore) — ready for the stripped Hermes clone in Phase 0.1 without merge conflicts.
+- Authenticated via existing `gh` CLI session (user `kbanc85`, token scopes `gist, read:org, repo, workflow`).
+
+**Decisions**: None written as ADRs yet. When the first Phase 0 session begins, write `decisions/2026-MM-DD-fork-vs-wrapper.md` — the outcome is baked into roadmap constraints, but the ADR preserves the reasoning.
+
+**Risks triggered or updated**: None.
+
+**Next session should**:
+1. Still on the **tracking-hub repo**: convert `autonomous/fork/` from a placeholder to a real submodule by running the three commands in `autonomous/fork/README.md`:
+   ```bash
+   rm -rf autonomous/fork
+   git submodule add https://github.com/kbanc85/claudia-autonomous.git autonomous/fork
+   git commit -m "autonomous: attach claudia-autonomous fork as submodule"
+   ```
+2. **Then begin Phase 0 Task 0.1** inside `autonomous/fork/`:
+   - `git clone https://github.com/NousResearch/hermes-agent.git .` (or clone elsewhere and copy)
+   - Strip history: `rm -rf .git && git init`
+   - Set remote: `git remote add origin https://github.com/kbanc85/claudia-autonomous.git`
+   - Remove submodules and unneeded dirs (see phase file)
+   - Initial push to the empty repo
+3. Mark Task 0.1 complete in `phases/phase-0-fork-security-tests.md` and update its Session handoff block.
+
+**Blockers**: None. All Phase 0.1 prerequisites are in place.
+
+---
+
 ## 2026-04-08 — Tracking hub scaffolded inside claudia repo
 
 **Phase**: scaffold / pre-phase

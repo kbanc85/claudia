@@ -72,8 +72,10 @@ Re-clone original Hermes. Phase 0 is idempotent — every artefact can be regene
 - _none yet_ — see `../decisions/` for ADRs. Expected early decision: **Fork vs wrapper** (outcome already baked into roadmap constraints: permanent fork, own repo).
 
 ## Session handoff
-_Last updated: 2026-04-08 by scaffold setup_
-- **Last completed**: Tracking hub scaffolded in claudia repo. Phase 0 not yet started.
-- **Next up**: Phase 0.1 — create `kbanc85/claudia-autonomous` GitHub repo, then run the clone and init steps inside `autonomous/fork/`.
-- **Blockers**: `kbanc85/claudia-autonomous` repo does not exist yet on GitHub.
-- **Notes**: When `fork/` becomes a submodule, remember to update the `.gitmodules` record in the outer claudia repo. See `../fork/README.md` for exact commands.
+_Last updated: 2026-04-09 by repo-creation session_
+- **Last completed**: `kbanc85/claudia-autonomous` GitHub repo created (private, empty). URL: https://github.com/kbanc85/claudia-autonomous. Tracking hub scaffold in place from 2026-04-08.
+- **Next up**:
+  1. Convert `autonomous/fork/` placeholder → real submodule using the commands in `../fork/README.md`.
+  2. Begin Task 0.1 inside the submodule: clone Hermes, strip history, `git init`, set remote to `kbanc85/claudia-autonomous`, remove submodules and unneeded directories, initial push.
+- **Blockers**: None. Phase 0.1 is unblocked and ready to execute.
+- **Notes**: When `fork/` becomes a submodule, an entry gets added to `.gitmodules` in this claudia repo automatically. See `../fork/README.md` for the exact commands.
