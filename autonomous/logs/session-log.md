@@ -18,6 +18,42 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.2 C4: package/display/CLI/files — success criterion MET
+
+**Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 4 of ~6
+**Worked on**: Package name, display names, CLI command refs, file renames, and broad hermes/Hermes/HERMES sweep
+**Completed**:
+- Applied 10 ordered sed passes in the submodule (full details in submodule commit `de4c048`):
+  - `hermes-agent` → `claudia-autonomous` (95 files), then broad `hermes-` → `claudia-` (103 files)
+  - `Hermes Agent` / `Hermes agent` / `hermes agent` → `Claudia` / `claudia` (136 files)
+  - 7 CLI command refs: `hermes {model,gateway,setup,update,tools,doctor,claw}` → `claudia {model,gateway,setup,update,tools,doctor,migrate}`
+  - `Hermes` → `Claudia` case-sensitive (207 files): caught display strings, class names (HermesCLI, HermesHome, HermesTime), test function names (TestEnsureHermesHome, TestHermesApiServerToolset, etc.), camelCase compounds
+  - `hermes` → `claudia` case-sensitive (242 files): caught standalone lowercase including `hermesBin`, `hermesCmd`, `hermesVenv`, string literals
+  - `HERMES-AGENT` → `CLAUDIA-AUTONOMOUS`, then `HERMES` → `CLAUDIA`: caught `HERMES.md` config file refs, `NOUS HERMES` ASCII banner, `PAL_HERMES` palette constant, pyfiglet examples
+- Renamed 4 files: `scripts/hermes-gateway` → `scripts/claudia-gateway`, `packaging/homebrew/hermes-agent.rb` → `claudia-autonomous.rb`, `skills/autonomous-ai-agents/hermes-agent/` → `claudia-autonomous/`, `openclaw_to_hermes.py` → `openclaw_to_claudia.py`
+- Resolved `_hermes` suffix identifiers (`browser_hermes`, `current_hermes`, `discord_hermes`, `test_*_returns_hermes`) via the broad `hermes` → `claudia` sweep
+- **Honcho plugin defaults changed**: `HOST = "claudia"`, `workspace_id = "claudia"`, `ai_peer = "claudia"` (was `"hermes"`). This is a semantic change, not just a label — new Claudia installs get a fresh Honcho workspace named `"claudia"`. Existing Hermes users migrating via Phase 6 will need the option to import their legacy `"hermes"` workspace.
+- Submodule commit `de4c048` (453 files changed, 3236 insertions/deletions), pushed.
+
+**Match count after C4**: **0** (zero case-insensitive hermes matches across 1,107 files, zero files with hermes in the path).
+
+**✅ ROADMAP SUCCESS CRITERION MET**:
+> `grep -ri "hermes" --include="*.py" --include="*.yaml" --include="*.md" --include="*.sh"` returns zero results in user-facing files.
+
+**Not yet touched** (C5 scope):
+- 84 `NousResearch` matches (mostly GitHub URL refs like `https://github.com/NousResearch/claudia-autonomous/...` which are now wrong — the real repo is at `kbanc85/claudia-autonomous`)
+- 34 `Nous Research` matches (LICENSE attribution MUST stay per MIT; everywhere else rebrand or remove)
+- 96 `nousresearch.com` matches (case-by-case — docs URLs, discord, website, homepage links)
+- The "created by Nous Research" system prompt line in `agent/prompt_builder.py` — Phase 1.2's SOUL.md persona injection is the right place to fix this; C5 just mechanically rebrands the attribution
+
+**Rollback point**: Revert this outer commit + force-push submodule to `4fadb16` (C3 state).
+
+**Next session should**: Proceed to C5 — Nous Research attribution cleanup. LICENSE stays, everything else becomes `kbanc85` / `Kamil Banc` per the roadmap rebrand map, `nousresearch.com` URLs get a placeholder pending Phase 1.5 docs rewrite.
+
+**Blockers**: None.
+
+---
+
 ## 2026-04-09 — Phase 0.2 C3: config dir + env vars + lowercase compounds
 
 **Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 3 of ~6
