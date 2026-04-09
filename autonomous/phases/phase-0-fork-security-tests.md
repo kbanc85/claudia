@@ -1,6 +1,6 @@
 # Phase 0: Fork, security baseline, and test harness
 
-**Status**: [ ] Not started
+**Status**: [~] In progress (Task 0.1 done, 0.2-0.5 remain)
 **Duration estimate**: 5 days
 **Critical path**: Yes
 **Can parallelise with**: Nothing (everything else depends on this)
@@ -11,16 +11,22 @@ Clean fork with no user-facing "hermes" references, known security baseline, and
 
 ## Tasks
 
-- [ ] **0.1 Clone and create repo**
-  - Files touched: `.git/`, `.gitmodules`, `landingpage/`, `website/`, `datagen-config-examples/`, `acp_adapter/`, `acp_registry/`, `mini-swe-agent/`, `tinker-atropos/`
+- [x] **0.1 Clone and create repo** _(completed 2026-04-09)_
+  - Files touched: `.git/`, `.gitmodules`, `landingpage/`, `website/`, `datagen-config-examples/`, `acp_adapter/`, `acp_registry/`, `tinker-atropos/`
   - Steps:
-    - [ ] `git clone https://github.com/NousResearch/hermes-agent.git claudia-autonomous`
-    - [ ] `cd claudia-autonomous && rm -rf .git && git init`
-    - [ ] `git remote add origin https://github.com/kbanc85/claudia-autonomous.git`
-    - [ ] Remove submodules: `rm -rf mini-swe-agent/ tinker-atropos/ .gitmodules`
-    - [ ] Remove unneeded dirs: `rm -rf landingpage/ website/ datagen-config-examples/ acp_adapter/ acp_registry/`
-  - Success criteria: Clean directory, git initialised, no submodules.
-  - Prerequisite: `kbanc85/claudia-autonomous` GitHub repo must exist (create empty before running).
+    - [x] Created empty private repo `kbanc85/claudia-autonomous` via `gh repo create`.
+    - [x] Cloned `NousResearch/hermes-agent` at tag `v2026.4.3` (commit `abf1e98f6253f6984479fe03d1098173a9b065a7`) into a temp directory.
+    - [x] `rm -rf .git && git init -b main`
+    - [x] Removed submodule dirs and `.gitmodules` (`mini-swe-agent/` was not present at v0.7.0 — only `tinker-atropos/` existed as a submodule entry).
+    - [x] Removed unneeded dirs: `landingpage/`, `website/`, `datagen-config-examples/`, `acp_adapter/`, `acp_registry/`.
+    - [x] `git remote add origin git@github.com:kbanc85/claudia-autonomous.git`
+    - [x] Initial commit `ceaa495` with full MIT attribution note.
+    - [x] `git push -u origin main` (1166 files).
+    - [x] Attached `autonomous/fork/` as submodule in this claudia repo.
+  - Success criteria: ✅ Clean directory, git initialised, no submodules. Fork repo now has 1166 tracked files on `main`, pinned commit `ceaa495`.
+  - **Discrepancies from roadmap noted for Phase 0.2**:
+    - `mini-swe-agent/` submodule does not exist at v0.7.0 (only `mini_swe_runner.py` file remains — decide in 0.2 whether to delete).
+    - Release notes `RELEASE_v0.4.0.md`, `RELEASE_v0.5.0.md`, `RELEASE_v0.6.0.md`, `RELEASE_v0.7.0.md` also exist beyond the v0.2/v0.3 files listed in the rebrand map. Add them to the remove list in Phase 0.2.
 
 - [ ] **0.2 Build curated rebrand map**
   - Files touched: `rebrand-map.csv` (and downstream every file with a "hermes" string)
@@ -69,13 +75,17 @@ Clean fork that boots with Claudia branding, security baseline documented, test 
 Re-clone original Hermes. Phase 0 is idempotent — every artefact can be regenerated from the source repo.
 
 ## Decisions made this phase
-- _none yet_ — see `../decisions/` for ADRs. Expected early decision: **Fork vs wrapper** (outcome already baked into roadmap constraints: permanent fork, own repo).
+- **Fork vs wrapper** — see [`../decisions/2026-04-09-fork-vs-wrapper.md`](../decisions/2026-04-09-fork-vs-wrapper.md). Accepted 2026-04-09. Fork `NousResearch/hermes-agent` at `abf1e98` (v0.7.0) into `kbanc85/claudia-autonomous`, strip upstream history, attach as submodule at `autonomous/fork/`. The outcome was already baked into roadmap constraints; the ADR records the reasoning, the alternatives that were ruled out (wrap, build-from-scratch), and the deferred question of whether to rebase to v0.8.0.
 
 ## Session handoff
-_Last updated: 2026-04-09 by repo-creation session_
-- **Last completed**: `kbanc85/claudia-autonomous` GitHub repo created (private, empty). URL: https://github.com/kbanc85/claudia-autonomous. Tracking hub scaffold in place from 2026-04-08.
+_Last updated: 2026-04-09 by Phase 0.1 execution session_
+- **Last completed**: **Task 0.1 done.** `kbanc85/claudia-autonomous` exists with `main` branch at commit `ceaa495` (1166 files, forked from Hermes v0.7.0 at `abf1e98`, MIT). Submodule attached at `autonomous/fork/` in this claudia repo. First ADR written: `../decisions/2026-04-09-fork-vs-wrapper.md`.
 - **Next up**:
-  1. Convert `autonomous/fork/` placeholder → real submodule using the commands in `../fork/README.md`.
-  2. Begin Task 0.1 inside the submodule: clone Hermes, strip history, `git init`, set remote to `kbanc85/claudia-autonomous`, remove submodules and unneeded directories, initial push.
-- **Blockers**: None. Phase 0.1 is unblocked and ready to execute.
-- **Notes**: When `fork/` becomes a submodule, an entry gets added to `.gitmodules` in this claudia repo automatically. See `../fork/README.md` for the exact commands.
+  1. **Task 0.2** — build the curated rebrand map. The seed CSV at `../data/rebrand-map.csv` already has the known rows; now run the full `grep -rn "hermes" ...` sweep inside `autonomous/fork/` and add anything new. Also add `RELEASE_v0.4.0.md` through `v0.7.0.md` to the remove list (discovered during 0.1 clone). Decide whether to delete `mini_swe_runner.py` (the orphaned file remaining after the missing `mini-swe-agent/` submodule). Apply targeted `sed` per file, review every change, do not use global substitution.
+  2. **Task 0.3** — security baseline audit against the unmodified fork. Write `docs/decisions/security-baseline.md` inside the submodule covering each attack surface.
+  3. **Task 0.4** — test harness (unit/integration/E2E tiers + CI workflow).
+  4. **Task 0.5** — boot test with renamed CLI.
+- **Blockers**: None. All of 0.2-0.5 can begin immediately.
+- **Notes**:
+  - The submodule is pinned to `ceaa495`. Any changes to the fork during Phase 0.2+ require committing inside `autonomous/fork/`, pushing to origin, then running `git add autonomous/fork && git commit` in the outer claudia repo to advance the pointer.
+  - Hermes v0.8.0 (tag `v2026.4.8`) released 2026-04-08. Deliberately not rebased — see the "Open questions" section of the Fork vs Wrapper ADR.

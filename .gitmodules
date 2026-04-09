@@ -1,0 +1,3 @@
+[submodule "autonomous/fork"]
+	path = autonomous/fork
+	url = git@github.com:kbanc85/claudia-autonomous.git

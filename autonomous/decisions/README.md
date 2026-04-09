@@ -39,8 +39,6 @@ These are listed in the roadmap as decisions that must be made during execution.
 
 ## Index
 
-_Populate as decisions are made._
-
 | Date | Topic | Status | Linked phase |
 |---|---|---|---|
-| _(none yet)_ | | | |
+| 2026-04-09 | [Fork vs wrapper](2026-04-09-fork-vs-wrapper.md) | accepted | Phase 0 |
