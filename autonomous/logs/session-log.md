@@ -18,6 +18,41 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.2 COMPLETE (C6 final verification)
+
+**Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 6 of 6 (final)
+**Worked on**: Final success criterion verification + tracking hub updates to mark Task 0.2 done
+**Completed**:
+- Ran the roadmap's exact success criterion grep: `grep -ri "hermes" --include="*.py" --include="*.yaml" --include="*.md" --include="*.sh"` inside `autonomous/fork/` → **zero results**
+- Ran `find . -iname "*hermes*"` → **zero files** with hermes in the path
+- Counted total case-insensitive hermes references via `git ls-files | xargs grep -ic "hermes"` → **zero**
+- Counted Nous Research residuals: 5, all legitimate (LICENSE, sanitizer, 3 Discord label files)
+- Total files in fork after Phase 0.2: **1,107** (down from 1,166 at start of 0.2 due to 59 scope deletions in C1)
+- Marked Task 0.2 `[x]` complete in `phases/phase-0-fork-security-tests.md`
+- Updated Session handoff to point at Task 0.3 with notes on known follow-ups for later phases
+- Updated `CHECKLIST.md` Phase 0 line to show both 0.1 and 0.2 complete
+- This session log summary appended
+
+**Phase 0.2 totals**:
+- Starting state: 9,482 hermes refs across 1,166 files (submodule commit `ceaa495`)
+- Final state: 0 hermes refs across 1,107 files (submodule commit `7bede11`)
+- Net: **-9,482 hermes refs, -59 files**
+- 6 submodule commits (`f5cd89f`, `ee2d6ef`, `4fadb16`, `de4c048`, `7bede11`, no C6 submodule commit)
+- 5 outer-repo rollback points (C1-C5 each advance the submodule pointer), plus this C6 finalization commit
+
+**Follow-ups captured for later phases**:
+- Phase 1.2 should review `agent/anthropic_adapter.py:1266` sanitizer and likely remove it (Hermes-specific legacy)
+- Phase 1.5 docs rewrite should handle: discord URLs, `scripts/release.py` committer map, `example.com` placeholder URLs
+- Phase 3 self-improvement integration should consider the Honcho workspace change (new default `"claudia"` vs legacy `"hermes"`)
+- Phase 6 migration should offer users importing from Hermes the option to bring their legacy Honcho `"hermes"` workspace with them
+- Open question from Fork vs Wrapper ADR: v0.8.0 rebase decision still deferred
+
+**Next phase work**: Task 0.3 (security baseline audit), Task 0.4 (test harness), Task 0.5 (boot test).
+
+**Rollback**: This commit is the final tracking hub update; nothing to roll back beyond the C5 submodule state (`7bede11`). If you need to undo ALL of Phase 0.2, the full sequence is: force-push submodule to `ceaa495` then revert outer commits `78e22d3`, `04d10d1`, `eb0050d`, `5139c9d`, `0045587`, and this commit.
+
+---
+
 ## 2026-04-09 — Phase 0.2 C5: Nous Research attribution cleanup
 
 **Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 5 of ~6
