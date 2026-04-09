@@ -18,6 +18,40 @@ Chronological journal of work sessions on the Claudia Autonomous project. One en
 
 ---
 
+## 2026-04-09 — Phase 0.2 C2: structural renames + imports
+
+**Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 2 of ~6
+**Worked on**: File renames and the imports that reference them
+**Completed**:
+- `git mv` 8 rename targets in the submodule:
+  - `hermes` → `claudia` (root CLI launcher)
+  - `hermes_constants.py` → `claudia_constants.py`
+  - `hermes_state.py` → `claudia_state.py`
+  - `hermes_time.py` → `claudia_time.py`
+  - `setup-hermes.sh` → `setup-claudia.sh`
+  - `hermes_cli/` → `claudia_cli/` (44 files)
+  - `tests/hermes_cli/` → `tests/claudia_cli/` (43 files)
+  - `tests/test_hermes_state.py` → `tests/test_claudia_state.py`
+- Applied sed across all text files to fix imports for the four renamed modules (`hermes_cli`, `hermes_constants`, `hermes_state`, `hermes_time`). 321 file-level touches total (205 + 80 + 31 + 5).
+- Verified: `git grep` for each of the four module names returns zero hits. No orphaned imports.
+- Spot-checked the renamed `claudia` script (formerly `hermes`): correctly imports `from claudia_cli.main import main`.
+- Submodule commit: `ee2d6ef`, pushed. Outer repo pointer advanced `f5cd89f` → `ee2d6ef`.
+
+**Match count after C2**: **6,498 matches across 1,107 files** (down from 7,987).
+
+**Still to fix in later checkpoints** (noted during C2):
+- `get_hermes_home`, `display_hermes_home`, `load_hermes_dotenv` — lowercase compound function names that didn't match the C2 patterns (targeted in C3)
+- `pyproject.toml` line 100: `hermes = "claudia_cli.main:main"` — the entry-point command name itself still says `hermes` (targeted in C4)
+- `setup-claudia.sh` line-with-usage-comment referencing old `setup-hermes.sh` filename (C5 cosmetic cleanup)
+
+**Rollback point**: Revert this outer-repo commit AND force-push the submodule to `f5cd89f` (C1 state).
+
+**Next session should**: Proceed to C3 — `HERMES_HOME` / `~/.hermes` config-dir rebrand, plus the lowercase compound patterns (`hermes_home`, `hermes_dotenv`).
+
+**Blockers**: None.
+
+---
+
 ## 2026-04-09 — Phase 0.2 C1: scope deletions
 
 **Phase**: Phase 0 Task 0.2 — Rebrand sweep, Checkpoint 1 of ~6
