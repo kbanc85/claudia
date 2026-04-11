@@ -2,6 +2,34 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## [Unreleased]
+
+### Preserve User-Modified Skills on Upgrade
+
+Re-running the installer in an existing project no longer silently overwrites skills, rules, or `CLAUDE.md` that the user has customized. Three-way merge via a shipped manifest detects which tracked files the user has edited and prompts before touching them.
+
+#### Added
+- **`template-v2/.claude/manifest.json`** -- SHA-256 hashes of every shipped file under `.claude/skills/`, `.claude/rules/`, and `CLAUDE.md`. Regenerated on `npm publish` via `prepublishOnly`. Users get the new manifest automatically on every upgrade so the next upgrade has a clean comparison baseline.
+- **`bin/manifest-lib.js`** -- Pure-function library: `hashFile`, `generateManifest`, `detectConflicts`, `resolveBakPath`, `applyResolution`, `loadManifest`. No runtime dependencies.
+- **`scripts/generate-manifest.js`** -- Standalone CLI wrapper: `npm run generate-manifest` rebuilds the shipped manifest from the current `template-v2/` tree.
+- **Batch conflict prompt** -- When an upgrade would overwrite locally-modified files, the installer prints a summary and offers `[k]eep all`, `[o]verwrite all`, `[r]eview each`, or `[c]ancel`. Review-each supports `[d]iff` (uses `git diff --no-index` when available), and `[s]kip rest`.
+- **Automatic `.bak` backups** -- Any file the user chooses to overwrite is first copied to `<file>.bak` (with numeric suffix on collision: `.bak.1`, `.bak.2`, ...). No existing `.bak` file is ever overwritten.
+- **25 tests** -- 22 unit tests in `test/manifest.test.js` plus 3 integration tests in `test/integration.test.js`. Run with `npm test`. Uses Node's built-in `node:test`; zero new dependencies.
+
+#### Changed
+- **Upgrade copy path** in `bin/index.js` now runs conflict detection before `cpSync` and passes a filter callback that skips any file the user chose to keep. The fresh-install path is unchanged.
+- **Non-TTY and `--yes` mode** defaults to keep-all for conflicts, printing what was preserved. Safe for CI.
+
+#### Notes
+- Manifest scope is deliberately narrow: `.claude/skills/**`, `.claude/rules/**`, and `CLAUDE.md`. Files under `hooks/`, `agents/`, `commands/`, `workspaces/`, and `settings.local.json` are excluded.
+- Missing or corrupt user manifest falls back to direct hash comparison against the new template -- the upgrade does not crash.
+- On the first upgrade after this feature ships, users will see a slightly noisier prompt because there's no prior manifest to diff against. Every subsequent upgrade is clean.
+
+#### Rollback
+Single atomic commit. `git revert <sha>` undoes everything. Pre-push `origin/main` was `2d65baa`.
+
+---
+
 ## 1.56.0 (2026-04-01)
 
 ### Claude Desktop Compatibility

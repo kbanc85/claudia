@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync, unlinkSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execFileSync } from 'child_process';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { setupGoogleWorkspace, detectOldGoogleMcp, extractProjectNumber, buildApiEnableUrl, TIER_APIS } from './google-setup.js';
+import {
+  loadManifest,
+  generateManifest,
+  detectConflicts,
+  resolveBakPath,
+  applyResolution,
+} from './manifest-lib.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -68,6 +75,181 @@ function confirm(question) {
       resolve(answer.trim().toLowerCase().startsWith('y'));
     });
   });
+}
+
+// Single-keystroke prompt. Returns the lowercased first character of the
+// user's answer, or `defaultKey` when non-TTY / --yes.
+function promptKey(question, validKeys, defaultKey) {
+  if (!isTTY || process.argv.includes('--yes') || process.argv.includes('-y')) {
+    return Promise.resolve(defaultKey);
+  }
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(question, (answer) => {
+      rl.close();
+      const c = (answer || '').trim().toLowerCase().charAt(0);
+      if (validKeys.includes(c)) resolve(c);
+      else resolve(defaultKey);
+    });
+  });
+}
+
+// Detect + resolve conflicts between shipped framework files and the user's
+// locally modified versions. Returns the set of relative paths the caller
+// must skip during cpSync. Saves .bak siblings for any file the user chose
+// to overwrite. May exit(0) if the user cancels.
+async function handleSkillConflicts(targetPath, templatePath) {
+  const userManifestPath = join(targetPath, '.claude', 'manifest.json');
+  const newManifestPath = join(templatePath, '.claude', 'manifest.json');
+
+  const oldManifest = loadManifest(userManifestPath);
+  let newManifest = loadManifest(newManifestPath);
+
+  // If the shipped manifest is missing (older package or dev build), fall
+  // back to generating one on the fly from the template tree. This keeps
+  // the feature working even when scripts/generate-manifest.js wasn't run.
+  if (!newManifest) {
+    try {
+      newManifest = generateManifest(templatePath, { version: getVersion() });
+    } catch {
+      return new Set(); // can't detect conflicts; preserve old behavior
+    }
+  }
+
+  const result = detectConflicts({
+    userDir: targetPath,
+    templateDir: templatePath,
+    oldManifest,
+    newManifest,
+  });
+
+  if (result.conflicts.length === 0) {
+    return new Set(); // nothing to prompt about
+  }
+
+  // Non-TTY or --yes → default to keeping user versions (safe in CI).
+  const isNonInteractive = !isTTY || process.argv.includes('--yes') || process.argv.includes('-y');
+
+  console.log('');
+  console.log(` ${colors.yellow}⚠${colors.reset}  ${result.conflicts.length} file(s) have local modifications that would be overwritten:`);
+  console.log('');
+  for (const f of result.conflicts) {
+    console.log(`    ${colors.dim}${f}${colors.reset}`);
+  }
+  console.log('');
+
+  if (isNonInteractive) {
+    console.log(` ${colors.cyan}i${colors.reset}  Non-interactive mode — keeping your versions. Updates for these files skipped.`);
+    console.log('');
+    return new Set(result.conflicts);
+  }
+
+  console.log(' How do you want to handle these?');
+  console.log(`   ${colors.bold}[k]${colors.reset} Keep all my versions (skip updates for these files)`);
+  console.log(`   ${colors.bold}[o]${colors.reset} Overwrite all ${colors.dim}(saves your versions as .bak)${colors.reset}`);
+  console.log(`   ${colors.bold}[r]${colors.reset} Review each one`);
+  console.log(`   ${colors.bold}[c]${colors.reset} Cancel upgrade`);
+  console.log('');
+
+  const topChoice = await promptKey(' Choice: ', ['k', 'o', 'r', 'c'], 'k');
+
+  let resolution;
+  if (topChoice === 'k') {
+    resolution = applyResolution(result.conflicts, { choice: 'keep-all' });
+  } else if (topChoice === 'o') {
+    resolution = applyResolution(result.conflicts, { choice: 'overwrite-all' });
+  } else if (topChoice === 'c') {
+    resolution = applyResolution(result.conflicts, { choice: 'cancel' });
+  } else {
+    // review each
+    const perFile = {};
+    let skipRest = false;
+    for (const f of result.conflicts) {
+      if (skipRest) {
+        perFile[f] = 'keep';
+        continue;
+      }
+      console.log('');
+      console.log(`   ${colors.cyan}•${colors.reset} ${f}`);
+      const k = await promptKey(
+        `     ${colors.bold}[k]${colors.reset}eep / ${colors.bold}[o]${colors.reset}verwrite / ${colors.bold}[d]${colors.reset}iff / ${colors.bold}[s]${colors.reset}kip rest: `,
+        ['k', 'o', 'd', 's'],
+        'k',
+      );
+      if (k === 'd') {
+        showDiff(join(targetPath, f), join(templatePath, f));
+        // Re-prompt after showing the diff
+        const k2 = await promptKey(
+          `     ${colors.bold}[k]${colors.reset}eep / ${colors.bold}[o]${colors.reset}verwrite: `,
+          ['k', 'o'],
+          'k',
+        );
+        perFile[f] = k2 === 'o' ? 'overwrite' : 'keep';
+      } else if (k === 's') {
+        perFile[f] = 'keep';
+        skipRest = true;
+      } else {
+        perFile[f] = k === 'o' ? 'overwrite' : 'keep';
+      }
+    }
+    resolution = applyResolution(result.conflicts, { choice: 'per-file', perFile });
+  }
+
+  if (resolution.cancelled) {
+    console.log('');
+    console.log(` ${colors.dim}Upgrade cancelled. No files changed.${colors.reset}`);
+    process.exit(0);
+  }
+
+  // Back up user versions for any file they chose to overwrite
+  for (const relPath of resolution.overwrite) {
+    const userAbs = join(targetPath, relPath);
+    if (existsSync(userAbs)) {
+      try {
+        const bakAbs = resolveBakPath(userAbs);
+        copyFileSync(userAbs, bakAbs);
+        console.log(` ${colors.cyan}↺${colors.reset}  Backed up ${colors.dim}${relPath}${colors.reset} → ${colors.dim}${bakAbs.replace(targetPath + '/', '')}${colors.reset}`);
+      } catch (err) {
+        console.log(` ${colors.red}!${colors.reset}  Failed to back up ${relPath}: ${err.message}`);
+      }
+    }
+  }
+
+  if (resolution.skip.length > 0) {
+    console.log('');
+    console.log(` ${colors.green}✓${colors.reset} Kept your versions of ${resolution.skip.length} file(s).`);
+  }
+
+  return new Set(resolution.skip);
+}
+
+// Best-effort diff display. Uses `git diff --no-index` if git is on PATH;
+// otherwise prints a plain head-of-each-file comparison.
+function showDiff(userAbs, templateAbs) {
+  try {
+    const out = execFileSync('git', ['diff', '--no-index', '--no-color', userAbs, templateAbs], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+    });
+    console.log(out);
+  } catch (err) {
+    // git diff --no-index returns exit 1 when files differ — that's normal
+    if (err.stdout) {
+      console.log(err.stdout);
+      return;
+    }
+    // No git available — fall back to naive display
+    try {
+      const userLines = readFileSync(userAbs, 'utf8').split('\n').slice(0, 40);
+      const tmplLines = readFileSync(templateAbs, 'utf8').split('\n').slice(0, 40);
+      console.log(`     ${colors.dim}--- your version (first 40 lines) ---${colors.reset}`);
+      userLines.forEach((l) => console.log(`     ${l}`));
+      console.log(`     ${colors.dim}--- shipped version (first 40 lines) ---${colors.reset}`);
+      tmplLines.forEach((l) => console.log(`     ${l}`));
+    } catch {
+      console.log(`     ${colors.dim}(diff unavailable)${colors.reset}`);
+    }
+  }
 }
 
 // Compact portrait-only banner
@@ -646,6 +828,26 @@ async function main() {
     // Upgrade: copy framework files, preserve user data
     const frameworkPaths = ['.claude', 'CLAUDE.md', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
 
+    // Detect user-modified shipped files and let the user decide what to
+    // do before we touch anything. Returns a Set of POSIX-relative paths
+    // to exclude from the copy; may exit(0) if the user cancels.
+    let skipPaths;
+    try {
+      skipPaths = await handleSkillConflicts(targetPath, templatePath);
+    } catch (err) {
+      // Conflict detection must never break the upgrade. Fall back to the
+      // original copy-over-top behavior with a warning.
+      console.log(` ${colors.yellow}!${colors.reset}  Conflict detection failed (${err.message}); falling back to overwrite.`);
+      skipPaths = new Set();
+    }
+
+    // Build an absolute-path skip set for the cpSync filter callback.
+    const skipAbs = new Set();
+    for (const rel of skipPaths) {
+      skipAbs.add(join(targetPath, rel));
+    }
+    const copyFilter = (_src, dest) => !skipAbs.has(dest);
+
     try {
       for (const item of frameworkPaths) {
         const src = join(templatePath, item);
@@ -654,9 +856,12 @@ async function main() {
 
         const srcStat = statSync(src);
         if (srcStat.isDirectory()) {
-          cpSync(src, dest, { recursive: true, force: true });
+          cpSync(src, dest, { recursive: true, force: true, filter: copyFilter });
         } else {
-          cpSync(src, dest, { force: true });
+          // For top-level files (CLAUDE.md, LICENSE, etc.), check skip manually
+          if (!skipAbs.has(dest)) {
+            cpSync(src, dest, { force: true });
+          }
         }
       }
 
