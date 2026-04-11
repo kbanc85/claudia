@@ -2,7 +2,7 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## [Unreleased]
+## 1.56.1 (2026-04-11)
 
 ### Preserve User-Modified Skills on Upgrade
 

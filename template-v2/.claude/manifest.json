@@ -1,6 +1,6 @@
 {
-  "version": "1.56.0",
-  "generated": "2026-04-11T14:23:27.338Z",
+  "version": "1.56.1",
+  "generated": "2026-04-11T14:34:01.463Z",
   "algorithm": "sha256",
   "files": {
     ".claude/rules/claudia-principles.md": "b1c5e33aeb33857f3485231e5ed34a441c3cc4568b69e3341be770963418a240",
