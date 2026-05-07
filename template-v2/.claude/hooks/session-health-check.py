@@ -24,6 +24,50 @@ def _fetch_briefing():
         return None
 
 
+def _recent_sessions_summary(max_days: int = 3) -> str:
+    """Return a compact recap of the last N days of session summaries.
+
+    Reads ~/.claudia/sessions/YYYY-MM-DD/INDEX.md files. Returns a short
+    multi-day digest showing what was worked on. Bounded to keep startup fast.
+
+    Empty string when no session history exists yet (fresh installs).
+    """
+    sessions_dir = Path.home() / ".claudia" / "sessions"
+    if not sessions_dir.exists():
+        return ""
+
+    date_folders = sorted(
+        [d for d in sessions_dir.iterdir() if d.is_dir() and d.name[:4].isdigit()],
+        reverse=True,
+    )[:max_days]
+
+    if not date_folders:
+        return ""
+
+    lines = []
+    for date_dir in date_folders:
+        summaries = sorted(date_dir.glob("[0-9][0-9]-*.md"))
+        if not summaries:
+            continue
+        topics = []
+        for f in summaries:
+            try:
+                first_line = f.read_text(encoding="utf-8").split("\n", 1)[0]
+                topic = first_line.lstrip("#").strip()
+                if "—" in topic:
+                    topic = topic.split("—", 1)[1].strip()
+                topics.append(topic)
+            except OSError:
+                continue
+        if topics:
+            lines.append(f"  {date_dir.name}: {' · '.join(topics[:5])}")
+
+    if not lines:
+        return ""
+
+    return "Recent sessions (from ~/.claudia/sessions/):\n" + "\n".join(lines)
+
+
 def _run_claudia(*args):
     """Run claudia CLI and return parsed JSON output, or None on failure."""
     claudia_bin = shutil.which("claudia")
@@ -65,11 +109,15 @@ def check_health():
 
         summary = " ".join(parts) if parts else "System ready."
         briefing = _fetch_briefing()
+        recent = _recent_sessions_summary()
+
+        sections = [f"Memory system healthy. {summary}"]
+        if recent:
+            sections.append("--- Recent Sessions ---\n" + recent)
         if briefing:
-            output = f"Memory system healthy. {summary}\n\n--- Session Briefing ---\n{briefing}"
-        else:
-            output = f"Memory system healthy. {summary}"
-        print(json.dumps({"additionalContext": output}))
+            sections.append("--- Session Briefing ---\n" + briefing)
+
+        print(json.dumps({"additionalContext": "\n\n".join(sections)}))
         return
 
     # CLI not available -- provide fallback guidance
