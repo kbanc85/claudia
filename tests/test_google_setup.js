@@ -120,7 +120,7 @@ describe('setupGoogleWorkspace', () => {
     writeMcpJson(tmp, {
       mcpServers: {
         'claudia-memory': { command: 'python', args: [] },
-        'rube': { type: 'http', url: 'https://mcp.composio.dev' }
+        'custom-mcp': { command: 'node', args: ['custom.js'] }
       }
     });
 
@@ -128,7 +128,7 @@ describe('setupGoogleWorkspace', () => {
 
     const config = readMcpJson(tmp);
     assert.ok(config.mcpServers['claudia-memory'], 'claudia-memory preserved');
-    assert.ok(config.mcpServers.rube, 'rube preserved');
+    assert.ok(config.mcpServers['custom-mcp'], 'custom-mcp preserved');
     assert.ok(config.mcpServers.google_workspace, 'google_workspace added');
   });
 
