@@ -37,15 +37,6 @@
         "extended": "Adds Docs, Sheets, Tasks, Chat (83 tools)",
         "complete": "All services including Slides, Forms, Apps Script (111 tools)"
       }
-    },
-    "rube": {
-      "type": "http",
-      "url": "https://mcp.composio.dev",
-      "headers": {
-        "x-composio-api-key": ""
-      },
-      "_description": "Rube by Composio -- 500+ app integrations (HTTP, no stdio conflict)",
-      "_setup": "Connect 500+ apps via Rube: Slack, Notion, Drive, GitHub, Granola, Otter.ai, Jira, Linear, Airtable, HubSpot, Stripe, and more. 1) Sign up free at https://rube.app 2) Connect your apps in Rube's marketplace 3) Copy your API key from the dashboard 4) Paste it in x-composio-api-key above 5) Restart Claude Code. See Rube section in CLAUDE.md for full guide."
     }
   },
 
@@ -53,7 +44,6 @@
     "memory": "Claudia's memory is powered by the claudia-memory daemon (Python MCP server). It provides ~33 tools for semantic search, pattern detection, and relationship tracking. The installer (npx get-claudia) automatically sets up the daemon in a Python venv at ~/.claudia/daemon/venv/ and configures .mcp.json.",
     "google_options": "Two paths for Google integration: (A) gmail + google-calendar (lightweight, focused, fewer tools) or (B) google_workspace via workspace-mcp (all-in-one, more tools). Both can coexist. See Google Integration Setup in CLAUDE.md.",
     "google_workspace": "Google Workspace uses the workspace-mcp server (taylorwilsdon/google_workspace_mcp). One server covers Gmail, Calendar, Drive, Docs, Sheets, Tasks, and more. Tool tiers control context usage.",
-    "rube": "Rube (by Composio) connects 500+ apps through one HTTP MCP connection. Each user creates their own free Rube account at rube.app. See the Rube section in CLAUDE.md for setup and troubleshooting.",
     "security": "Each user authenticates with their own accounts and credentials. OAuth tokens are stored locally on your machine, never shared.",
     "not_included": {
       "filesystem": "Claude Code has native Read/Write/Edit tools",

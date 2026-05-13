@@ -82,9 +82,9 @@ describe('.mcp.json.example (root)', () => {
       'No references to @gongrzhe should remain');
   });
 
-  it('still has rube entry', () => {
-    assert.ok(config.mcpServers.rube,
-      'Rube entry should be preserved');
+  it('does NOT have rube entry', () => {
+    assert.equal(config.mcpServers.rube, undefined,
+      'Rube entry should not be present');
   });
 });
 
@@ -135,9 +135,9 @@ describe('template-v2/.mcp.json.example', () => {
       'claudia-memory should be preserved');
   });
 
-  it('still has rube entry', () => {
-    assert.ok(config.mcpServers.rube,
-      'Rube entry should be preserved');
+  it('does NOT have rube entry', () => {
+    assert.equal(config.mcpServers.rube, undefined,
+      'Rube entry should not be present');
   });
 });
 

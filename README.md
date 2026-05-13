@@ -320,19 +320,6 @@ This generates a one-click URL to enable all required Google APIs and walks you 
 | **Extended** | 83 | Core + Docs, Sheets, Tasks, Chat |
 | **Complete** | 111 | Extended + Slides, Forms, Apps Script |
 
-### 500+ Apps via Rube
-
-[Rube](https://rube.app) (by Composio) connects Claudia to Slack, Notion, Jira, GitHub, Linear, HubSpot, Stripe, Figma, and hundreds more through one-click OAuth. No per-app MCP setup needed.
-
-| Category | Examples |
-|----------|----------|
-| **Communication** | Slack, Discord, Teams, Telegram |
-| **Project Management** | Jira, Linear, Asana, Trello, Monday.com |
-| **Knowledge & Docs** | Notion, Confluence, Google Docs, Coda |
-| **Code & Dev** | GitHub, GitLab, Bitbucket |
-| **CRM & Sales** | HubSpot, Salesforce, Pipedrive |
-| **And 500+ more** | [Browse the full list](https://rube.app) |
-
 ### Obsidian Vault
 
 Memory auto-syncs to an Obsidian vault at `~/.claudia/vault/` using PARA structure. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view maps your network. SQLite is the source of truth; the vault is a read-only projection you can browse and search.

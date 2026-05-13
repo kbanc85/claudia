@@ -230,7 +230,7 @@ MEMORY.md persists across sessions automatically. Because of this convenience, i
 | File locations | "Interview files live in workspaces/beemok/interviews/" | Stable reference |
 | Process knowledge | "Interviews follow the capture-interview skill" | Process, not status |
 | Preferences | "User prefers detailed briefs over minimal ones" | Slow-changing |
-| Tool configuration | "Gmail MCP is connected, Otter.ai via Rube" | Infrastructure |
+| Tool configuration | "Gmail MCP is connected, Otter.ai integration enabled" | Infrastructure |
 
 ### What MUST NOT go in MEMORY.md
 

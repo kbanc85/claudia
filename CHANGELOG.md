@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## Unreleased
+
+### Removed
+- **Rube (Composio) MCP integration** -- Removed Rube as a bundled MCP server option from `.mcp.json.example` (root and template-v2), README, and the Claudia documentation in `CLAUDE.md` (root and template-v2). Existing user installations that have a `rube` server configured continue to work; the installer simply no longer ships Rube as an example. Users who want a multi-app MCP aggregator can still add one to their own `.mcp.json` manually.
+- **Rube reference in `claudia-principles.md`** -- The "Tool configuration" example in the memory-discipline section ("Gmail MCP is connected, Otter.ai via Rube") was updated to a vendor-neutral phrasing ("Gmail MCP is connected, Otter.ai integration enabled").
+
+### Changed
+- **`tests/test_google_setup.js`** -- The "preserves existing MCP servers" test fixture now uses a generic `custom-mcp` entry instead of `rube` to verify that user-added servers survive Google Workspace setup. Test intent unchanged.
+- **`tests/test_workspace_config.js`** -- The two "still has rube entry" tests are inverted to "does NOT have rube entry," codifying the removal.
+
+---
+
 ## 1.57.0 (2026-05-13)
 
 ### The Curated Memory Release
