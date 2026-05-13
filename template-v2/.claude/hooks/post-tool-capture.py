@@ -15,6 +15,7 @@ Captured per-tool-call:
 """
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -27,23 +28,39 @@ SKIP_NAMES = {
     "TaskList", "TaskGet", "TaskOutput", "ToolSearch",
 }
 
-# Bash command substrings that signal an "external action" worth flagging
-# in the daily summary. Substring match is intentional but loose; tighten
-# in a follow-up if false positives appear (e.g., echo'd test JSON).
-EXTERNAL_ACTION_PATTERNS = [
-    "git push", "gh repo create", "gh pr create", "gh release",
-    "vercel --prod", "vercel deploy", "netlify deploy",
-    "supabase db push", "npx supabase",
+# Bash command patterns that signal an "external action" worth flagging in
+# the daily summary. Anchored so the candidate command must appear at the
+# start of the line or after a shell separator (`;`, `&&`, `|`, `\n`, `(`),
+# with optional transparent prefixes (`sudo`, `nohup`, `time`, `env VAR=`).
+# This rejects echo'd test JSON ("git push for testing") and prefixed
+# look-alikes ("git pushd", "ungit push") while still firing on real
+# invocations including chained ones (`cd foo && git push`).
+_BASH_CMD_ANCHOR = (
+    r"(?:^|[;&|\n(])\s*"
+    r"(?:sudo\s+|nohup\s+|time\s+|env\s+\w+=\S+\s+)*"
+)
+EXTERNAL_ACTION_PATTERNS: list[tuple[str, re.Pattern]] = [
+    ("git push", re.compile(_BASH_CMD_ANCHOR + r"git\s+push\b")),
+    ("gh repo create", re.compile(_BASH_CMD_ANCHOR + r"gh\s+repo\s+create\b")),
+    ("gh pr create", re.compile(_BASH_CMD_ANCHOR + r"gh\s+pr\s+create\b")),
+    ("gh release", re.compile(_BASH_CMD_ANCHOR + r"gh\s+release\b")),
+    ("vercel --prod", re.compile(_BASH_CMD_ANCHOR + r"vercel\s+(?:[^\n]*\s)?--prod\b")),
+    ("vercel deploy", re.compile(_BASH_CMD_ANCHOR + r"vercel\s+deploy\b")),
+    ("netlify deploy", re.compile(_BASH_CMD_ANCHOR + r"netlify\s+deploy\b")),
+    ("supabase db push", re.compile(_BASH_CMD_ANCHOR + r"supabase\s+db\s+push\b")),
+    ("npx supabase", re.compile(_BASH_CMD_ANCHOR + r"npx\s+supabase\b")),
 ]
 
 
-def is_external_action(tool_name: str, tool_input: dict) -> str | None:
+def is_external_action(tool_name: str, tool_input) -> str | None:
     """Return a short label if this tool call looks like an external action."""
     if tool_name == "Bash":
-        cmd = (tool_input or {}).get("command", "")
-        for pattern in EXTERNAL_ACTION_PATTERNS:
-            if pattern in cmd:
-                return pattern
+        cmd = (tool_input or {}).get("command", "") if tool_input else ""
+        if not cmd:
+            return None
+        for label, regex in EXTERNAL_ACTION_PATTERNS:
+            if regex.search(cmd):
+                return label
     elif tool_name in {
         "mcp__claudia-private-email__claudia_email_send",
         "mcp__gmail__send_email", "mcp__gmail__draft_email",
