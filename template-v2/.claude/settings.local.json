@@ -39,6 +39,19 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-capture.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-capture.py\" 2>/dev/null || true",
+            "timeout": 3000,
+            "statusMessage": ""
+          }
+        ]
+      }
     ]
   }
 }
