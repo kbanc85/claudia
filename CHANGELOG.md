@@ -2,15 +2,34 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## Unreleased
+## 1.58.0 (2026-05-13)
 
-### Removed
-- **Rube (Composio) MCP integration** -- Removed Rube as a bundled MCP server option from `.mcp.json.example` (root and template-v2), README, and the Claudia documentation in `CLAUDE.md` (root and template-v2). Existing user installations that have a `rube` server configured continue to work; the installer simply no longer ships Rube as an example. Users who want a multi-app MCP aggregator can still add one to their own `.mcp.json` manually.
-- **Rube reference in `claudia-principles.md`** -- The "Tool configuration" example in the memory-discipline section ("Gmail MCP is connected, Otter.ai via Rube") was updated to a vendor-neutral phrasing ("Gmail MCP is connected, Otter.ai integration enabled").
+### The Memory Reliability Release
 
-### Changed
-- **`tests/test_google_setup.js`** -- The "preserves existing MCP servers" test fixture now uses a generic `custom-mcp` entry instead of `rube` to verify that user-added servers survive Google Workspace setup. Test intent unchanged.
-- **`tests/test_workspace_config.js`** -- The two "still has rube entry" tests are inverted to "does NOT have rube entry," codifying the removal.
+Five PRs that fix the memory layer's biggest recurring failure mode and lock in the integration philosophy. After this release, memory writes that name entities ("Matt Blumberg") actually create those entities with the correct type. The release history's recurring memory-fix releases ("Recall Recovery", "Vector Search Fix", "Semantic Search Actually Works Now") get permanent regression-test sentinels so the same bug classes can't quietly come back. And the codebase loses a dual-maintenance hazard that was already costing time.
+
+#### Fixed
+- **`memory_remember` actually links entities and infers their type correctly (#54)** -- A confirmed bug from 2026-05-13: calling `memory_remember(content="Matt Blumberg said X", entities=["Matt Blumberg", "Markup AI"])` was creating entities but assigning them `type: person` by default, even when the name clearly indicated an organization. "Markup AI" was being saved as a person. The real bug was in `_infer_entity_type` -- it didn't recognise `AI` / `.ai` / `Co.` as corporate suffixes and fell back to `person`. Fixed with a pure-function rule-based type inference (corporate suffixes -> organization, project keywords -> project, person patterns -> person, fallback -> concept, never default to person). Plus a new `claudia-memory --backfill-entities` CLI to retroactively link orphaned references in existing user databases.
+
+#### Added
+- **`claudia memory backfill-entities` command (#54)** -- Default dry-run: prints a plan and writes nothing. `--apply` makes a timestamped backup to `~/.claudia/backups/memory-{timestamp}.db` first, then applies the backfill. Idempotent: re-running on an already-backfilled DB is a no-op. Aborts cleanly if backup creation fails.
+- **5 regression tests for recurring bug classes (#56)** -- New `memory-daemon/tests/test_recurring_regressions.py` adds permanent forward-looking sentinels for: entity linking on `memory_remember`, recall returning results after seed writes, embedding migration preserving recall, daemon startup tolerating stale SHM files, and `memory_briefing` returning a valid structure on an empty database. Each test docstring names the historical releases where its bug class appeared (v1.35.x, v1.51.5, v1.51.18, v1.55.7, v1.55.8, v1.55.14, v1.21.1, v1.40.1).
+- **API parameter aliases for read-side MCP tools (#57)** -- `memory_about` now accepts `entity_name` and `name` alongside `entity`. `memory_relate` accepts `source_entity` / `target_entity` / `relationship_type` alongside `source` / `target` / `relationship`. `memory_recall` accepts `q` and `search` alongside `query`. Purely additive: every existing caller continues to work unchanged. Aliases normalize at the MCP boundary; service-layer signatures are untouched. If both canonical and alias are passed in the same call, canonical wins.
+
+#### Removed
+- **Rube (Composio) MCP integration as a bundled default (#41)** -- Rube is no longer a recommended or bundled MCP server in `.mcp.json.example` (root and template-v2), README, or the Claudia documentation. Locks in the direct-integrations-only philosophy (claude.ai-native MCPs + user-built custom MCPs like Gmail/Calendar). Existing users with `rube` already configured continue to work unchanged; the installer simply no longer ships Rube as an example. The "Tool configuration" example in `claudia-principles.md` was updated to vendor-neutral phrasing.
+- **Legacy `claudia/` sibling files (#55)** -- Removed 3 stale sibling files (`post-tool-capture.py`, `session-health-check.py`, `settings.local.json`) that lived under `claudia/`. These were never reaching users (the installer ships from `template-v2/` only), but every hook bug fix had to remember to patch both locations. The dual-maintenance hazard was real: PR #38's sibling-fix step had to apply the same env-var fix twice. Removed at the source.
+
+#### Stats
+- **43 new tests** across 4 files (22 entity-resolution tests in #54, 5 regression sentinels in #56, 16 alias tests in #57)
+- **805 total daemon tests passing** (up from 762 before the v1.57.0 chain), 0 regressions
+- TDD sensitivity proofs for every behavior change: tests fail on the un-modified code, pass after the fix
+- 5 PRs merged, all with stop-gates and TDD discipline
+
+#### Notes
+- The bug in #54 was different from the original proposal (#51) described. The proposal said "entities are silently ignored." Actually the entity *records* were getting created -- the bug was that they were all getting `type: person`. Fixing the actual bug rather than the imagined one was a better outcome.
+- The `claudia memory backfill-entities` command surface lives on the daemon's argparse (alongside `--backfill-embeddings`, `--migrate-vault-para`), not as a `claudia memory ...` subcommand on the Node CLI. The Node CLI is the installer, not a memory-command dispatcher.
+- Aliases are NOT yet advertised in the MCP `list_tools()` `inputSchema`. They are tolerantly accepted at the request boundary. Schema-level advertisement is a future enhancement if it proves needed for client discoverability.
 
 ---
 
