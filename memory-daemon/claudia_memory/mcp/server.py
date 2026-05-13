@@ -141,6 +141,79 @@ def _require(arguments: dict, key: str, tool_name: str):
     return value
 
 
+# ── Parameter-name aliases (v1.58.0 PR E) ──
+#
+# The memory MCP tools historically used different parameter conventions
+# (entity vs source/target/relationship vs query). The aliases below let
+# callers use a consistent variant while every existing caller continues
+# to work unchanged. Normalization happens here at the MCP boundary;
+# service-layer signatures in claudia_memory/services/ are untouched.
+#
+# Rules:
+#   1. Purely additive. The canonical name continues to work as before.
+#   2. If both the canonical name and an alias are provided in the same
+#      call, the canonical name wins (the alias is left in place and is
+#      not consulted by the handler).
+#   3. Otherwise, the first matching alias is renamed to the canonical
+#      key and the alias key is removed from the arguments dict so the
+#      handler only ever sees the canonical name.
+
+_PARAM_ALIASES: Dict[str, Dict[str, List[str]]] = {
+    "memory_about": {
+        "entity": ["entity_name", "name"],
+    },
+    "memory_relate": {
+        "source": ["source_entity"],
+        "target": ["target_entity"],
+        "relationship": ["relationship_type"],
+    },
+    "memory_recall": {
+        "query": ["q", "search"],
+    },
+}
+
+
+def _normalize_params(arguments: dict, canonical: str, aliases: List[str]) -> dict:
+    """Resolve alias parameter names to the canonical name.
+
+    If the canonical name is already present in `arguments`, it wins and
+    `arguments` is returned unchanged. Otherwise, the first alias from
+    `aliases` that is present is renamed to the canonical key, and the
+    alias key is removed. If no alias matches either, `arguments` is
+    returned unchanged.
+
+    The function never mutates the caller's dict: when a rewrite is
+    needed it returns a shallow copy with the alias key replaced.
+    """
+    if canonical in arguments:
+        return arguments
+    for alias in aliases:
+        if alias in arguments:
+            arguments = dict(arguments)
+            arguments[canonical] = arguments.pop(alias)
+            return arguments
+    return arguments
+
+
+def _apply_parameter_aliases(tool_name: str, arguments: dict) -> dict:
+    """Apply all registered aliases for the given tool, if any.
+
+    Tools without an entry in `_PARAM_ALIASES` (the vast majority) get
+    their arguments back unchanged. Dot-notation aliases (e.g.
+    'memory.about') are routed to the same canonical tool name for the
+    purposes of alias lookup.
+    """
+    # Dot-notation aliases (memory.about, etc.) share the same canonical
+    # alias map as their underscore counterparts.
+    lookup_name = tool_name.replace(".", "_", 1) if "." in tool_name else tool_name
+    aliases_for_tool = _PARAM_ALIASES.get(lookup_name)
+    if not aliases_for_tool:
+        return arguments
+    for canonical, alias_list in aliases_for_tool.items():
+        arguments = _normalize_params(arguments, canonical, alias_list)
+    return arguments
+
+
 MAX_RESPONSE_BYTES = 50_000
 
 
@@ -3142,6 +3215,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
     """Handle tool calls via dispatch registry."""
     db = get_db()
     try:
+        # Normalize parameter-name aliases at the MCP boundary so handlers
+        # only ever see canonical parameter names. Purely additive: tools
+        # without registered aliases are unchanged. See _PARAM_ALIASES.
+        arguments = _apply_parameter_aliases(name, arguments)
         with db.transaction():
             handler = _TOOL_HANDLERS.get(name)
             if handler:
