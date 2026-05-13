@@ -52,6 +52,19 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.py\" 2>/dev/null || true",
+            "timeout": 10000,
+            "statusMessage": "Generating daily session summary..."
+          }
+        ]
+      }
     ]
   }
 }
