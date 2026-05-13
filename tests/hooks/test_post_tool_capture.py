@@ -153,9 +153,12 @@ class PostToolCaptureHookTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0)
         self.assertEqual(read_observations(self.home), [])
 
-    # ─── Scenario 6: large tool_response is truncated to 200 chars ─────────
+    # ─── Scenario 6: large tool_response is truncated ─────────
+    # PR #38 truncated to 200 chars. PR #40 expanded the truncation to 300
+    # chars when adding file_path and external_action fields (room for richer
+    # output context). Test matches current behavior.
 
-    def test_long_response_is_truncated_to_200_chars(self):
+    def test_long_response_is_truncated(self):
         long_output = "a" * 1000
         payload = json.dumps({
             "tool_name": "Bash",
@@ -167,8 +170,8 @@ class PostToolCaptureHookTests(unittest.TestCase):
 
         observations = read_observations(self.home)
         self.assertEqual(len(observations), 1)
-        self.assertEqual(len(observations[0]["output"]), 200)
-        self.assertEqual(observations[0]["output"], "a" * 200)
+        self.assertEqual(len(observations[0]["output"]), 300)
+        self.assertEqual(observations[0]["output"], "a" * 300)
 
     # ─── Scenario 7: missing tool_name field is a silent no-op ──────────────
 

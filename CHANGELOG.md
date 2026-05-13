@@ -2,6 +2,36 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.57.0 (2026-05-13)
+
+### The Curated Memory Release
+
+Five PRs that complete one thesis: **curated, judgment-driven memory capture, enforced at prompt time and persisted across sessions.** Claudia now catches the user's intent when it matters, persists canonical facts as they emerge, and writes a daily session summary so context survives across days.
+
+#### Fixed
+- **PostToolUse hook actually runs (#38)** -- The hook was reading `os.environ.get("CLAUDE_TOOL_NAME")`, which Claude Code never sets. Every install since the hook landed had been silently no-op'ing, so `~/.claudia/observations.jsonl` was never written. The hook now reads its payload from stdin per the documented hook contract. Includes a sibling fix to the legacy `claudia/.claude/hooks/post-tool-capture.py` for codebase consistency.
+
+#### Added
+- **Memory-commitment rule (#39)** -- A new always-active rule (`template-v2/.claude/rules/memory-commitment.md`) codifies when to save canonical facts immediately via `memory_remember` / `memory_batch` rather than batching to end-of-session reflection. Trigger phrases include "lock this in," "remember this," "this is canonical." Substantive-artifact discipline: at the end of producing a multi-file artifact, do a memory commitment pass and save the canonical facts as one bundled `memory_batch` call.
+- **UserPromptSubmit hook with intent detection (#42)** -- A new hook (`template-v2/.claude/hooks/user-prompt-capture.py`) inspects the user's prompt at submit time and injects reminder context for two trigger classes. Class 1: canonical-fact phrases ("lock this in," "remember this," etc.) tell the agent to save immediately rather than wait for `/meditate`. Class 2: destructive command patterns (`rm -rf`, `git push --force`, `DROP TABLE`, etc.) trigger a "verify before acting" reminder per the safety-first principle. Destructive patterns are surfaced to the model as human-readable labels (`rm -rf (recursive delete)`), not raw regex, so the agent can reason about them clearly.
+- **Daily session summary system (#40)** -- A new SessionEnd hook (`template-v2/.claude/hooks/session-summary.py`) writes a per-session markdown summary to `~/.claudia/sessions/YYYY-MM-DD/NN-slug.md` covering opening prompt, files touched, external actions, and find-this-again references. SessionStart now surfaces a 3-day digest of recent sessions via the existing health-check hook, so future-Claudia knows what past-Claudia worked on. PostToolUse hook gained `file_path` extraction for Write/Edit/MultiEdit/NotebookEdit and `external_action` labels for git push, gh repo create, vercel/netlify deploy, supabase db push, and direct MCP sends.
+- **Explicit upgrade messaging (#50)** -- The installer now names `~/.claudia/` explicitly after an upgrade and lists what is preserved (entities, relationships, reflections, embeddings) instead of the generic "data preserved" phrasing. Users care about their accumulated memory graph; the previous wording did not signal that the database is safe.
+
+#### Changed
+- **External-action detection uses word-boundary regex (#40)** -- Previously a substring match, so `echo "git push for testing"` falsely fired the `external_action` flag. The new patterns anchor on command separators (line start, `;`, `&&`, `|`, `(`) and skip transparent prefixes (`sudo`, `nohup`, `time`, `env`). False positives on echoed/quoted strings are eliminated; real commands still fire.
+- **PostToolUse output truncation 200 -> 300 chars (#40)** -- Room for the richer output context that includes `file_path` and `external_action` labels alongside the truncated stdout/stderr.
+
+#### Stats
+- 41 new hook tests in `tests/hooks/` (stdlib `unittest`, zero new dependencies), all passing in ~1.5s
+- TDD sensitivity proofs for every behavior change: tests fail on the un-modified hook, pass after the fix
+- 5 PRs merged, 0 regressions
+
+#### Notes
+- The brief that drove this chain emphasized one principle: **trust the existing user-file preservation policy (commit `efce9f2`)** rather than inventing a new upgrade framework. The installer's behavior didn't change; only the messaging did.
+- The four hook PRs each landed with their own automated tests and TDD sensitivity proofs. The legacy `claudia/` subdirectory was kept in sync with the canonical `template-v2/` to avoid maintenance drift.
+
+---
+
 ## 1.56.1 (2026-04-11)
 
 ### Preserve User-Modified Skills on Upgrade
