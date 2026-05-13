@@ -877,7 +877,10 @@ async function main() {
     }
 
     console.log('');
-    console.log(` ${colors.cyan}✓${colors.reset} Framework updated (data preserved)`);
+    console.log(` ${colors.cyan}✓${colors.reset} Framework updated`);
+    console.log(`   • Your memory at ${colors.bold}~/.claudia/${colors.reset} is preserved (entities, relationships, reflections, embeddings).`);
+    console.log(`   • Skills and hooks refreshed; any modifications you chose to keep were respected.`);
+    console.log(`   • Restart Claude Code for changes to take effect.`);
   }
 
   // Self-heal: strip CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS from settings (#24)
