@@ -23,6 +23,7 @@ from ..extraction.entity_extractor import (
     extract_all,
     get_extractor,
 )
+from .entities import infer_entity_type as _smart_infer_entity_type
 from .guards import validate_entity, validate_memory, validate_relationship
 
 logger = logging.getLogger(__name__)
@@ -366,10 +367,14 @@ class RememberService:
             except Exception as e:
                 logger.warning(f"Could not store memory embedding: {e}")
 
-        # Link to entities
+        # Link to entities. Pass the memory content as context so the type
+        # inference heuristic can use it (Proposal #51).
         if about_entities:
+            now_iso = datetime.utcnow().isoformat()
             for entity_name in about_entities:
-                entity_id = self._find_or_create_entity(entity_name)
+                entity_id = self._find_or_create_entity(
+                    entity_name, content_context=content
+                )
                 if entity_id:
                     try:
                         self.db.insert(
@@ -382,6 +387,17 @@ class RememberService:
                         )
                     except Exception:
                         pass  # Duplicate link, ignore
+                    # Touch the entity so attention-tier and recency reflect
+                    # that we just heard about it. Safe on existing rows;
+                    # newly-created rows already have these set.
+                    try:
+                        self.db.execute(
+                            "UPDATE entities SET last_contact_at = ?, "
+                            "updated_at = ? WHERE id = ?",
+                            (now_iso, now_iso, entity_id),
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not touch entity {entity_id}: {e}")
 
         logger.debug(f"Remembered {memory_type}: {content[:50]}...")
 
@@ -1807,8 +1823,25 @@ class RememberService:
             entity_type=extracted.type,
         )
 
-    def _find_or_create_entity(self, name: str, entity_type: str = "") -> Optional[int]:
-        """Find entity by name or create if not exists"""
+    def _find_or_create_entity(
+        self,
+        name: str,
+        entity_type: str = "",
+        content_context: str = "",
+    ) -> Optional[int]:
+        """Find entity by name or create if not exists.
+
+        When ``entity_type`` is not supplied, the smarter heuristic in
+        ``services/entities.py`` is used so that names like "Markup AI"
+        get typed as ``organization`` instead of the legacy
+        ``person`` fallback. Proposal #51 (2026-05-13).
+
+        Args:
+            name: Entity name (canonical lookup is case-insensitive).
+            entity_type: Optional explicit type. If empty, inferred.
+            content_context: Optional surrounding memory text. Passed to
+                the inference helper for future content-aware rules.
+        """
         canonical = self.extractor.canonical_name(name)
 
         # Try exact match
@@ -1829,13 +1862,19 @@ class RememberService:
         if alias_match:
             return alias_match["entity_id"]
 
+        # Smart inference for the *type* we will use to fuzzy-match and create.
+        # Without this, _fuzzy_find_entity queries with type="" (no matches)
+        # and remember_entity falls back to person.
+        effective_type = entity_type or _smart_infer_entity_type(name, content_context)
+
         # Fuzzy pre-check: find near-matches of the same type
-        fuzzy_match = self._fuzzy_find_entity(canonical, entity_type)
+        fuzzy_match = self._fuzzy_find_entity(canonical, effective_type)
         if fuzzy_match:
             return fuzzy_match
 
-        # Create new
-        return self.remember_entity(name=name, entity_type=entity_type)
+        # Create new with the inferred (or explicit) type. We pass the type
+        # explicitly so remember_entity skips its own (legacy) inference.
+        return self.remember_entity(name=name, entity_type=effective_type)
 
     def _fuzzy_find_entity(self, canonical: str, entity_type: str) -> Optional[int]:
         """Find a near-match entity of the same type using fuzzy string matching.

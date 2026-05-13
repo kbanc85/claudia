@@ -1111,6 +1111,24 @@ def main():
         help="Preview mode for --migrate-vault-para: show routing plan without making changes",
     )
     parser.add_argument(
+        "--backfill-entities",
+        action="store_true",
+        help=(
+            "Scan memories for un-linked entity references and propose "
+            "creating/linking them (Proposal #51). Dry-run by default; "
+            "pass --apply to write changes (creates a SQLite backup first)."
+        ),
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help=(
+            "With --backfill-entities: actually write the changes. "
+            "A SQLite backup is created at ~/.claudia/backups/ before any "
+            "writes; if backup creation fails, the command aborts."
+        ),
+    )
+    parser.add_argument(
         "--migrate-legacy",
         action="store_true",
         help="Manually migrate data from a legacy database into claudia.db",
@@ -1702,6 +1720,61 @@ def main():
             sys.exit(1)
 
         run_para_migration(vault_path, db=db, preview=args.preview)
+        return
+
+    if args.backfill_entities:
+        # Entity-link backfill (Proposal #51). Dry-run by default; --apply
+        # writes after creating a SQLite backup.
+        setup_logging(debug=args.debug)
+        from datetime import datetime as _dt
+
+        from .services.backfill import (
+            apply_backfill,
+            format_plan_summary,
+            plan_backfill,
+        )
+
+        db = get_db()
+        db.initialize()
+
+        plan = plan_backfill(db)
+        print(format_plan_summary(plan))
+
+        if not args.apply:
+            # Dry-run path: we already printed the plan; nothing more to do.
+            return
+
+        # --apply: take the mandatory backup first.
+        config = get_config()
+        backups_dir = Path(config.backup_dir)
+        try:
+            backups_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            print(
+                f"\nCannot create backup directory {backups_dir}: {e}\n"
+                "Aborting before any database writes."
+            )
+            sys.exit(1)
+
+        timestamp = _dt.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
+        backup_path = backups_dir / f"memory-{timestamp}.db"
+
+        try:
+            result = apply_backfill(db, plan, backup_path=backup_path)
+        except Exception as e:
+            print(
+                f"\nBackfill aborted (no DB writes performed): {e}\n"
+                f"Backup target was: {backup_path}"
+            )
+            sys.exit(1)
+
+        print(
+            "\nBackfill applied:\n"
+            f"  backup written to:   {result.backup_path}\n"
+            f"  entities created:    {result.entities_created}\n"
+            f"  entities reused:     {result.entities_reused}\n"
+            f"  memory_entities links created: {result.links_created}"
+        )
         return
 
     if args.merge_databases:
