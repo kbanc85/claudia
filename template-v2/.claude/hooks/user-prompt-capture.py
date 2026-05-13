@@ -9,8 +9,8 @@ Designed to complete in <5ms (regex match + simple JSON output, no network).
 
 Two trigger classes:
 1. Memory-commitment phrases ("lock this in", "remember this", "this is canonical")
-   -> Inject reminder for the agent to call memory_remember/memory_batch IMMEDIATELY,
-      not batch to /meditate.
+   -> Inject reminder for the agent to save the fact to memory immediately,
+      per the memory-commitment rule (which governs tool selection).
 2. Destructive operation patterns (rm -rf, drop table, force push, etc.)
    -> Inject "verify before acting" reminder per Claudia's safety-first principle.
 
@@ -45,6 +45,22 @@ DESTRUCTIVE_PATTERNS = [
     r"\bDELETE\s+FROM\b",  # SQL all-caps signals intent
 ]
 
+# Human-readable labels for each destructive pattern. Keep keys in lockstep
+# with DESTRUCTIVE_PATTERNS so the model never sees raw regex syntax.
+PATTERN_LABELS = {
+    r"\brm\s+-rf\b": "rm -rf (recursive delete)",
+    r"\bdrop\s+(table|database|schema)\b": "DROP TABLE/DATABASE/SCHEMA",
+    r"\bgit\s+push\s+(?:-+f\b|--force\b)": "git push --force",
+    r"\bgit\s+reset\s+--hard\b": "git reset --hard",
+    r"\btruncate\s+table\b": "TRUNCATE TABLE",
+    r"\bDELETE\s+FROM\b": "DELETE FROM (SQL)",
+}
+
+# Fail-fast at import time if a pattern is missing a label (or vice versa).
+assert set(DESTRUCTIVE_PATTERNS) == set(PATTERN_LABELS), (
+    "Every DESTRUCTIVE_PATTERN must have a matching PATTERN_LABELS entry"
+)
+
 
 def detect(text: str, patterns: list) -> list:
     """Return list of pattern strings that matched in the text."""
@@ -76,18 +92,20 @@ def main():
     if commitment_hits:
         sections.append(
             "**Canonical-fact trigger detected.** Per the memory-commitment rule, "
-            "save the relevant fact to memory IMMEDIATELY using memory_remember "
-            "(single fact) or memory_batch (multiple facts + entities + relationships "
-            "from one source). Do not batch to /meditate. After saving, continue the "
-            "conversation normally and surface the memory ID briefly so the user knows "
-            "the fact is recoverable in future sessions."
+            "save the canonical fact to memory immediately. Do not batch to "
+            "/meditate. After saving, continue the conversation normally and "
+            "briefly surface that the fact has been recorded so the user knows "
+            "it is recoverable in future sessions."
         )
 
     if destructive_hits:
-        # Show up to three matched patterns for context, in their literal regex form.
-        patterns_list = ", ".join(f"`{p}`" for p in destructive_hits[:3])
+        # Show up to three matched patterns for context, using human-readable
+        # labels so raw regex syntax never reaches the model.
+        labels_list = ", ".join(
+            f"`{PATTERN_LABELS[p]}`" for p in destructive_hits[:3]
+        )
         sections.append(
-            f"**Destructive operation pattern detected** ({patterns_list}). "
+            f"**Destructive operation pattern detected** ({labels_list}). "
             "Per the safety-first principle, verify with the user before executing: "
             "show what will happen (recipients, content, irreversible effects), ask "
             "for explicit confirmation, then proceed only on a clear yes. Silence or "
