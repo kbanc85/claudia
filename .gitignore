@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Git worktrees (managed by git worktree, not tracked content)
+.claude/worktrees/
+
 # OS files
 .DS_Store
 Thumbs.db
