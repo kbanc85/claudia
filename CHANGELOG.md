@@ -2,6 +2,26 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.60.0 (2026-05-15)
+
+### Internal refactor: installer modularization
+
+`bin/index.js` (2,293 lines, 28 top-level functions plus the `ProgressRenderer` class) is split into focused ES modules. The CLI entry point shrinks to a 14-line shim that imports `main()` from `bin/installer.js`.
+
+### Changed
+- `bin/index.js` is now a thin CLI shim. The orchestrator lives in `bin/installer.js`. Ten new modules host the domain logic (Ollama lifecycle, Python detection, MCP config, template copy, progress rendering, etc.).
+
+### Documentation
+- New `bin/README.md` maps the install pipeline top to bottom and lists every module's responsibility. Designed as a contributor's first read for `bin/`.
+
+### Verification
+- Strict before/after parity. A fresh install with `--skip-memory --yes` was captured pre-split and post-split. The resulting 95-file tree and 94 content hashes are byte-identical. Settings file is excluded from the hash set because it contains per-run randomness.
+- All 25 Node tests pass.
+
+No user-visible behavior change. No CLI flag change. No MCP tool change. No database schema change.
+
+---
+
 ## 1.58.0 (2026-05-13)
 
 ### The Memory Reliability Release
