@@ -1,6 +1,6 @@
 ---
 name: vault-awareness
-description: Teaches Claudia about the Obsidian vault projection of her memory, how to reference it, trigger syncs, and handle user edits.
+description: Reference for the Obsidian vault at ~/.claudia/vault/. The vault is a read projection of Claudia's memory. New installs default to the wiki layout (synthesized topic pages, see the `wiki` skill). Existing installs may still use the PARA layout (Active/, Relationships/, Reference/, Archive/, Claudia's Desk/) and that is preserved. This skill covers vault paths, when to read from vault vs. query memory directly, and how to trigger sync.
 user-invocable: false
 effort-level: low
 ---
@@ -8,6 +8,23 @@ effort-level: low
 # Vault Awareness Skill
 
 **Triggers:** User mentions Obsidian, vault, graph view, browsing memories, or asks about vault sync status.
+
+---
+
+## Wiki vs PARA: which layout is in use
+
+Claudia ships two vault layouts. Both write to `~/.claudia/vault/`:
+
+| Layout | What gets written | When it's the default |
+|--------|-------------------|-----------------------|
+| **Wiki** (new default) | Synthesized topic pages by Claudia, citing source memories, with contradiction flagging. See the `wiki` skill. | All installs from v1.60.0 onward, unless the vault already has PARA folders |
+| **PARA** (legacy) | Mechanical dump of entity rows into `Active/`, `Relationships/`, `Reference/`, `Archive/`, `Claudia's Desk/` | Installs from v1.42 to v1.59 that started syncing before the wiki shipped |
+
+**Detection rule.** If `~/.claudia/vault/Wiki/` exists, wiki mode is active. If `~/.claudia/vault/Active/` or `Relationships/` exists without `Wiki/`, the user is on PARA. If both exist, the user is mid-migration; treat both as readable, but write only to `Wiki/`.
+
+**Migration is not automatic.** Existing PARA vaults are preserved untouched. The `claudia-memory --migrate-to-wiki` CLI flag (when it ships in a future release) will copy PARA aside and rebuild wiki pages from raw memories. Until then, PARA users stay on PARA; new users get wiki.
+
+For wiki specifics (page structure, when to write, citations, contradiction flagging), see the `wiki` skill. The rest of this file documents the older PARA layout, kept here for backward compatibility.
 
 ---
 
