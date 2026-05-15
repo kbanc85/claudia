@@ -2,6 +2,33 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.60.0 (2026-05-15)
+
+### Wiki layer (new default vault projection)
+
+Inspired by Andrej Karpathy's [llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern, adapted to Claudia's working-set discipline. The wiki is the third tier of Claudia's memory: raw memories live in the database, derived signals (entities, reflections, patterns) live in the daemon, and **synthesized topic pages** now live in the user's vault at `~/.claudia/vault/Wiki/`. Each page is written by Claudia from raw memories, cites every load-bearing claim with `[mem:NNN]`, flags contradictions at the top, and grows incrementally with use.
+
+### Added
+- **`wiki` skill** at `template-v2/.claude/skills/wiki/SKILL.md` with two reference docs (page template, citations/contradictions discipline). The skill defines when to write pages, the page structure, the citation format, and the read workflow (consult the wiki page first, fall back to memory query if stale).
+
+### Changed
+- **Vault default for new installs is now wiki, not PARA.** New installs write synthesized pages at `~/.claudia/vault/Wiki/` instead of mechanical entity dumps.
+- **`vault-awareness` skill** updated with a "Wiki vs PARA" section at the top and a detection rule, with a pointer to the new wiki skill for specifics.
+
+### Compatibility
+- **Existing PARA vaults are preserved untouched.** Users with vaults from v1.42 to v1.59 keep their existing structure. Detection rule: if `~/.claudia/vault/Active/` or `Relationships/` exists without `Wiki/`, treat as PARA. The mechanical dump continues to function for them.
+- **A future `claudia-memory --migrate-to-wiki` CLI** will copy PARA aside and rebuild wiki pages from raw memories. Not in this release; PARA users stay on PARA until they explicitly migrate.
+
+### Not yet in this release
+- Automatic wiki-refresh queue (mark entities as "dirty" on ingest, batch refresh later). Today, wiki writes are explicit, driven by the skill.
+- Daemon-side MCP tools for wiki page metadata (`memory_wiki_get`, `memory_wiki_save`, `memory_wiki_dirty`). Today the wiki skill uses Read/Write directly.
+
+These are planned for a follow-up release once the wiki format proves itself in real use.
+
+No CLI surface change, no MCP tool removal, no database schema change.
+
+---
+
 ## 1.59.1 (2026-05-15)
 
 ### Docs uplift
