@@ -2,6 +2,21 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.59.0 (2026-05-15)
+
+### Removed
+- `claudia_memory.services.verify.VerifyService` and `run_verification`. No production callers since v1.35; only the dedicated test referenced it.
+- `claudia_memory.services.metrics.MetricsService` and `get_metrics_service`. Never wired into the scheduler, MCP server, or any service; only the dedicated test referenced it.
+- Orphan test files `tests/test_verify.py` (7 tests) and `tests/test_metrics.py` (12 tests).
+
+### Documentation
+- Added "Verifying dead code" section to `CONTRIBUTING.md` documenting the audit method used in this release.
+- Refactor design plan: `docs/plans/2026-05-15-craft-refactor-design.md` (shipped in PR #58).
+
+No user-visible behavior change. No CLI flag change. No MCP tool change. No database schema change.
+
+---
+
 ## 1.58.0 (2026-05-13)
 
 ### The Memory Reliability Release
