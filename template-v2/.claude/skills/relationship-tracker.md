@@ -1,6 +1,6 @@
 ---
 name: relationship-tracker
-description: Surface relevant context when people are mentioned in conversation, and track relationship health over time.
+description: Surface relevant context when people are mentioned in conversation, and track relationship health over time. See also: `new-person` to create a file for someone important; `map-connections` to extract relationships across files.
 user-invocable: false
 invocation: proactive
 effort-level: high

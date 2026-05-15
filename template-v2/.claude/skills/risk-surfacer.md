@@ -1,6 +1,6 @@
 ---
 name: risk-surfacer
-description: Proactively identify and surface potential problems before they become crises.
+description: Proactively identify and surface potential problems before they become crises. See also: `what-am-i-missing` for a user-invoked, full-sweep version.
 user-invocable: false
 invocation: proactive
 effort-level: high

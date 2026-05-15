@@ -1,6 +1,6 @@
 ---
 name: hire-agent
-description: Suggests new agents based on repeated task patterns.
+description: Suggests new agents based on repeated task patterns. See also: `capability-suggester` for skill or command-level additions; `agent-dispatcher` for routing logic.
 user-invocable: false
 invocation: proactive
 effort-level: high

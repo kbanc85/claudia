@@ -248,6 +248,54 @@ Include:
 - **Output Format** - Expected output structure
 - **Judgment Points** - Where to ask for confirmation
 
+## Writing a good skill description
+
+The `description:` field in a skill's frontmatter is what Claude Code uses to decide when to trigger the skill. A vague description fires inconsistently; a tight description fires reliably. Three patterns from the existing catalog earn their keep:
+
+**Verb + object + outcome + trigger phrases.** Lead with what the skill does, then list the exact phrases users say. From `capture-meeting`:
+
+> Process meeting notes or transcript to extract decisions, commitments, and insights. Use when user shares transcript or says "capture this meeting", "here are my notes from the call".
+
+**Quantify the work.** Numerical bounds disambiguate the skill from neighbors. From `deep-context`:
+
+> Full-context deep analysis for meeting prep, relationship analysis, or strategic planning. Pulls up to 180 memories across multiple dimensions for comprehensive synthesis.
+
+**State the proactive trigger threshold.** For proactive skills, name the count that fires them. From `pattern-recognizer`:
+
+> Activates when the same topic, frustration, or behavior appears across 3+ interactions.
+
+Avoid descriptions that read as aspirational ("helps you think strategically"), circular ("manages memory operations"), or multi-purpose without a clear trigger.
+
+## The "see also" convention
+
+When two skills could plausibly fire on the same situation, both should point at each other in their descriptions so a user who picked the less-canonical name finds the alternative. Pattern: append a final line to the `description:` field of the form:
+
+> See also: `<skill-name>` for <what differs>.
+
+Common overlap clusters in the current catalog:
+
+- **Outbound messages**: `draft-reply` (general) ↔ `follow-up-draft` (post-meeting)
+- **Memory**: `memory-audit` (content) ↔ `memory-health` (system) ↔ `diagnose` (connectivity)
+- **Visualization**: `brain` (3D web) ↔ `brain-monitor` (terminal)
+- **Reflective cadences**: `morning-brief` (daily) → `weekly-review` (weekly) → `growth-check` (monthly+) → `meditate` (per session)
+- **Meeting lifecycle**: `meeting-prep` (before) → `capture-meeting` (during/after notes) → `follow-up-draft` (after, outbound)
+- **Inbound processing**: `ingest-sources` (multi-doc) ↔ `file-document` (single) ↔ `capture-meeting` (meeting only) ↔ `summarize-doc` (no filing)
+
+## Disambiguation notes
+
+- `connector-discovery` is about connecting external services (Gmail, Calendar, Slack). It is not about people or human connections. For people, see `relationship-tracker`, `new-person`, and `map-connections`.
+- `pattern-recognizer` notices what's recurring. `judgment-awareness` applies the user's decision rules to a recurring situation. `capability-suggester` proposes a new command when the same task is repeated by hand. Three skills, three different stages of "we keep doing this."
+
+## Proactive vs contextual: when to make a skill auto-fire
+
+A skill with `invocation: proactive` runs without the user asking. This is powerful but expensive: every proactive skill loaded into context is a tax on every conversation. Use proactive only when:
+
+1. The trigger condition is **specific enough that false positives are rare** (e.g., commitment-detector watches for explicit promise phrasing, not vague intentions).
+2. The action is **observational**, not mutative (surface a pattern, not send an email).
+3. The output is **brief**, ideally one line, deferring detail to a follow-up question.
+
+Contextual skills (no `invocation` set, or `invocation: contextual`) are cheaper. They wait for the user to invoke them by name or phrase. Default to contextual; promote to proactive only after observing repeated manual invocations of the same skill.
+
 ## Archetype Templates
 
 The `archetypes/` folder contains structure and command templates for each user type:

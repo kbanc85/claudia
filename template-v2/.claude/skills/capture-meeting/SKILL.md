@@ -1,6 +1,6 @@
 ---
 name: capture-meeting
-description: Process meeting notes or transcript to extract decisions, commitments, and insights. Use when user shares transcript or says "capture this meeting", "here are my notes from the call".
+description: Process meeting notes or transcript to extract decisions, commitments, and insights. Use when user shares transcript or says "capture this meeting", "here are my notes from the call". See also: `meeting-prep` for pre-call briefings; `follow-up-draft` for post-meeting emails.
 effort-level: medium
 ---
 

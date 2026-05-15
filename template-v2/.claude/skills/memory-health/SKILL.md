@@ -1,6 +1,6 @@
 ---
 name: memory-health
-description: Check memory system health and data quality. Use when user asks "how's my memory?", "system health", "memory stats", "data quality", "how's my brain?", or for periodic self-diagnostics.
+description: Check memory system health and data quality. Use when user asks "how's my memory?", "system health", "memory stats", "data quality", "how's my brain?", or for periodic self-diagnostics. See also: `memory-audit` for content-level provenance; `diagnose` for daemon connectivity issues.
 effort-level: medium
 ---
 
