@@ -65,6 +65,82 @@ claude
 - Test with `curl http://localhost:3848/health`
 - Check logs: `tail -f ~/.claudia/daemon-stderr.log`
 
+## Your first PR: a walkthrough
+
+If you've never contributed before, this is the path the maintainers walk. It should take 30 to 60 minutes for a small change.
+
+### 1. Pick a starter issue
+
+Browse the [issues list](https://github.com/kbanc85/claudia/issues) and look for the `good first issue` or `help wanted` labels. If nothing jumps out, the safest first contributions are:
+
+- A typo or wording fix in `template-v2/CLAUDE.md`, a skill file, or `README.md`.
+- A clearer description on a skill that's currently vague (see the audit in `template-v2/.claude/skills/README.md` for examples of good descriptions).
+- A new test case for a recurring bug class (see `memory-daemon/tests/test_regression_classes.py` for the pattern).
+
+### 2. Fork and clone
+
+```bash
+gh repo fork kbanc85/claudia --clone
+cd claudia
+```
+
+### 3. Branch
+
+Name the branch after the change, conventional-commits-style:
+
+```bash
+git checkout -b fix/typo-in-onboarding
+# or
+git checkout -b feat/morning-brief-shows-pinned-projects
+```
+
+### 4. Make the change
+
+Match the existing style of whichever file you're editing. The hardest part of a small PR is *not* doing more than the issue asks. Resist the urge to also refactor adjacent code.
+
+### 5. Verify locally
+
+Run whatever test surface your change touches:
+
+```bash
+# For installer changes (bin/)
+npm test
+
+# For memory daemon changes (memory-daemon/)
+cd memory-daemon && ./test.sh
+```
+
+For a template-only change (markdown skill files, rules, hooks), there's no automated test surface. Verify by installing locally:
+
+```bash
+node bin/index.js ../scratch --skip-memory --yes
+cd ../scratch && claude
+# exercise the affected skill or behavior
+```
+
+### 6. Commit
+
+One commit per concern. Conventional Commits format:
+
+```bash
+git commit -m "docs: clarify onboarding trigger for context/me.md"
+```
+
+### 7. Open the PR
+
+```bash
+gh pr create --base main
+```
+
+A reviewer (often within a day or two) will reply. They're usually looking for:
+
+- Does the change match the issue's intent?
+- Does it follow project conventions (no em dashes, ESM imports, file naming)?
+- Are existing tests still passing?
+- For shipped-surface changes: does `CHANGELOG.md` have a new entry, and does the package version need a bump?
+
+That's the whole loop. The bar is not "perfect"; the bar is "fits the codebase and doesn't break what works."
+
 ## Code Style
 
 ### General Principles
