@@ -105,6 +105,16 @@ Scope examples: `installer`, `memory`, `skills`, `commands`, `template`
 - **Update README if needed**: New features should be documented
 - **Respond to feedback**: We may ask questions or request changes
 
+## Verifying dead code
+
+If you suspect code is unused, this is the method this project uses to confirm before proposing deletion:
+
+1. **Search the shipped tree for callers.** Grep for the symbol across `memory-daemon/claudia_memory/`, `bin/`, `template-v2/`, and the top-level docs. Exclude the file that defines the symbol.
+2. **Distinguish test-only references.** Run the same grep restricted to `memory-daemon/tests/`. If the only callers are in `test_<name>.py` for the same `<name>.py`, that is a strong signal of dead code.
+3. **Confirm with package import sanity.** Delete the candidate file in a worktree, then run `python -m compileall -q memory-daemon/claudia_memory/`. Any `SyntaxError` or `ImportError` means the code was wired in somewhere the grep missed.
+4. **Run the full test suite.** `cd memory-daemon && ./test.sh` for Python; `npm test` for the installer. Pass count drops only by the number of tests in deleted files.
+5. **Document the audit in the PR.** Include the grep commands you ran and their output so the reviewer can replicate.
+
 ## Architecture Overview
 
 ```
