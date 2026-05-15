@@ -4,28 +4,48 @@ All notable changes to Claudia will be documented in this file.
 
 ## 1.60.0 (2026-05-15)
 
+### Three new skills inspired by Karpathy's recent work, adapted to Claudia's principles
+
+This release adds the wiki layer (new default vault projection, inspired by Karpathy's [llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)), the auto-research skill (workspace-scoped iteration loop, inspired by Karpathy's [autoresearch](https://github.com/karpathy/autoresearch)), and the skill router (discovery and disambiguation meta-skill for the catalog).
+
 ### Wiki layer (new default vault projection)
 
-Inspired by Andrej Karpathy's [llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern, adapted to Claudia's working-set discipline. The wiki is the third tier of Claudia's memory: raw memories live in the database, derived signals (entities, reflections, patterns) live in the daemon, and **synthesized topic pages** now live in the user's vault at `~/.claudia/vault/Wiki/`. Each page is written by Claudia from raw memories, cites every load-bearing claim with `[mem:NNN]`, flags contradictions at the top, and grows incrementally with use.
+The wiki is the third tier of Claudia's memory: raw memories live in the database, derived signals (entities, reflections, patterns) live in the daemon, and **synthesized topic pages** now live in the user's vault at `~/.claudia/vault/Wiki/`. Each page is written by Claudia from raw memories, cites every load-bearing claim with `[mem:NNN]`, flags contradictions at the top, and grows incrementally with use.
 
-### Added
-- **`wiki` skill** at `template-v2/.claude/skills/wiki/SKILL.md` with two reference docs (page template, citations/contradictions discipline). The skill defines when to write pages, the page structure, the citation format, and the read workflow (consult the wiki page first, fall back to memory query if stale).
+- New `wiki` skill at `template-v2/.claude/skills/wiki/SKILL.md` with two reference docs (page template, citations/contradictions discipline). The skill defines when to write pages, the page structure, the citation format, and the read workflow (consult the wiki page first, fall back to memory query if stale).
+- Vault default for new installs is now wiki, not PARA. New installs write synthesized pages at `~/.claudia/vault/Wiki/` instead of mechanical entity dumps.
+- `vault-awareness` skill updated with a "Wiki vs PARA" section at the top and a detection rule, with a pointer to the new wiki skill for specifics.
 
-### Changed
-- **Vault default for new installs is now wiki, not PARA.** New installs write synthesized pages at `~/.claudia/vault/Wiki/` instead of mechanical entity dumps.
-- **`vault-awareness` skill** updated with a "Wiki vs PARA" section at the top and a detection rule, with a pointer to the new wiki skill for specifics.
+**Compatibility:** Existing PARA vaults are preserved untouched. Users with vaults from v1.42 to v1.59 keep their existing structure. Detection rule: if `~/.claudia/vault/Active/` or `Relationships/` exists without `Wiki/`, treat as PARA. The mechanical dump continues to function for them. A future `claudia-memory --migrate-to-wiki` CLI will copy PARA aside and rebuild wiki pages from raw memories. Not in this release; PARA users stay on PARA until they explicitly migrate.
 
-### Compatibility
-- **Existing PARA vaults are preserved untouched.** Users with vaults from v1.42 to v1.59 keep their existing structure. Detection rule: if `~/.claudia/vault/Active/` or `Relationships/` exists without `Wiki/`, treat as PARA. The mechanical dump continues to function for them.
-- **A future `claudia-memory --migrate-to-wiki` CLI** will copy PARA aside and rebuild wiki pages from raw memories. Not in this release; PARA users stay on PARA until they explicitly migrate.
+### Auto-research skill (workspace-scoped iteration loop)
+
+Workspace-scoped hill-climbing loop for iterating on local artifacts. Adapted to Claudia's safety principles (workspace-only edits, no external actions during the loop, bounded budget, baseline-score gate, per-iteration revertability).
+
+- New `auto-research` skill at `template-v2/.claude/skills/auto-research/SKILL.md` with two reference docs: `references/program-template.md` for the governance file each run uses, and `references/safety-rules.md` documenting the 8 mandatory safety rules.
+- Workspace at `~/.claudia/auto-research/<task-id>/`. Each run gets its own directory with a fresh git repo, an immutable copy of the original artifact, a working copy that gets edited, a `results.tsv` history, and per-iteration snapshots.
+- Loop: read state, propose one specific change, implement, score against rubric, ratchet if better OR revert if worse, report to user as one line per iteration.
+- Default budget: 20 iterations. Plateau detection: stops early if 5 consecutive iterations show no improvement.
+- The user's original file is **never** modified during the loop. Hand-off at the end requires explicit user confirmation of destination.
+- Refuse-to-start conditions are explicit: external-action artifacts, sensitive content, no clear evaluator, already-good baseline, or cases where bold structural change is the actual need (not iteration).
+- Karpathy named the conservatism ceiling himself: RLHF-trained iteration is "cagy and scared." Iterations tend toward safe edits, not bold reframing. The skill surfaces this honestly when the loop plateaus, so the user knows when to stop iterating and start a fresh draft instead.
+
+### Skill router (discovery + disambiguation)
+
+A meta-skill that helps both users and Claudia navigate the ~42-skill catalog. Addresses two long-standing problems: users not knowing what's available, and Claudia firing the wrong skill when a request straddles two.
+
+- New `skill-router` skill at `template-v2/.claude/skills/skill-router/SKILL.md` with `references/overlap-clusters.md` documenting all 10 known overlap clusters with canonical picks and disambiguation patterns.
+- **Discovery surface.** `/skills` returns a categorized list (daily flow, reviews, pipeline, knowledge, drafting, setup). `/skills <topic>` filters by keyword.
+- **Disambiguation surface.** When a request matches 2+ skills, Claudia names the candidates briefly and proceeds with the canonical one. Pattern: "Sounds like X or Y. I'll do X. Say so if you wanted Y."
 
 ### Not yet in this release
-- Automatic wiki-refresh queue (mark entities as "dirty" on ingest, batch refresh later). Today, wiki writes are explicit, driven by the skill.
-- Daemon-side MCP tools for wiki page metadata (`memory_wiki_get`, `memory_wiki_save`, `memory_wiki_dirty`). Today the wiki skill uses Read/Write directly.
+- Automatic wiki-refresh queue (mark entities as "dirty" on ingest, batch refresh later).
+- Daemon-side MCP tools for wiki page metadata.
+- Shell-command evaluators for auto-research (today: rubric-based scoring only).
+- Token-spend and wall-clock budgets for auto-research (today: iteration count only).
+- Telemetry for skill router.
 
-These are planned for a follow-up release once the wiki format proves itself in real use.
-
-No CLI surface change, no MCP tool removal, no database schema change.
+No CLI surface change, no MCP tool change, no database schema change. Existing skill names and trigger phrases unchanged. Existing PARA vaults preserved.
 
 ---
 
