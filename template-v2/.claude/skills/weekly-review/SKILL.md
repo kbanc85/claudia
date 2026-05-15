@@ -1,6 +1,6 @@
 ---
 name: weekly-review
-description: Guided weekly reflection across all relationships, commitments, and projects with pattern analysis. Use at end of week, or when user says "weekly review", "end of week", "reflect on this week", "weekly check-in", or "how did my week go".
+description: Guided weekly reflection across all relationships, commitments, and projects with pattern analysis. Use at end of week, or when user says "weekly review", "end of week", "reflect on this week", "weekly check-in", or "how did my week go". See also: `morning-brief` (daily), `growth-check` (zoom out), `meditate` (session reflection).
 effort-level: high
 ---
 

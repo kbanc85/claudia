@@ -2,6 +2,22 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.61.0 (2026-05-15)
+
+### Skill catalog: "see also" overlap markers + contributor guide
+
+No skills renamed, removed, or behavior-changed. Pure documentation and metadata work.
+
+### Documentation
+- Augmented `template-v2/.claude/skills/README.md` with four new sections: "Writing a good skill description", "The see also convention", "Disambiguation notes", and "Proactive vs contextual: when to make a skill auto-fire". Each section grounds itself in existing-catalog examples rather than abstract guidelines.
+
+### Changed
+- 27 skill descriptions get a final "See also: ..." line pointing at adjacent skills. Affected clusters: outbound message composition, memory introspection, memory visualization, reflective cadences, meeting lifecycle, risks and blind spots, people and relationships, patterns and judgment, inbound document processing.
+
+No user-visible behavior change. Skill names, trigger phrases, and behaviors are identical to v1.58.0. The added "See also" content extends descriptions to nudge skill triggering toward the more canonical name when an ambiguous request arrives.
+
+---
+
 ## 1.58.0 (2026-05-13)
 
 ### The Memory Reliability Release

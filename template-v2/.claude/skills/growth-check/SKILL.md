@@ -1,6 +1,6 @@
 ---
 name: growth-check
-description: Periodic reflection on development, skills, learning, and progress toward goals. Triggers on "am I growing?", "development check", "personal growth review".
+description: Periodic reflection on development, skills, learning, and progress toward goals. Triggers on "am I growing?", "development check", "personal growth review". See also: `weekly-review` for tactical week recap; `meditate` for session-level reflection.
 effort-level: low
 ---
 

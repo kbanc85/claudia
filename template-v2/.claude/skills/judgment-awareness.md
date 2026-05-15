@@ -1,6 +1,6 @@
 ---
 name: judgment-awareness
-description: Load and apply user-defined judgment rules from context/judgment.yaml to inform priority conflicts, escalation decisions, surfacing, and delegation.
+description: Load and apply user-defined judgment rules from context/judgment.yaml to inform priority conflicts, escalation decisions, surfacing, and delegation. See also: `pattern-recognizer` for theme detection; `meditate` updates judgment rules at session end.
 user-invocable: false
 invocation: proactive
 effort-level: low

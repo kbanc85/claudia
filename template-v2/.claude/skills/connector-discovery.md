@@ -1,6 +1,6 @@
 ---
 name: connector-discovery
-description: Help users connect their external tools in a gentle, non-technical way. Recommend solutions based on what works best, explain everything in plain language.
+description: Help users connect their external tools in a gentle, non-technical way. Recommend solutions based on what works best, explain everything in plain language. Note: this is about external service connectors (Gmail, Calendar), not human connections. See `relationship-tracker` and `map-connections` for person and relationship features.
 effort-level: high
 ---
 

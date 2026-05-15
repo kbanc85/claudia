@@ -1,6 +1,6 @@
 ---
 name: inbox-check
-description: Lightweight inbox triage across all configured email accounts. Dispatches fast subagent to fetch, then reviews with judgment. Use when user says "check my inbox", "any new emails?", "check email".
+description: Lightweight inbox triage across all configured email accounts. Dispatches fast subagent to fetch, then reviews with judgment. Use when user says "check my inbox", "any new emails?", "check email". See also: `draft-reply` once you pick an email to respond to.
 effort-level: low
 ---
 

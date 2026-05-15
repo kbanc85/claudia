@@ -1,6 +1,6 @@
 ---
 name: map-connections
-description: Scan context files to extract entities and relationships into the memory system. Triggers on "who knows who?", "network graph", "map my connections", "extract relationships".
+description: Scan context files to extract entities and relationships into the memory system. Triggers on "who knows who?", "network graph", "map my connections", "extract relationships". See also: `brain` for graph visualization once relationships are extracted.
 argument-hint: "[--incremental] [file-path]"
 effort-level: high
 ---

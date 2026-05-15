@@ -1,6 +1,6 @@
 ---
 name: ingest-sources
-description: Process multiple source documents with Extract-Then-Aggregate discipline. Use when user shares multiple transcripts, emails, or documents for batch processing.
+description: Process multiple source documents with Extract-Then-Aggregate discipline. Use when user shares multiple transcripts, emails, or documents for batch processing. See also: `capture-meeting` for a single meeting transcript; `file-document` for a single document; `summarize-doc` when you only need a summary.
 argument-hint: [folder-path]
 effort-level: max
 ---

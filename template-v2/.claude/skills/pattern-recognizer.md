@@ -1,6 +1,6 @@
 ---
 name: pattern-recognizer
-description: Notice trends, recurring themes, and patterns across conversations and surface them when relevant. Activates when the same topic, frustration, or behavior appears across 3+ interactions. Use for "I've noticed you keep...", "this is the third time...", recurring scheduling issues, or avoidance patterns.
+description: Notice trends, recurring themes, and patterns across conversations and surface them when relevant. Activates when the same topic, frustration, or behavior appears across 3+ interactions. Use for "I've noticed you keep...", "this is the third time...", recurring scheduling issues, or avoidance patterns. See also: `judgment-awareness` for applying user-set decision rules; `capability-suggester` for converting patterns into new commands.
 user-invocable: false
 invocation: proactive
 effort-level: high

@@ -1,6 +1,6 @@
 ---
 name: meeting-prep
-description: One-page briefing before a call or meeting with person context, open items, and talking points. Use when user says "prep me for my call with [person]", "meeting prep", "brief me before my meeting", "get ready for my call", or mentions an upcoming meeting where context would help.
+description: One-page briefing before a call or meeting with person context, open items, and talking points. Use when user says "prep me for my call with [person]", "meeting prep", "brief me before my meeting", "get ready for my call", or mentions an upcoming meeting where context would help. See also: `capture-meeting` for processing notes after the call; `follow-up-draft` for thank-yous.
 argument-hint: [person or meeting name]
 effort-level: medium
 ---

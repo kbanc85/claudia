@@ -1,6 +1,6 @@
 ---
 name: memory-audit
-description: Show everything Claudia knows with provenance tracing and entity counts. Triggers on "what do you know?", "show memories", "memory audit", "what do you remember about".
+description: Show everything Claudia knows with provenance tracing and entity counts. Triggers on "what do you know?", "show memories", "memory audit", "what do you remember about". See also: `memory-health` for system-level stats and data quality; `diagnose` for connectivity troubleshooting.
 argument-hint: "[entity name]"
 effort-level: medium
 ---

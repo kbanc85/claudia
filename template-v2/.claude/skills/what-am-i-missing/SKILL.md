@@ -1,6 +1,6 @@
 ---
 name: what-am-i-missing
-description: Surface risks, blind spots, overlooked items, and accountability across commitments and relationships. Triggers on "what am I overlooking?", "blind spots", "what's falling through the cracks", "what do I owe?", "am I overdue?", "check my commitments".
+description: Surface risks, blind spots, overlooked items, and accountability across commitments and relationships. Triggers on "what am I overlooking?", "blind spots", "what's falling through the cracks", "what do I owe?", "am I overdue?", "check my commitments". See also: `risk-surfacer` for the proactive auto-firing version on overdue items and cooling relationships.
 argument-hint: "[person name or 'overdue']"
 effort-level: high
 ---

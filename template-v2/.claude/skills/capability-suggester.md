@@ -1,6 +1,6 @@
 ---
 name: capability-suggester
-description: Notice repeated user behaviors and suggest new commands, workflows, structure, or integrations to streamline work. Also detects when the user's setup has outgrown its current structure and suggests targeted upgrades. Activates when repeated task patterns, workflow friction, structural gaps, or business growth signals are detected.
+description: Notice repeated user behaviors and suggest new commands, workflows, structure, or integrations to streamline work. Also detects when the user's setup has outgrown its current structure and suggests targeted upgrades. Activates when repeated task patterns, workflow friction, structural gaps, or business growth signals are detected. See also: `pattern-recognizer` for theme detection upstream; `hire-agent` for adding specialized subagents.
 user-invocable: false
 invocation: proactive
 effort-level: high
