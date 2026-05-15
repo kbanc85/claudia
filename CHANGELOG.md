@@ -2,6 +2,20 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.59.1 (2026-05-15)
+
+### Docs uplift
+
+Pure documentation. No code change.
+
+### Documentation
+- Added subpackage READMEs under `memory-daemon/claudia_memory/`: `services/`, `daemon/`, `extraction/`, `mcp/`. Each names the public entry points, lists the most relevant files, and captures the conventions a contributor needs to know before editing.
+- Expanded `CONTRIBUTING.md` with a "Your first PR" walkthrough covering the seven-step path from picking a starter issue to opening the PR.
+
+No user-visible behavior change.
+
+---
+
 ## 1.59.0 (2026-05-15)
 
 ### Removed
