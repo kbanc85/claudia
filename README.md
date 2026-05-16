@@ -79,6 +79,20 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 <p>End a session with <code>/meditate</code> and she extracts what she learned: your preferences, patterns, and judgment calls. Next session, she's sharper.</p>
 </td>
 </tr>
+<tr>
+<td width="33%" align="center">
+<h3>📚 Writes Her Own Wiki</h3>
+<p>Every active person, project, and organization gets a synthesized page in your Obsidian vault. Each fact cites its source memory. Contradictions get flagged at the top. <em>New in v1.60</em>.</p>
+</td>
+<td width="33%" align="center">
+<h3>🔁 Iterates Until It's Right</h3>
+<p>Ask her to <code>/auto-research</code> a draft and she runs a bounded loop against a rubric you name. Keeps the iterations she likes, reverts the ones she doesn't. Your original file never moves until you say so. <em>New in v1.60</em>.</p>
+</td>
+<td width="33%" align="center">
+<h3>🧭 Routes the Right Skill</h3>
+<p>Type <code>/skills</code> to see what's available. Ambiguous request? She names the options and proceeds with the canonical one, so you never get the wrong tool by accident. <em>New in v1.60</em>.</p>
+</td>
+</tr>
 </table>
 
 ---
@@ -103,7 +117,7 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 </td>
 <td width="50%" align="center">
 <h3>📓 Vault</h3>
-<p>Memory syncs to an Obsidian vault organized with PARA: Active projects, Relationships, Reference material, Archive. Graph view shows how your world connects. Plain markdown you own forever.</p>
+<p>Memory projects to an Obsidian vault. New installs default to the <strong>wiki layout</strong>: synthesized topic pages per active entity, each fact citing its source memory, contradictions flagged at the top. Existing PARA users keep their layout untouched. Plain markdown you own forever.</p>
 </td>
 </tr>
 </table>
@@ -264,9 +278,12 @@ Claudia detects your work style and generates structure that fits:
 | `/meditate` | End-of-session reflection: extracts learnings, judgment, patterns |
 | `/deep-context [topic]` | Full-context deep analysis |
 | `/memory-audit` | See everything Claudia knows, with source chains |
+| `/wiki` | Write or update a synthesized topic page in your vault |
+| `/auto-research` | Iterate a draft against a rubric until it scores well |
+| `/skills` | Discover all available skills, grouped by purpose |
 
 <details>
-<summary><strong>All commands (41 skills)</strong></summary>
+<summary><strong>All commands (45 skills)</strong></summary>
 
 | Command | What It Does |
 |---------|--------------|
@@ -322,17 +339,19 @@ This generates a one-click URL to enable all required Google APIs and walks you 
 
 ### Obsidian Vault
 
-Memory auto-syncs to an Obsidian vault at `~/.claudia/vault/` using PARA structure. Every entity becomes a markdown note with `[[wikilinks]]`, so Obsidian's graph view maps your network. SQLite is the source of truth; the vault is a read-only projection you can browse and search.
+Memory projects to an Obsidian vault at `~/.claudia/vault/`. New installs default to the **wiki layout**: synthesized topic pages at `~/.claudia/vault/Wiki/`, one per active person, project, or organization. Each page is written by Claudia from your raw memories, cites every load-bearing claim with `[mem:NNN]`, and flags contradictions at the top. Obsidian's graph view connects them via `[[wikilinks]]`.
+
+Existing installs from v1.59 and earlier keep their PARA-organized vault (`Active/`, `Relationships/`, `Reference/`, `Archive/`) untouched. SQLite remains the source of truth; the vault is a projection you can browse, search, and read.
 
 ---
 
 ## How It Works
 
-**41 skills · 33 MCP tools · 500+ tests**
+**45 skills · 33 MCP tools · 500+ tests**
 
 Claudia has two layers:
 
-**Template layer** (markdown) defines who she is. 41 skills, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`). Workspace templates let you spin up new projects with `/new-workspace [name]`.
+**Template layer** (markdown) defines who she is. 45 skills, rules, and identity files that Claude reads on startup. Skills range from proactive behaviors (commitment detection, pattern recognition, judgment awareness) to user-invocable workflows (`/morning-brief`, `/research`, `/meditate`, `/wiki`, `/auto-research`). Workspace templates let you spin up new projects with `/new-workspace [name]`. A built-in `skill-router` skill helps you discover what's available and disambiguates when a request straddles two skills.
 
 **Memory system** (Python) defines what she remembers. Two daemon modes share the same SQLite database:
 
@@ -393,7 +412,7 @@ For full architecture diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 - **Fully local.** Memory, embeddings, cognitive tools run on your machine. No external APIs for storage.
 - **No external actions without approval.** Every email, calendar event, external action requires your explicit "yes."
-- **Your data in two formats.** SQLite database (`~/.claudia/memory/`) for fast semantic search, plus a PARA-organized Obsidian vault for reading and graph navigation. Two independent copies you own forever.
+- **Your data in two formats.** SQLite database (`~/.claudia/memory/`) for fast semantic search, plus an Obsidian vault for reading and graph navigation. Two independent copies you own forever.
 - **Delete anything, anytime.** Full control over your data. No lock-in, no cloud dependency.
 
 ---
