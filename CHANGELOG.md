@@ -2,7 +2,11 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## Unreleased
+## 1.61.0 (2026-05-22)
+
+### Launch from anywhere, upgrade from anywhere
+
+This release adds a `claudia` shell command (and `update-claudia`) so you no longer have to remember where you installed Claudia or `cd` there before launching or upgrading. New installs and upgrades wire the helper into `~/.zshrc` and `~/.bashrc` automatically. After upgrading once via `npx get-claudia .`, future upgrades are just `update-claudia` from any directory.
 
 ### Added
 
