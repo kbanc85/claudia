@@ -1,6 +1,17 @@
 # Proposal 08: Smarter memory writes — auto-entity extraction, type inference, proper linking
 
-**Status**: Proposal · **Effort**: 1-2 weeks · **Batch**: Memory intelligence (with #09 and #10)
+**Status**: Partially shipped (2026-05-22) · **Effort**: 1-2 weeks (original estimate) · **Batch**: Memory intelligence (with #09 and #10)
+
+## Implementation status
+
+| Sub-tranche | Status | Notes |
+|-------------|--------|-------|
+| B1: `memory.remember` actually creates/links entities | **Shipped** | `services/remember.py:372-389` (the `about_entities` path); `_find_or_create_entity` at line ~1826 |
+| B2: Smart type inference on all auto-create paths | **Shipped 2026-05-22** | Commit 246ee30. Fixed `RememberService.end_session()` at remember.py:1445 and `remember_entity()` at line 441 to route untyped entries through the smart inferencer (`entities.infer_entity_type`) instead of the legacy `_infer_entity_type` which fell back to "person". Tests: `test_entity_resolution.py::TestEndSessionInfersEntityType` (3 cases). |
+| B3: Opt-in NER content extraction | **Deferred** | Decision 2026-05-22: nice-to-have but adds a spaCy dependency (~13MB) and is off by default. The `about_entities=[...]` path covers the primary use case. Revisit if user demand emerges. |
+| B4: One-shot backfill CLI | **Shipped** | `--backfill-entities` (default dry-run) and `--apply` in `__main__.py:1114`; `services/backfill.py` implements it. Tests: `TestBackfillCommand` (4 cases). |
+
+
 
 ## TL;DR
 
