@@ -2,7 +2,11 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## Unreleased
+## 1.61.1 (2026-05-23)
+
+### `claudia` command works from anywhere, and repairs itself
+
+A follow-up to 1.61.0's shell command. The installer was storing a relative path, so `claudia` only worked from the install's parent directory. This release fixes the stored path and makes the command self-healing, so the error cannot recur.
 
 ### Fixed
 
