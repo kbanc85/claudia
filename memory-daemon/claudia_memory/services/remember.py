@@ -436,9 +436,14 @@ class RememberService:
         Returns:
             Entity ID
         """
-        # Infer type from name keywords when no type is specified
+        # Infer type from name keywords when no type is specified.
+        # Use the smart inferencer (entities.infer_entity_type) so callers like
+        # end_session() benefit from the "AI"-suffix rule and concept fallback,
+        # matching _find_or_create_entity at line ~1871. The local legacy
+        # _infer_entity_type is preserved for direct unit-test imports.
+        # See Proposal #51 / docs/proposals/08-smarter-memory-writes.md.
         if not entity_type or not entity_type.strip():
-            entity_type = _infer_entity_type(name)
+            entity_type = _smart_infer_entity_type(name)
 
         # Run deterministic guards
         existing_names = [
@@ -1440,9 +1445,12 @@ class RememberService:
         # 5. Store entities
         if entities:
             for entity in entities:
+                # Default to empty string (not "person") so remember_entity()
+                # routes through _infer_entity_type() when type is missing.
+                # See Proposal #51 / test_entity_resolution.py for context.
                 entity_id = self.remember_entity(
                     name=entity["name"],
-                    entity_type=entity.get("type", "person"),
+                    entity_type=entity.get("type", ""),
                     description=entity.get("description"),
                     aliases=entity.get("aliases"),
                 )
