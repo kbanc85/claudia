@@ -2,6 +2,14 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- **`claudia` command failing with "Claudia home directory not found: claudia".** The installer wrote a *relative* path (`claudia`) into `~/.claudia/claudia-home` instead of the absolute install path, because the shell-helper step was handed `targetDir` (relative) rather than the resolved `targetPath`. The `claudia` command then only worked when run from the install's parent directory and failed everywhere else. The installer now always stores the absolute path (via `path.resolve`, which also fixes a separate bug where passing an absolute install path as an argument produced a doubled path like `/home/you/home/you/claudia`).
+- **`claudia` command now self-heals a bad `claudia-home`.** The shell function resolves a relative stored value against `$HOME` (never the current directory), falls back to the default `~/claudia` install when the stored path is missing or stale, and rewrites `claudia-home` with the corrected absolute path so the error cannot recur. Existing installs that already have a bad value are repaired the first time `claudia` runs after upgrading.
+- **`--skip-memory` installs now get the `claudia` command too.** Previously the shell-helper step was skipped entirely on the `--skip-memory` path, leaving those users with no `claudia`/`update-claudia` command. The shell helper is independent of the memory system and now installs on every path.
+
 ## 1.61.0 (2026-05-22)
 
 ### Launch from anywhere, upgrade from anywhere

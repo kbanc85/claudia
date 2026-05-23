@@ -28,17 +28,37 @@ export const SHELL_INIT_CONTENT = `# Claudia shell helpers — sourced from your
 
 _claudia_home() {
   local home_file="$HOME/.claudia/claudia-home"
-  if [ ! -f "$home_file" ]; then
-    echo "Claudia home not configured. Run: npx get-claudia ." >&2
+  local dir=""
+  [ -f "$home_file" ] && dir="$(cat "$home_file" 2>/dev/null)"
+
+  # A relative value (e.g. an older install that stored "claudia") is anchored to
+  # $HOME, never the current directory, so \`claudia\` works from anywhere.
+  case "$dir" in
+    /*) ;;                  # already absolute
+    "") ;;                  # empty -> handled by recovery below
+    *) dir="$HOME/$dir" ;;  # relative -> resolve under $HOME
+  esac
+
+  # Recover from a missing or stale path by falling back to the default install
+  # location when it looks like a real Claudia install.
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    if [ -d "$HOME/claudia/.claude" ] || [ -f "$HOME/claudia/CLAUDE.md" ]; then
+      dir="$HOME/claudia"
+    fi
+  fi
+
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    echo "Claudia install not found. Run: npx get-claudia ." >&2
+    [ -f "$home_file" ] && echo "(or set the correct path in $home_file)" >&2
     return 1
   fi
-  local dir
-  dir="$(cat "$home_file")"
-  if [ ! -d "$dir" ]; then
-    echo "Claudia home directory not found: $dir" >&2
-    echo "Fix by editing $home_file" >&2
-    return 1
+
+  # Self-heal: persist the corrected absolute path so the error never recurs.
+  if [ "$(cat "$home_file" 2>/dev/null)" != "$dir" ]; then
+    mkdir -p "$HOME/.claudia" 2>/dev/null
+    printf '%s\\n' "$dir" > "$home_file" 2>/dev/null || true
   fi
+
   printf '%s' "$dir"
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync, statSync, renameSync, unlinkSync, copyFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execFileSync } from 'child_process';
 import { homedir } from 'os';
@@ -828,7 +828,9 @@ async function main() {
   // Support "." or "upgrade" for current directory
   const isCurrentDir = arg === '.' || arg === 'upgrade';
   const targetDir = isCurrentDir ? '.' : (arg || 'claudia');
-  const targetPath = isCurrentDir ? process.cwd() : join(process.cwd(), targetDir);
+  // resolve() (not join) so an absolute arg is honored as-is and the result is
+  // always absolute (this value is what gets written into ~/.claudia/claudia-home).
+  const targetPath = isCurrentDir ? process.cwd() : resolve(process.cwd(), targetDir);
 
   // Check if directory already exists with Claudia files
   let isUpgrade = false;
@@ -969,11 +971,14 @@ async function main() {
     }
     renderer.render();
 
-    // Only run vault step
-    runVaultStep(renderer, () => {
-      renderer.stopSpinner();
-      renderer.render();
-      showCompletion(targetDir, isCurrentDir, false, undefined, isUpgrade);
+    // The `claudia` shell command is independent of the memory system, so install
+    // it here too, otherwise --skip-memory users get no `claudia` command.
+    runShellStep(renderer, targetPath, () => {
+      runVaultStep(renderer, () => {
+        renderer.stopSpinner();
+        renderer.render();
+        showCompletion(targetDir, isCurrentDir, false, undefined, isUpgrade);
+      });
     });
     return;
   }
@@ -1563,8 +1568,11 @@ async function main() {
 
   renderer.stopSpinner();
 
-  // Shell helper step, then vault, then completion
-  runShellStep(renderer, targetDir, () => {
+  // Shell helper step, then vault, then completion.
+  // Pass the absolute targetPath (not the relative targetDir): this value lands
+  // in ~/.claudia/claudia-home, and a relative value there breaks `claudia` from
+  // any directory other than the install's parent.
+  runShellStep(renderer, targetPath, () => {
     runVaultStep(renderer, () => {
       renderer.render();
       showDbScanResults(dbScan);
