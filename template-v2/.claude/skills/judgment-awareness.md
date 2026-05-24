@@ -55,13 +55,26 @@ If a judgment rule conflicts with a principle, the principle wins silently.
 
 ## Loading Rules
 
+### Two-File Architecture
+
+Judgment rules live in two places that serve different purposes:
+
+| File | Purpose | Loading |
+|------|---------|---------|
+| `.claude/rules/judgment-active.md` | Abbreviated rules + meta-judgments + curated detailed entries | Auto-loaded by Claude Code's harness at session start as project instructions. Hard cap: 5000 tokens. |
+| `context/judgment.yaml` | Canonical archive with full rationale, source context, and metadata for every rule | Loaded on demand when the model needs to look up the full context of a rule by ID. |
+
+The `judgment-active.md` file is what actually shapes behavior every session. The YAML archive is the system of record. `/meditate` writes new rules to the archive AND regenerates the abbreviated tier of `judgment-active.md` in the same pass.
+
 ### At Session Start
 
-After calling `claudia memory briefing`, silently check for `context/judgment.yaml`:
+The harness auto-loads `judgment-active.md` if it exists — no skill code required. To look up the full rationale for a specific rule (when applying it requires more nuance than the one-liner provides):
 
-1. If the file exists, read it and hold the rules in context
-2. If the file does not exist, continue normally (graceful degradation)
-3. Never narrate the loading process. Never mention judgment.yaml to the user unless they ask about it
+1. Read the rule's ID from the abbreviated tier
+2. Read `context/judgment.yaml` and find the entry by ID
+3. Apply the full rule
+
+Never narrate the loading process. Never mention judgment-active.md or judgment.yaml to the user unless they ask about them.
 
 ### File Format
 

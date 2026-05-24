@@ -153,26 +153,74 @@ Call the `memory_end_session` MCP tool with:
 - `reflections`: Array of approved reflections with type, content, and optional about fields
 - Other structured extractions (facts, commitments, entities) as needed
 
-**If judgment rules were approved**, also write them to `context/judgment.yaml`:
+**If judgment rules were approved**, write them to `context/judgment.yaml` AND regenerate the abbreviated tier of `.claude/rules/judgment-active.md`. Then scan for tensions and propose meta-judgments if needed.
+
+#### 5a. Write the new rule to the archive
 
 1. Read `context/judgment.yaml` (if it exists)
 2. If the file doesn't exist, create it with the initial structure:
    ```yaml
    version: 1
 
+   meta: []
    priorities: []
    escalation: []
    overrides: []
    surfacing: []
    delegation: []
+   process: []
    ```
 3. Append each approved rule to the appropriate category
 4. Assign a sequential ID within its category (e.g., `esc-001`, `esc-002`)
 5. Set `source` to `meditate/YYYY-MM-DD` (today's date)
 6. Write the updated file
 
-Confirm storage with both reflections and rules:
-"Got it. I've saved [N] reflection(s) and added [M] judgment rule(s) to your judgment file. I'll apply them going forward. See you next time."
+#### 5b. Regenerate the abbreviated tier in `.claude/rules/judgment-active.md`
+
+The archive (`context/judgment.yaml`) is the canonical store but is NOT auto-loaded into every session — the file is too large. Claude Code's harness automatically loads anything in `.claude/rules/` as project instructions, so `judgment-active.md` is where rules go to actually shape behavior.
+
+The file has three tiers:
+
+| Tier | What | Who maintains |
+|------|------|---------------|
+| Meta Judgments | Cross-rule tension resolvers | `meditate` (Step 5c) |
+| Promoted (Detailed) | High-stakes rules with full Why context | Human-curated |
+| All Active Rules (Abbreviated) | Every archive rule as one line | `meditate` (Step 5b, regenerates) |
+
+Only the Abbreviated tier gets regenerated mechanically. Preserve everything above the `# All Active Rules (Abbreviated)` header verbatim.
+
+1. Read `.claude/rules/judgment-active.md` (create from the template at `.claude/rules/judgment-active.md` if missing — see Loading & Defaults section)
+2. Read `context/judgment.yaml`
+3. For each rule in the archive, generate a one-line abbreviation:
+   - Format: `- **id** (date): one-sentence rule.`
+   - Mark rules that already appear in the Promoted (Detailed) tier with `*(promoted)*` at the end
+   - Group by category (Meta, Priorities, Escalation, Overrides, Surfacing, Delegation, Process)
+4. Replace everything below `# All Active Rules (Abbreviated)` with the regenerated list
+5. Token-count the file. Cap = 5000 tokens (rough estimate: chars / 4). If over:
+   - Pruning is a judgment call: surface the proposed prune list to the user before deleting
+   - Default candidates: rules superseded by meta-judgments, rules that haven't fired in 6+ months, rules now covered by a broader rule
+
+#### 5c. Scan for tensions and propose meta-judgments
+
+After adding a new rule, scan ALL rules in the archive for tensions with the new one. A tension exists when two rules could plausibly apply to the same situation and pull in different directions.
+
+If a tension is detected:
+1. Identify the rule pair and the overlap zone
+2. Draft a meta-judgment that resolves it: the rule itself + a distinguishing test + which underlying rule wins under which condition
+3. Surface to the user for approval BEFORE writing:
+   ```
+   **Tension detected:** [rule-A] and [rule-B] both apply when [overlap zone].
+   **Proposed meta-judgment:** [draft]
+   *Save to judgment-active.md as meta-NNN?*
+   ```
+4. If approved, write to the `meta:` section of judgment.yaml AND prepend to the Meta Judgments section of judgment-active.md. ID format: `meta-001`, `meta-002`, etc. The meta rule entry should include a `governs:` field listing the IDs of the underlying rules it resolves.
+
+Meta-judgments take precedence over the rules they govern. They are the highest-leverage entries in the judgment system — be precise. Do not propose meta-judgments for invented tensions or speculative edge cases. Only real overlap that has produced or would produce a wrong call.
+
+#### 5d. Confirm and close
+
+Confirm storage:
+"Got it. Saved [N] reflection(s), [M] judgment rule(s) to archive, regenerated active rules ([T] tokens, [H] under cap). [If meta-judgment added: Added meta-NNN to resolve [rule-A]/[rule-B] overlap.] See you next time."
 
 If only reflections (no rules): "Got it, I'll keep that in mind. See you next time."
 
