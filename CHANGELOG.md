@@ -2,7 +2,7 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## Unreleased
+## 1.62.0 (2026-06-13)
 
 ### Loop engineering foundation (Proposal 11, Phases 1-2)
 
