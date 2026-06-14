@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- **Status-only wrap for daemon scheduled jobs** (Proposal 11, E5). The seven background jobs (importance decay, pattern detection, consolidation, daily and weekly backups, vault sync, observation ingest) now each write `~/.claudia/loops/<job>_status.md` and check deterministic invariants (the backup jobs assert the backup file exists and is non-empty). It is status-only: a failed invariant is flagged but never halts the job, and a job that raises is recorded and then re-raised, so daemon behavior is unchanged. `memory.system_health` and the `/status` endpoint now surface each job's last verdict plus a flagged count. New module `claudia_memory/loops/job_wrapper.py` (6 tests); health surfacing has 2 tests; full daemon suite stays green (803 passed). This completes Proposal 11.
+
 ## 1.63.0 (2026-06-13)
 
 ### Added

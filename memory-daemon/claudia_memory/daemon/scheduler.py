@@ -23,8 +23,22 @@ from ..services.consolidate import (
     run_full_consolidation,
 )
 from ..services.vault_sync import run_vault_sync
+from ..loops.job_wrapper import run_with_status
 
 logger = logging.getLogger(__name__)
+
+
+def _file_nonempty(path) -> "tuple[bool, str]":
+    """Invariant: a backup path must exist and be a non-empty file."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            return False, f"backup file missing: {p}"
+        if p.stat().st_size == 0:
+            return False, f"backup file is empty: {p}"
+        return True, ""
+    except Exception as e:  # noqa: BLE001
+        return False, f"could not stat backup: {e!r}"
 
 
 # Tools whose invocations are always relevant for Claudia's memory
@@ -282,72 +296,99 @@ class MemoryScheduler:
         """Run importance decay daily"""
         try:
             logger.debug("Running daily decay")
-            result = run_decay()
+            result = run_with_status(
+                "daily_decay",
+                run_decay,
+                invariants=[("completed", lambda r: (r is not None, "decay returned no result"))],
+            )
             logger.debug(f"Daily decay complete: {result}")
-        except Exception as e:
+        except Exception:
             logger.exception("Error in daily decay")
 
     def _run_pattern_detection(self) -> None:
         """Run pattern detection"""
         try:
             logger.debug("Running pattern detection")
-            patterns = detect_patterns()
+            patterns = run_with_status(
+                "pattern_detection",
+                detect_patterns,
+                invariants=[("is_list", lambda r: (isinstance(r, (list, tuple)), "patterns not a list"))],
+            )
             logger.info(f"Pattern detection complete: {len(patterns)} patterns detected")
-        except Exception as e:
+        except Exception:
             logger.exception("Error in pattern detection")
 
     def _run_full_consolidation(self) -> None:
         """Run full overnight consolidation"""
         try:
             logger.info("Running full consolidation")
-            result = run_full_consolidation()
+            result = run_with_status(
+                "full_consolidation",
+                run_full_consolidation,
+                invariants=[("completed", lambda r: (r is not None, "consolidation returned no result"))],
+            )
             logger.info(f"Full consolidation complete: {result}")
-        except Exception as e:
+        except Exception:
             logger.exception("Error in full consolidation")
 
     def _run_daily_backup(self) -> None:
         """Create a labeled daily backup with 7-day retention."""
         try:
             from ..database import get_db
-            backup_path = get_db().backup(label="daily")
+            backup_path = run_with_status(
+                "daily_backup",
+                lambda: get_db().backup(label="daily"),
+                invariants=[("backup_nonempty", lambda p: _file_nonempty(p))],
+            )
             logger.info(f"Daily backup created: {backup_path}")
-        except Exception as e:
+        except Exception:
             logger.exception("Error in daily backup")
 
     def _run_weekly_backup(self) -> None:
         """Create a labeled weekly backup with 4-week retention."""
         try:
             from ..database import get_db
-            backup_path = get_db().backup(label="weekly")
+            backup_path = run_with_status(
+                "weekly_backup",
+                lambda: get_db().backup(label="weekly"),
+                invariants=[("backup_nonempty", lambda p: _file_nonempty(p))],
+            )
             logger.info(f"Weekly backup created: {backup_path}")
-        except Exception as e:
+        except Exception:
             logger.exception("Error in weekly backup")
 
     def _run_vault_sync(self) -> None:
         """Run Obsidian vault sync + canvas regeneration"""
         try:
-            logger.info("[Safety-net full sync] Running after 4R Reweave inline in consolidation")
             logger.info("Running vault sync")
             from ..config import _project_id
             from ..services.vault_sync import get_vault_path
             from ..services.canvas_generator import CanvasGenerator
 
-            result = run_vault_sync(project_id=_project_id)
-            logger.info(f"Vault sync complete: {result}")
+            def _sync_and_canvas():
+                result = run_vault_sync(project_id=_project_id)
+                logger.info(f"Vault sync complete: {result}")
+                vault_path = get_vault_path(_project_id)
+                canvas_result = CanvasGenerator(vault_path).generate_all()
+                logger.info(f"Canvas regeneration complete: {canvas_result}")
+                return result
 
-            # Regenerate canvases after sync
-            vault_path = get_vault_path(_project_id)
-            gen = CanvasGenerator(vault_path)
-            canvas_result = gen.generate_all()
-            logger.info(f"Canvas regeneration complete: {canvas_result}")
-        except Exception as e:
+            run_with_status(
+                "vault_sync",
+                _sync_and_canvas,
+                invariants=[("completed", lambda r: (r is not None, "vault sync returned no result"))],
+            )
+        except Exception:
             logger.exception("Error in vault sync")
 
     def _run_observation_ingest(self) -> None:
         """Ingest observations from PostToolUse hook captures."""
         try:
             from ..database import get_db
-            _ingest_observations(get_db(), self.config)
+            run_with_status(
+                "observation_ingest",
+                lambda: _ingest_observations(get_db(), self.config),
+            )
         except Exception as e:
             logger.debug(f"Error in observation ingestion: {e}")
 

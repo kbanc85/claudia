@@ -152,6 +152,34 @@ def build_status_report(*, db=None) -> dict:
     except Exception:
         report["components"]["scheduler"] = "error"
 
+    # Loop status files (Proposal 11, E5): last verdict per wrapped daemon job.
+    # Purely observational; the overall status is not changed by a flagged job.
+    try:
+        from ..loops.job_wrapper import default_loops_dir
+        from ..loops.status import read_status
+
+        loops = []
+        loops_dir = default_loops_dir()
+        if loops_dir.exists():
+            for status_file in sorted(loops_dir.glob("*_status.md")):
+                try:
+                    fields, _ = read_status(status_file)
+                except Exception:
+                    continue
+                loops.append(
+                    {
+                        "job": fields.get("loop_id", status_file.stem.replace("_status", "")),
+                        "verified": fields.get("verified"),
+                        "verdict": fields.get("checker_verdict"),
+                        "updated_at": fields.get("updated_at"),
+                    }
+                )
+        report["loops"] = loops
+        report["loops_flagged"] = sum(1 for entry in loops if entry.get("verified") is False)
+    except Exception:
+        report["loops"] = []
+        report["loops_flagged"] = 0
+
     return report
 
 
