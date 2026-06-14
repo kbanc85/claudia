@@ -18,6 +18,21 @@
       ]
     },
     {
+      "name": "build-team",
+      "path": "build-team/SKILL.md",
+      "description": "Propose a personalized team of specialized agents based on the user profile and real work, validated by an independent Checker, applied on approval with rollback.",
+      "invocation": "explicit",
+      "effort_level": "high",
+      "triggers": ["build my team", "set up my agents", "what agents should I have", "design my team", "/build-team"],
+      "examples": [
+        "build my team",
+        "what agents should I have for my work?",
+        "set up my agents",
+        "design a team around my client work",
+        "tailor your team to how I work"
+      ]
+    },
+    {
       "name": "onboarding",
       "path": "onboarding.md",
       "description": "Guide new users through a conversational discovery flow to create a personalized Claudia setup",

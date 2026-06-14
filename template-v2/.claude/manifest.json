@@ -1,6 +1,6 @@
 {
   "version": "1.62.0",
-  "generated": "2026-06-14T02:36:05.382Z",
+  "generated": "2026-06-14T02:42:35.412Z",
   "algorithm": "sha256",
   "files": {
     ".claude/rules/claudia-principles.md": "939e9720421628e7f2e4c8dfbaa4aeb9c1e18e8c6a5379cd6b772a6835b812e5",
@@ -26,6 +26,7 @@
     ".claude/skills/auto-research/references/safety-rules.md": "ae036270e86949ed0f9bface582f6038276adafd3f40a29aa733698111a26683",
     ".claude/skills/brain/SKILL.md": "b87dd93c85923c676292bea67f7a0580ee71eea2bea05426ea6eda951a140d5c",
     ".claude/skills/brain-monitor/SKILL.md": "6e9ce1e6e40bc612a5126d84d743c1fd7ebc596f60575873533479fdcae5b608",
+    ".claude/skills/build-team/SKILL.md": "38a33c8f3e84d0b27f4a4a6ac10cc8318e684b0611a9052a1dd47acbd26874d9",
     ".claude/skills/capability-suggester.md": "06235c8ab062d356cf9b6c18c7aa44ea667e7694983a46e8ae0a9fe32e734944",
     ".claude/skills/capture-meeting/SKILL.md": "815e7587fcd925323c379a6c57e458b3484d034338c1237378641d142c126175",
     ".claude/skills/capture-meeting/evals/basic.yaml": "47c4eb1479aeda8067bc877cebfe8688c9b2bb3ce09297e42375cdf558f412e3",
@@ -69,7 +70,7 @@
     ".claude/skills/research/SKILL.md": "0d317e6350b043ee774916b923957f61dbc174e3caafc0187198fa236a2fd28d",
     ".claude/skills/research/references/source-evaluation.md": "64614b7eff83468d7ff76dd640252579f23e69e760969672e9aebe5ceb00f695",
     ".claude/skills/risk-surfacer.md": "b01e6bc7a22df414a7ee7a5e4a108088b5d049646723cc7513fac27a3ba4856c",
-    ".claude/skills/skill-index.json": "043c86f1b07f28bb54db80117437f60fb3d79ad0d18549fdc2c74921b996a56f",
+    ".claude/skills/skill-index.json": "576ebd98fe5f597a45871366d286cd6765d6bdabefe49633c2d00514518c54bc",
     ".claude/skills/skill-router/SKILL.md": "12fc45aebc94d3ead65843cd336a88797a40856e82908cda47256c9cbb4cb60f",
     ".claude/skills/skill-router/references/overlap-clusters.md": "bc819b4892cbdf9919db392825230f4cd4eec546cd7f0c9de6c29a2468ab489a",
     ".claude/skills/structure-generator.md": "dbe70841ab60599a632687aaa3c3652361483df2fe854640c56982b60622eb19",
