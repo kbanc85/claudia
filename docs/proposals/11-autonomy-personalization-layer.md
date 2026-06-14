@@ -1,6 +1,6 @@
 # Proposal 11: Autonomy & Personalization Layer (Loop Engineering + Team Builder)
 
-**Status**: E1-E4 shipped in v1.62.0; E6-E7 shipped (unreleased) 2026-06-13; only E5 remains (needs go/no-go) · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; E5 can be split into its own numbered proposal when picked up)
+**Status**: COMPLETE. E1-E4 shipped in v1.62.0; E6-E7 in v1.63.0; E5 shipped status-only (unreleased) 2026-06-13 · **Effort**: delivered across v1.62.0, v1.63.0, and one unreleased branch · **Batch**: Autonomy & Personalization (batch master; all epics landed)
 
 ## Implementation status
 
@@ -18,7 +18,7 @@
 | E4 | B1-B2 meditate harness review | **Shipped** | `meditate/SKILL.md` reads loop status (Step 1), reviews harness performance (Step 2b), routes harness proposals through the Checker before writing (Step 5). Commit `bd3b9e5`. |
 | E6 | B1-B4 `/build-team` skill | **Shipped** | `template-v2/.claude/skills/build-team/SKILL.md` (commit `56f10d7`). Profile read + Maker proposal, loop-checker validation (bounded 2 revisions, 5-role hard cap), `team_status.md`, approval gate, apply with `.bak` rollback. |
 | E7 | B1-B2 proactive team review | **Shipped** | `hire-agent.md` "Proactive team review" section (commit `077d0e6`). Detects team drift (archetype shift, new task class, roster drift) and routes to `/build-team` for the validated, reversible change. |
-| E5 | all | **Proposed** | Not started. Daemon wrap; needs an explicit go/no-go (blast radius). See the backlog below. |
+| E5 | B1-B4 daemon wrap (status-only) | **Shipped** | Go/no-go resolved 2026-06-13: status-only. `claudia_memory/loops/job_wrapper.py` wraps all 7 scheduled jobs to write `~/.claudia/loops/<job>_status.md` + deterministic invariants (backups assert file exists and is non-empty); flags failures but never halts. B4: `health.py` surfaces last verdicts. B3: existing misfire/coalesce bounds unchanged. 14 new tests; 803 daemon tests pass. (commit `f53d3e9`) |
 
 ## What this is
 
@@ -81,7 +81,7 @@ The PRD assumes an independent LLM Checker everywhere. A scheduled daemon job ha
 | E2 | Maker-Checker on `auto-research` | 1 | E1 | S-M (2-3d) | **Shipped** |
 | E3 | Self-repair loop | 2 | E1, E2 | M (3-5d) | **Shipped** |
 | E4 | `/meditate` -> self-improvement feed | 2 | E1 | S (1-2d) | **Shipped** |
-| E5 | Wrap daemon scheduled jobs | 3 | E1 | L (1-2w) | Proposed |
+| E5 | Wrap daemon scheduled jobs | 3 | E1 | L (1-2w) | **Shipped (status-only)** |
 | E6 | `/build-team` skill | 4 | E1 | M-L (1w) | **Shipped** |
 | E7 | Proactive team-update suggestions | 4 | E6 | S-M (2-4d) | **Shipped** |
 
