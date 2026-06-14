@@ -13,7 +13,7 @@
 | E2 | B1 Checker subagent role | **Shipped** | `template-v2/.claude/agents/loop-checker.md`; `auto-research/SKILL.md` loop steps 4-5 (`eed7a79`). |
 | E2 | B2 emit status file | **Shipped** | `auto-research` writes `research_status.md` each iteration (`eed7a79`). |
 | E2 | B3 disagreement handling | **Shipped** | `contested` flag on Maker/Checker score divergence (`eed7a79`). |
-| E2 | B4 docs + worked example | **Partial** | `SKILL.md` updated; the worked dry-run transcript is deferred to the E2 split (proposal 12). |
+| E2 | B4 docs + worked example | **Shipped** | `SKILL.md` updated; worked dry-run transcript added (commit `07a2d36`). |
 | E3 | B1-B4 self-repair sub-loop | **Shipped** | `template-v2/.claude/skills/_loop/repair.md` + `auto-research` stall trigger (commit `bd3b9e5`). Trigger, repair-and-validate-on-original-input, regression capture, 2-attempt cap, human gate for shipped-brief edits. |
 | E4 | B1-B2 meditate harness review | **Shipped** | `meditate/SKILL.md` reads loop status (Step 1), reviews harness performance (Step 2b), routes harness proposals through the Checker before writing (Step 5). Commit `bd3b9e5`. |
 | E6 | B1-B4 `/build-team` skill | **Shipped** | `template-v2/.claude/skills/build-team/SKILL.md` (commit `56f10d7`). Profile read + Maker proposal, loop-checker validation (bounded 2 revisions, 5-role hard cap), `team_status.md`, approval gate, apply with `.bak` rollback. |
