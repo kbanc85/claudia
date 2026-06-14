@@ -1,6 +1,6 @@
 {
   "version": "1.61.1",
-  "generated": "2026-05-23T14:34:46.165Z",
+  "generated": "2026-06-14T02:23:18.915Z",
   "algorithm": "sha256",
   "files": {
     ".claude/rules/claudia-principles.md": "939e9720421628e7f2e4c8dfbaa4aeb9c1e18e8c6a5379cd6b772a6835b812e5",
@@ -10,6 +10,9 @@
     ".claude/rules/shell-compatibility.md": "565977bc04e269b3ce7d8a7963173df4f44bb9634692ea76abb1b64f6a67513e",
     ".claude/rules/trust-north-star.md": "0188b17c26b791cf597ce975bb75d40f543aa3d6b84b7edb1309b78530b3d43f",
     ".claude/skills/README.md": "22311215317c61dcb67975af02bdd1d7164578713ff9faf6fbed8aec14256bcd",
+    ".claude/skills/_loop/README.md": "50f5a57ac48d65eceb62f09e22fd0a09a009e362f20deb1fc7b6e09c3968374c",
+    ".claude/skills/_loop/checker.md": "dcec7e38330244973020050bb95e76853ff5f05ebf4ca82b6b442d2eb26f7832",
+    ".claude/skills/_loop/maker.md": "eadc6c2c59f3e43f4b029c3d40ce3af29cd746da219c132da0888d31a0743e01",
     ".claude/skills/agent-dispatcher.md": "b48fc5283f0a88d1ebbc692b30b6c326fef012d4168dcf721a94e3c954b76b90",
     ".claude/skills/archetypes/_base-structure.md": "c0d8df77c07aa48cd9ba9c5ba3eddb533fcea790c7f98440fa3d31405fd5c75d",
     ".claude/skills/archetypes/consultant.md": "1e0ccbf89115f92a1fa0c86b48edcce22668c4bb828ba4268376fcd6b5c05680",
@@ -17,7 +20,7 @@
     ".claude/skills/archetypes/executive.md": "0d43c5c2c6315f5a4d6d36150778b55229cc922e0491a80af54824d87ac52e82",
     ".claude/skills/archetypes/founder.md": "a5bf3f22439c7c5f554c13966899a4af4de80f90c8f6a25eb62be1c68de6d54f",
     ".claude/skills/archetypes/solo.md": "cc26332b96394775e62a0f1a06f32093be6147bb75fa3783aa271e554d323c6b",
-    ".claude/skills/auto-research/SKILL.md": "1a54e5d82f4e87c78a54e1331ff2d32aaff12c2712058e21173aa900a57b01c3",
+    ".claude/skills/auto-research/SKILL.md": "b8827ad3cc237a5ba8a6454a61a45e3d509fcbdcd802318121382af7cc6944ce",
     ".claude/skills/auto-research/references/program-template.md": "850457de96bde5ad65d24f1018509da94dd31fec9ec45c15087031f470a28dbc",
     ".claude/skills/auto-research/references/safety-rules.md": "ae036270e86949ed0f9bface582f6038276adafd3f40a29aa733698111a26683",
     ".claude/skills/brain/SKILL.md": "b87dd93c85923c676292bea67f7a0580ee71eea2bea05426ea6eda951a140d5c",

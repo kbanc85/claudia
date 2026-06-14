@@ -14,11 +14,11 @@ A hill-climber for any local artifact with a rubric. Inspired by [Karpathy's aut
 Three primitives, one governance file:
 
 1. **The artifact** — what gets iterated on (a draft email, a brief, a wiki page, a one-pager). Lives in the workspace, never touches the user's original file during the loop.
-2. **The evaluator** — a scalar rubric Claudia scores against. Plain English. Must produce a number for the original artifact before the loop starts.
+2. **The evaluator** — a scalar rubric. Plain English. An independent Checker (the `loop-checker` agent, Haiku) scores each iteration against it, not Claudia herself. The rubric must produce a number for the original artifact before the loop starts.
 3. **The budget** — iteration count (default 20). Loop stops when budget is exhausted or score plateaus.
 4. **The program** (governance file) — what the user wants, what's off-limits, what counts as "better." Claudia helps the user write this if they don't volunteer it.
 
-Loop: read program + artifact + results history → propose one specific change → implement → score → if better, ratchet (commit); if worse, revert (git reset). Report each iteration as a one-line update. Repeat until budget is hit.
+Loop: read program + artifact + results history, Claudia (the Maker) proposes one specific change, implements it, then dispatches the `loop-checker` (the Checker) to score it independently. If the Checker's score beats the running best, ratchet (commit); if worse, revert (git reset). Write the status file. Report each iteration as a one-line update. Repeat until budget is hit.
 
 ## When to invoke this skill
 
@@ -53,7 +53,8 @@ Each run gets its own workspace at `~/.claudia/auto-research/<task-id>/`:
 ├── program.md           the brief (user-authored with Claudia's help)
 ├── artifact.md          (or .txt, the working copy that gets edited)
 ├── original.md          immutable copy of the input, for reference and diff
-├── results.tsv          one row per iteration: timestamp, score, kept/reverted, change-summary
+├── results.tsv          one row per iteration: timestamp, score, kept/reverted/contested, change-summary
+├── research_status.md   loop control plane (see docs/loop-status-schema.md): iteration, verified, score, checker_verdict, next_action
 ├── best.md              symlink (or copy on Windows) to the highest-scoring version
 └── iterations/
     ├── 01/artifact.md
@@ -111,16 +112,43 @@ For each iteration N:
 1. **Read the state.** Read `program.md`, `artifact.md`, last 3 rows of `results.tsv`.
 2. **Propose one change.** One specific edit, justified in one sentence. Not a rewrite. Not a refactor. One change.
 3. **Implement.** Apply the edit to `artifact.md`. Save.
-4. **Score.** Score the new `artifact.md` against the rubric in `program.md`. Sum the dimensions. Round to one decimal.
-5. **Decide.** If new score > best score so far: ratchet. Copy `artifact.md` to `iterations/NN/`, update `best.md` to point at the new winner, append a row to `results.tsv` marked `kept`. If new score <= best: revert. Copy `iterations/(best_iter)/artifact.md` back to `artifact.md`, append a row marked `reverted`.
-6. **Report.** One line to the user: `iter N: score 7.4 (kept), change: tightened lede to one sentence`.
-7. **Check stop conditions.** If budget exhausted: stop. If score plateaued (no improvement for 5 iterations): stop. Otherwise: next iteration.
+4. **Score (independent Checker).** Dispatch the `loop-checker` agent (Haiku) with the rubric from `program.md`, the new `artifact.md`, and the one change you just made plus your expected effect (your Maker self-score). The Checker returns a verdict JSON: `verified`, `score`, `max_score`, `issues`, `rationale`, `hard_constraint_violated`. You do NOT score it yourself; the Checker's `score` governs the decision. (See `.claude/skills/_loop/checker.md`.)
+5. **Decide.** If the Checker's `score` > best score so far and `hard_constraint_violated` is false: ratchet. Copy `artifact.md` to `iterations/NN/`, update `best.md` to point at the new winner, append a row to `results.tsv` marked `kept`. Otherwise: revert. Copy `iterations/(best_iter)/artifact.md` back to `artifact.md`, append a row marked `reverted`.
+6. **Flag divergence.** Compare the Checker's `score` against your Maker self-score. If they diverge by more than 1.5 points on a 10-point scale, mark the iteration `contested` in `results.tsv`. The Checker's verdict still governs; the flag just surfaces the disagreement in the end-of-run summary.
+7. **Write the status file.** Atomically update `research_status.md` with `iteration`, `verified`, `score`, `budget_remaining`, `last_input`, `maker_proposal`, `checker_verdict` (the Checker's rationale), and `next_action`. Write to a temp sibling and rename; never edit it in place. (See `docs/loop-status-schema.md`.)
+8. **Report.** One line to the user: `iter N: score 7.4 (kept), change: tightened lede to one sentence`. Append `[contested]` when flagged.
+9. **Check stop conditions.** If budget exhausted: stop. If score plateaued (no improvement for 5 iterations): stop. Otherwise: next iteration.
+
+## The independent Checker (Maker-Checker)
+
+This loop separates the producer from the verifier (Proposal 11, E2). Claudia is
+the **Maker**: she reads the state and proposes one change. The **Checker** is a
+separate agent (`loop-checker`, Haiku) that scores the result independently. The
+two never collapse into one model grading its own work, which is the bias the
+split exists to remove.
+
+- The Checker's `score`, not Claudia's, drives keep/revert. Claudia's expected
+  effect is only a self-score, used to detect disagreement.
+- The Checker is adversarial by brief: it hunts for faults and defaults to
+  `verified: false` when uncertain. A passing verdict therefore means something.
+- A `hard_constraint_violated: true` verdict forces a revert regardless of score.
+
+**Contested iterations.** When the Checker's score and Claudia's self-score
+diverge by more than 1.5 points (10-point scale), the iteration is marked
+`contested`. The Checker still governs the decision; the flag makes the
+disagreement visible. The end-of-run summary reports how many iterations were
+contested, which is a useful signal that the rubric is ambiguous or that Claudia
+was over-optimistic.
+
+**Cost.** The Checker runs on Haiku, so the verification pass is cheap and fast.
+With the default 20-iteration budget, that is at most 21 Checker dispatches
+(including the baseline), each scoped to a single small artifact.
 
 ## Safety rules (mandatory, follow without exception)
 
 1. **Workspace-only edits.** The loop never writes to a file outside `~/.claudia/auto-research/<task-id>/`. The user's original file at `/Users/.../wherever.md` is untouched until the user explicitly approves the final hand-off.
 2. **No external actions during the loop.** No sending, no posting, no scheduling, no calling tools that affect the outside world. The loop is a closed system.
-3. **Baseline-score gate.** Before iteration 1, score the original artifact and write it to `results.tsv` as `iter 0: score X (baseline)`. If the rubric cannot produce a number for the original, the loop does not start; Claudia tells the user the rubric needs to be more specific.
+3. **Baseline-score gate.** Before iteration 1, dispatch the `loop-checker` to score the original artifact and write it to `results.tsv` as `iter 0: score X (baseline)` and to `research_status.md` as iteration 0. If the Checker cannot produce a number for the original, the loop does not start; Claudia tells the user the rubric needs to be more specific.
 4. **Bounded budget.** Default 20 iterations. User can set higher (50 max) or lower. Plateau detection (no improvement for 5 in a row) stops early. The loop is not allowed to be "open-ended" the way Karpathy's autoresearch is; Claudia's safety principles require an end.
 5. **Per-iteration revertability.** Each iteration is a git commit inside the workspace. Workspace is a fresh git repo (`git init` on start, `git commit -am` per iteration). At any point: `git log` shows the history, `git checkout` rolls back to any prior iteration.
 6. **User interrupt at any time.** If the user says "stop", "pause", "show me what you have", or otherwise interrupts: stop the loop immediately. The workspace persists. The best version so far is in `best.md`. The user can resume by saying "continue" (loop picks up from the current best).
@@ -178,10 +206,13 @@ When the user gives a bad rubric, help them turn it into a good one before start
 - `wiki` for iterating wiki pages specifically (compress, sharpen, restructure)
 - `draft-reply`, `follow-up-draft` for one-shot draft generation
 - `summarize-doc` for one-pass summarization
+- `.claude/skills/_loop/` for the shared Maker and Checker role briefs
+- `.claude/agents/loop-checker.md` for the Checker agent definition
+- `docs/loop-status-schema.md` for the `research_status.md` control-plane format
 
 ## Open questions for future versions
 
-- Shell-command evaluators (run `node test.js my-draft.md`, take the number it prints) are deferred. Today, Claudia scores against the rubric in `program.md` directly.
+- Shell-command evaluators (run `node test.js my-draft.md`, take the number it prints) are deferred. Today, the `loop-checker` agent scores against the rubric in `program.md`.
 - Token-spend budget and wall-clock budget are deferred. Today, only iteration count is supported.
 - Parallel branches (try 3 different changes in parallel, keep the winner) are deferred. Today, sequential only.
 - Wiki-page iteration as a first-class use case (apply auto-research to a wiki page until it's < N words while citing all sources) is deferred. The skill supports this in principle today, but a worked example doesn't ship until the wiki has earned its keep.

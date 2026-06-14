@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## Unreleased
+
+### Loop engineering foundation (Proposal 11, Phase 1)
+
+First slice of the Autonomy & Personalization Layer: the Maker-Checker pattern on the existing `auto-research` loop, plus the shared infrastructure later loops reuse. See `docs/proposals/11-autonomy-personalization-layer.md`.
+
+### Added
+
+- **Independent Checker for `auto-research`** (Proposal 11, E2). The iteration loop no longer grades its own work. Each iteration now dispatches a new `loop-checker` agent (Haiku, adversarial brief) that scores the artifact against the rubric independently; the Checker's score, not Claudia's, drives the keep/revert decision. When the Checker's score and Claudia's self-score diverge past threshold, the iteration is flagged `contested` and surfaced in the end-of-run summary. New files: `template-v2/.claude/agents/loop-checker.md` and `template-v2/.claude/skills/_loop/` (`maker.md`, `checker.md`, `README.md`).
+- **Loop status-file schema** (Proposal 11, E1). `docs/loop-status-schema.md` defines a standard Markdown-body + YAML-frontmatter control plane (`last_input`, `maker_proposal`, `checker_verdict`, `verified`, `next_action`, and friends) plus the exit-condition standard every loop must declare up front. `auto-research` now writes `research_status.md` in this format each iteration.
+- **Atomic status-file helper** (Proposal 11, E1/B3). New daemon module `claudia_memory/loops/status.py` (`write_status` / `read_status`) writes a status file through a same-directory temp file plus `os.replace`, so an interrupted write never leaves a partial file at the canonical path. Six tests in `memory-daemon/tests/test_loop_status.py` cover round-trip, native-type preservation, parent-dir creation, temp cleanup, and crash-safety.
+
 ## 1.61.1 (2026-05-23)
 
 ### `claudia` command works from anywhere, and repairs itself
@@ -31,7 +43,6 @@ This release adds a `claudia` shell command (and `update-claudia`) so you no lon
 
 - **ASCII greeting logo: row 1 (hair top) realigned over face** (in `template-v2/CLAUDE.md`). The top hair row was indented 6 leading spaces while the face row below it starts at column 0, so the hair appeared shifted ~4 characters to the right. Now sits correctly above the face. Existing installs see the fix on next upgrade.
 - **Installer no longer treats flag-looking arguments as install targets.** Previously, `npx get-claudia --help` (or any unrecognized `--flag`) was interpreted as the install path and would create a `./--help/` directory with templates copied into it. Now: `--help`/`-h` prints a proper usage message and exits, `--version`/`-V` prints the version, and any other leading-dash argument prints `Error: unrecognized argument: <flag>` and exits 1 without touching the filesystem.
-
 ## 1.60.1 (2026-05-22)
 
 ### Two bug fixes from the fixing-phase pass
