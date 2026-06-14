@@ -1,6 +1,6 @@
 # Proposal 11: Autonomy & Personalization Layer (Loop Engineering + Team Builder)
 
-**Status**: Phases 1-2 (E1-E4) shipped 2026-06-13; E5-E7 proposed · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; epics E5-E7 can each be split into their own numbered proposal, 12-17, when picked up)
+**Status**: E1-E4 shipped in v1.62.0; E6 shipped (unreleased) 2026-06-13; E5, E7 proposed · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; epics E5 and E7 can each be split into their own numbered proposal, 12-17, when picked up)
 
 ## Implementation status
 
@@ -16,7 +16,8 @@
 | E2 | B4 docs + worked example | **Partial** | `SKILL.md` updated; the worked dry-run transcript is deferred to the E2 split (proposal 12). |
 | E3 | B1-B4 self-repair sub-loop | **Shipped** | `template-v2/.claude/skills/_loop/repair.md` + `auto-research` stall trigger (commit `bd3b9e5`). Trigger, repair-and-validate-on-original-input, regression capture, 2-attempt cap, human gate for shipped-brief edits. |
 | E4 | B1-B2 meditate harness review | **Shipped** | `meditate/SKILL.md` reads loop status (Step 1), reviews harness performance (Step 2b), routes harness proposals through the Checker before writing (Step 5). Commit `bd3b9e5`. |
-| E5-E7 | all | **Proposed** | Not started. See the backlog below. |
+| E6 | B1-B4 `/build-team` skill | **Shipped** | `template-v2/.claude/skills/build-team/SKILL.md` (commit `56f10d7`). Profile read + Maker proposal, loop-checker validation (bounded 2 revisions, 5-role hard cap), `team_status.md`, approval gate, apply with `.bak` rollback. |
+| E5, E7 | all | **Proposed** | Not started. E5 (daemon wrap) needs a go/no-go; E7 (proactive team updates) builds on E6. See the backlog below. |
 
 ## What this is
 
@@ -80,7 +81,7 @@ The PRD assumes an independent LLM Checker everywhere. A scheduled daemon job ha
 | E3 | Self-repair loop | 2 | E1, E2 | M (3-5d) | **Shipped** |
 | E4 | `/meditate` -> self-improvement feed | 2 | E1 | S (1-2d) | **Shipped** |
 | E5 | Wrap daemon scheduled jobs | 3 | E1 | L (1-2w) | Proposed |
-| E6 | `/build-team` skill | 4 | E1 | M-L (1w) | Proposed |
+| E6 | `/build-team` skill | 4 | E1 | M-L (1w) | **Shipped** |
 | E7 | Proactive team-update suggestions | 4 | E6 | S-M (2-4d) | Proposed |
 
 Phase 1 proves the whole pattern end-to-end on a surface that already exists (`auto-research`), so it ships value with the least blast radius. Phase 3 (daemon) is deliberately late: it is the most invasive and least reversible, and nothing else depends on it.
