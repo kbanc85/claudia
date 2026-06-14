@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- **`auto-research` worked example** (Proposal 11, E2/B4). The skill now includes a short dry-run transcript: a board-update iteration showing baseline scoring, keep/revert decisions, a `contested` iteration where Claudia self-scores 9.5 but the independent Checker holds it to 8.4, the resulting `research_status.md`, and the hand-off. This closes the last open sub-tranche of Proposal 11.
+
 ## 1.65.0 (2026-06-15)
 
 ### Added
