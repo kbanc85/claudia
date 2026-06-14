@@ -117,7 +117,7 @@ For each iteration N:
 6. **Flag divergence.** Compare the Checker's `score` against your Maker self-score. If they diverge by more than 1.5 points on a 10-point scale, mark the iteration `contested` in `results.tsv`. The Checker's verdict still governs; the flag just surfaces the disagreement in the end-of-run summary.
 7. **Write the status file.** Atomically update `research_status.md` with `iteration`, `verified`, `score`, `budget_remaining`, `last_input`, `maker_proposal`, `checker_verdict` (the Checker's rationale), and `next_action`. Write to a temp sibling and rename; never edit it in place. (See `docs/loop-status-schema.md`.)
 8. **Report.** One line to the user: `iter N: score 7.4 (kept), change: tightened lede to one sentence`. Append `[contested]` when flagged.
-9. **Check stop conditions.** If budget exhausted: stop. If score plateaued (no improvement for 5 iterations): stop. Otherwise: next iteration.
+9. **Check stop conditions and self-repair.** If the Checker has returned `verified: false` 3 times in a row, or its score has regressed for 3 straight iterations, enter the self-repair sub-loop (see `.claude/skills/_loop/repair.md`) before giving up: it diagnoses whether the rubric or a brief is the real problem, proposes one fix, and proves it on the exact failing input. If budget exhausted: stop. If score plateaued (no improvement for 5 iterations): stop. Otherwise: next iteration.
 
 ## The independent Checker (Maker-Checker)
 
@@ -143,6 +143,13 @@ was over-optimistic.
 **Cost.** The Checker runs on Haiku, so the verification pass is cheap and fast.
 With the default 20-iteration budget, that is at most 21 Checker dispatches
 (including the baseline), each scoped to a single small artifact.
+
+**Self-repair.** If the loop stalls (the Checker fails 3 times running, or scores
+regress), `auto-research` enters a bounded self-repair sub-loop that treats the
+harness, not the artifact, as the suspect: it diagnoses the rubric or a brief,
+proposes one fix, and proves it on the exact failing input before adopting it.
+See `.claude/skills/_loop/repair.md`. It is capped at 2 repair attempts and never
+auto-edits shipped briefs (those changes go to a human approval gate).
 
 ## Safety rules (mandatory, follow without exception)
 

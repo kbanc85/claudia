@@ -42,6 +42,7 @@ Silently retrieve:
 
 - Call the `memory_reflections` MCP tool to see what already exists
 - Call the `memory_session_context` MCP tool for recent context (if available)
+- Read recent loop status files (`~/.claudia/loops/*_status.md`, and any `research_status.md` from `auto-research` runs this session) to see how Claudia's own Maker-Checker loops performed: which iterations were `contested`, which loops never reached `verified`, where budgets ran out. This feeds the harness review in Step 2b.
 
 ### Step 2: Generate Reflections
 
@@ -77,6 +78,18 @@ Review the session and identify 1-3 reflections. Ask yourself:
    If yes, draft a judgment rule for each (see Step 3). Not every session produces judgment rules. Most won't. Only propose rules when behavior clearly indicates a repeatable business trade-off.
 
 **Quality over quantity.** One genuine insight beats three generic observations.
+
+### Step 2b: Loop harness review (only if loops ran this session)
+
+If any Maker-Checker loop ran this session (`auto-research`, or a wrapped daemon job), review how the harness itself performed, separately from reflections about the user. Read the signal from the status files gathered in Step 1, not from memory:
+
+- **Contested iterations.** Did the Maker (Claudia) and the Checker disagree often? Frequent `contested` flags usually mean the rubric is ambiguous or Claudia was over-optimistic, not that the Checker is wrong.
+- **Stuck loops.** Did a loop burn its whole budget without reaching `verified`? That points at the rubric, the Maker brief, or the Checker brief needing sharpening.
+- **Recurring failure shape.** Across runs, is the same kind of issue showing up in the Checker's `issues` list?
+
+If a clear, repeatable harness problem emerges, draft a **harness-improvement proposal**: a concrete edit to a rubric, the Maker brief (`.claude/skills/_loop/maker.md`), the Checker brief (`.claude/skills/_loop/checker.md`), or a new judgment rule about how to run loops. Do not apply it yet. Harness proposals go through the Checker gate in Step 5.
+
+Most sessions produce no harness proposal. Raise one only when the evidence is in the status files.
 
 ### Step 3: Present for Approval
 
@@ -170,6 +183,12 @@ Call the `memory_end_session` MCP tool with:
 4. Assign a sequential ID within its category (e.g., `esc-001`, `esc-002`)
 5. Set `source` to `meditate/YYYY-MM-DD` (today's date)
 6. Write the updated file
+
+**Harness proposals go through the Checker before anything is written** (Proposal 11, E4). If Step 2b produced a harness-improvement proposal (a rubric edit, a Maker or Checker brief edit, or a loop-running judgment rule), validate it first:
+
+1. Dispatch the `loop-checker` agent with the proposal as the artifact and a one-line rubric: "does this change actually fix the observed failure without breaking the brief's contract?"
+2. Write the proposal only if the Checker returns `verified: true`. A proposal the Checker rejects is surfaced to the user as an open question, not saved.
+3. Edits to shipped briefs (`_loop/maker.md`, `_loop/checker.md`) are never auto-applied. Present them as a diff for the user to approve, like any other change to Claudia's own files. Loop-running judgment rules go into `context/judgment.yaml` like any other rule, after passing the Checker.
 
 Confirm storage with both reflections and rules:
 "Got it. I've saved [N] reflection(s) and added [M] judgment rule(s) to your judgment file. I'll apply them going forward. See you next time."

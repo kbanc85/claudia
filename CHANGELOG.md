@@ -4,15 +4,17 @@ All notable changes to Claudia will be documented in this file.
 
 ## Unreleased
 
-### Loop engineering foundation (Proposal 11, Phase 1)
+### Loop engineering foundation (Proposal 11, Phases 1-2)
 
-First slice of the Autonomy & Personalization Layer: the Maker-Checker pattern on the existing `auto-research` loop, plus the shared infrastructure later loops reuse. See `docs/proposals/11-autonomy-personalization-layer.md`.
+The first two phases of the Autonomy & Personalization Layer: the Maker-Checker pattern on the existing `auto-research` loop, a bounded self-repair sub-loop, the shared loop infrastructure later loops reuse, and a `meditate` feed that reviews how the loops themselves performed. See `docs/proposals/11-autonomy-personalization-layer.md`.
 
 ### Added
 
 - **Independent Checker for `auto-research`** (Proposal 11, E2). The iteration loop no longer grades its own work. Each iteration now dispatches a new `loop-checker` agent (Haiku, adversarial brief) that scores the artifact against the rubric independently; the Checker's score, not Claudia's, drives the keep/revert decision. When the Checker's score and Claudia's self-score diverge past threshold, the iteration is flagged `contested` and surfaced in the end-of-run summary. New files: `template-v2/.claude/agents/loop-checker.md` and `template-v2/.claude/skills/_loop/` (`maker.md`, `checker.md`, `README.md`).
 - **Loop status-file schema** (Proposal 11, E1). `docs/loop-status-schema.md` defines a standard Markdown-body + YAML-frontmatter control plane (`last_input`, `maker_proposal`, `checker_verdict`, `verified`, `next_action`, and friends) plus the exit-condition standard every loop must declare up front. `auto-research` now writes `research_status.md` in this format each iteration.
 - **Atomic status-file helper** (Proposal 11, E1/B3). New daemon module `claudia_memory/loops/status.py` (`write_status` / `read_status`) writes a status file through a same-directory temp file plus `os.replace`, so an interrupted write never leaves a partial file at the canonical path. Six tests in `memory-daemon/tests/test_loop_status.py` cover round-trip, native-type preservation, parent-dir creation, temp cleanup, and crash-safety.
+- **Self-repair sub-loop** (Proposal 11, E3). When a loop stalls (the Checker fails 3 times running or scores regress), `auto-research` now enters a bounded self-repair pass (`template-v2/.claude/skills/_loop/repair.md`): it diagnoses whether the rubric or a brief is the real problem, proposes one fix, and proves it on the exact failing input before adopting it. Capped at 2 repair attempts; confirmed repairs leave a regression fixture under `~/.claudia/loops/regressions/`; edits to shipped briefs always go to a human approval gate.
+- **`meditate` reviews loop-harness performance** (Proposal 11, E4). End-of-session reflection now reads recent loop status files, summarizes how Claudia's own Maker-Checker loops did (contested iterations, stuck loops, recurring Checker findings), and can propose a harness improvement. Any such proposal passes through the Checker before it is written, and edits to shipped briefs are presented as a diff for approval.
 
 ## 1.61.1 (2026-05-23)
 

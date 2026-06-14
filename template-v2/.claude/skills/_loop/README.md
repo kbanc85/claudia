@@ -22,6 +22,7 @@ design.
 |------|------|
 | `maker.md` | The producer prompt: makes one bounded change per iteration. |
 | `checker.md` | The independent verifier prompt: scores adversarially, returns a structured verdict. |
+| `repair.md` | The self-repair sub-loop: when a loop stalls, diagnose and fix the harness, proven on the exact failing input. |
 
 ## Why Maker and Checker are separate
 
