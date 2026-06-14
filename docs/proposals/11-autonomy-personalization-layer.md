@@ -1,20 +1,22 @@
 # Proposal 11: Autonomy & Personalization Layer (Loop Engineering + Team Builder)
 
-**Status**: Phase 1 (E1+E2) shipped 2026-06-13; E3-E7 proposed · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; epics E2-E7 can each be split into their own numbered proposal, 12-17, when picked up)
+**Status**: Phases 1-2 (E1-E4) shipped 2026-06-13; E5-E7 proposed · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; epics E5-E7 can each be split into their own numbered proposal, 12-17, when picked up)
 
 ## Implementation status
 
 | Epic | Sub-tranche | Status | Notes |
 |------|-------------|--------|-------|
-| E1 | B1 status-file schema | **Shipped** | `docs/loop-status-schema.md` (commit `3bc19cf`). |
-| E1 | B2 Maker/Checker templates | **Shipped** | `template-v2/.claude/skills/_loop/{maker,checker,README}.md` (`3bc19cf`). |
-| E1 | B3 atomic status helper | **Shipped** | `memory-daemon/claudia_memory/loops/status.py` + 6 tests (commit `729b1f6`). |
-| E1 | B4 exit-condition standard | **Shipped** | Section in `docs/loop-status-schema.md` (`3bc19cf`). |
-| E2 | B1 Checker subagent role | **Shipped** | `template-v2/.claude/agents/loop-checker.md`; `auto-research/SKILL.md` loop steps 4-5 (`3bc19cf`). |
-| E2 | B2 emit status file | **Shipped** | `auto-research` writes `research_status.md` each iteration (`3bc19cf`). |
-| E2 | B3 disagreement handling | **Shipped** | `contested` flag on Maker/Checker score divergence (`3bc19cf`). |
+| E1 | B1 status-file schema | **Shipped** | `docs/loop-status-schema.md` (commit `eed7a79`). |
+| E1 | B2 Maker/Checker templates | **Shipped** | `template-v2/.claude/skills/_loop/{maker,checker,README}.md` (`eed7a79`). |
+| E1 | B3 atomic status helper | **Shipped** | `memory-daemon/claudia_memory/loops/status.py` + 6 tests (commit `b1d2d02`). |
+| E1 | B4 exit-condition standard | **Shipped** | Section in `docs/loop-status-schema.md` (`eed7a79`). |
+| E2 | B1 Checker subagent role | **Shipped** | `template-v2/.claude/agents/loop-checker.md`; `auto-research/SKILL.md` loop steps 4-5 (`eed7a79`). |
+| E2 | B2 emit status file | **Shipped** | `auto-research` writes `research_status.md` each iteration (`eed7a79`). |
+| E2 | B3 disagreement handling | **Shipped** | `contested` flag on Maker/Checker score divergence (`eed7a79`). |
 | E2 | B4 docs + worked example | **Partial** | `SKILL.md` updated; the worked dry-run transcript is deferred to the E2 split (proposal 12). |
-| E3-E7 | all | **Proposed** | Not started. See the backlog below. |
+| E3 | B1-B4 self-repair sub-loop | **Shipped** | `template-v2/.claude/skills/_loop/repair.md` + `auto-research` stall trigger (commit `bd3b9e5`). Trigger, repair-and-validate-on-original-input, regression capture, 2-attempt cap, human gate for shipped-brief edits. |
+| E4 | B1-B2 meditate harness review | **Shipped** | `meditate/SKILL.md` reads loop status (Step 1), reviews harness performance (Step 2b), routes harness proposals through the Checker before writing (Step 5). Commit `bd3b9e5`. |
+| E5-E7 | all | **Proposed** | Not started. See the backlog below. |
 
 ## What this is
 
@@ -75,8 +77,8 @@ The PRD assumes an independent LLM Checker everywhere. A scheduled daemon job ha
 |------|-------|-------|-----------|------|--------|
 | E1 | Loop harness foundation | 1 | none | M (3-5d) | **Shipped** |
 | E2 | Maker-Checker on `auto-research` | 1 | E1 | S-M (2-3d) | **Shipped** |
-| E3 | Self-repair loop | 2 | E1, E2 | M (3-5d) | Proposed |
-| E4 | `/meditate` -> self-improvement feed | 2 | E1 | S (1-2d) | Proposed |
+| E3 | Self-repair loop | 2 | E1, E2 | M (3-5d) | **Shipped** |
+| E4 | `/meditate` -> self-improvement feed | 2 | E1 | S (1-2d) | **Shipped** |
 | E5 | Wrap daemon scheduled jobs | 3 | E1 | L (1-2w) | Proposed |
 | E6 | `/build-team` skill | 4 | E1 | M-L (1w) | Proposed |
 | E7 | Proactive team-update suggestions | 4 | E6 | S-M (2-4d) | Proposed |
