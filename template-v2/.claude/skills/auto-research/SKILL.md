@@ -151,6 +151,56 @@ proposes one fix, and proves it on the exact failing input before adopting it.
 See `.claude/skills/_loop/repair.md`. It is capped at 2 repair attempts and never
 auto-edits shipped briefs (those changes go to a human approval gate).
 
+## Worked example (dry run)
+
+A short run of "tighten this board update", to show the loop and the independent
+Checker in practice. The artifact is `artifact.md`; the rubric is the board
+update rubric below. Budget: 20 iterations.
+
+```
+iter 0: score 6.1 (baseline)            checker: solid update, but the lede buries the one number that matters; the ask is split across two sentences
+iter 1: score 7.0 (kept)                maker: moved the revenue number into the opening line | checker: lede now leads with the number; ask still split
+iter 2: score 7.0 (reverted)            maker: cut the second paragraph | checker: lost the context the board needs for the ask; net neutral
+iter 3: score 7.8 (kept)                maker: merged the ask into one sentence | checker: ask is now one clear line; tone matches prior updates
+iter 4: score 8.4 (kept) [contested]    maker self-score 9.5 | checker: tighter, but "significantly" is doing unearned work in the headline
+iter 5: score 8.4 (reverted)            maker: swapped the closing line | checker: weaker call to action than iter 4; revert
+iter 6: plateau                         no gain for the last 3 iterations; remaining changes are cosmetic
+```
+
+The loop stops at iteration 6 on plateau. `research_status.md` at that point:
+
+```markdown
+---
+loop_id: tighten-board-update-20260613
+iteration: 6
+verified: true
+score: 8.4
+budget_remaining: 14
+last_input: board update draft v4
+maker_proposal: swapped the closing line (reverted)
+checker_verdict: best version is iter 4; remaining changes are cosmetic
+next_action: hand off iter 4 to the user
+updated_at: 2026-06-13T15:02:00Z
+---
+
+# Loop status: tighten-board-update
+
+Ratcheted 6.1 to 8.4 over 4 kept iterations. One contested iteration (iter 4):
+Claudia self-scored 9.5, the Checker scored 8.4 and flagged an unearned
+intensifier. The Checker's score governed. Plateaued at iter 6.
+```
+
+Hand-off to the user: "Started at 6.1, ended at 8.4 over 6 iterations. The three
+biggest jumps were moving the revenue number into the lede (iter 1), collapsing
+the ask into one sentence (iter 3), and the tone pass (iter 4). One iteration was
+contested: I scored iter 4 a 9.5, the Checker held it to 8.4 because the headline
+leaned on 'significantly' with no number behind it. I kept the Checker's call.
+Want iter 4 back at the original location?"
+
+That contested iteration is the whole point of the split. Without an independent
+Checker, iter 4 ships at the inflated 9.5 self-score. With it, the unearned
+intensifier gets caught and the honest 8.4 governs.
+
 ## Safety rules (mandatory, follow without exception)
 
 1. **Workspace-only edits.** The loop never writes to a file outside `~/.claudia/auto-research/<task-id>/`. The user's original file at `/Users/.../wherever.md` is untouched until the user explicitly approves the final hand-off.
