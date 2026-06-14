@@ -1,10 +1,24 @@
 # Proposal 11: Autonomy & Personalization Layer (Loop Engineering + Team Builder)
 
-**Status**: Proposed (2026-06-13) · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; epics E2-E7 can each be split into their own numbered proposal, 12-17, when picked up)
+**Status**: Phase 1 (E1+E2) shipped 2026-06-13; E3-E7 proposed · **Effort**: 4-6 weeks across 4 phases · **Batch**: Autonomy & Personalization (this proposal is the batch master; epics E2-E7 can each be split into their own numbered proposal, 12-17, when picked up)
+
+## Implementation status
+
+| Epic | Sub-tranche | Status | Notes |
+|------|-------------|--------|-------|
+| E1 | B1 status-file schema | **Shipped** | `docs/loop-status-schema.md` (commit `3bc19cf`). |
+| E1 | B2 Maker/Checker templates | **Shipped** | `template-v2/.claude/skills/_loop/{maker,checker,README}.md` (`3bc19cf`). |
+| E1 | B3 atomic status helper | **Shipped** | `memory-daemon/claudia_memory/loops/status.py` + 6 tests (commit `729b1f6`). |
+| E1 | B4 exit-condition standard | **Shipped** | Section in `docs/loop-status-schema.md` (`3bc19cf`). |
+| E2 | B1 Checker subagent role | **Shipped** | `template-v2/.claude/agents/loop-checker.md`; `auto-research/SKILL.md` loop steps 4-5 (`3bc19cf`). |
+| E2 | B2 emit status file | **Shipped** | `auto-research` writes `research_status.md` each iteration (`3bc19cf`). |
+| E2 | B3 disagreement handling | **Shipped** | `contested` flag on Maker/Checker score divergence (`3bc19cf`). |
+| E2 | B4 docs + worked example | **Partial** | `SKILL.md` updated; the worked dry-run transcript is deferred to the E2 split (proposal 12). |
+| E3-E7 | all | **Proposed** | Not started. See the backlog below. |
 
 ## What this is
 
-A backlog, not a design doc. It takes the "Autonomy & Personalization Layer" PRD (Loop Engineering Foundation + Dynamic Agent Team Builder) and turns it into deduped, sized, sequenced epics. Each epic carries a sub-tranche table whose Notes column is the acceptance criteria. Nothing here is built yet. Read the Decisions and Dedup map first: they are where the PRD's hand-waving gets resolved against what already ships.
+A backlog, not a design doc. It takes the "Autonomy & Personalization Layer" PRD (Loop Engineering Foundation + Dynamic Agent Team Builder) and turns it into deduped, sized, sequenced epics. Each epic carries a sub-tranche table whose Notes column is the acceptance criteria. Phase 1 (E1 + E2) is now built; the rest is proposed. Read the Decisions and Dedup map first: they are where the PRD's hand-waving gets resolved against what already ships.
 
 ## TL;DR
 
@@ -59,8 +73,8 @@ The PRD assumes an independent LLM Checker everywhere. A scheduled daemon job ha
 
 | Epic | Title | Phase | Depends on | Size | Status |
 |------|-------|-------|-----------|------|--------|
-| E1 | Loop harness foundation | 1 | none | M (3-5d) | Proposed |
-| E2 | Maker-Checker on `auto-research` | 1 | E1 | S-M (2-3d) | Proposed |
+| E1 | Loop harness foundation | 1 | none | M (3-5d) | **Shipped** |
+| E2 | Maker-Checker on `auto-research` | 1 | E1 | S-M (2-3d) | **Shipped** |
 | E3 | Self-repair loop | 2 | E1, E2 | M (3-5d) | Proposed |
 | E4 | `/meditate` -> self-improvement feed | 2 | E1 | S (1-2d) | Proposed |
 | E5 | Wrap daemon scheduled jobs | 3 | E1 | L (1-2w) | Proposed |
