@@ -1,6 +1,6 @@
 {
   "version": "1.62.0",
-  "generated": "2026-06-14T02:42:35.412Z",
+  "generated": "2026-06-14T02:45:03.860Z",
   "algorithm": "sha256",
   "files": {
     ".claude/rules/claudia-principles.md": "939e9720421628e7f2e4c8dfbaa4aeb9c1e18e8c6a5379cd6b772a6835b812e5",
@@ -45,7 +45,7 @@
     ".claude/skills/fix-duplicates/SKILL.md": "bd3d6aae0bce09bc844ba93f76abb4a97ff0286c6a4da29cd369763864fd4a86",
     ".claude/skills/follow-up-draft/SKILL.md": "49212946cb7b2db39cecd435ab6fcb7cb26cc49666306084d27676543be67281",
     ".claude/skills/growth-check/SKILL.md": "a3ed3f2427f3639f81d16b1a2adfa268bafed795d2b0d02621bc6be318784c24",
-    ".claude/skills/hire-agent.md": "2d60d241592db7d5f30a635d11164802f907b02616fb25170f3f867d5235f067",
+    ".claude/skills/hire-agent.md": "8f46632d6c9b02563a41c00c811e1bcd365614bb5e64d770482f3536fa30e6fe",
     ".claude/skills/inbox-check/SKILL.md": "e2cddc91f72ffc0443d105385d2e8b464f86404a4825d308bd03a68e4ee43726",
     ".claude/skills/ingest-sources/SKILL.md": "938b93d299649db156ad19e9a7bd5d09e950f53bc2eaf8a85386f9fdbca350d0",
     ".claude/skills/ingest-sources/references/extraction-patterns.md": "28d6dc604c4a11eacfe4523e705ad430ba8fe26632bafcccaef656e9618e5aea",

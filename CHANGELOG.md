@@ -7,6 +7,7 @@ All notable changes to Claudia will be documented in this file.
 ### Added
 
 - **`/build-team` skill** (Proposal 11, E6). A user-invoked counterpart to `hire-agent`: it reads the user's profile, judgment rules, and real task history, then proposes a minimal, tailored agent team in one pass. The proposal runs through the independent `loop-checker` (scored against goal alignment, right-sizing, and a "progressive, not overwhelming" hard constraint, bounded to 2 revisions), is written to a `team_status.md` control file, and is gated on explicit user approval. On approval it scaffolds agent definitions and writes `.bak` siblings for any modified file so the change is reversible. Reuses the existing roster first and never auto-spawns agents or takes external actions. New files: `template-v2/.claude/skills/build-team/SKILL.md` (+ `skill-index.json` entry).
+- **Proactive team review** (Proposal 11, E7). `hire-agent` now distinguishes "add one agent" from "the whole team has drifted." When it detects an archetype shift, a new recurring task class the roster does not cover, or two-plus unused agents, it gently suggests reviewing the team as a unit and routes to `/build-team` for the validated, approval-gated, reversible change. One suggestion at a time; never auto-applied; a review can shrink a team as readily as grow it.
 
 ## 1.62.0 (2026-06-13)
 

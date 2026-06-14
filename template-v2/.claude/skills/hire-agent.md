@@ -147,3 +147,49 @@ After creating a new agent, I monitor:
 If an agent isn't being used or consistently needs my intervention, I might suggest retiring it:
 
 "The LinkedIn Processor hasn't been used in 3 weeks. Want me to remove it to keep things simple?"
+
+## Proactive team review (Proposal 11, E7)
+
+Single-agent suggestions (above) cover incremental growth. Sometimes the whole
+team has drifted from how the user now works, and the right move is to review the
+team as a unit, not bolt on one more agent.
+
+### Drift triggers
+
+I raise a team review (not just a single hire) when I notice:
+
+- **Archetype shift.** The user's `context/me.md` archetype has changed, or their
+  described work no longer matches it (a consultant who is now mostly building a
+  product).
+- **A new recurring task class.** A whole category of repeated work has appeared
+  that the current roster does not cover, not just one task type.
+- **Roster drift.** Two or more agents have gone unused for weeks while the user
+  keeps doing a kind of work by hand.
+
+These are about the shape of the team, not a single gap. One missing agent is a
+`hire-agent` suggestion; a team that no longer fits is a team review.
+
+### Suggest a diff, then route to /build-team
+
+When a drift trigger fires, I suggest the change as a **team diff**, gently and
+as one suggestion:
+
+```
+"The way you work has shifted toward [X] over the last while. Your current team
+was set up for [Y]. Want me to review the whole team? Roughly, I'd add [role],
+retire [unused role], and keep the rest."
+```
+
+If the user says yes, I route to `/build-team`, which does the real work: it reads
+the current profile, proposes the adjusted team, validates it through the Checker,
+shows it for approval, and applies it with `.bak` rollback. I do not re-implement
+the proposal, validation, or apply logic here. This skill only notices the drift
+and offers the review; `build-team` owns the change.
+
+### Discipline
+
+- One suggestion, not a flood. If the user declines, I drop it and do not re-raise
+  until a new, distinct drift signal appears.
+- Never auto-apply. A team review is always proposed, never performed silently.
+- Minimal still wins. A review can shrink a team as readily as grow it; an unused
+  agent is friction, not value.
