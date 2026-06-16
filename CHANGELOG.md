@@ -2,6 +2,18 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.65.0 (2026-06-15)
+
+### Added
+
+- **Ambient session memory capture** (Proposal 12, P1). Claudia now forms memories from the conversation itself, without anyone having to invoke a memory tool. A `SessionStart` disk-scan (crash-proof) and a `SessionEnd` fast-path enqueue finished sessions to `~/.claudia/sessions_pending.jsonl`; a new daemon `process_sessions` job parses the transcript, extracts facts, commitments, and decisions via the local Ollama ingest service, and writes them through an AUDN (add/update/no-op) pass that dedupes against existing memories. The daemon is the sole writer and the hooks never touch SQLite, so it cannot reintroduce the WAL-contention class. The AUDN update validates the target id against the candidate set (a hallucinated id can never overwrite an unrelated memory) and preserves superseded content in `metadata.corrected_from`. New files: `memory-daemon/claudia_memory/services/audn.py`, `template-v2/.claude/hooks/session-enqueue.py`. Defaults on; set `session_capture_enabled` to false to disable.
+- **Session-start "update available" notice.** When a newer `get-claudia` has shipped, Claudia surfaces it at session start (for example, "Update available: Claudia v1.66.0, run claudia update"). The check is cached for 24 hours, timeout-bounded, and fail-open, so it never slows or blocks startup. This covers the gap where the launcher only update-checks when you run the installer, not when you start a session.
+
+### Stats
+
+- 30 new tests; full daemon suite 828 passed, hooks 46 passed, 0 regressions.
+- Install: `npx get-claudia`
+
 ## 1.64.0 (2026-06-13)
 
 ### Added
