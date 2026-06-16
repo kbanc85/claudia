@@ -4,6 +4,7 @@ Background Scheduler for Claudia Memory System
 Runs scheduled consolidation tasks using APScheduler.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -183,6 +184,328 @@ def _ingest_observations(db, config):
         logger.debug(f"Ingested {ingested} observations from hook capture")
 
 
+def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
+    """Parse a Claude Code JSONL transcript and extract readable conversation text.
+
+    Tolerates truncated last lines. Skips tool_use/tool_result entries.
+    Returns up to max_chars of concatenated human/assistant text.
+    """
+    path = Path(transcript_path)
+    if not path.exists():
+        return ""
+
+    # Skip very large files
+    try:
+        if path.stat().st_size > 50 * 1024 * 1024:  # 50MB
+            return ""
+    except OSError:
+        return ""
+
+    text_parts = []
+    total_chars = 0
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                if total_chars >= max_chars:
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    turn = json.loads(line)
+                except json.JSONDecodeError:
+                    # Tolerate truncated last line silently
+                    continue
+
+                # Skip tool use entries
+                turn_type = turn.get("type", "")
+                if turn_type in ("tool_use", "tool_result"):
+                    continue
+
+                role = turn.get("role") or turn.get("type", "")
+                if role not in ("user", "human", "assistant"):
+                    continue
+
+                content = turn.get("content") or turn.get("text") or ""
+                if isinstance(content, list):
+                    # Extract text blocks, skip tool_use blocks
+                    parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            if block.get("type") == "tool_use" or block.get("type") == "tool_result":
+                                continue
+                            if block.get("type") == "text":
+                                parts.append(block.get("text", ""))
+                    content = " ".join(parts)
+                elif not isinstance(content, str):
+                    continue
+
+                content = content.strip()
+                if not content:
+                    continue
+
+                prefix = "User: " if role in ("user", "human") else "Assistant: "
+                chunk = prefix + content[:500] + "\n"
+                text_parts.append(chunk)
+                total_chars += len(chunk)
+
+    except OSError:
+        return ""
+
+    return "".join(text_parts)[:max_chars]
+
+
+def _process_sessions(db, config):
+    """Poll ~/.claudia/sessions_pending.jsonl and ingest sessions into memory.
+
+    Mirrors _ingest_observations() exactly in structure:
+    - Atomic rename to prevent race conditions with hook writers
+    - Skips sessions already ingested (ingested_at IS NOT NULL in episodes)
+    - Extracts text from transcript JSONL
+    - Files raw source material first (Source Preservation)
+    - Runs LLM extraction via ingest service
+    - Uses AUDN write helper for semantic dedup
+    - Marks episode as ingested when done
+    """
+    if not getattr(config, "session_capture_enabled", True):
+        return
+
+    queue_file = Path.home() / ".claudia" / "sessions_pending.jsonl"
+    processing_file = queue_file.with_suffix(".jsonl.processing")
+
+    if not queue_file.exists():
+        return
+
+    try:
+        if queue_file.stat().st_size == 0:
+            return
+    except OSError:
+        return
+
+    # Atomic rename to prevent race with hook writes
+    try:
+        os.rename(str(queue_file), str(processing_file))
+    except OSError:
+        return
+
+    processed = 0
+
+    try:
+        with open(processing_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                session_id = entry.get("session_id", "")
+                transcript_path = entry.get("transcript_path", "")
+
+                if not session_id:
+                    continue
+
+                # Skip if already ingested
+                try:
+                    row = db.execute(
+                        "SELECT id, ingested_at FROM episodes WHERE session_id = ?",
+                        (session_id,),
+                        fetch=True,
+                    )
+                    if row and row[0]["ingested_at"] is not None:
+                        logger.debug(f"Session {session_id} already ingested, skipping")
+                        continue
+                    episode_id = row[0]["id"] if row else None
+                except Exception as e:
+                    logger.debug(f"Could not check episode for {session_id}: {e}")
+                    episode_id = None
+
+                # Parse transcript
+                raw_text = ""
+                if transcript_path:
+                    try:
+                        raw_text = _parse_transcript(transcript_path)
+                    except Exception as e:
+                        logger.debug(f"Transcript parse error for {session_id}: {e}")
+
+                # Create or reuse episode
+                try:
+                    if episode_id is None:
+                        now = datetime.utcnow().isoformat()
+                        episode_id = db.insert(
+                            "episodes",
+                            {
+                                "session_id": session_id,
+                                "started_at": now,
+                                "message_count": 0,
+                                "is_summarized": 0,
+                            },
+                        )
+                except Exception as e:
+                    logger.debug(f"Could not create episode for {session_id}: {e}")
+                    continue
+
+                now_iso = datetime.utcnow().isoformat()
+
+                # If transcript is empty, mark as ingested and continue
+                if not raw_text.strip():
+                    try:
+                        db.update(
+                            "episodes",
+                            {"ingested_at": now_iso, "is_summarized": 1},
+                            "id = ?",
+                            (episode_id,),
+                        )
+                    except Exception:
+                        pass
+                    processed += 1
+                    continue
+
+                # Source Preservation: file raw transcript first
+                try:
+                    from ..services.remember import get_remember_service
+                    remember_svc = get_remember_service()
+                    # Store a stub memory to link to source material
+                    stub_id = remember_svc.remember_fact(
+                        content=f"Session transcript: {session_id}",
+                        memory_type="observation",
+                        importance=0.3,
+                        source="session_transcript",
+                        source_id=session_id,
+                        origin_type="extracted",
+                        metadata={"verification_status": "pending", "is_source_stub": True},
+                    )
+                    if stub_id:
+                        remember_svc.save_source_material(
+                            stub_id,
+                            raw_text,
+                            metadata={
+                                "source": "session_transcript",
+                                "session_id": session_id,
+                            },
+                        )
+                except Exception as e:
+                    logger.debug(f"Source preservation failed for {session_id}: {e}")
+
+                # LLM extraction
+                try:
+                    from ..services.ingest import get_ingest_service
+                    from ..language_model import get_language_model_service
+                    from ..services.audn import audn_write
+
+                    ingest_svc = get_ingest_service()
+                    llm_svc = get_language_model_service()
+
+                    result = asyncio.run(ingest_svc.ingest(raw_text, source_type="session"))
+
+                    if result["status"] == "llm_unavailable":
+                        # Mark as ingested so we don't re-queue; no data to store
+                        logger.debug(f"LLM unavailable for session {session_id}, marking as processed")
+                        db.update(
+                            "episodes",
+                            {"ingested_at": now_iso, "is_summarized": 0},
+                            "id = ?",
+                            (episode_id,),
+                        )
+                        processed += 1
+                        continue
+
+                    if result["status"] == "extracted" and result.get("data"):
+                        data = result["data"]
+
+                        # Write facts via AUDN
+                        for fact in data.get("facts", []):
+                            try:
+                                asyncio.run(audn_write(
+                                    content=fact.get("content", ""),
+                                    memory_type=fact.get("type", "fact"),
+                                    about_entities=fact.get("about", []),
+                                    importance=fact.get("importance", 0.6),
+                                    source="session_transcript",
+                                    source_id=session_id,
+                                    db=db,
+                                    llm_service=llm_svc,
+                                ))
+                            except Exception as e:
+                                logger.debug(f"AUDN write failed for fact: {e}")
+
+                        # Write commitments via AUDN
+                        for commitment in data.get("commitments", []):
+                            try:
+                                asyncio.run(audn_write(
+                                    content=commitment.get("content", ""),
+                                    memory_type="commitment",
+                                    about_entities=[commitment["who"]] if commitment.get("who") else [],
+                                    importance=commitment.get("importance", 0.7),
+                                    source="session_transcript",
+                                    source_id=session_id,
+                                    db=db,
+                                    llm_service=llm_svc,
+                                ))
+                            except Exception as e:
+                                logger.debug(f"AUDN write failed for commitment: {e}")
+
+                        # Write decisions via AUDN
+                        for decision in data.get("decisions", []):
+                            try:
+                                asyncio.run(audn_write(
+                                    content=decision.get("content", ""),
+                                    memory_type="fact",
+                                    about_entities=[],
+                                    importance=decision.get("importance", 0.7),
+                                    source="session_transcript",
+                                    source_id=session_id,
+                                    db=db,
+                                    llm_service=llm_svc,
+                                ))
+                            except Exception as e:
+                                logger.debug(f"AUDN write failed for decision: {e}")
+
+                        # Store narrative and structured data via end_session
+                        try:
+                            from ..services.remember import get_remember_service
+                            remember_svc = get_remember_service()
+                            narrative = data.get("summary", f"Session {session_id} processed from transcript.")
+                            remember_svc.end_session(
+                                episode_id=episode_id,
+                                narrative=narrative,
+                                entities=data.get("entities", []),
+                                relationships=data.get("relationships", []),
+                                key_topics=data.get("key_topics", []),
+                            )
+                        except Exception as e:
+                            logger.debug(f"end_session failed for {session_id}: {e}")
+
+                except Exception as e:
+                    logger.debug(f"Extraction failed for session {session_id}: {e}")
+
+                # Mark as ingested regardless of extraction outcome
+                try:
+                    db.update(
+                        "episodes",
+                        {"ingested_at": now_iso},
+                        "id = ?",
+                        (episode_id,),
+                    )
+                    processed += 1
+                except Exception as e:
+                    logger.debug(f"Could not mark session {session_id} as ingested: {e}")
+
+    except Exception as e:
+        logger.debug(f"Error reading sessions_pending file: {e}")
+    finally:
+        try:
+            processing_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    if processed > 0:
+        logger.debug(f"Processed {processed} sessions from session capture queue")
+
+
 class MemoryScheduler:
     """Manages scheduled memory maintenance tasks"""
 
@@ -263,6 +586,17 @@ class MemoryScheduler:
                 name="Observation ingestion",
                 replace_existing=True,
                 misfire_grace_time=60,
+            )
+
+        # Every 60 seconds: Session ingestion from SessionEnd/SessionStart hooks
+        if getattr(self.config, "session_capture_enabled", True):
+            self.scheduler.add_job(
+                self._run_session_ingest,
+                IntervalTrigger(seconds=60),
+                id="session_ingest",
+                name="Session ingestion",
+                replace_existing=True,
+                misfire_grace_time=300,
             )
 
         self.scheduler.start()
@@ -391,6 +725,17 @@ class MemoryScheduler:
             )
         except Exception as e:
             logger.debug(f"Error in observation ingestion: {e}")
+
+    def _run_session_ingest(self) -> None:
+        """Ingest sessions from SessionEnd/SessionStart hook queue."""
+        try:
+            from ..database import get_db
+            run_with_status(
+                "session_ingest",
+                lambda: _process_sessions(get_db(), self.config),
+            )
+        except Exception as e:
+            logger.debug(f"Error in session ingestion: {e}")
 
 
 # Global scheduler instance

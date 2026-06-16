@@ -107,6 +107,26 @@ Return JSON with this exact schema:
   "summary": "string"
 }
 """,
+
+    "session": _SYSTEM_BASE + """
+You are extracting structured data from a CLAUDE CODE CONVERSATION TRANSCRIPT.
+
+The transcript is a JSONL file where each line is a conversation turn.
+Focus on substantive content: decisions made, facts stated, commitments given,
+people and entities mentioned. SKIP: tool calls, file reads, generic chit-chat,
+meta-commentary about the AI's own process.
+
+Return JSON with this exact schema:
+{
+  "facts": [{"content": "string", "type": "string", "about": ["string"], "importance": number}],
+  "commitments": [{"content": "string", "who": "string or null", "deadline": "string or null", "importance": number}],
+  "decisions": [{"content": "string", "importance": number}],
+  "entities": [{"name": "string", "type": "string", "description": "string or null"}],
+  "relationships": [{"source": "string", "target": "string", "relationship": "string"}],
+  "key_topics": ["string"],
+  "summary": "string"
+}
+""",
 }
 
 
