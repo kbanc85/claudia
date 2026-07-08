@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/kbanc85-claudia-badge.png)](https://mseep.ai/app/kbanc85-claudia)
+
 <p align="center">
 <img src="assets/claudia-banner.gif" alt="Claudia" width="500">
 </p>
