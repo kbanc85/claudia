@@ -9,6 +9,8 @@ import json
 import os
 import shutil
 import subprocess
+import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -22,6 +24,88 @@ def _fetch_briefing():
             return data.get("briefing")
     except Exception:
         return None
+
+
+# Daemon self-heal at session start.
+# A fresh install (or a crashed/killed daemon) can leave the memory daemon down,
+# in which case the in-session memory tools silently do nothing. This probes the
+# daemon and, on macOS with a LaunchAgent present, attempts exactly one automatic
+# restart; every other down path only advises. A hook must never become a process
+# manager, so process spawning is limited to a single launchd reload that mirrors
+# the installer (bin/index.js). Fail-open and hard-bounded: it must never block or
+# crash session start.
+
+DAEMON_HEALTH_URL = "http://localhost:3848/health"
+LAUNCHD_LABEL = "com.claudia.memory"
+LAUNCHD_PLIST = Path.home() / "Library" / "LaunchAgents" / "com.claudia.memory.plist"
+
+
+def _daemon_up(timeout: float = 2.0) -> bool:
+    """True if the memory daemon answers its /health endpoint. Fail-closed."""
+    try:
+        req = urllib.request.Request(DAEMON_HEALTH_URL)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return getattr(resp, "status", 200) == 200
+    except Exception:
+        return False
+
+
+def _is_macos() -> bool:
+    return sys.platform == "darwin"
+
+
+def _launchd_restart() -> None:
+    """One launchd reload: unload then load the plist (mirrors bin/index.js).
+    Bounded 5s per call, fail-open, never raises."""
+    for action in ("unload", "load"):
+        try:
+            subprocess.run(
+                ["launchctl", action, str(LAUNCHD_PLIST)],
+                capture_output=True, timeout=5,
+            )
+        except Exception:
+            pass
+
+
+def _daemon_fix_guidance() -> str:
+    """Concrete, stepwise fix guidance when the daemon is down and could not be
+    auto-restarted, so the persona can walk the user through it."""
+    return (
+        "Memory daemon is not running and I could not auto-restart it. To fix: "
+        "(1) run `claudia system-health` to diagnose; "
+        "(2) on macOS, re-run `npx get-claudia .` from your Claudia folder to reinstall "
+        "the LaunchAgent, then restart this session; "
+        "(3) on Windows, this is known issue #37 (the daemon's Python dependencies may "
+        "never have installed) -- re-run the installer and check that ~/.claudia/daemon/ "
+        "has a venv. "
+        "Meanwhile I will work from context/ files only (no semantic search or pattern "
+        "detection), and I will say so rather than imply memory is live."
+    )
+
+
+def _ensure_daemon() -> str:
+    """Ensure the memory daemon is up at session start.
+
+    Returns a message to surface (a recovery note or fix guidance), or '' when the
+    daemon is healthy. Fail-open and hard-bounded so it never blocks or crashes
+    session start.
+    """
+    try:
+        if _daemon_up(timeout=2.0):
+            return ""
+        if _is_macos() and LAUNCHD_PLIST.exists():
+            _launchd_restart()
+            time.sleep(2)  # give launchd a moment to bring the daemon up
+            if _daemon_up(timeout=2.0):
+                return (
+                    "Memory daemon was down at session start; I restarted it "
+                    "automatically. Memory is available."
+                )
+            return _daemon_fix_guidance()
+        # Non-macOS, or macOS with no LaunchAgent plist: advise only, never spawn.
+        return _daemon_fix_guidance()
+    except Exception:
+        return ""
 
 
 def _recent_sessions_summary(max_days: int = 3) -> str:
@@ -322,10 +406,13 @@ def check_health():
             parts.append("Embeddings unavailable.")
 
         summary = " ".join(parts) if parts else "System ready."
+        daemon_note = _ensure_daemon()
         briefing = _fetch_briefing()
         recent = _recent_sessions_summary()
 
         sections = [f"Memory system healthy. {summary}"]
+        if daemon_note:
+            sections.append("--- Memory Daemon ---\n" + daemon_note)
         if recent:
             sections.append("--- Recent Sessions ---\n" + recent)
         if briefing:

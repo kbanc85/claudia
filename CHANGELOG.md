@@ -9,6 +9,7 @@ All notable changes to Claudia will be documented in this file.
 - **Commitment resolver: expired and stale auto-archive** (Proposal 12, P2). A new nightly `resolve_commitments()` phase inside `run_full_consolidation` (Phase 1c) retires commitments that have gone quiet: `expired` when a deadline passed more than the grace window ago and the item has not been touched since, `stale` when a deadline-less commitment is old, unreferenced, and low importance. It is archive-never-delete (Prop 12 D5): rows keep `lifecycle_tier='archived'` and stay fully queryable, with `metadata.resolution` and `metadata.resolved_at` recording why and when, so the briefing can disclose the batch and you can restore any of them by setting `lifecycle_tier='active'`. Sacred and invalidated commitments are never touched. Gentle, tunable thresholds via new config knobs (`commitment_grace_days=14`, `commitment_stale_days=60`, `commitment_stale_importance_ceiling=0.5`, `commitment_resolver_enabled=true`).
 - **Salience-ranked session briefing** (Proposal 12, P3). The briefing's commitment section no longer dumps a raw "N active" count. It shows the top 3 by soonest deadline then importance, each with its due date, followed by one honest summary line ("+N more active; M auto-archived recently, say 'restore' to correct") so an auto-archived batch is always disclosed (Prop 12 locked decision 4). The top proactive prediction is now gated by importance (new `prediction_surface_threshold=0.6` knob) so weak hunches stay quiet at session start.
 - **Honest memory-degradation disclosure** (Proposal 12, P3). When local embedding intelligence (Ollama) is unreachable, the briefing's first line says so plainly: recall still works, but semantic extraction and ambient capture are paused. The check is warm by the time the briefing runs (the SessionStart health check populates it first) and fails open, so it never blocks startup or false-alarms.
+- **Daemon self-heal at session start.** The SessionStart health-check hook now probes the memory daemon and, when it is down on macOS with a LaunchAgent present, attempts exactly one automatic restart (a launchd reload mirroring the installer), then re-probes: on recovery it says so, otherwise it injects concrete, stepwise fix guidance (`claudia system-health`, reinstall via `npx get-claudia .`, the Windows deps known issue, and the context-files fallback). A hook never becomes a process manager, so every non-macOS or no-plist path only advises. Fail-open and hard-bounded so it never blocks or crashes session start. So a fresh install (or a crashed daemon) surfaces the problem and often fixes itself instead of silently doing nothing.
 
 ### Fixed
 
@@ -21,8 +22,8 @@ All notable changes to Claudia will be documented in this file.
 
 ### Stats
 
-- 23 new daemon tests (12 commitment resolver, 11 briefing salience/degradation); full daemon suite 851 passed, 12 skipped, 0 regressions.
-- No schema migration; no template or hook changes.
+- 34 new tests (12 commitment resolver, 11 briefing salience/degradation, 11 daemon self-heal). Daemon suite 851 passed, 12 skipped; hooks suite 57 passed, 29 subtests. 0 regressions.
+- No schema migration. One template hook changed (`session-health-check.py`, daemon self-heal), added per the release requirement.
 
 ## 1.65.0 (2026-06-15)
 
