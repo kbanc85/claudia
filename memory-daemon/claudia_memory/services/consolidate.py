@@ -2707,6 +2707,94 @@ class ConsolidateService:
 
         return {"cooled": cooled, "archived": archived}
 
+    def resolve_commitments(self) -> dict:
+        """Archive commitments that expired or went stale. Never delete (Prop 12 D5).
+
+        expired: deadline passed more than the grace window ago and not recently
+                 accessed (a recent access means it is still live in conversation).
+        stale:   no deadline, old, unreferenced, and low importance.
+
+        Sacred and invalidated rows are never touched. metadata.resolution records
+        why and metadata.resolved_at records when, so the briefing can disclose the
+        batch and the user can correct it (restore lifecycle_tier='active').
+
+        Counts use SELECT changes() (like _surge_approaching_deadlines): this db.execute
+        wrapper returns None, so the cursor.rowcount idiom would always report 0.
+        """
+        config = self.config
+        if not getattr(config, "commitment_resolver_enabled", True):
+            return {"expired": 0, "stale": 0}
+
+        now = datetime.utcnow()
+        now_iso = now.isoformat()
+        grace_cutoff = (now - timedelta(days=config.commitment_grace_days)).isoformat()
+        stale_cutoff = (now - timedelta(days=config.commitment_stale_days)).isoformat()
+        importance_ceiling = config.commitment_stale_importance_ceiling
+
+        # Expired: deadline passed the grace window, not recently accessed.
+        expired = 0
+        try:
+            with self.db.transaction():
+                self.db.execute(
+                    """
+                    UPDATE memories
+                    SET lifecycle_tier = 'archived',
+                        archived_at = ?,
+                        updated_at = ?,
+                        metadata = json_set(
+                            CASE WHEN json_valid(metadata) THEN metadata ELSE '{}' END,
+                            '$.resolution', 'expired',
+                            '$.resolved_at', ?
+                        )
+                    WHERE type = 'commitment'
+                      AND invalidated_at IS NULL
+                      AND (lifecycle_tier IS NULL OR lifecycle_tier NOT IN ('sacred', 'archived'))
+                      AND deadline_at IS NOT NULL
+                      AND deadline_at < ?
+                      AND (last_accessed_at IS NULL OR last_accessed_at < ?)
+                    """,
+                    (now_iso, now_iso, now_iso, grace_cutoff, grace_cutoff),
+                )
+                res = self.db.execute("SELECT changes()", fetch=True)
+                expired = res[0][0] if res else 0
+        except Exception as e:
+            logger.debug(f"Commitment expiry resolution error: {e}")
+
+        # Stale: no deadline, old, unreferenced, low importance.
+        stale = 0
+        try:
+            with self.db.transaction():
+                self.db.execute(
+                    """
+                    UPDATE memories
+                    SET lifecycle_tier = 'archived',
+                        archived_at = ?,
+                        updated_at = ?,
+                        metadata = json_set(
+                            CASE WHEN json_valid(metadata) THEN metadata ELSE '{}' END,
+                            '$.resolution', 'stale',
+                            '$.resolved_at', ?
+                        )
+                    WHERE type = 'commitment'
+                      AND invalidated_at IS NULL
+                      AND (lifecycle_tier IS NULL OR lifecycle_tier NOT IN ('sacred', 'archived'))
+                      AND deadline_at IS NULL
+                      AND created_at < ?
+                      AND (last_accessed_at IS NULL OR last_accessed_at < ?)
+                      AND importance < ?
+                    """,
+                    (now_iso, now_iso, now_iso, stale_cutoff, stale_cutoff, importance_ceiling),
+                )
+                res = self.db.execute("SELECT changes()", fetch=True)
+                stale = res[0][0] if res else 0
+        except Exception as e:
+            logger.debug(f"Commitment stale resolution error: {e}")
+
+        if expired > 0 or stale > 0:
+            logger.info(f"Commitment resolution: {expired} expired, {stale} stale (archived)")
+
+        return {"expired": expired, "stale": stale}
+
     def detect_auto_sacred(self) -> int:
         """Auto-promote memories about close-circle entities that match sacred keywords."""
         config = self.config
