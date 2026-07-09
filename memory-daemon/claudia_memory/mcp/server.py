@@ -3327,6 +3327,80 @@ def _top_commitments(db, n: int = 3) -> dict:
     }
 
 
+def _render_commitment_lines(commitments: dict) -> list:
+    """Render the ranked commitment section for the briefing (Prop 12 D6).
+
+    A top-3 bulleted list (soonest deadline first), then one demoted summary line
+    disclosing how many more are active and how many were auto-archived recently
+    with a hint to restore (locked decision 4). Never a bare "N active" count.
+    """
+    lines = []
+    top = commitments.get("top", [])
+    active_count = commitments.get("active_count", 0)
+    recently_archived = commitments.get("recently_archived_count", 0)
+
+    if not top:
+        # No active items; still disclose a recent auto-archive batch if any.
+        if recently_archived > 0:
+            lines.append(
+                f'**Commitments:** none active ({recently_archived} auto-archived '
+                f'recently, say "restore" to correct)'
+            )
+        return lines
+
+    lines.append("**Commitments:**")
+    for c in top:
+        snippet = (c.get("content") or "").strip()[:80]
+        deadline = c.get("deadline_at")
+        due = f"due {str(deadline)[:10]}" if deadline else "no deadline"
+        lines.append(f"- {snippet} ({due})")
+
+    summary_bits = []
+    more = active_count - len(top)
+    if more > 0:
+        summary_bits.append(f"+{more} more active")
+    if recently_archived > 0:
+        summary_bits.append(
+            f'{recently_archived} auto-archived recently, say "restore" to correct'
+        )
+    if summary_bits:
+        lines.append(f"({'; '.join(summary_bits)})")
+
+    return lines
+
+
+def _top_prediction(db, threshold: float):
+    """Return the single most salient un-shown prediction, or None if the top one
+    is below the surface threshold (Prop 12 P3 interruptibility gate).
+
+    Gates on `priority` (the predictions table's salience field). No surfaced-history
+    field beyond is_shown exists, so the gate is importance-only, no migration.
+    """
+    try:
+        rows = db.execute(
+            """
+            SELECT content, prediction_type, priority FROM predictions
+            WHERE expires_at > datetime('now') AND is_shown = 0
+            ORDER BY priority DESC
+            LIMIT 1
+            """,
+            fetch=True,
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        if row["priority"] is None or row["priority"] < threshold:
+            return None
+        return {
+            "content": row["content"],
+            "prediction_type": row["prediction_type"],
+            "priority": row["priority"],
+        }
+    except Exception as e:
+        logger.debug(f"Briefing top prediction failed: {e}")
+        return None
+
+
 def _build_briefing() -> str:
     """
     Build a compact session briefing (~500 tokens).
@@ -3413,9 +3487,7 @@ def _build_briefing() -> str:
     #    Active excludes archived (resolver output) and invalidated rows (#67 class).
     try:
         commitments = _top_commitments(db, n=3)
-        active_count = commitments["active_count"]
-        if active_count > 0:
-            lines.append(f"**Commitments:** {active_count} active")
+        lines.extend(_render_commitment_lines(commitments))
     except Exception as e:
         logger.debug(f"Briefing commitments failed: {e}")
 
@@ -3450,19 +3522,12 @@ def _build_briefing() -> str:
     except Exception as e:
         logger.debug(f"Briefing unread failed: {e}")
 
-    # 4. Top prediction (1 line)
+    # 4. Top prediction (1 line), gated by importance (Prop 12 P3 interruptibility)
     try:
-        pred_row = db.execute(
-            """
-            SELECT content, prediction_type FROM predictions
-            WHERE expires_at > datetime('now') AND is_shown = 0
-            ORDER BY priority DESC
-            LIMIT 1
-            """,
-            fetch=True,
-        )
-        if pred_row:
-            p = pred_row[0]
+        from ..config import get_config as _get_config
+        threshold = _get_config().prediction_surface_threshold
+        p = _top_prediction(db, threshold)
+        if p:
             lines.append(f"**Top prediction:** [{p['prediction_type']}] {p['content'][:100]}")
     except Exception as e:
         logger.debug(f"Briefing prediction failed: {e}")
