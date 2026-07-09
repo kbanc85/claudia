@@ -110,6 +110,9 @@ class MemoryConfig:
     commitment_grace_days: int = 14                  # Grace after a deadline passes before it counts as expired
     commitment_stale_days: int = 60                  # Age (no deadline) + unreferenced before a commitment goes stale
     commitment_stale_importance_ceiling: float = 0.5 # Only stale-archive commitments below this importance
+
+    # Proactive surfacing (Proposal 12 P3)
+    prediction_surface_threshold: float = 0.6        # Min prediction priority before it surfaces in the brief
     enable_auto_sacred: bool = True         # Auto-detect sacred facts for close-circle entities
     close_circle_keywords: list = field(default_factory=lambda: [
         "close friend", "bestie", "family", "inner circle", "best friend",
@@ -244,6 +247,8 @@ class MemoryConfig:
                     config.commitment_stale_days = data["commitment_stale_days"]
                 if "commitment_stale_importance_ceiling" in data:
                     config.commitment_stale_importance_ceiling = data["commitment_stale_importance_ceiling"]
+                if "prediction_surface_threshold" in data:
+                    config.prediction_surface_threshold = data["prediction_surface_threshold"]
                 if "enable_auto_sacred" in data:
                     config.enable_auto_sacred = data["enable_auto_sacred"]
                 if "close_circle_keywords" in data:
@@ -358,6 +363,9 @@ class MemoryConfig:
         if not (0.0 <= self.commitment_stale_importance_ceiling <= 1.0):
             logger.warning(f"commitment_stale_importance_ceiling={self.commitment_stale_importance_ceiling} out of range [0,1], using default 0.5")
             self.commitment_stale_importance_ceiling = 0.5
+        if not (0.0 <= self.prediction_surface_threshold <= 1.0):
+            logger.warning(f"prediction_surface_threshold={self.prediction_surface_threshold} out of range [0,1], using default 0.6")
+            self.prediction_surface_threshold = 0.6
         if self.context_builder_token_budget < 500:
             logger.warning(f"context_builder_token_budget={self.context_builder_token_budget} too small, using 2000")
             self.context_builder_token_budget = 2000
@@ -416,6 +424,7 @@ class MemoryConfig:
             "commitment_grace_days": self.commitment_grace_days,
             "commitment_stale_days": self.commitment_stale_days,
             "commitment_stale_importance_ceiling": self.commitment_stale_importance_ceiling,
+            "prediction_surface_threshold": self.prediction_surface_threshold,
             "enable_auto_sacred": self.enable_auto_sacred,
             "enable_chain_verification": self.enable_chain_verification,
             "context_builder_token_budget": self.context_builder_token_budget,
