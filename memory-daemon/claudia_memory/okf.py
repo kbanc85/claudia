@@ -1,4 +1,4 @@
-"""Open Knowledge Format (OKF) schema — the single source of truth.
+"""Open Knowledge Format (OKF) schema: the single source of truth.
 
 OKF is Google's open format for agent-authored knowledge: a directory of
 markdown files with YAML frontmatter. Spec (v0.1 draft):
@@ -29,7 +29,7 @@ CORE_FIELDS = ("type", "title", "description", "resource", "tags", "timestamp")
 
 # The house ``type`` vocabulary. OKF types are free strings, but everything
 # Claudia AUTHORS is drawn from this list so the corpus stays self-consistent.
-# (Consumers still tolerate any unknown type — this constrains writers only.)
+# (Consumers still tolerate any unknown type; this constrains writers only.)
 TYPE_VOCABULARY = frozenset(
     {
         # context / relationship / knowledge entities

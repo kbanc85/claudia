@@ -343,6 +343,8 @@ Memory projects to an Obsidian vault at `~/.claudia/vault/`. New installs defaul
 
 Existing installs from v1.59 and earlier keep their PARA-organized vault (`Active/`, `Relationships/`, `Reference/`, `Archive/`) untouched. SQLite remains the source of truth; the vault is a projection you can browse, search, and read.
 
+**Claudia speaks OKF.** Every knowledge file she writes, in the vault and in your install, carries [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) frontmatter: a `type`, a `title`, and an ISO 8601 `timestamp`, plus tags and a description. OKF is Google's open, tooling-free standard for agent-authored knowledge (a directory of markdown files with YAML frontmatter), so your notes stay portable and readable by any OKF-aware tool, not just Claudia. She is mandatory on write and lenient on read: she never rejects a file of yours for missing a field. To bring an older install up to standard, run `claudia-memory --okf-normalize --project-dir <path>` (dry-run first, then `--apply`). See `docs/okf-conventions.md`.
+
 ---
 
 ## How It Works
