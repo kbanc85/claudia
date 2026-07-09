@@ -4,9 +4,25 @@ All notable changes to Claudia will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Commitment resolver: expired and stale auto-archive** (Proposal 12, P2). A new nightly `resolve_commitments()` phase inside `run_full_consolidation` (Phase 1c) retires commitments that have gone quiet: `expired` when a deadline passed more than the grace window ago and the item has not been touched since, `stale` when a deadline-less commitment is old, unreferenced, and low importance. It is archive-never-delete (Prop 12 D5): rows keep `lifecycle_tier='archived'` and stay fully queryable, with `metadata.resolution` and `metadata.resolved_at` recording why and when, so the briefing can disclose the batch and you can restore any of them by setting `lifecycle_tier='active'`. Sacred and invalidated commitments are never touched. Gentle, tunable thresholds via new config knobs (`commitment_grace_days=14`, `commitment_stale_days=60`, `commitment_stale_importance_ceiling=0.5`, `commitment_resolver_enabled=true`).
+- **Salience-ranked session briefing** (Proposal 12, P3). The briefing's commitment section no longer dumps a raw "N active" count. It shows the top 3 by soonest deadline then importance, each with its due date, followed by one honest summary line ("+N more active; M auto-archived recently, say 'restore' to correct") so an auto-archived batch is always disclosed (Prop 12 locked decision 4). The top proactive prediction is now gated by importance (new `prediction_surface_threshold=0.6` knob) so weak hunches stay quiet at session start.
+- **Honest memory-degradation disclosure** (Proposal 12, P3). When local embedding intelligence (Ollama) is unreachable, the briefing's first line says so plainly: recall still works, but semantic extraction and ambient capture are paused. The check is warm by the time the briefing runs (the SessionStart health check populates it first) and fails open, so it never blocks startup or false-alarms.
+
+### Fixed
+
+- **Briefing counted archived and invalidated commitments** (issue #67 class). The commitment count filtered only `invalidated_at IS NULL`, so once the new resolver archived a commitment it would still inflate the "active" number. The briefing now routes through a single `_top_commitments` helper whose active filter excludes both archived and invalidated rows.
+
 ### Changed
 
 - **`auto-research` worked example** (Proposal 11, E2/B4). The skill now includes a short dry-run transcript: a board-update iteration showing baseline scoring, keep/revert decisions, a `contested` iteration where Claudia self-scores 9.5 but the independent Checker holds it to 8.4, the resulting `research_status.md`, and the hand-off. This closes the last open sub-tranche of Proposal 11.
+- **Retroactive credit: automated memory lifecycle transitions.** The active to cooling to archived lifecycle transitions (`run_lifecycle_transitions`, Phase 1b of nightly consolidation) shipped in v1.65.0 inside `run_full_consolidation` but were not listed in that release's changelog entry. Noting it here for the record; Proposal 12 P2 (the commitment resolver above) builds directly on that machinery.
+
+### Stats
+
+- 23 new daemon tests (12 commitment resolver, 11 briefing salience/degradation); full daemon suite 851 passed, 12 skipped, 0 regressions.
+- No schema migration; no template or hook changes.
 
 ## 1.65.0 (2026-06-15)
 
