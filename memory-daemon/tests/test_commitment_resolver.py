@@ -236,3 +236,40 @@ def test_resolver_disabled_is_noop(db):
 
     assert result == {"expired": 0, "stale": 0}
     assert _row(db, mid)["lifecycle_tier"] == "active"
+
+
+# ── Nightly consolidation wiring ─────────────────────────────────
+
+
+def test_full_consolidation_runs_resolver(db):
+    """run_full_consolidation archives a seeded expired commitment and reports it.
+
+    The commitment is aged so ONLY the resolver (not lifecycle cooling) would
+    archive it: created 40d ago (inside the 60d cooling window, so active->cooling
+    does not fire) with a deadline 30d past.
+    """
+    from claudia_memory.config import MemoryConfig
+    from claudia_memory.services.consolidate import ConsolidateService
+
+    mid = _insert_commitment(
+        db, "Send the launch recap to the team",
+        importance=0.4, deadline_at=_days_ago(30),
+        created_at=_days_ago(40), last_accessed_at=_days_ago(30),
+    )
+
+    svc = ConsolidateService.__new__(ConsolidateService)
+    svc.db = db
+    cfg = MemoryConfig()
+    cfg.enable_pre_consolidation_backup = False
+    cfg.vault_sync_enabled = False
+    svc.config = cfg
+
+    results = svc.run_full_consolidation()
+
+    assert "commitments" in results
+    assert results["commitments"]["expired"] == 1
+
+    row = _row(db, mid)
+    assert row["lifecycle_tier"] == "archived"
+    meta = json.loads(row["metadata"])
+    assert meta["resolution"] == "expired"
