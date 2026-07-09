@@ -55,6 +55,9 @@ Every wiki page follows this template:
 
 ```markdown
 ---
+type: wiki-page
+title: "Sarah Chen"
+timestamp: "2026-05-15T00:00:00Z"
 entity: "Sarah Chen"
 entity_type: person
 last_updated: 2026-05-15
@@ -96,7 +99,11 @@ contradiction_count: 0
 ```
 
 Required elements:
-- **YAML frontmatter** with `entity`, `entity_type`, `last_updated`, `source_memories` (list of memory IDs that contributed to this version of the page), `contradiction_count`.
+- **OKF frontmatter.** The OKF core comes first: `type: wiki-page`, `title` (the
+  entity display name), `timestamp` (ISO 8601 of the last update). Then the wiki
+  extension fields, kept as-is: `entity`, `entity_type`, `last_updated`,
+  `source_memories` (memory IDs that contributed to this version), `contradiction_count`.
+  `title` mirrors `entity`; `timestamp` mirrors `last_updated`. See `docs/okf-conventions.md`.
 - **TLDR** in a blockquote at the top. One sentence that answers "what's the deal with this entity?"
 - **Citations** as `[mem:NNN]` after each load-bearing claim. The user can trace any fact back to its source.
 - **Cross-references** as `[[Entity Name]]` Obsidian wikilinks. These power the graph view.
@@ -130,7 +137,7 @@ When I'm asked to write or update a wiki page for an entity:
    - If there's an existing page and only 1-3 new memories: incremental. Add new facts to relevant sections, append to "History", update the TLDR if warranted.
    - If there's no page, or 5+ new memories since the last update, or the page is older than 60 days: full rewrite. Build the page from scratch using all memories.
 4. **Synthesize the page** following the template. Cite every meaningful claim. Flag contradictions explicitly.
-5. **Save** using the Write tool to `~/.claudia/vault/Wiki/<entity-name>.md`. Update `last_updated`, append new memory IDs to `source_memories`, refresh `contradiction_count`.
+5. **Save** using the Write tool to `~/.claudia/vault/Wiki/<entity-name>.md`. Update `last_updated` and `timestamp` (ISO 8601), append new memory IDs to `source_memories`, refresh `contradiction_count`.
 6. **Cross-link.** If the page references other entities, ensure those entities have wiki pages too. If not and they're active, queue them for later (don't recursively write the whole graph).
 
 ## Read workflow (when user asks about an entity)

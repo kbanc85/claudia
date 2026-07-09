@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from claudia_memory import okf
 from claudia_memory.services.vault_sync import (
     VaultSyncService,
     _sanitize_filename,
@@ -141,12 +142,14 @@ def test_export_single_entity(db, vault_svc, vault_dir):
     assert path.name == "Sarah Chen.md"
 
     content = path.read_text()
-    # Check frontmatter
+    # Check frontmatter (OKF core + Claudia extensions, parsed not string-matched)
     assert "---" in content
-    assert f"claudia_id: {eid}" in content
-    assert "type: person" in content
-    assert 'name: "Sarah Chen"' in content
-    assert "sync_hash:" in content
+    fm, _ = okf.parse_frontmatter(content)
+    assert fm["claudia_id"] == eid
+    assert fm["type"] == "person"
+    assert fm["title"] == "Sarah Chen"   # OKF display title
+    assert fm["name"] == "Sarah Chen"    # legacy key kept as extension
+    assert "sync_hash" in fm
     # Check title
     assert "# Sarah Chen" in content
     # Check description
@@ -202,8 +205,8 @@ def test_export_entity_with_aliases(db, vault_svc, vault_dir):
     path = vault_svc.export_entity(entity)
     content = path.read_text()
 
-    assert "aliases:" in content
-    assert '  - "S. Chen"' in content
+    fm, _ = okf.parse_frontmatter(content)
+    assert fm["aliases"] == ["S. Chen"]
 
 
 # =============================================================================
@@ -530,10 +533,11 @@ def test_frontmatter_contact_fields(db, vault_svc, vault_dir):
     path = vault_svc.export_entity(entity)
     content = path.read_text()
 
-    assert "attention_tier: active" in content
-    assert "contact_trend: stable" in content
-    assert "contact_frequency_days: 4.2" in content
-    assert "last_contact: 2026-02-10" in content
+    fm, _ = okf.parse_frontmatter(content)
+    assert fm["attention_tier"] == "active"
+    assert fm["contact_trend"] == "stable"
+    assert fm["contact_frequency_days"] == 4.2
+    assert fm["last_contact"] == "2026-02-10"
 
 
 def test_frontmatter_compound_tags(db, vault_svc, vault_dir):
@@ -547,9 +551,10 @@ def test_frontmatter_compound_tags(db, vault_svc, vault_dir):
     path = vault_svc.export_entity(entity)
     content = path.read_text()
 
-    assert "  - person" in content
-    assert "  - active" in content
-    assert "  - stable" in content
+    fm, _ = okf.parse_frontmatter(content)
+    assert "person" in fm["tags"]
+    assert "active" in fm["tags"]
+    assert "stable" in fm["tags"]
 
 
 def test_frontmatter_cssclasses(db, vault_svc, vault_dir):
@@ -559,8 +564,8 @@ def test_frontmatter_cssclasses(db, vault_svc, vault_dir):
     path = vault_svc.export_entity(entity)
     content = path.read_text()
 
-    assert "cssclasses:" in content
-    assert "  - entity-person" in content
+    fm, _ = okf.parse_frontmatter(content)
+    assert fm["cssclasses"] == ["entity-person"]
 
 
 # =============================================================================

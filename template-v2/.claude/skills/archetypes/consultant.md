@@ -371,6 +371,22 @@ For each client folder in `clients/`:
 
 ## Client Templates
 
+Every `overview.md` here is an OKF knowledge file: frontmatter first, then the
+body described below. Set `timestamp` (ISO 8601) on write. A client
+`overview.md`:
+
+```yaml
+---
+type: organization
+title: "[Client Name]"
+description: "[One line: the engagement]"
+tags: [client, engagement]
+timestamp: "[ISO 8601, now]"
+---
+```
+
+A project `overview.md` uses `type: project`. See `docs/okf-conventions.md`.
+
 ### Full Business Depth: Per-Client Files
 
 Each client folder (`clients/[client-name]/`) contains:

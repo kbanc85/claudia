@@ -213,6 +213,22 @@ Health check across all active clients at once.
 
 ## Client Templates
 
+Every `overview.md` here is an OKF knowledge file: frontmatter first, then the
+body described below. Set `timestamp` (ISO 8601) on write. A client
+`overview.md`:
+
+```yaml
+---
+type: organization
+title: "[Client Name]"
+description: "[One line: the engagement]"
+tags: [client]
+timestamp: "[ISO 8601, now]"
+---
+```
+
+A project `overview.md` uses `type: project`. See `docs/okf-conventions.md`.
+
 ### Full Business Depth
 
 `clients/[client-name]/overview.md`: Quick stats (status, since, contact, health, last contact), engagement (type, rate, scope, contract end), contact channels, active work (project/status/deadline/value), deliverables due, commitments (mine + theirs), history (projects/dates/value, total revenue, average project), financial (last invoice, outstanding, payment terms, payment history), what they value, how to work with them (communication, feedback, decisions, quirks), opportunities, notes.

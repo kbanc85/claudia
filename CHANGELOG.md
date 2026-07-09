@@ -2,6 +2,17 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **OKF is Claudia's authoring standard.** Every knowledge file Claudia writes now carries [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) frontmatter (v0.1): a required `type` from a house vocabulary plus `title`, `description`, `tags`, and an ISO 8601 `timestamp`. A new shared module, `memory-daemon/claudia_memory/okf.py` (marked `OKF_SPEC_VERSION`), is the single place all OKF field logic lives (build / parse / normalize), and `docs/okf-conventions.md` is the canonical conventions doc every skill cites. All install templates gained frontmatter, the three divergent person templates and two pipeline templates were collapsed to one canonical each, and the wiki dialect now leads with the OKF core (`type: wiki-page`, `title`, `timestamp`) while keeping its existing fields as extensions. Mandatory on write, lenient on read: Claudia never validates-and-rejects a user's file. A template conformance test (`tests/okf/`) makes the standard enforceable rather than aspirational.
+- **`claudia-memory --okf-normalize --project-dir <install> [--apply]`.** An additive, reversible migration that brings an existing install's knowledge files up to OKF: it infers `type` from the directory, `title` from the first heading, and `timestamp` from mtime, and ADDS frontmatter (bodies preserved byte-for-byte), then writes per-directory `index.md` listings. Dry-run by default; `--apply` backs every changed file up to `~/.claudia/backups/okf-normalize-<date>/` first. Idempotent (a second run changes nothing). Files that already conform are left untouched.
+
+### Changed
+
+- **The Obsidian vault now emits OKF-conformant frontmatter.** All five `vault_sync` note builders (entities, patterns, reflections, session logs, MOC indices) route through `okf.py`, so entity notes gain `title`/`description`/`timestamp` and the MOC index files gain `type: moc`; Claudia-specific fields (`claudia_id`, `sync_hash`, `importance`, `cssclasses`, `name`) are kept as extensions. This reformats every note's frontmatter once on the next sync. It is safe: `sync_hash` covers the note body only, so the one-time rewrite is never misread as a user edit (proven by tests).
+
 ## 1.66.0 (2026-07-09)
 
 ### Added

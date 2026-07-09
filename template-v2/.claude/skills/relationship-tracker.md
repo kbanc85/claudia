@@ -82,7 +82,10 @@ I can capture what you've shared about them."
    - "What's their role?"
    - "How do you know them?"
    - "Any key context I should capture?"
-3. Create file with available info
+3. Create file with available info, using the **canonical person template**
+   (the `people/_template.md` block in `structure-generator.md`): OKF
+   frontmatter (`type: person`, `title`, `timestamp` in ISO 8601) then the body.
+   See `docs/okf-conventions.md`.
 4. Note as incomplete for future enrichment
 
 ---

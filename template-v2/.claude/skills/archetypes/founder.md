@@ -207,6 +207,23 @@ Financial runway and burn rate summary.
 
 ## Investor Templates
 
+Every `overview.md` here is an OKF knowledge file: frontmatter first, then the
+body described below. Set `timestamp` (ISO 8601) on write. An investor
+`overview.md`:
+
+```yaml
+---
+type: organization
+title: "[Investor / Firm Name]"
+description: "[One line: stage, check size, status]"
+tags: [investor]
+timestamp: "[ISO 8601, now]"
+---
+```
+
+Product `roadmap.md` uses `type: project`; `fundraising/overview.md` uses
+`type: context`. See `docs/okf-conventions.md`.
+
 ### Full Business Depth
 
 `investors/[investor-name]/overview.md`: Quick stats (firm, role, stage focus, check size, relationship status, investment amount), about them (thesis, sweet spot, relevant portfolio, known preferences, decision process), relationship (intro source, first contact, strength, interaction history), their view of us (likes, concerns, feedback), investment status (amount, instrument, board seat), communication preferences, value-add (how they help, help requested), next steps, personal notes.

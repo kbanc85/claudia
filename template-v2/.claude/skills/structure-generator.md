@@ -288,6 +288,13 @@ claudia/
 
 ### context/me.md Template
 ```markdown
+---
+type: context
+title: "[Name]"
+description: "User profile and working context."
+tags: [context, profile]
+---
+
 # [Name]
 
 ## Profile
@@ -316,6 +323,13 @@ claudia/
 
 ### context/commitments.md Template
 ```markdown
+---
+type: commitment-ledger
+title: "Commitments"
+description: "Active promises being tracked."
+tags: [context, commitments]
+---
+
 # Commitments
 
 Active promises I'm tracking for you.
@@ -341,6 +355,13 @@ Active promises I'm tracking for you.
 
 ### context/waiting.md Template
 ```markdown
+---
+type: commitment-ledger
+title: "Waiting On"
+description: "Things awaited from others."
+tags: [context, waiting]
+---
+
 # Waiting On
 
 Things you're waiting for from others.
@@ -366,6 +387,13 @@ Things you're waiting for from others.
 
 ### context/patterns.md Template
 ```markdown
+---
+type: context
+title: "Patterns"
+description: "Observations across our work together."
+tags: [context, patterns]
+---
+
 # Patterns
 
 Observations across our work together.
@@ -389,6 +417,13 @@ Observations across our work together.
 
 ### context/learnings.md Template
 ```markdown
+---
+type: context
+title: "Claudia's Learnings"
+description: "What Claudia has learned about working with you."
+tags: [context, learnings]
+---
+
 # Claudia's Learnings
 
 What I've learned about working with you.
@@ -418,6 +453,13 @@ These templates are used when `business_depth` is "full" or "starter".
 
 ### pipeline/active.md Template
 ```markdown
+---
+type: context
+title: "Active Pipeline"
+description: "Current engagements and opportunities in progress."
+tags: [pipeline]
+---
+
 # Active Pipeline
 
 Current engagements and opportunities in progress.
@@ -456,6 +498,13 @@ Current engagements and opportunities in progress.
 
 ### pipeline/prospecting.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Prospecting Pipeline"
+description: "Leads and outreach in progress."
+tags: [pipeline]
+---
+
 # Prospecting Pipeline
 
 Potential opportunities being cultivated.
@@ -493,6 +542,13 @@ Potential opportunities being cultivated.
 
 ### pipeline/completed.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Completed Engagements"
+description: "Closed and delivered engagements."
+tags: [pipeline]
+---
+
 # Completed Engagements
 
 Historical record of past work.
@@ -528,6 +584,13 @@ Historical record of past work.
 
 ### accountability/commitments.md Template (Full System Only)
 ```markdown
+---
+type: commitment-ledger
+title: "Commitments"
+description: "Commitments tracked for accountability."
+tags: [accountability, commitments]
+---
+
 # Commitments
 
 Active promises and obligations being tracked.
@@ -563,6 +626,13 @@ Active promises and obligations being tracked.
 
 ### accountability/overdue.md Template (Full System Only)
 ```markdown
+---
+type: commitment-ledger
+title: "Overdue Items"
+description: "Commitments past their due date."
+tags: [accountability, overdue]
+---
+
 # Overdue Items
 
 Things that need immediate attention.
@@ -590,6 +660,13 @@ Things that need immediate attention.
 
 ### finances/overview.md Template
 ```markdown
+---
+type: context
+title: "Financial Overview"
+description: "Monthly financial snapshot."
+tags: [finances]
+---
+
 # Financial Overview
 
 Revenue, capacity, and financial health at a glance.
@@ -633,6 +710,13 @@ Revenue, capacity, and financial health at a glance.
 
 ### finances/expenses.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Expenses"
+description: "Expense tracking by category."
+tags: [finances]
+---
+
 # Expenses
 
 Business expense tracking.
@@ -679,6 +763,13 @@ Business expense tracking.
 
 ### finances/invoicing.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Invoicing Log"
+description: "Outstanding and paid invoices."
+tags: [finances]
+---
+
 # Invoicing Log
 
 Track all invoices sent and payments received.
@@ -721,6 +812,13 @@ Track all invoices sent and payments received.
 
 ### finances/tax-planning.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Tax Planning"
+description: "Quarterly estimates and set-aside tracking."
+tags: [finances]
+---
+
 # Tax Planning
 
 Quarterly tax notes and planning.
@@ -766,6 +864,13 @@ Quarterly tax notes and planning.
 
 ### templates/new-client-intake.md Template (Full System Only)
 ```markdown
+---
+type: organization
+title: "[Client Name]"
+description: "New client intake."
+tags: [template, client]
+---
+
 # New Client Intake
 
 Use this template when onboarding a new client.
@@ -836,6 +941,13 @@ Use this template when onboarding a new client.
 
 ### templates/meeting-prep.md Template (Full System Only)
 ```markdown
+---
+type: meeting
+title: "[Meeting Title]"
+description: "Preparation notes for a meeting."
+tags: [template, meeting]
+---
+
 # Meeting Prep Template
 
 ## Meeting: [Title]
@@ -900,6 +1012,13 @@ What I expect to do after:
 
 ### templates/meeting-capture.md Template
 ```markdown
+---
+type: meeting
+title: "[Meeting Title]"
+description: "Notes captured from a meeting."
+tags: [template, meeting]
+---
+
 # Meeting Notes
 
 ## Meeting: [Title]
@@ -958,6 +1077,13 @@ What I expect to do after:
 
 ### templates/milestone-plan.md Template (Full System Only)
 ```markdown
+---
+type: project
+title: "[Client/Project Name]"
+description: "Milestone plan for an engagement."
+tags: [template, project]
+---
+
 # Milestone Plan
 
 ## Engagement: [Client/Project Name]
@@ -1024,6 +1150,13 @@ What does "done well" look like?
 
 ### templates/stakeholder-map.md Template (Full System Only)
 ```markdown
+---
+type: project
+title: "[Client/Project Name]"
+description: "Stakeholder map for an engagement."
+tags: [template, project]
+---
+
 # Stakeholder Map
 
 ## Client/Project: [Name]
@@ -1079,6 +1212,13 @@ What does "done well" look like?
 
 ### templates/weekly-review.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Weekly Review"
+description: "Weekly review of wins, progress, and next steps."
+tags: [template, review]
+---
+
 # Weekly Review
 
 ## Week of: [Date]
@@ -1157,6 +1297,13 @@ What would I do differently?
 
 ### insights/patterns.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "Patterns"
+description: "Cross-engagement patterns and insights."
+tags: [insights]
+---
+
 # Patterns
 
 Observations and insights across all work.
@@ -1217,6 +1364,13 @@ Things that apply broadly:
 
 ### insights/methodology.md Template (Full System Only)
 ```markdown
+---
+type: context
+title: "My Methodology"
+description: "Personal methodology and process."
+tags: [insights]
+---
+
 # My Methodology
 
 How I approach my work.
@@ -1283,6 +1437,13 @@ How this methodology has changed over time:
 Only create this file if user showed interest in integrations during onboarding Phase 3.5.
 
 ```markdown
+---
+type: context
+title: "Integrations"
+description: "Connected and desired integrations."
+tags: [context, integrations]
+---
+
 # Integrations
 
 External tools and services connected to Claudia.
@@ -1332,7 +1493,22 @@ Ask me about connecting any tool. I'll:
 ```
 
 ### people/_template.md
+
+This is the **canonical person template**. The `new-person` skill and
+`archetypes/_base-structure.md` both reference this block instead of keeping
+their own variants. When you instantiate it, fill the OKF frontmatter (set
+`timestamp` to the current time in ISO 8601) and slug the filename (`Sarah
+Chen` -> `people/sarah-chen.md`).
+
 ```markdown
+---
+type: person
+title: "[Person Name]"
+description: "Relationship profile."
+tags: [person]
+timestamp: "[ISO 8601, set on creation]"
+---
+
 # [Person Name]
 
 **Role:** [Their title/position]
@@ -1390,6 +1566,22 @@ Ask me about connecting any tool. I'll:
 
 ---
 
+## OKF Authoring Standard
+
+Every knowledge file generated here ships an OKF frontmatter block (see
+`docs/okf-conventions.md`). The templates above already carry it. Two rules
+when you instantiate them:
+
+- **Set `timestamp`** to the current time in ISO 8601 on every file you write
+  (templates omit it; you fill it). `type` and `title` come from the template.
+- **Write an `index.md` per knowledge directory.** Any generated directory that
+  holds knowledge files (`people/`, `projects/`, `context/`, and per archetype
+  `clients/`, `pipeline/`, `finances/`, `accountability/`, `insights/`) gets an
+  `index.md` listing its files. Per OKF §6 an `index.md` has **no frontmatter**;
+  its body is one bullet per file: `* [Title](file.md) - one-line description`,
+  grouped under a `#` heading per type when the directory mixes types. Generation
+  ends by writing these index files.
+
 ## Generation Process
 
 When generating a structure:
@@ -1420,7 +1612,11 @@ When generating a structure:
    - Create `context/integrations.md`
    - Add integrations section to `context/me.md`
    - Note any specific integration interests for later
-10. **Report what was created**, grouped by category:
+10. **Write an `index.md` in every knowledge directory** created (per the OKF
+    Authoring Standard above): `people/`, `context/`, and any business modules
+    present (`pipeline/`, `finances/`, `accountability/`, `insights/`, plus
+    archetype equivalents like `clients/`). No frontmatter; one bullet per file.
+11. **Report what was created**, grouped by category:
     - Core files (context, people)
     - Business modules (if applicable)
     - Archetype-specific structure

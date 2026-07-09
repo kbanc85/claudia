@@ -1129,6 +1129,17 @@ def main():
         ),
     )
     parser.add_argument(
+        "--okf-normalize",
+        action="store_true",
+        help=(
+            "Bring an install's knowledge files up to OKF: add missing "
+            "frontmatter (type/title/timestamp), preserve bodies byte-for-byte, "
+            "and write per-directory index.md files. Requires --project-dir. "
+            "Dry-run by default; pass --apply to write (a timestamped backup is "
+            "taken first). Idempotent."
+        ),
+    )
+    parser.add_argument(
         "--migrate-legacy",
         action="store_true",
         help="Manually migrate data from a legacy database into claudia.db",
@@ -1774,6 +1785,58 @@ def main():
             f"  entities created:    {result.entities_created}\n"
             f"  entities reused:     {result.entities_reused}\n"
             f"  memory_entities links created: {result.links_created}"
+        )
+        return
+
+    if args.okf_normalize:
+        # Bring an install's knowledge files up to OKF. Additive, reversible,
+        # dry-run by default, backup-first on --apply, idempotent.
+        setup_logging(debug=args.debug)
+        from datetime import datetime as _dt
+
+        from .services.okf_normalize import (
+            apply_okf_normalize,
+            format_plan_summary,
+            plan_okf_normalize,
+        )
+
+        if not args.project_dir:
+            print("--okf-normalize requires --project-dir <install path>")
+            sys.exit(1)
+        install_dir = Path(args.project_dir)
+        if not install_dir.is_dir():
+            print(f"Install directory not found: {install_dir}")
+            sys.exit(1)
+
+        plan = plan_okf_normalize(install_dir)
+        print(format_plan_summary(plan))
+
+        if not args.apply:
+            print(
+                "\nDry-run. Re-run with --apply to write changes "
+                "(a timestamped backup is taken first)."
+            )
+            return
+
+        if not plan.has_changes():
+            return
+
+        config = get_config()
+        backups_dir = Path(config.backup_dir)
+        timestamp = _dt.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
+        backup_root = backups_dir / f"okf-normalize-{timestamp}"
+        try:
+            stats = apply_okf_normalize(plan, backup_root=backup_root)
+        except Exception as e:
+            print(f"\nokf-normalize aborted (no writes performed): {e}")
+            sys.exit(1)
+
+        print(
+            "\nOKF normalize applied:\n"
+            f"  backup dir:        {stats['backup_dir']}\n"
+            f"  frontmatter added: {stats['files_added']}\n"
+            f"  files normalized:  {stats['files_normalized']}\n"
+            f"  index.md written:  {stats['indexes_written']}"
         )
         return
 

@@ -208,6 +208,30 @@ Create a summary that captures:
 ---
 ```
 
+### Saved meeting file
+
+The block above is the chat display (emoji headers). When you PERSIST the meeting
+note as a file (e.g. `workspaces/[slug]/meetings/YYYY-MM-DD-topic.md`, or under a
+person's folder), it is an OKF knowledge file: lead with frontmatter, then the
+summary body. Set `timestamp` to the meeting time in ISO 8601.
+
+```markdown
+---
+type: meeting
+title: "[Meeting Name / Person] - [Date]"
+description: "[One line: what this meeting was about]"
+tags: [meeting]
+timestamp: "[ISO 8601 of the meeting]"
+---
+
+# [Meeting Name / Person] - [Date]
+
+[Summary, decisions, action items, discussion points, sentiment.]
+```
+
+The workspace `Dashboard.md` append is unchanged (it updates an existing file,
+not a new knowledge file). See `docs/okf-conventions.md`.
+
 ## Judgment Points
 
 Proceed automatically with:

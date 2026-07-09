@@ -32,63 +32,25 @@ Save to `people/[name-slug].md`
 
 ## Template
 
-```markdown
-# [Person Name]
+Use the **canonical person template** defined in `structure-generator.md` (the
+`people/_template.md` block). Do not keep a separate variant here. It ships OKF
+frontmatter and the full section set.
 
-**Role:** [Their title/position]
-**Organization:** [Company/org]
-**How we met:** [Context]
-**Relationship type:** [Client, Colleague, Friend, Prospect, etc.]
+Fill the OKF frontmatter, setting `timestamp` to the current time in ISO 8601:
 
-## Quick Stats
-
-| Field | Value |
-|-------|-------|
-| Last Contact | [Today's date] |
-| Relationship Health | Active |
-| Sentiment | Positive / Neutral / Unknown |
-
-## Contact
-
-| Channel | Details |
-|---------|---------|
-| Email | [If provided] |
-| Phone | [If provided] |
-| LinkedIn | [If provided] |
-| Preferred | [If known] |
-
-## Communication Style
-[How they prefer to communicate, if known]
-
-## What Matters to Them
-[Their priorities, if known]
-
-## Current Context
-*Last updated: [Today]*
-
-[What they're working on, if known]
-
-## Our History
-
-| Date | Event | Notes |
-|------|-------|-------|
-| [Today] | [Initial context] | Created file |
-
-## Commitments
-
-### I owe them
-- [None yet]
-
-### They owe me
-- [None yet]
-
-## Notes
-[Any other context worth remembering]
-
+```yaml
 ---
-
-*Created: [Today's date]*
+type: person
+title: "[Person Name]"
+description: "[One line: who they are]"
+tags: [person]
+timestamp: "[ISO 8601, now]"
+---
 ```
+
+Then follow the canonical body (Role/Organization header, Quick Stats, Contact,
+Communication Style, What Matters, Current Context, Our History, Commitments,
+Notes). See `docs/okf-conventions.md` for the authoring standard.
 
 ## After Creation
 

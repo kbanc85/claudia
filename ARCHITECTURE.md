@@ -272,6 +272,7 @@ claudia/
 │   ├── claudia_memory/           # Python package
 │   │   ├── __main__.py           # Entry point
 │   │   ├── config.py             # Settings and defaults
+│   │   ├── okf.py                # Open Knowledge Format schema (build/parse/normalize frontmatter)
 │   │   ├── database.py           # SQLite management with crash safety
 │   │   ├── embeddings.py         # Ollama embedding generation
 │   │   ├── schema.sql            # Database table definitions

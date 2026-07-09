@@ -238,6 +238,7 @@ Want me to create this structure? I can adjust anything.
 After they approve:
 
 1. **Invoke structure-generator skill** with archetype, business_depth, and user data
+   - Structure generation follows the OKF authoring standard: every knowledge file gets OKF frontmatter and every knowledge directory gets an `index.md` (see `docs/okf-conventions.md`).
    - Pass `business_depth` (full/starter/minimal) to control structure complexity
    - Pass `tracks_finances` to determine if finances/ folder is created
    - Pass `has_methodology` to determine if methodology.md is created

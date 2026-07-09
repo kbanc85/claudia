@@ -40,6 +40,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .. import okf
 from ..config import get_config
 from ..database import get_db
 from ..utils import parse_naive
@@ -367,48 +368,12 @@ class VaultSyncService:
         """
         etype = entity["type"]
 
-        lines = ["---"]
-        lines.append(f"claudia_id: {entity['id']}")
-        lines.append(f"type: {etype}")
-        # Quoted name for YAML safety (handles colons, special chars)
-        lines.append(f'name: "{entity["name"]}"')
-        lines.append(f"importance: {entity['importance']}")
-
         # Contact velocity fields (from entities table)
         attention_tier = _row_get(entity, "attention_tier")
-        if attention_tier:
-            lines.append(f"attention_tier: {attention_tier}")
-
-        close_circle = _row_get(entity, "close_circle")
-        if close_circle:
-            lines.append("close_circle: true")
-            close_reason = _row_get(entity, "close_circle_reason")
-            if close_reason:
-                lines.append(f'close_circle_reason: "{close_reason}"')
-
         contact_trend = _row_get(entity, "contact_trend")
-        if contact_trend:
-            lines.append(f"contact_trend: {contact_trend}")
+        close_circle = _row_get(entity, "close_circle")
 
-        freq = _row_get(entity, "contact_frequency_days")
-        if freq is not None:
-            lines.append(f"contact_frequency_days: {freq}")
-
-        last_contact = _row_get(entity, "last_contact_at")
-        if last_contact:
-            # Date-only for cleaner display
-            lines.append(f"last_contact: {last_contact[:10]}")
-
-        lines.append(f"created: {entity['created_at']}")
-        lines.append(f"updated: {entity['updated_at']}")
-
-        # Aliases as proper YAML list
-        if aliases:
-            lines.append("aliases:")
-            for alias in aliases:
-                lines.append(f'  - "{alias}"')
-
-        # Compound tags: [type, tier, trend] for graph filtering
+        # Compound tags: [type, tier, trend, close-circle] for graph filtering
         tags = [etype]
         if attention_tier and attention_tier != "standard":
             tags.append(attention_tier)
@@ -416,19 +381,50 @@ class VaultSyncService:
             tags.append(contact_trend)
         if close_circle:
             tags.append("close-circle")
-        lines.append(f"tags:")
-        for tag in tags:
-            lines.append(f"  - {tag}")
 
-        # CSS classes for per-type styling
-        lines.append(f"cssclasses:")
-        lines.append(f"  - entity-{etype}")
-
+        # Claudia extension fields, kept alongside the OKF core (the spec permits
+        # unknown keys). `name` stays as the legacy alias of the OKF `title`.
+        extra: Dict[str, Any] = {
+            "claudia_id": entity["id"],
+            "name": entity["name"],
+            "importance": entity["importance"],
+        }
+        if attention_tier:
+            extra["attention_tier"] = attention_tier
+        if close_circle:
+            extra["close_circle"] = True
+            close_reason = _row_get(entity, "close_circle_reason")
+            if close_reason:
+                extra["close_circle_reason"] = close_reason
+        if contact_trend:
+            extra["contact_trend"] = contact_trend
+        freq = _row_get(entity, "contact_frequency_days")
+        if freq is not None:
+            extra["contact_frequency_days"] = freq
+        last_contact = _row_get(entity, "last_contact_at")
+        if last_contact:
+            extra["last_contact"] = last_contact[:10]  # date-only for display
+        extra["created"] = entity["created_at"]
+        extra["updated"] = entity["updated_at"]
+        if aliases:
+            extra["aliases"] = list(aliases)
+        extra["cssclasses"] = [f"entity-{etype}"]
         if sync_hash:
-            lines.append(f"sync_hash: {sync_hash}")
+            extra["sync_hash"] = sync_hash
 
-        lines.append("---")
-        return "\n".join(lines)
+        description = entity["description"] if entity["description"] else None
+
+        # OKF core: type, title (= canonical name), description, tags, timestamp
+        # (= updated_at, the last-meaningful-change key). Returned without the
+        # trailing newline so the caller's "{frontmatter}\n\n{body}\n" is stable.
+        return okf.build_frontmatter(
+            type=etype,
+            title=entity["name"],
+            description=description,
+            tags=tags,
+            timestamp=entity["updated_at"],
+            extra=extra,
+        ).rstrip("\n")
 
     def _render_status_callout(self, entity: Dict) -> str:
         """Render a status callout box at the top of person/project notes.
@@ -834,17 +830,22 @@ class VaultSyncService:
             detected_at = row["first_observed_at"] if "first_observed_at" in row_keys else ""
             confidence = row["confidence"] if "confidence" in row_keys else 0.0
 
-            # Build note
-            lines = ["---"]
-            lines.append(f"claudia_id: pattern-{row['id']}")
-            lines.append(f"type: pattern")
-            lines.append(f"pattern_type: {pattern_type}")
-            lines.append(f"confidence: {confidence}")
-            lines.append(f"detected: {detected_at}")
-            lines.append("tags: [pattern]")
-            lines.append("---")
-            lines.append("")
-            lines.append(f"# {pattern_type.replace('_', ' ').title()}")
+            # Build note (OKF frontmatter via okf.build_frontmatter)
+            title = pattern_type.replace('_', ' ').title()
+            fm = okf.build_frontmatter(
+                type="pattern",
+                title=title,
+                tags=["pattern"],
+                timestamp=detected_at or None,
+                extra={
+                    "claudia_id": f"pattern-{row['id']}",
+                    "pattern_type": pattern_type,
+                    "confidence": confidence,
+                    "detected": detected_at,
+                },
+            ).rstrip("\n")
+            lines = [fm, ""]
+            lines.append(f"# {title}")
             lines.append("")
             lines.append(description)
 
@@ -916,19 +917,24 @@ class VaultSyncService:
             last_confirmed = row["last_confirmed_at"] if "last_confirmed_at" in row_keys else ""
             agg_count = row["aggregation_count"] if "aggregation_count" in row_keys else 1
 
-            lines = ["---"]
-            lines.append(f"claudia_id: reflection-{row['id']}")
-            lines.append(f"type: reflection")
-            lines.append(f"reflection_type: {ref_type}")
-            lines.append(f"importance: {importance}")
-            lines.append(f"confidence: {confidence}")
-            lines.append(f"first_observed: {first_observed}")
-            lines.append(f"last_confirmed: {last_confirmed}")
-            lines.append(f"times_confirmed: {agg_count}")
-            lines.append("tags: [reflection]")
-            lines.append("---")
-            lines.append("")
-            lines.append(f"# {ref_type.title()}")
+            title = ref_type.title()
+            fm = okf.build_frontmatter(
+                type="reflection",
+                title=title,
+                tags=["reflection"],
+                timestamp=(last_confirmed or first_observed or None),
+                extra={
+                    "claudia_id": f"reflection-{row['id']}",
+                    "reflection_type": ref_type,
+                    "importance": importance,
+                    "confidence": confidence,
+                    "first_observed": first_observed,
+                    "last_confirmed": last_confirmed,
+                    "times_confirmed": agg_count,
+                },
+            ).rstrip("\n")
+            lines = [fm, ""]
+            lines.append(f"# {title}")
             lines.append("")
             lines.append(content)
 
@@ -1003,14 +1009,17 @@ class VaultSyncService:
         count = 0
 
         for date_str, episodes in by_date.items():
-            lines = ["---"]
-            lines.append(f"type: session-log")
-            lines.append(f"date: {date_str}")
-            lines.append(f"session_count: {len(episodes)}")
-            lines.append("tags:")
-            lines.append("  - session")
-            lines.append("---")
-            lines.append("")
+            fm = okf.build_frontmatter(
+                type="session-log",
+                title=f"Sessions: {date_str}",
+                tags=["session"],
+                timestamp=(date_str if date_str != "unknown" else None),
+                extra={
+                    "date": date_str,
+                    "session_count": len(episodes),
+                },
+            ).rstrip("\n")
+            lines = [fm, ""]
             lines.append(f"# Sessions: {date_str}")
 
             for ep in episodes:
@@ -1331,13 +1340,13 @@ class VaultSyncService:
                     fetch=True,
                 ) or []
 
-            lines = ["---"]
-            lines.append("tags:")
-            lines.append("  - moc")
-            lines.append("cssclasses:")
-            lines.append("  - moc-index")
-            lines.append("---")
-            lines.append("")
+            fm = okf.build_frontmatter(
+                type="moc",
+                title=title,
+                tags=["moc"],
+                extra={"cssclasses": ["moc-index"]},
+            ).rstrip("\n")
+            lines = [fm, ""]
             lines.append(f"# {title}")
 
             if not entities:
