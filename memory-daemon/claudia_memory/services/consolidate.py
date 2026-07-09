@@ -2928,6 +2928,13 @@ class ConsolidateService:
             logger.warning(f"Lifecycle phase failed: {e}")
             results["lifecycle"] = {"error": str(e)}
 
+        # Phase 1c: Commitment resolution (expired/stale auto-archive, Prop 12 P2)
+        try:
+            results["commitments"] = self.resolve_commitments()
+        except Exception as e:
+            logger.warning(f"Commitment resolution phase failed: {e}")
+            results["commitments"] = {"error": str(e)}
+
         # [4R: Reflect]
         # Phase 2: Merging (modifies memory content)
         try:
