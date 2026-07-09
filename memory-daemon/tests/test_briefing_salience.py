@@ -179,3 +179,49 @@ def test_high_importance_prediction_surfaced(db):
 # test_briefing.py inlines its logic for the same reason. The salience/#67 logic
 # lives in the pure helpers above (_top_commitments, _render_commitment_lines,
 # _top_prediction), which are tested in full isolation against a temp DB.
+
+
+# ── Honest degradation disclosure (Task 7) ───────────────────────
+
+
+def test_memory_degraded_line_present_when_unavailable():
+    from claudia_memory.mcp.server import _memory_degraded_line
+
+    line = _memory_degraded_line(False)
+    assert line is not None
+    assert "degraded" in line.lower()
+    assert "Ollama" in line
+    assert "Recall works" in line
+
+
+def test_memory_degraded_line_absent_when_healthy():
+    from claudia_memory.mcp.server import _memory_degraded_line
+
+    assert _memory_degraded_line(True) is None
+
+
+def test_embeddings_available_reflects_service(monkeypatch):
+    """_embeddings_available mirrors the embedding service's is_available_sync."""
+    import claudia_memory.mcp.server as srv
+    from claudia_memory.embeddings import get_embedding_service
+
+    svc = get_embedding_service()
+    monkeypatch.setattr(svc, "is_available_sync", lambda: False)
+    assert srv._embeddings_available() is False
+
+    monkeypatch.setattr(svc, "is_available_sync", lambda: True)
+    assert srv._embeddings_available() is True
+
+
+def test_embeddings_available_fails_open(monkeypatch):
+    """An error in the availability check must not cry wolf (fail open to True)."""
+    import claudia_memory.mcp.server as srv
+    from claudia_memory.embeddings import get_embedding_service
+
+    svc = get_embedding_service()
+
+    def boom():
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr(svc, "is_available_sync", boom)
+    assert srv._embeddings_available() is True

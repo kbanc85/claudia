@@ -3401,6 +3401,33 @@ def _top_prediction(db, threshold: float):
         return None
 
 
+def _embeddings_available() -> bool:
+    """Whether local embedding intelligence (Ollama) is up.
+
+    Delegates to the embedding service's is_available_sync(), which returns
+    instantly once availability is known. The SessionStart health check calls
+    the same method before the briefing is built, so it is warm in the normal
+    flow and never blocks here. Fails open on error so a transient hiccup never
+    cries wolf.
+    """
+    try:
+        return bool(get_embedding_service().is_available_sync())
+    except Exception as e:
+        logger.debug(f"Embedding availability check failed: {e}")
+        return True
+
+
+def _memory_degraded_line(available: bool):
+    """The honest degradation disclosure (Prop 12). Returned as the briefing's
+    first line when local memory intelligence is down; None when healthy."""
+    if available:
+        return None
+    return (
+        "⚠️ Memory intelligence degraded: Ollama unreachable. "
+        "Recall works; semantic extraction and ambient capture are paused."
+    )
+
+
 def _build_briefing() -> str:
     """
     Build a compact session briefing (~500 tokens).
@@ -3591,6 +3618,15 @@ def _build_briefing() -> str:
 
     if len(lines) <= 1:
         lines.append("No context available yet. This appears to be a fresh workspace.")
+
+    # Honest degradation disclosure goes first (Prop 12). Prepend last so it does
+    # not affect the fresh-workspace check above.
+    try:
+        degraded = _memory_degraded_line(_embeddings_available())
+        if degraded:
+            lines.insert(0, degraded)
+    except Exception as e:
+        logger.debug(f"Briefing degradation disclosure failed: {e}")
 
     return "\n".join(lines)
 
