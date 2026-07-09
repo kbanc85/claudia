@@ -3249,6 +3249,84 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
         )
 
 
+def _top_commitments(db, n: int = 3) -> dict:
+    """Salience-ranked active commitments for the session briefing (Prop 12 P3).
+
+    'Active' excludes invalidated and archived rows (the #67 class): once the
+    resolver archives a commitment it must never reappear in the brief. Ranks by
+    deadline (soonest first, no-deadline last) then importance, and reports how
+    many were auto-archived in the last 7 days so the brief can disclose the
+    batch (Prop 12 locked decision 4).
+
+    Returns {"active_count": int, "top": [ {content, deadline_at, importance} ],
+             "recently_archived_count": int}.
+    """
+    from datetime import datetime, timedelta
+
+    active_where = (
+        "type = 'commitment' AND importance > 0.1 AND invalidated_at IS NULL "
+        "AND (lifecycle_tier IS NULL OR lifecycle_tier != 'archived')"
+    )
+
+    active_count = 0
+    top = []
+    recently_archived = 0
+
+    try:
+        count_row = db.execute(
+            f"SELECT COUNT(*) as cnt FROM memories WHERE {active_where}",
+            fetch=True,
+        )
+        active_count = count_row[0]["cnt"] if count_row else 0
+    except Exception as e:
+        logger.debug(f"Briefing active commitment count failed: {e}")
+
+    try:
+        rows = db.execute(
+            f"""
+            SELECT content, deadline_at, importance FROM memories
+            WHERE {active_where}
+            ORDER BY (deadline_at IS NULL), deadline_at ASC, importance DESC
+            LIMIT ?
+            """,
+            (n,),
+            fetch=True,
+        ) or []
+        top = [
+            {
+                "content": r["content"],
+                "deadline_at": r["deadline_at"],
+                "importance": r["importance"],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.debug(f"Briefing top commitments failed: {e}")
+
+    try:
+        cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        arch_row = db.execute(
+            """
+            SELECT COUNT(*) as cnt FROM memories
+            WHERE type = 'commitment'
+              AND json_valid(metadata)
+              AND json_extract(metadata, '$.resolution') IS NOT NULL
+              AND json_extract(metadata, '$.resolved_at') >= ?
+            """,
+            (cutoff,),
+            fetch=True,
+        )
+        recently_archived = arch_row[0]["cnt"] if arch_row else 0
+    except Exception as e:
+        logger.debug(f"Briefing recent auto-archive count failed: {e}")
+
+    return {
+        "active_count": active_count,
+        "top": top,
+        "recently_archived_count": recently_archived,
+    }
+
+
 def _build_briefing() -> str:
     """
     Build a compact session briefing (~500 tokens).
@@ -3331,25 +3409,13 @@ def _build_briefing() -> str:
     except Exception as e:
         logger.debug(f"Briefing consolidation check failed: {e}")
 
-    # 1. Active commitments count + stale count
+    # 1. Active commitments: salience-ranked top-3 + honest summary (Prop 12 P3).
+    #    Active excludes archived (resolver output) and invalidated rows (#67 class).
     try:
-        total_row = db.execute(
-            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1 AND invalidated_at IS NULL",
-            fetch=True,
-        )
-        total_commitments = total_row[0]["cnt"] if total_row else 0
-
-        stale_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
-        stale_row = db.execute(
-            "SELECT COUNT(*) as cnt FROM memories WHERE type = 'commitment' AND importance > 0.1 AND invalidated_at IS NULL AND created_at < ?",
-            (stale_cutoff,),
-            fetch=True,
-        )
-        stale_commitments = stale_row[0]["cnt"] if stale_row else 0
-
-        if total_commitments > 0:
-            stale_note = f" ({stale_commitments} older than 7d)" if stale_commitments else ""
-            lines.append(f"**Commitments:** {total_commitments} active{stale_note}")
+        commitments = _top_commitments(db, n=3)
+        active_count = commitments["active_count"]
+        if active_count > 0:
+            lines.append(f"**Commitments:** {active_count} active")
     except Exception as e:
         logger.debug(f"Briefing commitments failed: {e}")
 
