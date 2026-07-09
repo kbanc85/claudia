@@ -104,6 +104,12 @@ class MemoryConfig:
     # Lifecycle & Sacred memory settings
     cooling_threshold_days: int = 60        # Days without access before memory enters 'cooling'
     archive_threshold_days: int = 180       # Days in cooling + low importance before archiving
+
+    # Commitment resolution (Proposal 12 P2): gentle, reversible auto-archive
+    commitment_resolver_enabled: bool = True         # Toggle the nightly commitment resolver
+    commitment_grace_days: int = 14                  # Grace after a deadline passes before it counts as expired
+    commitment_stale_days: int = 60                  # Age (no deadline) + unreferenced before a commitment goes stale
+    commitment_stale_importance_ceiling: float = 0.5 # Only stale-archive commitments below this importance
     enable_auto_sacred: bool = True         # Auto-detect sacred facts for close-circle entities
     close_circle_keywords: list = field(default_factory=lambda: [
         "close friend", "bestie", "family", "inner circle", "best friend",
@@ -230,6 +236,14 @@ class MemoryConfig:
                     config.cooling_threshold_days = data["cooling_threshold_days"]
                 if "archive_threshold_days" in data:
                     config.archive_threshold_days = data["archive_threshold_days"]
+                if "commitment_resolver_enabled" in data:
+                    config.commitment_resolver_enabled = data["commitment_resolver_enabled"]
+                if "commitment_grace_days" in data:
+                    config.commitment_grace_days = data["commitment_grace_days"]
+                if "commitment_stale_days" in data:
+                    config.commitment_stale_days = data["commitment_stale_days"]
+                if "commitment_stale_importance_ceiling" in data:
+                    config.commitment_stale_importance_ceiling = data["commitment_stale_importance_ceiling"]
                 if "enable_auto_sacred" in data:
                     config.enable_auto_sacred = data["enable_auto_sacred"]
                 if "close_circle_keywords" in data:
@@ -335,6 +349,15 @@ class MemoryConfig:
         if self.archive_threshold_days < self.cooling_threshold_days:
             logger.warning(f"archive_threshold_days must be >= cooling_threshold_days, using {self.cooling_threshold_days * 3}")
             self.archive_threshold_days = self.cooling_threshold_days * 3
+        if self.commitment_grace_days < 0:
+            logger.warning(f"commitment_grace_days={self.commitment_grace_days} below minimum, using 14")
+            self.commitment_grace_days = 14
+        if self.commitment_stale_days < 1:
+            logger.warning(f"commitment_stale_days={self.commitment_stale_days} below minimum, using 60")
+            self.commitment_stale_days = 60
+        if not (0.0 <= self.commitment_stale_importance_ceiling <= 1.0):
+            logger.warning(f"commitment_stale_importance_ceiling={self.commitment_stale_importance_ceiling} out of range [0,1], using default 0.5")
+            self.commitment_stale_importance_ceiling = 0.5
         if self.context_builder_token_budget < 500:
             logger.warning(f"context_builder_token_budget={self.context_builder_token_budget} too small, using 2000")
             self.context_builder_token_budget = 2000
@@ -389,6 +412,10 @@ class MemoryConfig:
             "backup_weekly_retention": self.backup_weekly_retention,
             "cooling_threshold_days": self.cooling_threshold_days,
             "archive_threshold_days": self.archive_threshold_days,
+            "commitment_resolver_enabled": self.commitment_resolver_enabled,
+            "commitment_grace_days": self.commitment_grace_days,
+            "commitment_stale_days": self.commitment_stale_days,
+            "commitment_stale_importance_ceiling": self.commitment_stale_importance_ceiling,
             "enable_auto_sacred": self.enable_auto_sacred,
             "enable_chain_verification": self.enable_chain_verification,
             "context_builder_token_budget": self.context_builder_token_budget,
