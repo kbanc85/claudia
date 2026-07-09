@@ -211,6 +211,23 @@ Draft outreach for potential collaboration.
 
 ## Partnership Templates
 
+Every `overview.md` here is an OKF knowledge file: frontmatter first, then the
+body described below. Set `timestamp` (ISO 8601) on write. A partnership
+`overview.md`:
+
+```yaml
+---
+type: organization
+title: "[Brand / Partner Name]"
+description: "[One line: deal type and status]"
+tags: [partnership]
+timestamp: "[ISO 8601, now]"
+---
+```
+
+A collaboration `overview.md` uses `type: organization`; `revenue/overview.md`
+uses `type: context`. See `docs/okf-conventions.md`.
+
 ### Full Business Depth
 
 `partnerships/[brand-name]/overview.md`: Deal summary (status, type, value, dates, contact), deal terms (compensation, payment terms), deliverables table (platform/due/status), usage rights (duration, platforms, exclusivity), content requirements (brand guidelines, must/cannot include, hashtags, FTC disclosure, approval process), campaign goals and metrics, relationship contacts and history, financial (invoice status, amounts), content drafts reference, notes.

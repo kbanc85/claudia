@@ -2,8 +2,13 @@
 
 Copy this when creating a new wiki page. Fill the placeholders with synthesized content from memories. Cite every load-bearing claim with `[mem:NNN]` where NNN is the memory ID.
 
+The frontmatter is OKF (`docs/okf-conventions.md`): OKF core first (`type: wiki-page`, `title` = the entity name, `timestamp` = last update in ISO 8601), then the wiki extension fields (`entity`, `entity_type`, `last_updated`, `source_memories`, `contradiction_count`) which are kept as-is.
+
 ```markdown
 ---
+type: wiki-page
+title: "ENTITY NAME"
+timestamp: "YYYY-MM-DDTHH:MM:SSZ"
 entity: "ENTITY NAME"
 entity_type: person | organization | project | concept | location
 last_updated: YYYY-MM-DD

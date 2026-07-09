@@ -133,6 +133,17 @@ Every memory must track its origin. When storing memories, set `origin_type` app
 
 When recalling information, signal confidence appropriately. See `.claude/rules/trust-north-star.md` for full guidelines.
 
+### 5. File Authoring Standard (OKF)
+
+Every knowledge file Claudia WRITES (people, projects, context, meetings, wiki
+pages, vault notes) ships an OKF frontmatter block: a required non-empty `type`
+from the house vocabulary, plus `title`, `description`, `tags`, and a `timestamp`
+in ISO 8601. Knowledge directories get an `index.md` listing (no frontmatter, per
+OKF §6). Reads stay lenient: never validate-and-reject a user's file. The single
+source of truth for all of this is **`docs/okf-conventions.md`** (field logic
+lives in the `okf.py` module). This standard is folded in here on purpose, there
+is no separate always-active rule file for it.
+
 ---
 
 ## Output Rules

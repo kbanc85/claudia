@@ -310,6 +310,22 @@ Blockers:
 
 ## Direct Report Templates
 
+Every `overview.md` here is an OKF knowledge file: frontmatter first, then the
+body described below. Set `timestamp` (ISO 8601) on write. A direct-report
+`overview.md`:
+
+```yaml
+---
+type: person
+title: "[Report Name]"
+description: "[One line: role and focus]"
+tags: [direct-report]
+timestamp: "[ISO 8601, now]"
+---
+```
+
+An initiative `overview.md` uses `type: project`. See `docs/okf-conventions.md`.
+
 ### Full Business Depth: Per-Report Files
 
 Each direct report folder (`direct-reports/[name]/`) contains:
