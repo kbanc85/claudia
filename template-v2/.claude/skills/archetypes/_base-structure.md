@@ -57,55 +57,18 @@ Structure scales with `business_depth` from onboarding:
 
 ## Common Templates
 
+Both shared templates are defined once, canonically, in `structure-generator.md`.
+This file does not restate them (they carried divergent variants before v1.67).
+They ship OKF frontmatter per `docs/okf-conventions.md`.
+
 ### people/_template.md
 
-```markdown
-# [Person Name]
-
-## About
-| Field | Value |
-|-------|-------|
-| Role | |
-| Organization | |
-| Met | [Date] |
-| Relationship | [How you know them] |
-
-## Context
-[What matters about this person]
-
-## Communication
-**Preferred channel:** [Email/Slack/Phone]
-**Style notes:** [How to communicate with them]
-
-## History
-| Date | Context | Notes |
-|------|---------|-------|
-| | | |
-
----
-*Created: [Date]*
-```
+Canonical: the `people/_template.md` block in `structure-generator.md`
+(`type: person`, full section set). Use it as-is.
 
 ### Pipeline Template (shared across archetypes)
 
-`pipeline/active.md`:
-
-```markdown
-# Active Pipeline
-
-## Stages
-1. **Prospect** — Initial interest
-2. **Discovery** — Had conversation
-3. **Proposal** — Proposal sent
-4. **Negotiation** — Discussing terms
-5. **Verbal** — Awaiting paperwork
-
-## Active Opportunities
-
-| Prospect | Stage | Est. Value | Next Action | Due |
-|----------|-------|------------|-------------|-----|
-| | | | | |
-
-## Stalled (2+ weeks no activity)
-- [Prospect] — last action [date]
-```
+Canonical: the `pipeline/active.md` block in `structure-generator.md`
+(`type: context`, the 7-stage pipeline: Prospecting, Discovery, Proposal,
+Negotiation, Verbal, Active, Closing). Use it as-is; do not reintroduce the
+older 5-stage variant.
