@@ -1,6 +1,6 @@
 {
   "version": "1.65.0",
-  "generated": "2026-06-16T03:56:46.561Z",
+  "generated": "2026-07-09T14:53:40.623Z",
   "algorithm": "sha256",
   "files": {
     ".claude/rules/claudia-principles.md": "939e9720421628e7f2e4c8dfbaa4aeb9c1e18e8c6a5379cd6b772a6835b812e5",
@@ -21,7 +21,7 @@
     ".claude/skills/archetypes/executive.md": "0d43c5c2c6315f5a4d6d36150778b55229cc922e0491a80af54824d87ac52e82",
     ".claude/skills/archetypes/founder.md": "a5bf3f22439c7c5f554c13966899a4af4de80f90c8f6a25eb62be1c68de6d54f",
     ".claude/skills/archetypes/solo.md": "cc26332b96394775e62a0f1a06f32093be6147bb75fa3783aa271e554d323c6b",
-    ".claude/skills/auto-research/SKILL.md": "2f7f8a7d0731813921094b0117026693314f0f59e8d9b52637bd3e775a2e95f8",
+    ".claude/skills/auto-research/SKILL.md": "ca02992657324bd48c84c00168062903ce7fda303479185b1aeb62a90a97c46d",
     ".claude/skills/auto-research/references/program-template.md": "850457de96bde5ad65d24f1018509da94dd31fec9ec45c15087031f470a28dbc",
     ".claude/skills/auto-research/references/safety-rules.md": "ae036270e86949ed0f9bface582f6038276adafd3f40a29aa733698111a26683",
     ".claude/skills/brain/SKILL.md": "b87dd93c85923c676292bea67f7a0580ee71eea2bea05426ea6eda951a140d5c",
