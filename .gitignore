@@ -36,3 +36,4 @@ build/
 # Temporary files
 *.tmp
 *.temp
+__pycache__/
