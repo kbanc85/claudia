@@ -36,7 +36,6 @@ build/
 # Temporary files
 *.tmp
 *.temp
-
 # Python bytecode (was shipping into the npm tarball)
 __pycache__/
 *.pyc
