@@ -1,6 +1,6 @@
 # Proposal 13: Runtime-agnostic host adapters
 
-**Status**: Draft · **Effort**: 1–2 weeks phased · **Batch**: Host layer (follows Proposal 12 ambient capture)  
+**Status**: Phase 1+2 implemented on `feat/runtime-agnostic-host-adapters` · **Effort**: 1–2 weeks phased · **Batch**: Host layer (follows Proposal 12 ambient capture)  
 **Constraint**: Keep memory daemon + SQLite + MCP as the single brain. Do not rewrite Claudia. Add hosts.
 
 ---
@@ -153,22 +153,22 @@ Not required for Phase 1 spike.
 
 ## Phased delivery
 
-### Phase 1 — Spike (this PR track) · ~2–3 days
+### Phase 1 — Spike · done
 
 1. `docs/proposals/13-…` (this file)  
 2. `host-adapters/shared/enqueue.py` — atomic append identical to `session-enqueue.py`  
 3. `host-adapters/grok/` — session log + CLI enqueue producing Claude-compatible JSONL  
-4. Manual test: enqueue a fake Grok session → daemon `process_sessions` ingests  
-5. Document how Grok sessions should call enqueue at end (operator checklist)
+4. Manual smoke: enqueue + `_parse_transcript`  
+5. Operator checklist in `host-adapters/README.md`
 
-**Success:** A Grok day can land in the same memory DB as a Claude day without Claude Code.
+**Success:** A Grok day can land in the same queue as Claude without Claude Code.
 
-### Phase 2 — Daemon polish · ~2–4 days
+### Phase 2 — Daemon polish · done (this PR)
 
-1. Honor `source_channel` / `host` on enqueue → episode + memories  
-2. Briefing line or memory_about filter: “from grok_build”  
-3. Optional: artifact paths in transcript metadata  
-4. Tests: queue entry with source_channel; parser fixtures for grok-shaped JSONL  
+1. `_resolve_source_channel()` on queue entries  
+2. `episodes.source` set from channel (legacy → `claude_code`)  
+3. `audn_write` / stub `remember_fact` pass `source_channel`  
+4. Tests: resolve helper + grok episode source + legacy default  
 
 ### Phase 3 — Productize · ~1 week
 
