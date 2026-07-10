@@ -46,6 +46,7 @@ async def audn_write(
     source_id: str,
     db,
     llm_service,
+    source_channel: Optional[str] = None,
 ) -> Optional[int]:
     """Add/Update/No-op a fact using semantic dedup before inserting.
 
@@ -58,17 +59,22 @@ async def audn_write(
         source_id: Reference ID (e.g. session_id)
         db: Database instance
         llm_service: Language model service (may be unavailable)
+        source_channel: Host/channel origin (claude_code, grok_build, telegram, …)
 
     Returns:
         Memory ID if stored/updated, None if noop or error
     """
     try:
         return await _audn_write_inner(
-            content, memory_type, about_entities, importance, source, source_id, db, llm_service
+            content, memory_type, about_entities, importance, source, source_id,
+            db, llm_service, source_channel=source_channel,
         )
     except Exception as e:
         logger.debug(f"AUDN write error, falling back to plain add: {e}")
-        return _plain_add(content, memory_type, about_entities, importance, source, source_id)
+        return _plain_add(
+            content, memory_type, about_entities, importance, source, source_id,
+            source_channel=source_channel,
+        )
 
 
 async def _audn_write_inner(
@@ -80,6 +86,7 @@ async def _audn_write_inner(
     source_id: str,
     db,
     llm_service,
+    source_channel: Optional[str] = None,
 ) -> Optional[int]:
     """Inner implementation with structured error propagation."""
     # Step 1: Semantic search for similar memories
@@ -106,11 +113,17 @@ async def _audn_write_inner(
     except Exception as e:
         logger.debug(f"AUDN: recall failed, adding without dedup: {e}")
         # No recall = safe to add without dedup
-        return _plain_add(content, memory_type, about_entities, importance, source, source_id)
+        return _plain_add(
+            content, memory_type, about_entities, importance, source, source_id,
+            source_channel=source_channel,
+        )
 
     # Step 2: If no similar memories found, add directly
     if not similar:
-        return _plain_add(content, memory_type, about_entities, importance, source, source_id)
+        return _plain_add(
+            content, memory_type, about_entities, importance, source, source_id,
+            source_channel=source_channel,
+        )
 
     # Step 3: Ask LLM to decide
     action = "add"
@@ -146,6 +159,7 @@ async def _audn_write_inner(
     return _apply_decision(
         action, target_id, similar, content, memory_type,
         about_entities, importance, source, source_id, db,
+        source_channel=source_channel,
     )
 
 
@@ -160,6 +174,7 @@ def _apply_decision(
     source: str,
     source_id: str,
     db,
+    source_channel: Optional[str] = None,
 ) -> Optional[int]:
     """Execute an AUDN decision.
 
@@ -208,7 +223,10 @@ def _apply_decision(
                 logger.debug(f"AUDN: update failed, falling back to add: {e}")
 
     # Default: add
-    return _plain_add(content, memory_type, about_entities, importance, source, source_id)
+    return _plain_add(
+        content, memory_type, about_entities, importance, source, source_id,
+        source_channel=source_channel,
+    )
 
 
 def _plain_add(
@@ -218,6 +236,7 @@ def _plain_add(
     importance: float,
     source: str,
     source_id: str,
+    source_channel: Optional[str] = None,
 ) -> Optional[int]:
     """Add a fact without dedup, with verification_status=pending in metadata."""
     try:
@@ -232,6 +251,7 @@ def _plain_add(
             source_id=source_id,
             origin_type="extracted",
             metadata={"verification_status": "pending"},
+            source_channel=source_channel,
         )
     except Exception as e:
         logger.debug(f"AUDN: plain_add failed: {e}")
