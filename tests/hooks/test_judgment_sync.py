@@ -548,6 +548,23 @@ class HookContractTests(unittest.TestCase):
         self.assertIn("primary source", out.stdout)
         self.assertIn("2026-04-07", out.stdout, "provenance must come with the rule")
 
+    def test_show_accepts_a_domain_and_returns_every_rule_in_it(self):
+        """Expanding a domain must be ONE command.
+
+        The always-on file tells you "build (23)" and to read those rules before
+        working there. If that costs 23 separate lookups, nobody does it, and the
+        tier silently becomes a way to lose rules rather than defer them. The
+        retrieval instruction has to be cheap enough to actually follow."""
+        out, _ = self._run(["show", "client"], FIXTURE)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("proc-012", out.stdout)
+        self.assertIn("talking points", out.stdout)
+
+    def test_domain_and_id_do_not_collide(self):
+        out, _ = self._run(["show", "esc-001"], FIXTURE)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertNotIn("proc-012", out.stdout)
+
     def test_show_unknown_id_fails_clearly(self):
         out, _ = self._run(["show", "nope-999"], FIXTURE)
         self.assertNotEqual(out.returncode, 0)

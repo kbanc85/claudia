@@ -44,6 +44,7 @@ Usage:
     judgment-sync.py --write        # regenerate the always-on view
     judgment-sync.py --hook         # SessionStart mode, JSON out, never fatal
     judgment-sync.py show <id>      # full text + provenance for one rule
+    judgment-sync.py show <domain>  # every rule in one activity, e.g. `show video`
     judgment-sync.py next           # next free id per prefix, for /meditate
 """
 
@@ -444,10 +445,10 @@ def render(sections: dict) -> str:
     )
     out.append("")
     out.append(
-        "Full text and rationale for any rule below: "
-        "`python3 .claude/hooks/judgment-sync.py show <id>`. "
-        "Lines ending in `...` are shortened. Ids listed under Activity-scoped "
-        "have no text here at all: read them before working in that area."
+        "Expand any rule with `python3 .claude/hooks/judgment-sync.py show <id>`, "
+        "or a whole domain at once with `show <domain>` (e.g. `show video`). "
+        "Lines ending in `...` are shortened. Ids under Activity-scoped have no "
+        "text here at all: run `show <domain>` BEFORE working in that area."
     )
     out.append("")
 
@@ -569,25 +570,50 @@ def _load() -> tuple:
     return sections, raw, status
 
 
+def _print_rule(section: str, raw: dict) -> None:
+    rule = normalise(raw)
+    print(f"{rule['id']}  [{section}]  {rule['source'] or 'undated'}")
+    print()
+    print(rule["text"])
+    if rule["rationale"]:
+        print()
+        print(f"Why: {rule['rationale']}")
+    if rule["governs"]:
+        print()
+        print(f"Governs: {', '.join(map(str, rule['governs']))}")
+
+
 def cmd_show(rid: str) -> int:
+    """
+    Expand one rule by id, or a whole domain in a single command.
+
+    The domain form is what makes the activity-scoped tier honest. The always-on
+    file says "build (23)" and tells you to read those before working there; if
+    that cost 23 lookups nobody would, and deferring rules would quietly become
+    losing them.
+    """
     sections, _raw, err = _load()
     if err == "unparseable" or not sections:
         print(f"Could not read {yaml_path()}", file=sys.stderr)
         return 1
+
+    wanted = rid.strip().lower()
+    if not re.match(r"^[a-z]+-\d+$", wanted):
+        group = [(s, r) for s, r in _all_rules(sections)
+                 if str(r.get("domain") or "").strip().lower() == wanted]
+        if group:
+            print(f"{len(group)} rule(s) in domain {wanted!r}:\n")
+            for i, (section, raw) in enumerate(group):
+                if i:
+                    print("\n" + "-" * 60 + "\n")
+                _print_rule(section, raw)
+            return 0
+
     for section, raw in _all_rules(sections):
         if str(raw.get("id") or "").strip() == rid:
-            rule = normalise(raw)
-            print(f"{rule['id']}  [{section}]  {rule['source'] or 'undated'}")
-            print()
-            print(rule["text"])
-            if rule["rationale"]:
-                print()
-                print(f"Why: {rule['rationale']}")
-            if rule["governs"]:
-                print()
-                print(f"Governs: {', '.join(map(str, rule['governs']))}")
+            _print_rule(section, raw)
             return 0
-    print(f"No rule with id {rid!r} in {yaml_path()}", file=sys.stderr)
+    print(f"No rule or domain {rid!r} in {yaml_path()}", file=sys.stderr)
     return 1
 
 

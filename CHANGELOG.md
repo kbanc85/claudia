@@ -2,6 +2,12 @@
 
 All notable changes to Claudia will be documented in this file.
 
+## 1.67.1 (2026-08-11)
+
+### Fixed
+
+- **Expanding an activity-scoped domain took one command per rule.** The always-on view tells you `build (23)` and to read those rules before working there, but the only way to read them was 23 separate `show <id>` calls. Retrieval that costs that much does not happen, which would have turned the activity-scoped tier from a way to DEFER rules into a way to lose them. `show <domain>` now prints every rule in an activity, in full, in one command (`show video`, `show email`). The always-on file says so on its first line.
+
 ## 1.67.0 (2026-08-11)
 
 ### Fixed
