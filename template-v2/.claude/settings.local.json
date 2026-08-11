@@ -7,8 +7,14 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/judgment-sync.py\" --hook 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/judgment-sync.py\" --hook 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "Syncing judgment rules..."
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.py\" 2>/dev/null || bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-health-check.sh\" 2>/dev/null || echo {\"additionalContext\":\"Health check skipped (no python3/python/bash on PATH).\"}",
-            "timeout": 10000,
+            "timeout": 10,
             "statusMessage": "Checking Claudia systems..."
           }
         ]
@@ -21,7 +27,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.py\" 2>/dev/null || bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh\" 2>/dev/null || echo {\"additionalContext\":\"Pre-compact hook skipped.\"}",
-            "timeout": 10000,
+            "timeout": 10,
             "statusMessage": "Preserving context..."
           }
         ]
@@ -34,7 +40,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-capture.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-capture.py\" 2>/dev/null || true",
-            "timeout": 3000,
+            "timeout": 3,
             "statusMessage": ""
           }
         ]
@@ -47,7 +53,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-capture.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/user-prompt-capture.py\" 2>/dev/null || true",
-            "timeout": 3000,
+            "timeout": 3,
             "statusMessage": ""
           }
         ]
@@ -60,13 +66,13 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.py\" 2>/dev/null || true",
-            "timeout": 10000,
+            "timeout": 10,
             "statusMessage": "Generating daily session summary..."
           },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-enqueue.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-enqueue.py\" 2>/dev/null || true",
-            "timeout": 3000,
+            "timeout": 3,
             "statusMessage": "Queuing session for memory..."
           }
         ]

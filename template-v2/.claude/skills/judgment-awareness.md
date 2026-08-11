@@ -1,6 +1,6 @@
 ---
 name: judgment-awareness
-description: Load and apply user-defined judgment rules from context/judgment.yaml to inform priority conflicts, escalation decisions, surfacing, and delegation. See also: `pattern-recognizer` for theme detection; `meditate` updates judgment rules at session end.
+description: Apply and expand the user's judgment rules during priority conflicts, escalation decisions, surfacing, and delegation. Loading is handled by the judgment-sync SessionStart hook, not by this skill. See also: `pattern-recognizer` for theme detection; `meditate` updates judgment rules at session end.
 user-invocable: false
 invocation: proactive
 effort-level: low
@@ -22,7 +22,9 @@ outputs:
 
 # Judgment Awareness Skill
 
-**Triggers:** Activates at session start (after `claudia memory briefing`) and during any priority conflict, escalation decision, surfacing choice, or delegation routing.
+**Triggers:** Any priority conflict, escalation decision, surfacing choice, or delegation routing.
+
+**This skill does not load rules.** It used to claim it activated at session start. It did not: skills load only when invoked, and nothing invoked this one, so for a long time approved rules reached no session at all. Loading now happens in `.claude/hooks/judgment-sync.py`, a SessionStart hook that regenerates `.claude/rules/judgment-active.md` from the archive. That file is always in context before you read this.
 
 ---
 
@@ -55,62 +57,69 @@ If a judgment rule conflicts with a principle, the principle wins silently.
 
 ## Loading Rules
 
-### At Session Start
+### Where rules already are
 
-After calling `claudia memory briefing`, silently check for `context/judgment.yaml`:
+By the time this skill runs, `.claude/rules/judgment-active.md` is in context. It
+carries rules at three levels of detail, by how expensive they are to miss:
 
-1. If the file exists, read it and hold the rules in context
-2. If the file does not exist, continue normally (graceful degradation)
-3. Never narrate the loading process. Never mention judgment.yaml to the user unless they ask about it
+| In the file | What you have | What to do |
+|---|---|---|
+| **Always resident** | The full rule | Apply it |
+| **Indexed** | One line, sometimes ending `...` | Apply it if the line is enough; expand if not |
+| **Activity-scoped** | An ID under a domain heading, no text | **Expand before working in that area** |
+
+Expand any rule by ID:
+
+```bash
+python3 .claude/hooks/judgment-sync.py show esc-001
+```
+
+The third row is the one that matters. A heading like `video (12)` is telling you
+twelve rules govern work you are about to do and you have not read any of them.
+Read them before starting, not after being corrected.
+
+If `context/judgment.yaml` does not exist, everything below is inert and all
+skills operate on standard logic. The judgment layer is purely additive.
 
 ### File Format
+
+This is the shape `/meditate` writes. An older version of this document showed a
+`when`/`action`/`condition` schema; both are still read, but new rules use this:
 
 ```yaml
 version: 1
 
-priorities:        # When tasks conflict, use this ordering
-  - label: "Client deliverables"
-    rank: 1
-    note: "Always prioritize active client work over internal tasks"
+meta:          # rules that resolve conflicts BETWEEN other rules
+  - id: meta-001
+    rule: "External actions are not monolithic. Infrastructure setup (deploys, config, scaffolding) runs autonomously; anything that commits you to a person, an amount, or a public record verifies first."
+    context: "Two existing rules fired in the same session and pointed opposite ways."
+    source: meditate/2026-03-04
+    governs: [del-007, esc-001]
 
-escalation:        # When to always surface something
+escalation:    # always carried in full; these fire when nobody is looking
   - id: esc-001
-    when: "Commitments involving Sarah Chen"
-    condition: "Within 72 hours of deadline"
-    action: "Surface immediately in any session, not just morning brief"
-    source: "meditate/2026-02-25"
+    rule: "Verify prerequisites against a primary source before any externally-visible action, and flag any mismatch first."
+    context: "A message went out based on an assumed fact that turned out to be wrong."
+    source: meditate/2026-02-18
 
-overrides:         # When to break standard behavior
-  - id: ovr-001
-    when: "Investor emails from Series A leads"
-    action: "Boost to top of morning brief regardless of other priorities"
-    source: "manual"
-
-surfacing:         # What to always bring up
-  - id: srf-001
-    trigger: "morning_brief"
-    what: "Open proposals older than 5 business days"
-    why: "Stale proposals signal lost deals"
-    source: "meditate/2026-02-20"
-
-delegation:        # What to auto-delegate vs escalate
-  - id: del-001
-    task_type: "Meeting transcript processing"
-    action: "Auto-delegate to Document Processor"
-    exception: "Unless it involves board members"
-    source: "meditate/2026-02-18"
+overrides:
+  - id: ov-017
+    rule: "Explainer beats that stay on screen beyond a few seconds get a persistent sidebar, not a timed pop-in."
+    context: "The same note came up in three separate reviews."
+    source: meditate/2026-03-11
+    domain: video          # only the ID stays resident; expand before video work
 ```
 
 ### Rule Fields
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `id` | Yes (except priorities) | Unique identifier for editing/removing |
-| `when` / `trigger` | Yes | Natural language condition |
-| `action` / `what` | Yes | What to do when condition matches |
-| `condition` | No | Additional qualifying context |
+| `id` | Yes | Unique across the WHOLE file, not per section |
+| `rule` | Yes | The directive. First sentence must stand alone; it becomes the index line |
 | `source` | Yes | Provenance: `meditate/YYYY-MM-DD` or `manual` |
-| `note` / `why` | No | Reasoning for the rule |
+| `context` | Strongly preferred | Why the rule exists. Shown by `show <id>` |
+| `domain` | No | Demotes to activity-scoped. Ignored on `meta-`/`esc-` rules |
+| `governs` | No | Other rule IDs this one arbitrates between |
 
 ---
 
