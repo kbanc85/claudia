@@ -148,6 +148,39 @@ class ParserTests(unittest.TestCase):
                             f"{rid}.{field} differs between parsers",
                         )
 
+    def test_malformed_but_recoverable_yaml_is_reported(self):
+        """A file the fallback can read but PyYAML cannot is still broken.
+
+        Found the hard way: a mis-indented field was inserted into a real
+        judgment.yaml, PyYAML rejected the file, the forgiving fallback read all
+        132 rules anyway, and this script cheerfully reported everything fine.
+        Resilience that hides corruption is worse than a clean failure, because
+        every OTHER tool touching that file will break and nothing said so."""
+        bad = FIXTURE.replace(
+            '    rule: "Never echo', '      rule: "Never echo'
+        )
+        try:
+            import yaml
+            yaml.safe_load(bad)
+            self.skipTest("mangled fixture still parses; test is not exercising the path")
+        except ImportError:
+            self.skipTest("PyYAML absent, nothing to disagree with")
+        except Exception:
+            pass
+
+        sections, status = self.m.parse_with_status(bad)
+        self.assertTrue(
+            any(sections.values()), "fallback should still recover the rules"
+        )
+        self.assertEqual(
+            status, "recovered",
+            "silently rescued a file that PyYAML rejects",
+        )
+
+    def test_clean_yaml_reports_no_recovery(self):
+        _sections, status = self.m.parse_with_status(FIXTURE)
+        self.assertIsNone(status)
+
     def test_folded_block_scalars_are_folded_to_one_line(self):
         sections = self.m._parse_fallback(FIXTURE)
         esc = next(r for r in sections["escalation"] if r["id"] == "esc-001")
@@ -456,6 +489,29 @@ class HookContractTests(unittest.TestCase):
             any(w in ctx for w in ("could not", "problem", "duplicate", "not")),
             f"failure was not reported clearly: {ctx}",
         )
+
+    def test_recovered_file_still_generates_and_warns(self):
+        """A recoverable syntax error must not be treated as a fatal one.
+
+        The first fix for silent rescue overcorrected: `check` treated any
+        non-clean status as unparseable, so a file that WAS readable stopped
+        generating entirely. Recovery and failure are different outcomes.
+        """
+        bad = FIXTURE.replace('    rule: "Never echo', '      rule: "Never echo')
+        try:
+            import yaml
+            yaml.safe_load(bad)
+            self.skipTest("mangled fixture still parses")
+        except ImportError:
+            self.skipTest("PyYAML absent")
+        except Exception:
+            pass
+
+        out, tmp = self._run(["--write"], bad)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("not valid YAML", out.stderr + out.stdout)
+        text = (tmp / ".claude" / "rules" / "judgment-active.md").read_text()
+        self.assertIn("esc-001", text, "stopped generating from a readable file")
 
     def test_hook_survives_missing_yaml(self):
         out, _ = self._run(["--hook"], None)

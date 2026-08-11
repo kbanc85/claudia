@@ -129,15 +129,29 @@ DEFAULT_BUDGET = 5000
 
 def parse_judgment(text: str) -> dict:
     """Parse judgment.yaml. Prefers PyYAML, falls back to the stdlib reader."""
+    return parse_with_status(text)[0]
+
+
+def parse_with_status(text: str):
+    """
+    Parse, and say whether the file was merely SURVIVED rather than read cleanly.
+
+    The fallback reader is deliberately forgiving, which turned out to be a way
+    to hide damage: a mis-indented field once made a real judgment.yaml invalid
+    YAML, the fallback read all 132 rules regardless, and this script reported
+    everything healthy. Every other tool touching that file would have failed
+    and nothing would have said why. So a recovery is reported, not swallowed.
+
+    Returns (sections, status) where status is None for a clean parse or
+    "recovered" when PyYAML rejected the file and the fallback rescued it.
+    """
     if yaml is not None and hasattr(yaml, "safe_load"):
         try:
-            return _parse_with_pyyaml(text)
+            return _parse_with_pyyaml(text), None
         except Exception:
-            # A YAML error here is not fatal: the fallback reader is more
-            # forgiving, and if it also finds nothing the caller refuses to
-            # write rather than truncating a good file.
-            pass
-    return _parse_fallback(text)
+            recovered = _parse_fallback(text)
+            return recovered, ("recovered" if any(recovered.values()) else None)
+    return _parse_fallback(text), None
 
 
 def _sections_from_mapping(data) -> dict:
@@ -547,17 +561,17 @@ def _load() -> tuple:
     if not path.exists():
         return {}, "", None
     raw = path.read_text(encoding="utf-8", errors="replace")
-    sections = parse_judgment(raw)
+    sections, status = parse_with_status(raw)
     # Non-empty source that yields no rules means the file did not parse.
     # Reporting that beats overwriting a good generated file with nothing.
     if raw.strip() and not any(sections.values()):
         return {}, raw, "unparseable"
-    return sections, raw, None
+    return sections, raw, status
 
 
 def cmd_show(rid: str) -> int:
     sections, _raw, err = _load()
-    if err or not sections:
+    if err == "unparseable" or not sections:
         print(f"Could not read {yaml_path()}", file=sys.stderr)
         return 1
     for section, raw in _all_rules(sections):
@@ -579,7 +593,7 @@ def cmd_show(rid: str) -> int:
 
 def cmd_next() -> int:
     sections, _raw, err = _load()
-    if err:
+    if err == "unparseable":
         print(f"Could not parse {yaml_path()}", file=sys.stderr)
         return 1
     for prefix, nxt in next_free_ids(sections).items():
@@ -589,9 +603,14 @@ def cmd_next() -> int:
 
 def cmd_check(write: bool) -> int:
     sections, _raw, err = _load()
-    if err:
+    if err == "unparseable":
         print(f"Could not parse {yaml_path()}.", file=sys.stderr)
         return 1
+
+    if err == "recovered":
+        print("WARNING: context/judgment.yaml is not valid YAML. It was read with "
+              "the fallback parser, so rules below are correct, but other tools "
+              "will fail on this file. Fix the syntax.", file=sys.stderr)
 
     total = sum(len(v) for v in sections.values())
     active = active_path().read_text(encoding="utf-8") if active_path().exists() else ""
@@ -687,6 +706,12 @@ def cmd_hook() -> int:
         return 0
 
     notes = []
+    if err == "recovered":
+        notes.append(
+            "context/judgment.yaml is NOT valid YAML and was only read by the "
+            "fallback parser. The rules loaded correctly, but any other tool "
+            "reading that file will fail. Worth fixing the syntax."
+        )
     if missing:
         shown = ", ".join(missing[:12]) + ("..." if len(missing) > 12 else "")
         notes.append(
