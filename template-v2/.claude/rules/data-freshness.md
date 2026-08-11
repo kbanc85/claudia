@@ -43,7 +43,7 @@ These go stale the moment the next event happens.
 
 ### Instead, store pointers:
 
-- **Where to find the data** ("Interview files are in `workspaces/beemok/interviews/`")
+- **Where to find the data** ("Interview files are in `workspaces/acme-corp/interviews/`")
 - **How to count it** ("Count `.md` files in the interviews directory for current total")
 - **What the source of truth is** ("Pipeline status lives in `pipeline/active.md`")
 
@@ -51,7 +51,7 @@ These go stale the moment the next event happens.
 
 - **Structural facts** ("User uses the Consultant archetype", "Project X has a workspace")
 - **Preferences** ("User prefers bullet points over paragraphs")
-- **Process knowledge** ("Interviews for Beemok follow the capture-interview skill")
+- **Process knowledge** ("Interviews for Acme Corp follow the capture-interview skill")
 - **Relationships** ("Sarah Chen is the main contact for Acme Corp")
 
 **Test:** If the fact could change tomorrow because of a single new event (a meeting, a file creation, a status change), it does not belong in MEMORY.md.
