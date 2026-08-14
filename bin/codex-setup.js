@@ -19,6 +19,23 @@ import { execFileSync } from 'child_process';
 export const CODEX_MARKETPLACE_NAME = 'claudia-official';
 export const CODEX_PLUGIN_NAME = 'claudia';
 
+/**
+ * Inside an active Codex thread, a bare installer command should target the
+ * folder the user already opened. Explicit `codex` keeps the same behavior
+ * outside Codex. Ordinary terminal installs retain the legacy ./claudia target.
+ */
+export function resolveCodexInstallArgs(filteredArgs, env = process.env) {
+  const explicitCodex = filteredArgs[0] === 'codex';
+  const detectedCodex = Boolean(env.CODEX_THREAD_ID);
+  const codexMode = explicitCodex || detectedCodex;
+  const installArg = explicitCodex ? filteredArgs[1] : filteredArgs[0];
+  return {
+    codexMode,
+    installArg,
+    defaultToCurrentDir: codexMode && installArg === undefined,
+  };
+}
+
 function readJson(path, fallback = {}) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
@@ -134,16 +151,23 @@ export function activateCodexPlugin(targetPath, run = execFileSync) {
     const marketplaces = listed.marketplaces || [];
     const existing = marketplaces.find((item) => item.name === CODEX_MARKETPLACE_NAME);
     const existingSource = existing?.marketplaceSource?.source;
+    let marketplaceReady = Boolean(existing && existingSource === targetPath);
+    let marketplaceReplaced = false;
 
-    if (existing && existingSource && existingSource !== targetPath) {
-      return {
-        ok: false,
-        issue: 'marketplace-conflict',
-        message: `${CODEX_MARKETPLACE_NAME} already points to ${existingSource}`,
-      };
+    if (existing && existingSource !== targetPath) {
+      const pluginId = `${CODEX_PLUGIN_NAME}@${CODEX_MARKETPLACE_NAME}`;
+      const plugins = runJson(run, command, ['plugin', 'list', '--json']);
+      const installed = (plugins.installed || []).some((item) => item.pluginId === pluginId);
+      if (installed) {
+        runJson(run, command, ['plugin', 'remove', pluginId, '--json']);
+      }
+      runJson(run, command, ['plugin', 'marketplace', 'remove', CODEX_MARKETPLACE_NAME, '--json']);
+      runJson(run, command, ['plugin', 'marketplace', 'add', targetPath, '--json']);
+      marketplaceReady = true;
+      marketplaceReplaced = true;
     }
 
-    if (!existing) {
+    if (!marketplaceReady) {
       runJson(run, command, ['plugin', 'marketplace', 'add', targetPath, '--json']);
     }
 
@@ -155,7 +179,12 @@ export function activateCodexPlugin(targetPath, run = execFileSync) {
     // it on upgrades too so regenerated skills, hooks, and MCP paths take effect.
     runJson(run, command, ['plugin', 'add', pluginId, '--json']);
 
-    return { ok: true, pluginId, alreadyInstalled: installed };
+    return {
+      ok: true,
+      pluginId,
+      alreadyInstalled: installed,
+      marketplaceReplaced,
+    };
   } catch (error) {
     return {
       ok: false,
@@ -165,17 +194,9 @@ export function activateCodexPlugin(targetPath, run = execFileSync) {
   }
 }
 
-export function codexManualCommands(targetPath, replaceExisting = false) {
-  const commands = [];
-  if (replaceExisting) {
-    commands.push(
-      `codex plugin remove ${CODEX_PLUGIN_NAME}@${CODEX_MARKETPLACE_NAME}`,
-      `codex plugin marketplace remove ${CODEX_MARKETPLACE_NAME}`,
-    );
-  }
-  commands.push(
+export function codexManualCommands(targetPath) {
+  return [
     `codex plugin marketplace add ${JSON.stringify(targetPath)}`,
     `codex plugin add ${CODEX_PLUGIN_NAME}@${CODEX_MARKETPLACE_NAME}`,
-  );
-  return commands;
+  ];
 }

@@ -10,6 +10,7 @@ import {
   codexManualCommands,
   CODEX_MARKETPLACE_NAME,
   prepareCodexRuntime,
+  resolveCodexInstallArgs,
   syncCodexPluginMcp,
 } from '../bin/codex-setup.js';
 
@@ -18,6 +19,35 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 function tempWorkspace() {
   return mkdtempSync(join(tmpdir(), 'claudia-codex-'));
 }
+
+test('bare install in Codex targets the folder already open', () => {
+  assert.deepEqual(resolveCodexInstallArgs([], { CODEX_THREAD_ID: 'thread-123' }), {
+    codexMode: true,
+    installArg: undefined,
+    defaultToCurrentDir: true,
+  });
+});
+
+test('bare install outside Codex retains the legacy ./claudia default', () => {
+  assert.deepEqual(resolveCodexInstallArgs([], {}), {
+    codexMode: false,
+    installArg: undefined,
+    defaultToCurrentDir: false,
+  });
+});
+
+test('explicit Codex install defaults to the current folder anywhere', () => {
+  assert.deepEqual(resolveCodexInstallArgs(['codex'], {}), {
+    codexMode: true,
+    installArg: undefined,
+    defaultToCurrentDir: true,
+  });
+  assert.deepEqual(resolveCodexInstallArgs(['codex', '/tmp/project'], {}), {
+    codexMode: true,
+    installArg: '/tmp/project',
+    defaultToCurrentDir: false,
+  });
+});
 
 test('prepareCodexRuntime copies the plugin and creates a local marketplace', () => {
   const targetPath = tempWorkspace();
@@ -87,8 +117,11 @@ test('activateCodexPlugin registers the marketplace and installs Claudia', () =>
   assert.ok(calls.some((args) => args.join(' ') === 'plugin add claudia@claudia-official --json'));
 });
 
-test('activateCodexPlugin does not overwrite a marketplace with the same name', () => {
+test('activateCodexPlugin replaces a stale official marketplace automatically', () => {
+  const calls = [];
+  let pluginListCalls = 0;
   const fakeRun = (_command, args) => {
+    calls.push(args);
     if (args[0] === '--version') return 'codex-cli 1.0.0';
     if (args.join(' ') === 'plugin marketplace list --json') {
       return JSON.stringify({
@@ -98,15 +131,24 @@ test('activateCodexPlugin does not overwrite a marketplace with the same name', 
         }],
       });
     }
-    throw new Error('No mutation should run after a marketplace conflict');
+    if (args.join(' ') === 'plugin list --json') {
+      pluginListCalls += 1;
+      return pluginListCalls === 1
+        ? '{"installed":[{"pluginId":"claudia@claudia-official"}]}'
+        : '{"installed":[]}';
+    }
+    if (args.join(' ') === 'plugin remove claudia@claudia-official --json') return '{}';
+    if (args.join(' ') === 'plugin marketplace remove claudia-official --json') return '{}';
+    if (args.join(' ') === 'plugin marketplace add /tmp/claudia --json') return '{}';
+    if (args.join(' ') === 'plugin add claudia@claudia-official --json') return '{}';
+    throw new Error(`Unexpected command: ${args.join(' ')}`);
   };
 
   const result = activateCodexPlugin('/tmp/claudia', fakeRun);
-  assert.equal(result.ok, false);
-  assert.equal(result.issue, 'marketplace-conflict');
-  assert.deepEqual(codexManualCommands('/tmp/claudia', true), [
-    'codex plugin remove claudia@claudia-official',
-    'codex plugin marketplace remove claudia-official',
+  assert.equal(result.ok, true);
+  assert.equal(result.marketplaceReplaced, true);
+  assert.equal(calls.filter((args) => args.join(' ') === 'plugin marketplace add /tmp/claudia --json').length, 1);
+  assert.deepEqual(codexManualCommands('/tmp/claudia'), [
     'codex plugin marketplace add "/tmp/claudia"',
     'codex plugin add claudia@claudia-official',
   ]);

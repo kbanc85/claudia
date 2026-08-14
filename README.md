@@ -126,26 +126,31 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 
 ## Quick Start
 
-**1. Install for Codex**
+**1. Open the folder you want Claudia to live in with Codex.**
+
+**2. Paste this into Codex:**
+
+> Install Claudia in this folder. Run `npx get-claudia@latest` and keep going until setup and health checks pass.
+
+Codex runs the installer, recognizes the active Codex session, installs into the open folder, registers Claudia's official plugin, connects the memory MCP server, and verifies the setup.
+
+Prefer to run the command yourself? It is the same one-liner:
+
 ```bash
-npx get-claudia codex
+npx get-claudia@latest
 ```
 
-**2. Start**
-```bash
-cd claudia
-codex
-```
+**3. Start a new Codex chat in the same folder and say hi.** Claudia will introduce herself, learn about you through a natural conversation, and generate a personalized workspace.
 
-**3. Say hi.** She'll introduce herself, learn about you through a natural conversation, and generate a personalized workspace.
+That's the whole required setup. The plugin's `AGENTS.md` startup contract and memory tools load automatically in the new chat.
 
-The Codex install registers Claudia's official local plugin, memory MCP server, and two lifecycle hooks. In your first session, run `/hooks` once to review and trust the memory briefing and transcript capture hooks.
+Optional: run `/hooks` once if you want Claudia's automatic start-of-session briefing and end-of-session transcript capture. Claudia still runs without trusting those hooks; you can ask for a briefing or save a memory directly.
 
 <details>
 <summary><strong>Using Claude Code instead?</strong></summary>
 
 ```bash
-npx get-claudia
+npx get-claudia@latest
 cd claudia
 claude
 ```
@@ -189,7 +194,7 @@ Installs only the template layer (skills, commands, rules). Claudia works using 
 
 ```bash
 cd your-claudia-directory
-npx get-claudia .
+npx get-claudia@latest
 ```
 
 This upgrades framework files (CLAUDE.md, skills, rules, daemon code) while preserving your data (context/, people/, projects/, databases). Safe to run multiple times. The installer detects existing installations and only updates system files.

@@ -19,6 +19,7 @@ import {
   activateCodexPlugin,
   codexManualCommands,
   prepareCodexRuntime,
+  resolveCodexInstallArgs,
   syncCodexPluginMcp,
 } from './codex-setup.js';
 
@@ -74,8 +75,9 @@ function printUsage(version) {
   console.log(`get-claudia v${version}
 
 Usage:
+  npx get-claudia                In Codex: install into the open folder
   npx get-claudia [target-dir]   Install or upgrade Claudia (default: ./claudia)
-  npx get-claudia codex [dir]    Install Claudia natively for Codex
+  npx get-claudia codex [dir]    Explicit Codex install (default: current folder)
   npx get-claudia .              Install or upgrade in the current directory
   npx get-claudia upgrade        Same as \`.\` (in-place upgrade)
   npx get-claudia google         Set up Google Workspace integration
@@ -818,8 +820,7 @@ async function main() {
   const devMode = args.includes('--dev');
   const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--skip-memory' && a !== '--dev' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
-  const codexMode = arg === 'codex';
-  const installArg = codexMode ? filteredArgs[1] : arg;
+  const { codexMode, installArg, defaultToCurrentDir } = resolveCodexInstallArgs(filteredArgs);
 
   // Reject flag-looking arguments early so they don't get used as install paths
   // (e.g. `npx get-claudia --foo` would otherwise create a ./--foo/ directory).
@@ -838,7 +839,7 @@ async function main() {
   }
 
   // Support "." or "upgrade" for current directory
-  const isCurrentDir = installArg === '.' || installArg === 'upgrade';
+  const isCurrentDir = defaultToCurrentDir || installArg === '.' || installArg === 'upgrade';
   const targetDir = isCurrentDir ? '.' : (installArg || 'claudia');
   // resolve() (not join) so an absolute arg is honored as-is and the result is
   // always absolute (this value is what gets written into ~/.claudia/claudia-home).
@@ -1773,7 +1774,7 @@ async function main() {
     codexHost = false,
     codexActivation = null,
   ) {
-    const installCommand = codexHost ? 'npx get-claudia codex .' : 'npx get-claudia .';
+    const installCommand = codexHost ? 'npx get-claudia@latest' : 'npx get-claudia@latest .';
     const rerunCmd = isCurrentDir ? installCommand : `cd ${targetDir} && ${installCommand}`;
     const runtimeCommand = codexHost ? 'codex' : 'claude';
     const launchCmd = isCurrentDir ? runtimeCommand : `cd ${targetDir} && ${runtimeCommand}`;
@@ -1807,18 +1808,18 @@ async function main() {
       }
       if (codexHost) {
         if (codexActivation?.ok) {
-          console.log(` ${colors.dim}Codex plugin enabled. In the first session, run ${colors.reset}${colors.cyan}/hooks${colors.reset}${colors.dim} and trust Claudia's two hooks.${colors.reset}`);
+          console.log(` ${colors.dim}Codex plugin enabled. Start a new Codex chat in this folder and Claudia will take it from there.${colors.reset}`);
         } else {
           console.log('');
           console.log(` ${colors.yellow}Codex plugin needs one manual step:${colors.reset}`);
           if (codexActivation?.message) {
             console.log(` ${colors.dim}${codexActivation.message}${colors.reset}`);
           }
-          const replaceMarketplace = codexActivation?.issue === 'marketplace-conflict';
-          for (const command of codexManualCommands(targetPath, replaceMarketplace)) {
+          for (const command of codexManualCommands(targetPath)) {
             console.log(`   ${colors.cyan}${command}${colors.reset}`);
           }
         }
+        console.log(` ${colors.dim}Optional: run ${colors.reset}${colors.cyan}/hooks${colors.reset}${colors.dim} to enable automatic session briefing and transcript capture.${colors.reset}`);
         console.log(` ${colors.dim}Voice: run ${colors.reset}${colors.cyan}claudia voice${colors.reset}${colors.dim}, then begin a new ChatGPT Voice conversation.${colors.reset}`);
       }
       console.log(` ${colors.dim}Feedback? Tell Claudia, or visit github.com/kbanc85/claudia/discussions${colors.reset}`);
