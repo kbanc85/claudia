@@ -15,6 +15,14 @@ import {
   applyResolution,
 } from './manifest-lib.js';
 import { writeShellInit, appendShellRC } from './shell-init.js';
+import {
+  activateCodexPlugin,
+  codexManualCommands,
+  prepareCodexRuntime,
+  syncCodexPluginMcp,
+} from './codex-setup.js';
+import { resolveInstallArgs } from './host-detection.js';
+import { checkForNewerVersion } from './update-check.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -68,7 +76,11 @@ function printUsage(version) {
   console.log(`get-claudia v${version}
 
 Usage:
+  npx get-claudia                In Codex, Claude Code, or Grok: use the open folder
   npx get-claudia [target-dir]   Install or upgrade Claudia (default: ./claudia)
+  npx get-claudia codex [dir]    Explicit Codex install (default: current folder)
+  npx get-claudia claude [dir]   Explicit Claude Code install (default: current folder)
+  npx get-claudia grok [dir]     Explicit Grok install (default: current folder)
   npx get-claudia .              Install or upgrade in the current directory
   npx get-claudia upgrade        Same as \`.\` (in-place upgrade)
   npx get-claudia google         Set up Google Workspace integration
@@ -81,8 +93,12 @@ Flags:
   --version, -V                  Print version and exit
 
 After install, from any directory:
-  claudia                        cd to your install folder, launch claude
-  claudia yolo                   Launch claude --dangerously-skip-permissions
+  claudia                        cd to your install folder, launch the selected host
+  claudia codex                  Launch Codex explicitly
+  claudia claude                 Launch Claude Code explicitly
+  claudia grok                   Launch Grok explicitly
+  claudia voice                  Open ChatGPT for a native Voice conversation
+  claudia yolo                   Launch the selected host without permission prompts
   claudia update                 Upgrade Claudia (no need to cd first)
   update-claudia                 Alias for \`claudia update\`
 `);
@@ -724,40 +740,6 @@ async function restartOllama() {
   return startOllama();
 }
 
-// ─── Self-update trampoline ──────────────────────────────────────────────
-// npx aggressively caches packages. If the user runs `npx get-claudia .`
-// and a newer version exists, we re-exec with the latest to avoid stale installs.
-
-function isNewerVersion(latest, current) {
-  const a = latest.split('.').map(Number);
-  const b = current.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] || 0) > (b[i] || 0)) return true;
-    if ((a[i] || 0) < (b[i] || 0)) return false;
-  }
-  return false;
-}
-
-async function checkForNewerVersion(currentVersion) {
-  // Skip if already re-execing (prevent infinite recursion)
-  if (process.env.CLAUDIA_SKIP_UPDATE_CHECK) return null;
-  // Skip for --help / --version (no need to update-check)
-  if (process.argv.includes('--help') || process.argv.includes('-h') || process.argv.includes('--version')) return null;
-
-  try {
-    const resp = await fetch('https://registry.npmjs.org/get-claudia/latest', {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const latest = data.version;
-    if (latest && isNewerVersion(latest, currentVersion)) return latest;
-  } catch {
-    // Network error or timeout: proceed with current version
-  }
-  return null;
-}
-
 // ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -808,13 +790,20 @@ async function main() {
   const devMode = args.includes('--dev');
   const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--skip-memory' && a !== '--dev' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
+  const {
+    host: runtimeHost,
+    installArg,
+    defaultToCurrentDir,
+    detectionSignal,
+  } = resolveInstallArgs(filteredArgs);
+  const codexMode = runtimeHost === 'codex';
 
   // Reject flag-looking arguments early so they don't get used as install paths
   // (e.g. `npx get-claudia --foo` would otherwise create a ./--foo/ directory).
   // --help and --version are handled at the top of main(); anything else with a
   // leading dash is a typo or unsupported flag.
-  if (typeof arg === 'string' && arg.startsWith('-')) {
-    console.error(`${colors.red}Error:${colors.reset} unrecognized argument: ${arg}`);
+  if (typeof installArg === 'string' && installArg.startsWith('-')) {
+    console.error(`${colors.red}Error:${colors.reset} unrecognized argument: ${installArg}`);
     console.error(`Run ${colors.cyan}npx get-claudia --help${colors.reset} for usage.`);
     process.exit(1);
   }
@@ -826,8 +815,8 @@ async function main() {
   }
 
   // Support "." or "upgrade" for current directory
-  const isCurrentDir = arg === '.' || arg === 'upgrade';
-  const targetDir = isCurrentDir ? '.' : (arg || 'claudia');
+  const isCurrentDir = defaultToCurrentDir || installArg === '.' || installArg === 'upgrade';
+  const targetDir = isCurrentDir ? '.' : (installArg || 'claudia');
   // resolve() (not join) so an absolute arg is honored as-is and the result is
   // always absolute (this value is what gets written into ~/.claudia/claudia-home).
   const targetPath = isCurrentDir ? process.cwd() : resolve(process.cwd(), targetDir);
@@ -844,7 +833,12 @@ async function main() {
   }
 
   // Ask for confirmation before installing or upgrading
-  const action = isUpgrade ? 'Update Claudia' : `Install Claudia to ./${targetDir}`;
+  const hostNames = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
+  const hostLabel = ` for ${hostNames[runtimeHost]}`;
+  if (detectionSignal) {
+    console.log(` ${colors.cyan}✓${colors.reset} Detected ${hostNames[runtimeHost]} runtime`);
+  }
+  const action = isUpgrade ? `Update Claudia${hostLabel}` : `Install Claudia${hostLabel} to ./${targetDir}`;
   const confirmed = await confirm(`${action}?`);
   if (!confirmed) {
     console.log(` ${colors.dim}Cancelled.${colors.reset}`);
@@ -874,7 +868,7 @@ async function main() {
     }
   } else {
     // Upgrade: copy framework files, preserve user data
-    const frameworkPaths = ['.claude', 'CLAUDE.md', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
+    const frameworkPaths = ['.claude', '.codex', 'AGENTS.md', 'CLAUDE.md', '.mcp.json.example', 'LICENSE', 'NOTICE', 'workspaces'];
 
     // Detect user-modified shipped files and let the user decide what to
     // do before we touch anything. Returns a Set of POSIX-relative paths
@@ -928,7 +922,21 @@ async function main() {
     console.log(` ${colors.cyan}✓${colors.reset} Framework updated`);
     console.log(`   • Your memory at ${colors.bold}~/.claudia/${colors.reset} is preserved (entities, relationships, reflections, embeddings).`);
     console.log(`   • Skills and hooks refreshed; any modifications you chose to keep were respected.`);
-    console.log(`   • Restart Claude Code for changes to take effect.`);
+    console.log(`   • Restart ${hostNames[runtimeHost]} for changes to take effect.`);
+  }
+
+  let codexPrepared = null;
+  if (codexMode) {
+    try {
+      codexPrepared = prepareCodexRuntime({
+        packageRoot: join(__dirname, '..'),
+        targetPath,
+        version,
+      });
+      console.log(` ${colors.cyan}✓${colors.reset} Codex plugin prepared`);
+    } catch (error) {
+      console.log(` ${colors.yellow}!${colors.reset}  Codex plugin preparation failed: ${error.message}`);
+    }
   }
 
   // Self-heal: strip CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS from settings (#24)
@@ -954,6 +962,16 @@ async function main() {
   // Install brain visualizer to ~/.claudia/visualizer/ (silent)
   installVisualizer();
 
+  function finalizeCodexRuntime() {
+    if (!codexMode || !codexPrepared) return null;
+    try {
+      syncCodexPluginMcp(targetPath);
+      return activateCodexPlugin(targetPath);
+    } catch (error) {
+      return { ok: false, issue: 'activation-failed', message: error.message };
+    }
+  }
+
   // Create and render progress display
   const renderer = new ProgressRenderer();
 
@@ -977,7 +995,15 @@ async function main() {
       runVaultStep(renderer, () => {
         renderer.stopSpinner();
         renderer.render();
-        showCompletion(targetDir, isCurrentDir, false, undefined, isUpgrade);
+        showCompletion(
+          targetDir,
+          isCurrentDir,
+          false,
+          undefined,
+          isUpgrade,
+          runtimeHost,
+          finalizeCodexRuntime(),
+        );
       });
     });
     return;
@@ -1576,7 +1602,15 @@ async function main() {
     runVaultStep(renderer, () => {
       renderer.render();
       showDbScanResults(dbScan);
-      showCompletion(targetDir, isCurrentDir, memoryOk, rootCause, isUpgrade);
+      showCompletion(
+        targetDir,
+        isCurrentDir,
+        memoryOk,
+        rootCause,
+        isUpgrade,
+        runtimeHost,
+        finalizeCodexRuntime(),
+      );
     });
   });
 
@@ -1585,7 +1619,7 @@ async function main() {
   function runShellStep(renderer, targetPath, callback) {
     renderer.update('shell', 'active', 'installing claudia command...');
     try {
-      writeShellInit(homedir(), targetPath);
+      writeShellInit(homedir(), targetPath, runtimeHost);
       const rc = appendShellRC(homedir());
       if (rc.skipped) {
         renderer.update('shell', 'done', 'files written (Windows: source manually)');
@@ -1711,14 +1745,24 @@ async function main() {
     console.log(`${colors.dim}${'─'.repeat(46)}${colors.reset}`);
   }
 
-  function showCompletion(targetDir, isCurrentDir, memoryInstalled, failureCause, isUpgrade) {
-    const rerunCmd = isCurrentDir ? 'npx get-claudia .' : `cd ${targetDir} && npx get-claudia .`;
-    const launchCmd = isCurrentDir ? 'claude' : `cd ${targetDir} && claude`;
+  function showCompletion(
+    targetDir,
+    isCurrentDir,
+    memoryInstalled,
+    failureCause,
+    isUpgrade,
+    selectedHost = 'claude',
+    codexActivation = null,
+  ) {
+    const installCommand = `npx get-claudia ${selectedHost}`;
+    const rerunCmd = isCurrentDir ? installCommand : `cd ${targetDir} && ${installCommand}`;
+    const runtimeCommand = selectedHost;
+    const launchCmd = isCurrentDir ? runtimeCommand : `cd ${targetDir} && ${runtimeCommand}`;
 
     console.log('');
     console.log(`${colors.dim}${'━'.repeat(46)}${colors.reset}`);
 
-    if (memoryInstalled && !failureCause) {
+    if ((memoryInstalled || skipMemory) && !failureCause) {
       console.log('');
       if (isUpgrade) {
         // Returning user: short and sweet
@@ -1736,11 +1780,30 @@ async function main() {
         if (!isCurrentDir) {
           console.log(`   ${colors.cyan}cd ${targetDir}${colors.reset}`);
         }
-        console.log(`   ${colors.cyan}claude${colors.reset}`);
+        console.log(`   ${colors.cyan}${runtimeCommand}${colors.reset}`);
         console.log('');
         console.log(` ${colors.dim}Or open a new terminal and type ${colors.reset}${colors.cyan}claudia${colors.reset}${colors.dim} from anywhere.${colors.reset}`);
         console.log(` ${colors.dim}She'll introduce herself and learn how you work.${colors.reset}`);
         console.log(` ${colors.dim}Try: ${colors.reset}${colors.cyan}"Say hi"${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}/morning-brief${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}"Who do I know?"${colors.reset}`);
+      }
+      if (selectedHost === 'codex') {
+        if (codexActivation?.ok) {
+          console.log(` ${colors.dim}Codex plugin enabled and current. Start a new Codex chat in this folder and Claudia will take it from there.${colors.reset}`);
+        } else {
+          console.log('');
+          console.log(` ${colors.yellow}Codex plugin needs one manual step:${colors.reset}`);
+          if (codexActivation?.message) {
+            console.log(` ${colors.dim}${codexActivation.message}${colors.reset}`);
+          }
+          for (const command of codexManualCommands(targetPath)) {
+            console.log(`   ${colors.cyan}${command}${colors.reset}`);
+          }
+        }
+        console.log(` ${colors.dim}Optional: run ${colors.reset}${colors.cyan}/hooks${colors.reset}${colors.dim} to enable automatic session briefing and transcript capture.${colors.reset}`);
+        console.log(` ${colors.dim}Voice: run ${colors.reset}${colors.cyan}claudia voice${colors.reset}${colors.dim}, then begin a new ChatGPT Voice conversation.${colors.reset}`);
+      } else if (selectedHost === 'grok') {
+        console.log(` ${colors.dim}Grok will load Claudia's CLAUDE.md, AGENTS.md, skills, rules, hooks, and MCP configuration through its compatibility layer.${colors.reset}`);
+        console.log(` ${colors.dim}Optional: run ${colors.reset}${colors.cyan}/hooks-trust${colors.reset}${colors.dim} to enable project lifecycle hooks.${colors.reset}`);
       }
       console.log(` ${colors.dim}Feedback? Tell Claudia, or visit github.com/kbanc85/claudia/discussions${colors.reset}`);
       console.log('');

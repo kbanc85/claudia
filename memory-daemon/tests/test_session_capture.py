@@ -19,6 +19,7 @@ import pytest
 from claudia_memory.daemon.scheduler import (
     _parse_transcript,
     _process_sessions,
+    _resolve_source_channel,
 )
 
 
@@ -41,6 +42,39 @@ def _write_jsonl(path: Path, lines: list) -> None:
     with open(path, "w", encoding="utf-8") as f:
         for item in lines:
             f.write(json.dumps(item) + "\n")
+
+
+# ---------------------------------------------------------------------------
+# TestResolveSourceChannel (Proposal 13 / multi-host)
+# ---------------------------------------------------------------------------
+
+class TestResolveSourceChannel:
+    def test_explicit_source_channel_wins(self):
+        assert _resolve_source_channel({
+            "source_channel": "grok_build",
+            "host": "claude",
+        }) == "grok_build"
+
+    def test_host_grok_maps_to_grok_build(self):
+        assert _resolve_source_channel({"host": "grok"}) == "grok_build"
+
+    def test_host_telegram(self):
+        assert _resolve_source_channel({"host": "telegram"}) == "telegram"
+
+    def test_host_codex_maps_to_codex(self):
+        assert _resolve_source_channel({"host": "codex"}) == "codex"
+        assert _resolve_source_channel({"host": "codex_cli"}) == "codex"
+
+    def test_legacy_claude_enqueue_defaults(self):
+        # Claude SessionEnd only sends session_id / transcript_path / enqueued_at
+        assert _resolve_source_channel({
+            "session_id": "x",
+            "transcript_path": "/tmp/x",
+            "enqueued_at": 1.0,
+        }) == "claude_code"
+
+    def test_manual_host(self):
+        assert _resolve_source_channel({"host": "manual"}) == "manual"
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +151,46 @@ class TestTranscriptParser:
         result = _parse_transcript(str(transcript))
         assert "Hello from list" in result
 
+    def test_codex_rollout_response_messages(self, tmp_path):
+        """Codex response_item messages retain user and assistant text only."""
+        transcript = tmp_path / "rollout.jsonl"
+        _write_jsonl(transcript, [
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "Prepare the launch plan"}],
+                },
+            },
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "function_call",
+                    "name": "exec_command",
+                    "arguments": "{\"cmd\":\"secret tool noise\"}",
+                },
+            },
+            {
+                "type": "event_msg",
+                "payload": {"type": "user_message", "message": "duplicate event text"},
+            },
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "The launch plan is ready."}],
+                },
+            },
+        ])
+
+        result = _parse_transcript(str(transcript))
+        assert "Prepare the launch plan" in result
+        assert "The launch plan is ready" in result
+        assert "secret tool noise" not in result
+        assert "duplicate event text" not in result
+
 
 # ---------------------------------------------------------------------------
 # TestAUDNWrite
@@ -139,9 +213,15 @@ class TestAUDNWrite:
         # Patch _audn_write_inner to simulate "recall returned nothing -> _plain_add"
         calls = []
 
-        async def fake_inner(content, memory_type, about_entities, importance, source, source_id, db, llm_service):
+        async def fake_inner(
+            content, memory_type, about_entities, importance, source, source_id, db, llm_service,
+            source_channel=None,
+        ):
             # Simulate what happens when recall returns empty: call _plain_add
-            result = audn_mod._plain_add(content, memory_type, about_entities, importance, source, source_id)
+            result = audn_mod._plain_add(
+                content, memory_type, about_entities, importance, source, source_id,
+                source_channel=source_channel,
+            )
             calls.append(result)
             return result
 
@@ -517,6 +597,101 @@ class TestProcessSessions:
 
         # Queue file should still exist (not consumed)
         assert queue_file.exists()
+
+    def test_grok_source_channel_on_episode(self, db, tmp_path):
+        """Queue entries with source_channel=grok_build tag the episode.source field."""
+        config = MockConfig()
+
+        transcript = tmp_path / "grok-session.jsonl"
+        _write_jsonl(transcript, [
+            {"role": "user", "content": "Printer is Brother HL-L2460DW B&W laser."},
+            {"role": "assistant", "content": "Noted for printables."},
+        ])
+        queue_file = self._make_queue_dir(tmp_path)
+        _write_jsonl(queue_file, [{
+            "session_id": "test-sess-grok-channel-003",
+            "transcript_path": str(transcript),
+            "enqueued_at": 1.0,
+            "source_channel": "grok_build",
+            "host": "grok",
+        }])
+
+        mock_ingest_result = {
+            "status": "extracted",
+            "source_type": "session",
+            "data": {
+                "facts": [
+                    {
+                        "content": "Default printer is Brother HL-L2460DW B&W laser",
+                        "type": "fact",
+                        "about": ["Kamil"],
+                        "importance": 0.9,
+                    },
+                ],
+                "commitments": [],
+                "decisions": [],
+                "entities": [],
+                "relationships": [],
+                "key_topics": ["printer"],
+                "summary": "Grok session about B&W laser printer.",
+            },
+            "raw_text": "conversation",
+        }
+
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            with patch("claudia_memory.daemon.scheduler.asyncio.run") as mock_run:
+                call_count = [0]
+
+                def side_effect(coro):
+                    call_count[0] += 1
+                    if call_count[0] == 1:
+                        return mock_ingest_result
+                    return 1
+
+                mock_run.side_effect = side_effect
+                _process_sessions(db, config)
+
+        rows = db.execute(
+            "SELECT * FROM episodes WHERE session_id = ?",
+            ("test-sess-grok-channel-003",),
+            fetch=True,
+        )
+        assert rows and len(rows) == 1
+        assert rows[0]["source"] == "grok_build"
+        assert rows[0]["ingested_at"] is not None
+
+    def test_legacy_enqueue_episode_source_claude_code(self, db, tmp_path):
+        """Claude SessionEnd lines without channel still land as claude_code."""
+        config = MockConfig()
+
+        transcript = tmp_path / "claude-session.jsonl"
+        _write_jsonl(transcript, [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+        ])
+        queue_file = self._make_queue_dir(tmp_path)
+        _write_jsonl(queue_file, [{
+            "session_id": "test-sess-legacy-channel-004",
+            "transcript_path": str(transcript),
+            "enqueued_at": 1.0,
+        }])
+
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            with patch("claudia_memory.daemon.scheduler.asyncio.run") as mock_run:
+                mock_run.return_value = {
+                    "status": "llm_unavailable",
+                    "source_type": "session",
+                    "data": None,
+                    "raw_text": "",
+                }
+                _process_sessions(db, config)
+
+        rows = db.execute(
+            "SELECT source, ingested_at FROM episodes WHERE session_id = ?",
+            ("test-sess-legacy-channel-004",),
+            fetch=True,
+        )
+        assert rows and rows[0]["source"] == "claude_code"
 
     def test_empty_transcript_marks_ingested(self, db, tmp_path):
         """Empty transcript is marked as ingested without storing facts."""

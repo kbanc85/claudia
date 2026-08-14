@@ -184,9 +184,40 @@ def _ingest_observations(db, config):
         logger.debug(f"Ingested {ingested} observations from hook capture")
 
 
-def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
-    """Parse a Claude Code JSONL transcript and extract readable conversation text.
+def _resolve_source_channel(entry: dict) -> str:
+    """Map a sessions_pending queue entry to a source_channel string.
 
+    Preference: explicit source_channel, then host alias, then claude_code
+    (legacy Claude SessionEnd enqueue has neither field).
+    """
+    channel = (entry.get("source_channel") or "").strip()
+    if channel:
+        return channel
+    host = (entry.get("host") or "").strip().lower()
+    host_map = {
+        "grok": "grok_build",
+        "grok_build": "grok_build",
+        "claude": "claude_code",
+        "claude_code": "claude_code",
+        "codex": "codex",
+        "codex_cli": "codex",
+        "codex_desktop": "codex",
+        "telegram": "telegram",
+        "slack": "slack",
+        "cursor": "cursor",
+        "cowork": "cowork",
+        "manual": "manual",
+        "demo": "manual",
+    }
+    if host in host_map:
+        return host_map[host]
+    return "claude_code"
+
+
+def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
+    """Parse a host JSONL transcript and extract readable conversation text.
+
+    Accepts Claude Code, Codex rollout, and host-adapter JSONL.
     Tolerates truncated last lines. Skips tool_use/tool_result entries.
     Returns up to max_chars of concatenated human/assistant text.
     """
@@ -218,16 +249,26 @@ def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
                     # Tolerate truncated last line silently
                     continue
 
+                # Codex rollout files wrap model messages as response_item
+                # payloads. Other response_item payloads are tool calls,
+                # reasoning, or bookkeeping and should not enter memory.
+                record = turn
+                if turn.get("type") == "response_item":
+                    payload = turn.get("payload")
+                    if not isinstance(payload, dict) or payload.get("type") != "message":
+                        continue
+                    record = payload
+
                 # Skip tool use entries
                 turn_type = turn.get("type", "")
                 if turn_type in ("tool_use", "tool_result"):
                     continue
 
-                role = turn.get("role") or turn.get("type", "")
+                role = record.get("role") or record.get("type", "")
                 if role not in ("user", "human", "assistant"):
                     continue
 
-                content = turn.get("content") or turn.get("text") or ""
+                content = record.get("content") or record.get("text") or ""
                 if isinstance(content, list):
                     # Extract text blocks, skip tool_use blocks
                     parts = []
@@ -235,7 +276,7 @@ def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
                         if isinstance(block, dict):
                             if block.get("type") == "tool_use" or block.get("type") == "tool_result":
                                 continue
-                            if block.get("type") == "text":
+                            if block.get("type") in ("text", "input_text", "output_text"):
                                 parts.append(block.get("text", ""))
                     content = " ".join(parts)
                 elif not isinstance(content, str):
@@ -304,6 +345,7 @@ def _process_sessions(db, config):
 
                 session_id = entry.get("session_id", "")
                 transcript_path = entry.get("transcript_path", "")
+                source_channel = _resolve_source_channel(entry)
 
                 if not session_id:
                     continue
@@ -331,7 +373,7 @@ def _process_sessions(db, config):
                     except Exception as e:
                         logger.debug(f"Transcript parse error for {session_id}: {e}")
 
-                # Create or reuse episode
+                # Create or reuse episode (source = host channel for multi-runtime)
                 try:
                     if episode_id is None:
                         now = datetime.utcnow().isoformat()
@@ -342,8 +384,20 @@ def _process_sessions(db, config):
                                 "started_at": now,
                                 "message_count": 0,
                                 "is_summarized": 0,
+                                "source": source_channel,
                             },
                         )
+                    else:
+                        # Backfill channel on re-open of un-ingested episode
+                        try:
+                            db.update(
+                                "episodes",
+                                {"source": source_channel},
+                                "id = ? AND (source IS NULL OR source = '')",
+                                (episode_id,),
+                            )
+                        except Exception:
+                            pass
                 except Exception as e:
                     logger.debug(f"Could not create episode for {session_id}: {e}")
                     continue
@@ -376,7 +430,12 @@ def _process_sessions(db, config):
                         source="session_transcript",
                         source_id=session_id,
                         origin_type="extracted",
-                        metadata={"verification_status": "pending", "is_source_stub": True},
+                        metadata={
+                            "verification_status": "pending",
+                            "is_source_stub": True,
+                            "source_channel": source_channel,
+                        },
+                        source_channel=source_channel,
                     )
                     if stub_id:
                         remember_svc.save_source_material(
@@ -385,6 +444,7 @@ def _process_sessions(db, config):
                             metadata={
                                 "source": "session_transcript",
                                 "session_id": session_id,
+                                "source_channel": source_channel,
                             },
                         )
                 except Exception as e:
@@ -428,6 +488,7 @@ def _process_sessions(db, config):
                                     source_id=session_id,
                                     db=db,
                                     llm_service=llm_svc,
+                                    source_channel=source_channel,
                                 ))
                             except Exception as e:
                                 logger.debug(f"AUDN write failed for fact: {e}")
@@ -444,6 +505,7 @@ def _process_sessions(db, config):
                                     source_id=session_id,
                                     db=db,
                                     llm_service=llm_svc,
+                                    source_channel=source_channel,
                                 ))
                             except Exception as e:
                                 logger.debug(f"AUDN write failed for commitment: {e}")
@@ -460,6 +522,7 @@ def _process_sessions(db, config):
                                     source_id=session_id,
                                     db=db,
                                     llm_service=llm_svc,
+                                    source_channel=source_channel,
                                 ))
                             except Exception as e:
                                 logger.debug(f"AUDN write failed for decision: {e}")

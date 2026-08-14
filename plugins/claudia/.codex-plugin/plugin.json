@@ -1,0 +1,37 @@
+{
+  "name": "claudia",
+  "version": "1.68.0",
+  "description": "Local-first strategic assistant with persistent memory, relationship context, and reflective workflows.",
+  "author": {
+    "name": "Kamil Banc"
+  },
+  "repository": "https://github.com/kbanc85/claudia",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "memory",
+    "relationships",
+    "productivity",
+    "local-first",
+    "voice"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Claudia",
+    "shortDescription": "Persistent local memory and strategic workflows.",
+    "longDescription": "Bring Claudia's local memory, relationship context, judgment rules, and recurring workflows into Codex, including tasks coordinated through ChatGPT Voice, while keeping durable data on your machine.",
+    "developerName": "Kamil Banc",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Give me my Claudia briefing.",
+      "What am I missing across my projects and relationships?",
+      "Help me think this through as Claudia."
+    ],
+    "brandColor": "#79DBFF"
+  },
+  "mcpServers": "./.mcp.json"
+}
