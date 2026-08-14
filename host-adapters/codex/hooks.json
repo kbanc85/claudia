@@ -1,0 +1,30 @@
+{
+  "description": "Claudia memory continuity for Codex sessions.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/session-start.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Loading Claudia's memory",
+            "additionalContextLimit": 2500
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/session-end.mjs\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -126,18 +126,38 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 
 ## Quick Start
 
-**1. Install**
+**1. Install for Codex**
 ```bash
-npx get-claudia
+npx get-claudia codex
 ```
 
 **2. Start**
 ```bash
 cd claudia
-claude
+codex
 ```
 
 **3. Say hi.** She'll introduce herself, learn about you through a natural conversation, and generate a personalized workspace.
+
+The Codex install registers Claudia's official local plugin, memory MCP server, and two lifecycle hooks. In your first session, run `/hooks` once to review and trust the memory briefing and transcript capture hooks.
+
+<details>
+<summary><strong>Using Claude Code instead?</strong></summary>
+
+```bash
+npx get-claudia
+cd claudia
+claude
+```
+
+</details>
+
+<details>
+<summary><strong>Using ChatGPT Voice?</strong></summary>
+
+After the Codex install, run `claudia voice`, begin a new ChatGPT Voice conversation, then say: “Start a Codex task in my Claudia workspace and give me my briefing.” Voice coordinates the Codex task and follows its permissions; the task itself receives Claudia's plugin and memory tools.
+
+</details>
 
 <p align="center">
 <img src="assets/claudia-install.gif" alt="Installing Claudia" width="600">
@@ -149,7 +169,7 @@ claude
 - Share meeting notes and she'll extract action items
 - `npx get-claudia google` to connect Gmail, Calendar, Drive, and more
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 18+, Python 3.10+ (for memory), [Ollama](https://ollama.com) (for embeddings)
+**Requirements:** [Codex](https://developers.openai.com/codex) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Node.js 18+, Python 3.10+ (for memory), [Ollama](https://ollama.com) (for embeddings)
 
 > **Embeddings model:** After installing Ollama, pull the required model: `ollama pull all-minilm:l6-v2`
 
@@ -368,7 +388,7 @@ Claudia has two layers:
 | Pattern detection | Every 6h | Surfaces trends across conversations |
 
 ```
-You ──► Claude Code ──► Reads Claudia's templates ──► Becomes Claudia
+You ──► Codex / Claude Code ──► Reads Claudia's runtime contract ──► Becomes Claudia
                                                            │
                                                     MCP daemon (stdio)
                                                            │

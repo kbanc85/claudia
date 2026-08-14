@@ -40,6 +40,7 @@ Rules:
 
 - `role`: `user`, `human`, or `assistant`  
 - `content`: string, or list of `{ "type": "text", "text": "..." }`  
+- Codex rollout messages are accepted as `response_item` records whose payload is a user/assistant `message` with `input_text` or `output_text` blocks
 - Skip or omit tool_use / tool_result lines (parser ignores them)  
 - Ambient extract uses up to ~4000 characters; keep high-signal turns  
 
@@ -55,3 +56,4 @@ Rules:
 
 - Python: `host-adapters/shared/enqueue.py`  
 - Grok: `host-adapters/grok/session_log.py`, `enqueue_session.py`
+- Codex: `host-adapters/codex/session-start.mjs`, `session-end.mjs`, `hooks.json`

@@ -1,0 +1,156 @@
+---
+name: what-am-i-missing
+description: "Surface risks, blind spots, overlooked items, and accountability across commitments and relationships. Triggers on \"what am I overlooking?\", \"blind spots\", \"what's falling through the cracks\", \"what do I owe?\", \"am I overdue?\", \"check my commitments\". See also: `risk-surfacer` for the proactive auto-firing version on overdue items and cooling relationships."
+argument-hint: "[person name or 'overdue']"
+effort-level: high
+---
+
+# What Am I Missing
+
+Surface risks, blind spots, overlooked items, and accountability across all areas.
+
+## What to Check
+
+### 1. Commitment Risks
+From `context/commitments.md`:
+- Overdue items
+- Items at risk (due soon, no progress)
+- Patterns of slippage
+- Cascading delays
+
+### 2. Relationship Risks
+From `people/` files:
+- Cooling relationships (60+ days)
+- Unfulfilled promises to key people
+- Sentiment shifts detected
+- Key relationships not nurtured
+
+### 3. Waiting Risks
+From `context/waiting.md`:
+- Overdue items from others
+- Critical dependencies at risk
+- Patterns (chronic late deliverers)
+
+### 4. Pattern Risks
+From `context/patterns.md`:
+- Recurring issues not addressed
+- Blind spots observed
+- Capacity concerns
+- Self-limiting patterns
+
+### 5. Strategic Risks
+Looking at the bigger picture:
+- Important-but-not-urgent items being neglected
+- Opportunities cooling
+- Decisions being avoided
+
+### 6. Data Consistency Check
+Cross-reference memory DB against file state to catch divergence:
+- Run `claudia memory recall "project status commitments" --project-dir "$PWD" --limit 10`
+- Compare recalled statuses (interview completion, deliverable state) against file-based trackers
+- For any active project with a dashboard/README tracker, grep actual file statuses and compare to stated counts
+- Flag contradictions: "Memory says X is completed, but tracker shows it outstanding" (or vice versa)
+- Recommend correction path: update the stale source to match the authoritative one
+
+This step catches the scenario where an interview/task was processed but only some status sources were updated.
+
+## Output Format
+
+```
+## What You Might Be Missing - [Date]
+
+### Commitment Risks
+
+**Overdue:**
+- [Item] was due [date] - [impact]
+
+**At Risk:**
+- [Item] due [date] - [concern]
+
+### Relationship Risks
+
+**Cooling:**
+- [Person] - last contact [X] days ago
+  -> Was: [relationship context]
+  -> Risk: [what could happen]
+
+**Open Loops:**
+- Promised [thing] to [person] - [status]
+
+### Waiting Risks
+
+**Overdue from Others:**
+- [Item] from [person] - expected [date]
+  -> Impact: [why this matters]
+  -> Suggested action: [what to do]
+
+### Pattern Risks
+
+- [Pattern] - seen [X] times recently
+  -> Concern: [why it matters]
+  -> Suggestion: [what to consider]
+
+### Strategic Blind Spots
+
+- [Thing being neglected]
+  -> Why it matters: [impact]
+  -> Suggestion: [action]
+
+### By Relationship
+
+#### [Person/Client Name]
+**I Owe:**
+- [Item] - due [Date]
+
+**They Owe:**
+- [Item] - since [Date]
+
+[Repeat for key relationships with open items]
+
+**Recovery Actions:**
+- [Overdue item]: [What to do now]
+
+### Data Consistency
+
+- [Source A] says [X], but [Source B] says [Y]
+  -> Authoritative source: [which one and why]
+  -> Fix: Update [stale source] to match
+
+### Summary
+
+Critical: [X items need immediate attention]
+Watch: [Y items to keep an eye on]
+Consider: [Z strategic things to think about]
+Consistency: [N data mismatches found across sources]
+```
+
+## Tone
+
+- Matter-of-fact, not alarmist
+- Specific, not vague
+- Actionable suggestions
+- Prioritized by importance
+- Respectful of user's judgment
+
+## When to Use
+
+- When feeling overwhelmed and wanting perspective
+- Before important planning sessions
+- When something feels "off" but unclear what
+- As a regular check-in (weekly or biweekly)
+
+## Usage Variations
+
+**Full analysis:**
+Comprehensive review across all risk categories and relationships.
+
+**For specific person:**
+`/what-am-i-missing [person name]`
+Filters to only show commitments and risks involving that person.
+
+**Quick overdue only:**
+`/what-am-i-missing overdue`
+Shows only overdue items and immediate recovery actions.
+
+**Quick check:**
+Major risks only, no deep analysis.

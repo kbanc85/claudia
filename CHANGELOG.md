@@ -6,6 +6,7 @@ All notable changes to Claudia will be documented in this file.
 
 ### Added
 
+- **Native Codex installation and Voice-ready runtime.** `npx get-claudia codex [dir]` now installs Claudia's workspace, memory daemon, repository marketplace, official Codex plugin, 34 Codex-adapted skills, and lifecycle hooks in one path. `AGENTS.md` provides the Codex startup contract; SessionStart injects the compact memory briefing; SessionEnd queues Codex rollout transcripts for the existing sole-writer daemon; the parser now understands Codex `response_item` messages and records them as `source_channel=codex`. The `claudia` shell helper remembers the selected host and adds explicit `codex`, `claude`, and `voice` surfaces.
 - **Runtime-agnostic host adapters (Proposal 13, Phase 1–2).** New `host-adapters/` package lets any host enqueue finished sessions into the same ambient-capture queue Claude has used since v1.65 (`~/.claudia/sessions_pending.jsonl`). Shared `enqueue.py`, Grok session log + CLI (`source_channel=grok_build`), and `PROTOCOL.md`. Daemon `process_sessions` now resolves `source_channel` / `host` onto `episodes.source` and passes `source_channel` through AUDN / stub remembers; legacy Claude enqueue lines still default to `claude_code`. Tests cover channel resolution and multi-host episode tagging. Does not rewrite Claudia; does not add a second memory DB.
 
 ## 1.67.1 (2026-08-11)

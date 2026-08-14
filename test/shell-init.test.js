@@ -23,17 +23,19 @@ function cleanup(dir) {
   rmSync(dir, { recursive: true, force: true });
 }
 
-test('writeShellInit writes claudia-home pointing at install dir', () => {
+test('writeShellInit writes claudia-home and the selected host', () => {
   const home = makeHome();
   try {
     const targetDir = '/some/where/claudia';
-    const { homeFile, initFile } = writeShellInit(home, targetDir);
+    const { homeFile, hostFile, initFile } = writeShellInit(home, targetDir, 'codex');
 
     assert.equal(homeFile, join(home, '.claudia', 'claudia-home'));
+    assert.equal(hostFile, join(home, '.claudia', 'claudia-host'));
     assert.equal(initFile, join(home, '.claudia', 'shell-init.sh'));
 
     const homeContent = readFileSync(homeFile, 'utf8');
     assert.equal(homeContent.trim(), targetDir);
+    assert.equal(readFileSync(hostFile, 'utf8').trim(), 'codex');
   } finally {
     cleanup(home);
   }
@@ -50,6 +52,9 @@ test('writeShellInit writes the shell function content', () => {
     assert.ok(content.includes('yolo'));
     assert.ok(content.includes('--dangerously-skip-permissions'));
     assert.ok(content.includes('command claudia'));
+    assert.ok(content.includes('claudia-host'));
+    assert.ok(content.includes('codex --dangerously-bypass-approvals-and-sandbox'));
+    assert.ok(content.includes('open -a ChatGPT'));
     // Update surface area
     assert.ok(content.includes('update-claudia()'));
     assert.ok(content.includes('npx get-claudia'));

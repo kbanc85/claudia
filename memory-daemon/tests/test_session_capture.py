@@ -61,6 +61,10 @@ class TestResolveSourceChannel:
     def test_host_telegram(self):
         assert _resolve_source_channel({"host": "telegram"}) == "telegram"
 
+    def test_host_codex_maps_to_codex(self):
+        assert _resolve_source_channel({"host": "codex"}) == "codex"
+        assert _resolve_source_channel({"host": "codex_cli"}) == "codex"
+
     def test_legacy_claude_enqueue_defaults(self):
         # Claude SessionEnd only sends session_id / transcript_path / enqueued_at
         assert _resolve_source_channel({
@@ -146,6 +150,46 @@ class TestTranscriptParser:
         ])
         result = _parse_transcript(str(transcript))
         assert "Hello from list" in result
+
+    def test_codex_rollout_response_messages(self, tmp_path):
+        """Codex response_item messages retain user and assistant text only."""
+        transcript = tmp_path / "rollout.jsonl"
+        _write_jsonl(transcript, [
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "Prepare the launch plan"}],
+                },
+            },
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "function_call",
+                    "name": "exec_command",
+                    "arguments": "{\"cmd\":\"secret tool noise\"}",
+                },
+            },
+            {
+                "type": "event_msg",
+                "payload": {"type": "user_message", "message": "duplicate event text"},
+            },
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "The launch plan is ready."}],
+                },
+            },
+        ])
+
+        result = _parse_transcript(str(transcript))
+        assert "Prepare the launch plan" in result
+        assert "The launch plan is ready" in result
+        assert "secret tool noise" not in result
+        assert "duplicate event text" not in result
 
 
 # ---------------------------------------------------------------------------

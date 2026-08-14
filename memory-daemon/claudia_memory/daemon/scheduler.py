@@ -199,6 +199,9 @@ def _resolve_source_channel(entry: dict) -> str:
         "grok_build": "grok_build",
         "claude": "claude_code",
         "claude_code": "claude_code",
+        "codex": "codex",
+        "codex_cli": "codex",
+        "codex_desktop": "codex",
         "telegram": "telegram",
         "slack": "slack",
         "cursor": "cursor",
@@ -214,7 +217,7 @@ def _resolve_source_channel(entry: dict) -> str:
 def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
     """Parse a host JSONL transcript and extract readable conversation text.
 
-    Accepts Claude Code and host-adapter JSONL (role user/assistant + content).
+    Accepts Claude Code, Codex rollout, and host-adapter JSONL.
     Tolerates truncated last lines. Skips tool_use/tool_result entries.
     Returns up to max_chars of concatenated human/assistant text.
     """
@@ -246,16 +249,26 @@ def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
                     # Tolerate truncated last line silently
                     continue
 
+                # Codex rollout files wrap model messages as response_item
+                # payloads. Other response_item payloads are tool calls,
+                # reasoning, or bookkeeping and should not enter memory.
+                record = turn
+                if turn.get("type") == "response_item":
+                    payload = turn.get("payload")
+                    if not isinstance(payload, dict) or payload.get("type") != "message":
+                        continue
+                    record = payload
+
                 # Skip tool use entries
                 turn_type = turn.get("type", "")
                 if turn_type in ("tool_use", "tool_result"):
                     continue
 
-                role = turn.get("role") or turn.get("type", "")
+                role = record.get("role") or record.get("type", "")
                 if role not in ("user", "human", "assistant"):
                     continue
 
-                content = turn.get("content") or turn.get("text") or ""
+                content = record.get("content") or record.get("text") or ""
                 if isinstance(content, list):
                     # Extract text blocks, skip tool_use blocks
                     parts = []
@@ -263,7 +276,7 @@ def _parse_transcript(transcript_path: str, max_chars: int = 4000) -> str:
                         if isinstance(block, dict):
                             if block.get("type") == "tool_use" or block.get("type") == "tool_result":
                                 continue
-                            if block.get("type") == "text":
+                            if block.get("type") in ("text", "input_text", "output_text"):
                                 parts.append(block.get("text", ""))
                     content = " ".join(parts)
                 elif not isinstance(content, str):

@@ -6,6 +6,9 @@
     "claudia",
     "claude",
     "claude-code",
+    "codex",
+    "openai",
+    "voice",
     "ai",
     "assistant",
     "executive-assistant",
@@ -21,7 +24,7 @@
     "type": "git",
     "url": "git+https://github.com/kbanc85/claudia.git"
   },
-  "homepage": "https://github.com/kbanc85/claudia",
+  "homepage": "https://claudia.aiadopters.club",
   "bugs": {
     "url": "https://github.com/kbanc85/claudia/issues"
   },
@@ -30,6 +33,9 @@
   },
   "files": [
     "bin",
+    ".agents",
+    "plugins",
+    "host-adapters",
     "template-v2",
     "assets",
     "visualizer",
@@ -40,9 +46,10 @@
   "dependencies": {},
   "devDependencies": {},
   "scripts": {
+    "build-codex-plugin": "node scripts/build-codex-plugin.js",
     "generate-manifest": "node scripts/generate-manifest.js",
     "test": "node --test test/*.test.js",
-    "prepublishOnly": "node scripts/generate-manifest.js",
+    "prepublishOnly": "node scripts/build-codex-plugin.js && node scripts/generate-manifest.js",
     "prepack": "find template-v2 -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; true"
   },
   "engines": {
