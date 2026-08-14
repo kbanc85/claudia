@@ -10,7 +10,6 @@ import {
   codexManualCommands,
   CODEX_MARKETPLACE_NAME,
   prepareCodexRuntime,
-  resolveCodexInstallArgs,
   syncCodexPluginMcp,
 } from '../bin/codex-setup.js';
 
@@ -19,35 +18,6 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 function tempWorkspace() {
   return mkdtempSync(join(tmpdir(), 'claudia-codex-'));
 }
-
-test('bare install in Codex targets the folder already open', () => {
-  assert.deepEqual(resolveCodexInstallArgs([], { CODEX_THREAD_ID: 'thread-123' }), {
-    codexMode: true,
-    installArg: undefined,
-    defaultToCurrentDir: true,
-  });
-});
-
-test('bare install outside Codex retains the legacy ./claudia default', () => {
-  assert.deepEqual(resolveCodexInstallArgs([], {}), {
-    codexMode: false,
-    installArg: undefined,
-    defaultToCurrentDir: false,
-  });
-});
-
-test('explicit Codex install defaults to the current folder anywhere', () => {
-  assert.deepEqual(resolveCodexInstallArgs(['codex'], {}), {
-    codexMode: true,
-    installArg: undefined,
-    defaultToCurrentDir: true,
-  });
-  assert.deepEqual(resolveCodexInstallArgs(['codex', '/tmp/project'], {}), {
-    codexMode: true,
-    installArg: '/tmp/project',
-    defaultToCurrentDir: false,
-  });
-});
 
 test('prepareCodexRuntime copies the plugin and creates a local marketplace', () => {
   const targetPath = tempWorkspace();

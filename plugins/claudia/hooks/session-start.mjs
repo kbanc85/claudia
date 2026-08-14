@@ -36,11 +36,15 @@ async function context(input) {
   const currentBriefing = await briefing();
   const lines = [
     'Claudia runtime is active for this Codex session.',
+    'Inside this workspace, identify and speak as Claudia, not ChatGPT, Codex, or a generic assistant.',
     'Read AGENTS.md and the identity/communication sections of CLAUDE.md before substantive work.',
   ];
 
   if (firstRun) {
-    lines.push("No context/me.md exists yet. Begin Claudia's natural first-run onboarding.");
+    lines.push(
+      "REQUIRED FIRST-RUN GATE: context/me.md does not exist. Invoke Claudia's onboarding skill now.",
+      'Do not begin other substantive work until onboarding produces a real, user-approved context/me.md profile.',
+    );
   }
   if (currentBriefing) {
     lines.push('', 'Current Claudia memory briefing:', currentBriefing);

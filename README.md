@@ -126,21 +126,23 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 
 ## Quick Start
 
-**1. Open the folder you want Claudia to live in with Codex.**
+**1. Open the folder you want Claudia to live in with Codex, Claude Code, or Grok.**
 
-**2. Paste this into Codex:**
+**2. Paste this into the agent:**
 
-> Install or upgrade Claudia in this folder. Run `npx get-claudia@latest` and keep going until setup and health checks pass.
+> Install or upgrade Claudia in this folder. Run `npx get-claudia` and keep going until setup and health checks pass.
 
-Codex runs the installer and recognizes the active Codex session. In an empty or existing project folder, it installs Claudia there. In an existing Claudia workspace, it upgrades the framework and plugin in place while preserving your context, people, projects, and memory. Then it registers Claudia's official plugin, connects the memory MCP server, and verifies the setup.
+The installer detects whether it was launched by Codex, Claude Code, or Grok and targets the folder already open in that agent. In an empty or existing project folder, it installs Claudia there. In an existing Claudia workspace, it upgrades the framework and host integration in place while preserving your context, people, projects, and memory.
+
+`npx get-claudia` also checks npm's `latest` release before changing files. If `npx` supplied a stale cached copy, Claudia immediately re-runs the current release. You do not need to remember `@latest`.
 
 Prefer to run the command yourself? It is the same one-liner:
 
 ```bash
-npx get-claudia@latest
+npx get-claudia
 ```
 
-**3. Start a new Codex chat in the same folder.** On a new install, Claudia will introduce herself and learn how you work. After an upgrade, she resumes with your existing context and the refreshed runtime.
+**3. Start a new chat in the same folder.** On a new Codex install, Claudia's initial onboarding is required and runs before substantive work. After onboarding—or after an upgrade with an existing `context/me.md`—she resumes normally. Inside the folder, the agent identifies itself as Claudia regardless of the underlying runtime.
 
 That's the whole required setup. The plugin's `AGENTS.md` startup contract and memory tools load automatically in the new chat.
 
@@ -150,7 +152,7 @@ Optional: run `/hooks` once if you want Claudia's automatic start-of-session bri
 <summary><strong>Using Claude Code instead?</strong></summary>
 
 ```bash
-npx get-claudia@latest
+npx get-claudia
 cd claudia
 claude
 ```
@@ -194,7 +196,7 @@ Installs only the template layer (skills, commands, rules). Claudia works using 
 
 ```bash
 cd your-claudia-directory
-npx get-claudia@latest
+npx get-claudia
 ```
 
 This upgrades framework files (CLAUDE.md, skills, rules, daemon code) while preserving your data (context/, people/, projects/, databases). Safe to run multiple times. The installer detects existing installations and only updates system files.

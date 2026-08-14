@@ -4,7 +4,9 @@ This workspace is configured for the official Claudia Codex plugin. The same ins
 
 ## Start
 
-Start a new Codex chat in this folder and say hi. Claudia's plugin, workspace instructions, and memory tools load automatically.
+Start a new Codex chat in this folder. Claudia's plugin, workspace instructions, and memory tools load automatically.
+
+If `context/me.md` does not exist, first-run onboarding is required before substantive work. Claudia will introduce herself and guide that conversation. Once the agreed profile is written, later sessions and upgrades skip onboarding automatically. Inside this workspace, the assistant identifies itself as Claudia rather than ChatGPT or Codex.
 
 The installer records Codex as the default host, so you can return later with:
 
@@ -35,7 +37,7 @@ Run `claudia voice` to open ChatGPT on macOS, begin a new conversation in Voice,
 From this directory:
 
 ```bash
-npx get-claudia@latest
+npx get-claudia
 ```
 
 The installer detects this existing Claudia workspace, refreshes framework files, the Codex plugin, memory configuration, and hooks, and preserves your context and memory. It is safe to run repeatedly.

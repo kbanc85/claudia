@@ -19,23 +19,6 @@ import { execFileSync } from 'child_process';
 export const CODEX_MARKETPLACE_NAME = 'claudia-official';
 export const CODEX_PLUGIN_NAME = 'claudia';
 
-/**
- * Inside an active Codex thread, a bare installer command should target the
- * folder the user already opened. Explicit `codex` keeps the same behavior
- * outside Codex. Ordinary terminal installs retain the legacy ./claudia target.
- */
-export function resolveCodexInstallArgs(filteredArgs, env = process.env) {
-  const explicitCodex = filteredArgs[0] === 'codex';
-  const detectedCodex = Boolean(env.CODEX_THREAD_ID);
-  const codexMode = explicitCodex || detectedCodex;
-  const installArg = explicitCodex ? filteredArgs[1] : filteredArgs[0];
-  return {
-    codexMode,
-    installArg,
-    defaultToCurrentDir: codexMode && installArg === undefined,
-  };
-}
-
 function readJson(path, fallback = {}) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'));

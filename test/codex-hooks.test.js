@@ -28,7 +28,9 @@ test('SessionStart emits Codex additionalContext and fails open without the daem
     const context = output.hookSpecificOutput.additionalContext;
     assert.equal(output.hookSpecificOutput.hookEventName, 'SessionStart');
     assert.match(context, /Claudia runtime is active/);
-    assert.match(context, /first-run onboarding/);
+    assert.match(context, /identify and speak as Claudia/);
+    assert.match(context, /REQUIRED FIRST-RUN GATE/);
+    assert.match(context, /onboarding skill/);
     assert.match(context, /degraded mode/);
   } finally {
     rmSync(cwd, { recursive: true, force: true });

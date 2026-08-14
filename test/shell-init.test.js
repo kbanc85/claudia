@@ -41,6 +41,16 @@ test('writeShellInit writes claudia-home and the selected host', () => {
   }
 });
 
+test('writeShellInit accepts Grok as the selected host', () => {
+  const home = makeHome();
+  try {
+    const { hostFile } = writeShellInit(home, '/some/where/claudia', 'grok');
+    assert.equal(readFileSync(hostFile, 'utf8').trim(), 'grok');
+  } finally {
+    cleanup(home);
+  }
+});
+
 test('writeShellInit writes the shell function content', () => {
   const home = makeHome();
   try {
@@ -54,10 +64,12 @@ test('writeShellInit writes the shell function content', () => {
     assert.ok(content.includes('command claudia'));
     assert.ok(content.includes('claudia-host'));
     assert.ok(content.includes('codex --dangerously-bypass-approvals-and-sandbox'));
+    assert.ok(content.includes('grok --always-approve'));
+    assert.ok(content.includes('_claudia_cd && grok'));
     assert.ok(content.includes('open -a ChatGPT'));
     // Update surface area
     assert.ok(content.includes('update-claudia()'));
-    assert.ok(content.includes('npx get-claudia'));
+    assert.ok(content.includes('npx get-claudia "$host" "$dir"'));
     assert.ok(content.includes('update)'), 'claudia() must route the `update` subcommand');
   } finally {
     cleanup(home);

@@ -19,9 +19,10 @@ import {
   activateCodexPlugin,
   codexManualCommands,
   prepareCodexRuntime,
-  resolveCodexInstallArgs,
   syncCodexPluginMcp,
 } from './codex-setup.js';
+import { resolveInstallArgs } from './host-detection.js';
+import { checkForNewerVersion } from './update-check.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -75,9 +76,11 @@ function printUsage(version) {
   console.log(`get-claudia v${version}
 
 Usage:
-  npx get-claudia                In Codex: install or upgrade the open folder
+  npx get-claudia                In Codex, Claude Code, or Grok: use the open folder
   npx get-claudia [target-dir]   Install or upgrade Claudia (default: ./claudia)
   npx get-claudia codex [dir]    Explicit Codex install (default: current folder)
+  npx get-claudia claude [dir]   Explicit Claude Code install (default: current folder)
+  npx get-claudia grok [dir]     Explicit Grok install (default: current folder)
   npx get-claudia .              Install or upgrade in the current directory
   npx get-claudia upgrade        Same as \`.\` (in-place upgrade)
   npx get-claudia google         Set up Google Workspace integration
@@ -93,6 +96,7 @@ After install, from any directory:
   claudia                        cd to your install folder, launch the selected host
   claudia codex                  Launch Codex explicitly
   claudia claude                 Launch Claude Code explicitly
+  claudia grok                   Launch Grok explicitly
   claudia voice                  Open ChatGPT for a native Voice conversation
   claudia yolo                   Launch the selected host without permission prompts
   claudia update                 Upgrade Claudia (no need to cd first)
@@ -736,40 +740,6 @@ async function restartOllama() {
   return startOllama();
 }
 
-// ─── Self-update trampoline ──────────────────────────────────────────────
-// npx aggressively caches packages. If the user runs `npx get-claudia .`
-// and a newer version exists, we re-exec with the latest to avoid stale installs.
-
-function isNewerVersion(latest, current) {
-  const a = latest.split('.').map(Number);
-  const b = current.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] || 0) > (b[i] || 0)) return true;
-    if ((a[i] || 0) < (b[i] || 0)) return false;
-  }
-  return false;
-}
-
-async function checkForNewerVersion(currentVersion) {
-  // Skip if already re-execing (prevent infinite recursion)
-  if (process.env.CLAUDIA_SKIP_UPDATE_CHECK) return null;
-  // Skip for --help / --version (no need to update-check)
-  if (process.argv.includes('--help') || process.argv.includes('-h') || process.argv.includes('--version')) return null;
-
-  try {
-    const resp = await fetch('https://registry.npmjs.org/get-claudia/latest', {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const latest = data.version;
-    if (latest && isNewerVersion(latest, currentVersion)) return latest;
-  } catch {
-    // Network error or timeout: proceed with current version
-  }
-  return null;
-}
-
 // ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -820,7 +790,13 @@ async function main() {
   const devMode = args.includes('--dev');
   const filteredArgs = args.filter(a => a !== '--no-memory' && a !== '--skip-memory' && a !== '--dev' && a !== '--yes' && a !== '-y');
   const arg = filteredArgs[0];
-  const { codexMode, installArg, defaultToCurrentDir } = resolveCodexInstallArgs(filteredArgs);
+  const {
+    host: runtimeHost,
+    installArg,
+    defaultToCurrentDir,
+    detectionSignal,
+  } = resolveInstallArgs(filteredArgs);
+  const codexMode = runtimeHost === 'codex';
 
   // Reject flag-looking arguments early so they don't get used as install paths
   // (e.g. `npx get-claudia --foo` would otherwise create a ./--foo/ directory).
@@ -857,7 +833,11 @@ async function main() {
   }
 
   // Ask for confirmation before installing or upgrading
-  const hostLabel = codexMode ? ' for Codex' : '';
+  const hostNames = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
+  const hostLabel = ` for ${hostNames[runtimeHost]}`;
+  if (detectionSignal) {
+    console.log(` ${colors.cyan}✓${colors.reset} Detected ${hostNames[runtimeHost]} runtime`);
+  }
   const action = isUpgrade ? `Update Claudia${hostLabel}` : `Install Claudia${hostLabel} to ./${targetDir}`;
   const confirmed = await confirm(`${action}?`);
   if (!confirmed) {
@@ -942,7 +922,7 @@ async function main() {
     console.log(` ${colors.cyan}✓${colors.reset} Framework updated`);
     console.log(`   • Your memory at ${colors.bold}~/.claudia/${colors.reset} is preserved (entities, relationships, reflections, embeddings).`);
     console.log(`   • Skills and hooks refreshed; any modifications you chose to keep were respected.`);
-    console.log(`   • Restart ${codexMode ? 'Codex' : 'Claude Code'} for changes to take effect.`);
+    console.log(`   • Restart ${hostNames[runtimeHost]} for changes to take effect.`);
   }
 
   let codexPrepared = null;
@@ -1021,7 +1001,7 @@ async function main() {
           false,
           undefined,
           isUpgrade,
-          codexMode,
+          runtimeHost,
           finalizeCodexRuntime(),
         );
       });
@@ -1628,7 +1608,7 @@ async function main() {
         memoryOk,
         rootCause,
         isUpgrade,
-        codexMode,
+        runtimeHost,
         finalizeCodexRuntime(),
       );
     });
@@ -1639,7 +1619,7 @@ async function main() {
   function runShellStep(renderer, targetPath, callback) {
     renderer.update('shell', 'active', 'installing claudia command...');
     try {
-      writeShellInit(homedir(), targetPath, codexMode ? 'codex' : 'claude');
+      writeShellInit(homedir(), targetPath, runtimeHost);
       const rc = appendShellRC(homedir());
       if (rc.skipped) {
         renderer.update('shell', 'done', 'files written (Windows: source manually)');
@@ -1771,12 +1751,12 @@ async function main() {
     memoryInstalled,
     failureCause,
     isUpgrade,
-    codexHost = false,
+    selectedHost = 'claude',
     codexActivation = null,
   ) {
-    const installCommand = codexHost ? 'npx get-claudia@latest' : 'npx get-claudia@latest .';
+    const installCommand = `npx get-claudia ${selectedHost}`;
     const rerunCmd = isCurrentDir ? installCommand : `cd ${targetDir} && ${installCommand}`;
-    const runtimeCommand = codexHost ? 'codex' : 'claude';
+    const runtimeCommand = selectedHost;
     const launchCmd = isCurrentDir ? runtimeCommand : `cd ${targetDir} && ${runtimeCommand}`;
 
     console.log('');
@@ -1806,7 +1786,7 @@ async function main() {
         console.log(` ${colors.dim}She'll introduce herself and learn how you work.${colors.reset}`);
         console.log(` ${colors.dim}Try: ${colors.reset}${colors.cyan}"Say hi"${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}/morning-brief${colors.reset} ${colors.dim}·${colors.reset} ${colors.cyan}"Who do I know?"${colors.reset}`);
       }
-      if (codexHost) {
+      if (selectedHost === 'codex') {
         if (codexActivation?.ok) {
           console.log(` ${colors.dim}Codex plugin enabled and current. Start a new Codex chat in this folder and Claudia will take it from there.${colors.reset}`);
         } else {
@@ -1821,6 +1801,9 @@ async function main() {
         }
         console.log(` ${colors.dim}Optional: run ${colors.reset}${colors.cyan}/hooks${colors.reset}${colors.dim} to enable automatic session briefing and transcript capture.${colors.reset}`);
         console.log(` ${colors.dim}Voice: run ${colors.reset}${colors.cyan}claudia voice${colors.reset}${colors.dim}, then begin a new ChatGPT Voice conversation.${colors.reset}`);
+      } else if (selectedHost === 'grok') {
+        console.log(` ${colors.dim}Grok will load Claudia's CLAUDE.md, AGENTS.md, skills, rules, hooks, and MCP configuration through its compatibility layer.${colors.reset}`);
+        console.log(` ${colors.dim}Optional: run ${colors.reset}${colors.cyan}/hooks-trust${colors.reset}${colors.dim} to enable project lifecycle hooks.${colors.reset}`);
       }
       console.log(` ${colors.dim}Feedback? Tell Claudia, or visit github.com/kbanc85/claudia/discussions${colors.reset}`);
       console.log('');

@@ -3,7 +3,7 @@
 // Writes three files into ~/.claudia/:
 //   - claudia-home      : single-line file with the absolute path to the user's
 //                         Claudia install directory (where the selected host launches).
-//   - claudia-host      : default runtime (`claude` or `codex`).
+//   - claudia-host      : default runtime (`claude`, `codex`, or `grok`).
 //   - shell-init.sh     : defines the `claudia` shell function.
 //
 // Then idempotently appends a one-line source to ~/.zshrc and ~/.bashrc so the
@@ -20,7 +20,7 @@ import { join } from 'path';
 export const SHELL_INIT_MARKER = '# Claudia shell helpers';
 
 const RC_SNIPPET = `
-${SHELL_INIT_MARKER} (\`claudia\` from anywhere; \`claudia codex|claude|voice\` selects a surface)
+${SHELL_INIT_MARKER} (\`claudia\` from anywhere; \`claudia codex|claude|grok|voice\` selects a surface)
 [ -f "$HOME/.claudia/shell-init.sh" ] && source "$HOME/.claudia/shell-init.sh"
 `;
 
@@ -74,7 +74,7 @@ _claudia_host() {
   local host=""
   [ -f "$host_file" ] && host="$(cat "$host_file" 2>/dev/null)"
   case "$host" in
-    codex|claude) printf '%s' "$host" ;;
+    codex|claude|grok) printf '%s' "$host" ;;
     *) printf '%s' "claude" ;;
   esac
 }
@@ -85,11 +85,7 @@ update-claudia() {
   dir="$(_claudia_home)" || return 1
   host="$(_claudia_host)"
   echo "Updating Claudia at $dir ..."
-  if [ "$host" = "codex" ]; then
-    npx get-claudia codex "$dir"
-  else
-    npx get-claudia "$dir"
-  fi
+  npx get-claudia "$host" "$dir"
 }
 
 claudia() {
@@ -102,6 +98,10 @@ claudia() {
       shift
       _claudia_cd && claude "$@"
       ;;
+    grok)
+      shift
+      _claudia_cd && grok "$@"
+      ;;
     voice)
       shift
       _claudia_cd || return 1
@@ -112,11 +112,11 @@ claudia() {
       ;;
     yolo)
       shift
-      if [ "$(_claudia_host)" = "codex" ]; then
-        _claudia_cd && codex --dangerously-bypass-approvals-and-sandbox "$@"
-      else
-        _claudia_cd && claude --dangerously-skip-permissions "$@"
-      fi
+      case "$(_claudia_host)" in
+        codex) _claudia_cd && codex --dangerously-bypass-approvals-and-sandbox "$@" ;;
+        grok) _claudia_cd && grok --always-approve "$@" ;;
+        *) _claudia_cd && claude --dangerously-skip-permissions "$@" ;;
+      esac
       ;;
     update)
       shift
@@ -127,11 +127,11 @@ claudia() {
       command claudia "$@"
       ;;
     *)
-      if [ "$(_claudia_host)" = "codex" ]; then
-        _claudia_cd && codex "$@"
-      else
-        _claudia_cd && claude "$@"
-      fi
+      case "$(_claudia_host)" in
+        codex) _claudia_cd && codex "$@" ;;
+        grok) _claudia_cd && grok "$@" ;;
+        *) _claudia_cd && claude "$@" ;;
+      esac
       ;;
   esac
 }
@@ -148,7 +148,8 @@ export function writeShellInit(homeDir, claudiaTargetDir, host = 'claude') {
   const initFile = join(claudiaConfigDir, 'shell-init.sh');
 
   writeFileSync(homeFile, `${claudiaTargetDir}\n`);
-  writeFileSync(hostFile, `${host === 'codex' ? 'codex' : 'claude'}\n`);
+  const selectedHost = ['codex', 'claude', 'grok'].includes(host) ? host : 'claude';
+  writeFileSync(hostFile, `${selectedHost}\n`);
   writeFileSync(initFile, SHELL_INIT_CONTENT);
 
   return { homeFile, hostFile, initFile };
