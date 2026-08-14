@@ -75,7 +75,7 @@ function printUsage(version) {
   console.log(`get-claudia v${version}
 
 Usage:
-  npx get-claudia                In Codex: install into the open folder
+  npx get-claudia                In Codex: install or upgrade the open folder
   npx get-claudia [target-dir]   Install or upgrade Claudia (default: ./claudia)
   npx get-claudia codex [dir]    Explicit Codex install (default: current folder)
   npx get-claudia .              Install or upgrade in the current directory
@@ -1808,7 +1808,7 @@ async function main() {
       }
       if (codexHost) {
         if (codexActivation?.ok) {
-          console.log(` ${colors.dim}Codex plugin enabled. Start a new Codex chat in this folder and Claudia will take it from there.${colors.reset}`);
+          console.log(` ${colors.dim}Codex plugin enabled and current. Start a new Codex chat in this folder and Claudia will take it from there.${colors.reset}`);
         } else {
           console.log('');
           console.log(` ${colors.yellow}Codex plugin needs one manual step:${colors.reset}`);

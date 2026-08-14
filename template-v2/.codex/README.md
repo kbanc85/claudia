@@ -1,6 +1,6 @@
 # Claudia on Codex
 
-This workspace is configured for the official Claudia Codex plugin.
+This workspace is configured for the official Claudia Codex plugin. The same installer handles both new setups and in-place upgrades.
 
 ## Start
 
@@ -30,7 +30,7 @@ These hooks are optional. Claudia's workspace instructions, skills, and memory t
 
 Run `claudia voice` to open ChatGPT on macOS, begin a new conversation in Voice, then say: “Start a Codex task in my Claudia workspace and give me my briefing.” Voice can coordinate that Codex task and follows the task's permissions. The Codex task receives Claudia's workspace, plugin, hooks, and memory tools.
 
-## Repair
+## Upgrade or repair
 
 From this directory:
 
@@ -38,4 +38,4 @@ From this directory:
 npx get-claudia@latest
 ```
 
-The installer refreshes the Codex plugin and hooks while preserving your context and memory.
+The installer detects this existing Claudia workspace, refreshes framework files, the Codex plugin, memory configuration, and hooks, and preserves your context and memory. It is safe to run repeatedly.

@@ -130,9 +130,9 @@ You make a promise in a meeting. Nobody tracks it. You promise a deliverable on 
 
 **2. Paste this into Codex:**
 
-> Install Claudia in this folder. Run `npx get-claudia@latest` and keep going until setup and health checks pass.
+> Install or upgrade Claudia in this folder. Run `npx get-claudia@latest` and keep going until setup and health checks pass.
 
-Codex runs the installer, recognizes the active Codex session, installs into the open folder, registers Claudia's official plugin, connects the memory MCP server, and verifies the setup.
+Codex runs the installer and recognizes the active Codex session. In an empty or existing project folder, it installs Claudia there. In an existing Claudia workspace, it upgrades the framework and plugin in place while preserving your context, people, projects, and memory. Then it registers Claudia's official plugin, connects the memory MCP server, and verifies the setup.
 
 Prefer to run the command yourself? It is the same one-liner:
 
@@ -140,7 +140,7 @@ Prefer to run the command yourself? It is the same one-liner:
 npx get-claudia@latest
 ```
 
-**3. Start a new Codex chat in the same folder and say hi.** Claudia will introduce herself, learn about you through a natural conversation, and generate a personalized workspace.
+**3. Start a new Codex chat in the same folder.** On a new install, Claudia will introduce herself and learn how you work. After an upgrade, she resumes with your existing context and the refreshed runtime.
 
 That's the whole required setup. The plugin's `AGENTS.md` startup contract and memory tools load automatically in the new chat.
 
