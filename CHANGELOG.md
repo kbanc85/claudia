@@ -2,7 +2,7 @@
 
 All notable changes to Claudia will be documented in this file.
 
-## [Unreleased]
+## 1.68.0 (2026-08-13)
 
 ### Added
 

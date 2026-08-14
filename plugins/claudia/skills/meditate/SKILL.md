@@ -173,16 +173,56 @@ Call the `memory_end_session` MCP tool with:
    ```yaml
    version: 1
 
+   meta: []          # rules that resolve conflicts between other rules
    priorities: []
    escalation: []
    overrides: []
    surfacing: []
    delegation: []
+   process: []
    ```
-3. Append each approved rule to the appropriate category
-4. Assign a sequential ID within its category (e.g., `esc-001`, `esc-002`)
-5. Set `source` to `meditate/YYYY-MM-DD` (today's date)
-6. Write the updated file
+3. **Get the next free ID from the script, never by reading the file yourself:**
+   ```bash
+   python3 .claude/hooks/judgment-sync.py next
+   ```
+   IDs are unique across the WHOLE file, not per section. Rules drift between
+   sections over time (an `esc-` rule can end up filed under `process`), so
+   counting within a category reads the wrong set and silently reuses an ID that
+   already belongs to another rule. This has happened twice.
+4. Append each approved rule to the appropriate category, in this shape:
+   ```yaml
+   escalation:
+     - id: esc-012
+       rule: "The directive itself, first sentence standalone. See below."
+       context: "What happened this session that produced the rule."
+       source: meditate/2026-08-11
+       domain: video          # OPTIONAL. See step 5.
+   ```
+   **Write the directive as the first sentence.** The always-on view shortens
+   long rules to their first sentence or clause, so a rule that opens with
+   preamble loses its instruction. Lead with what to do; put caveats,
+   cross-references and rationale after.
+5. **Decide whether the rule needs to be resident.** Every rule is at least
+   named in the always-on view; the tag only decides how much text rides along.
+   - **No `domain:`** (the default): the rule is indexed as one line. Correct for
+     anything that could apply when you are not expecting it.
+   - **With `domain:`** (e.g. `video`, `newsletter`, `deploy`, `client`): only the
+     ID stays resident, grouped under that domain, and the full text is fetched
+     before working in that area. Use this ONLY when the rule is meaningless
+     outside a recognisable activity.
+   - Rules in `meta` and `escalation`, and any rule whose ID starts `meta-` or
+     `esc-`, are always carried in full and ignore `domain:`. Safety gates fire
+     when nobody is looking for them, so they are never abbreviated.
+6. Set `source` to `meditate/YYYY-MM-DD` (today's date)
+7. Write the updated file
+8. **Regenerate the always-on view, and report the result:**
+   ```bash
+   python3 .claude/hooks/judgment-sync.py --write
+   ```
+   Until this runs, the rule exists in the archive but is not applied. If the
+   script reports the file is over budget, say so and offer to tag the named
+   rules with a `domain:` so they become activity-scoped. Do not skip this step:
+   the failure it prevents is invisible.
 
 **Harness proposals go through the Checker before anything is written** (Proposal 11, E4). If Step 2b produced a harness-improvement proposal (a rubric edit, a Maker or Checker brief edit, or a loop-running judgment rule), validate it first:
 
@@ -284,7 +324,7 @@ Claudia:
 
 ### Judgment Rules
 
-The meditate skill is the primary mechanism for creating judgment rules. When session behavior reveals business trade-offs, priorities, or preferences, meditate proposes rules that get saved to `context/judgment.yaml`. See the `judgment-awareness` skill for how rules are loaded and applied.
+The meditate skill is the primary mechanism for creating judgment rules. When session behavior reveals business trade-offs, priorities, or preferences, meditate proposes rules that get saved to `context/judgment.yaml`. Rules are loaded by the SessionStart hook `.claude/hooks/judgment-sync.py`, which regenerates `.claude/rules/judgment-active.md` from the archive. See the `judgment-awareness` skill for how to apply and expand them.
 
 ### Morning Brief
 
