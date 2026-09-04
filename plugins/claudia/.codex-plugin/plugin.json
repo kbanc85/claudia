@@ -1,6 +1,6 @@
 {
   "name": "claudia",
-  "version": "1.68.0",
+  "version": "1.68.1",
   "description": "Local-first strategic assistant with persistent memory, relationship context, and reflective workflows.",
   "author": {
     "name": "Kamil Banc"
