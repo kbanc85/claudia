@@ -61,7 +61,7 @@ class TestPrecomputedEmbedding:
 
         with patch("claudia_memory.services.remember.embed_sync") as mock_embed:
             memory_id = svc.remember_fact(
-                content="Ford prefers async communication",
+                content="Dana prefers async communication",
                 memory_type="preference",
                 importance=0.7,
                 _precomputed_embedding=fake_emb,
@@ -73,7 +73,7 @@ class TestPrecomputedEmbedding:
         # Memory itself is stored in the regular memories table
         memory = db.get_one("memories", where="id = ?", where_params=(memory_id,))
         assert memory is not None
-        assert memory["content"] == "Ford prefers async communication"
+        assert memory["content"] == "Dana prefers async communication"
         assert memory["type"] == "preference"
 
     def test_remember_fact_without_precomputed_calls_embed(self, db):
@@ -95,13 +95,13 @@ class TestPrecomputedEmbedding:
     def test_remember_entity_with_precomputed_skips_embed(self, db):
         """New entity uses precomputed embedding instead of calling embed_sync"""
         svc = _get_remember_service(db)
-        fake_emb = _fake_embedding("Ford Perry. CEO of Perry Ventures")
+        fake_emb = _fake_embedding("Dana Walsh. CEO of Northstar Ventures")
 
         with patch("claudia_memory.services.remember.embed_sync") as mock_embed:
             entity_id = svc.remember_entity(
-                name="Ford Perry",
+                name="Dana Walsh",
                 entity_type="person",
-                description="CEO of Perry Ventures",
+                description="CEO of Northstar Ventures",
                 _precomputed_embedding=fake_emb,
             )
 
@@ -109,8 +109,8 @@ class TestPrecomputedEmbedding:
 
         assert entity_id is not None
         entity = db.get_one("entities", where="id = ?", where_params=(entity_id,))
-        assert entity["name"] == "Ford Perry"
-        assert entity["description"] == "CEO of Perry Ventures"
+        assert entity["name"] == "Dana Walsh"
+        assert entity["description"] == "CEO of Northstar Ventures"
 
     def test_remember_entity_existing_skips_embedding(self, db):
         """Updating an existing entity doesn't try to embed again"""
@@ -119,14 +119,14 @@ class TestPrecomputedEmbedding:
         with patch("claudia_memory.services.remember.embed_sync") as mock_embed:
             # Create entity first time
             entity_id1 = svc.remember_entity(
-                name="Ford Perry",
+                name="Dana Walsh",
                 entity_type="person",
                 _precomputed_embedding=_fake_embedding("first"),
             )
 
             # Update same entity (existing path doesn't embed)
             entity_id2 = svc.remember_entity(
-                name="Ford Perry",
+                name="Dana Walsh",
                 entity_type="person",
                 description="Updated description",
                 _precomputed_embedding=_fake_embedding("second"),
@@ -142,11 +142,11 @@ class TestPrecomputedEmbedding:
 
         with patch("claudia_memory.services.remember.embed_sync") as mock_embed:
             id1 = svc.remember_fact(
-                content="Ford prefers email",
+                content="Dana prefers email",
                 _precomputed_embedding=_fake_embedding("v1"),
             )
             id2 = svc.remember_fact(
-                content="Ford prefers email",
+                content="Dana prefers email",
                 _precomputed_embedding=_fake_embedding("v2"),
             )
 
@@ -213,23 +213,23 @@ class TestBatchWithParallelEmbeddings:
         with patch("claudia_memory.services.remember.embed_sync") as mock_embed:
             # Entity op with precomputed
             entity_id = svc.remember_entity(
-                name="Ford Perry",
+                name="Dana Walsh",
                 entity_type="person",
-                description="CEO of Perry Ventures",
-                _precomputed_embedding=_fake_embedding("Ford Perry. CEO"),
+                description="CEO of Northstar Ventures",
+                _precomputed_embedding=_fake_embedding("Dana Walsh. CEO"),
             )
 
             # Remember op with precomputed
             memory_id = svc.remember_fact(
-                content="Ford prefers async communication",
+                content="Dana prefers async communication",
                 memory_type="preference",
-                about_entities=["Ford Perry"],
-                _precomputed_embedding=_fake_embedding("Ford prefers async"),
+                about_entities=["Dana Walsh"],
+                _precomputed_embedding=_fake_embedding("Dana prefers async"),
             )
 
             # Relate op (no embedding needed)
             rel_id = svc.relate_entities(
-                source_name="Ford Perry",
+                source_name="Dana Walsh",
                 target_name="Test User",
                 relationship_type="potential_partner",
             )
@@ -276,10 +276,10 @@ class TestBatchWithParallelEmbeddings:
 
         # These are the operations that would come from memory.batch
         operations = [
-            {"op": "entity", "name": "Ford Perry", "type": "person", "description": "CEO"},
-            {"op": "remember", "content": "Ford prefers email", "type": "preference", "importance": 0.7, "about": ["Ford Perry"]},
+            {"op": "entity", "name": "Dana Walsh", "type": "person", "description": "CEO"},
+            {"op": "remember", "content": "Dana prefers email", "type": "preference", "importance": 0.7, "about": ["Dana Walsh"]},
             {"op": "remember", "content": "Meeting scheduled for Friday", "type": "fact", "importance": 0.8},
-            {"op": "relate", "source": "Ford Perry", "target": "Kamil", "relationship": "business_contact"},
+            {"op": "relate", "source": "Dana Walsh", "target": "Test User", "relationship": "business_contact"},
         ]
 
         # --- Pass 1: Collect texts and generate embeddings ---
@@ -327,7 +327,7 @@ class TestBatchWithParallelEmbeddings:
                     results.append({"op": "relate", "id": rid})
 
             # embed_sync may be called for entities created during linking
-            # (e.g., "Kamil" created by relate), but NOT for the primary ops
+            # (e.g., "Test User" created by relate), but NOT for the primary ops
             # For the 2 remember ops and 1 entity op, embed_sync was NOT used
             # It might be called for auto-created entities in about_entities linking
             pass
@@ -336,11 +336,11 @@ class TestBatchWithParallelEmbeddings:
         assert all(r["id"] is not None for r in results)
 
         # Verify data integrity
-        entity = db.get_one("entities", where="name = ?", where_params=("Ford Perry",))
+        entity = db.get_one("entities", where="name = ?", where_params=("Dana Walsh",))
         assert entity is not None
         assert entity["description"] == "CEO"
 
-        mem1 = db.get_one("memories", where="content = ?", where_params=("Ford prefers email",))
+        mem1 = db.get_one("memories", where="content = ?", where_params=("Dana prefers email",))
         assert mem1 is not None
         assert mem1["type"] == "preference"
 
@@ -357,20 +357,20 @@ class TestBatchRelateForwarding:
 
         # Create entities first
         svc.remember_entity(
-            name="Ford Perry",
+            name="Dana Walsh",
             entity_type="person",
-            _precomputed_embedding=_fake_embedding("Ford Perry"),
+            _precomputed_embedding=_fake_embedding("Dana Walsh"),
         )
         svc.remember_entity(
-            name="Beemok Capital",
+            name="Summit Capital",
             entity_type="organization",
-            _precomputed_embedding=_fake_embedding("Beemok Capital"),
+            _precomputed_embedding=_fake_embedding("Summit Capital"),
         )
 
         # Relate with inferred origin
         rel_id = svc.relate_entities(
-            source_name="Ford Perry",
-            target_name="Beemok Capital",
+            source_name="Dana Walsh",
+            target_name="Summit Capital",
             relationship_type="works_at",
             origin_type="inferred",
         )
@@ -386,9 +386,9 @@ class TestBatchRelateForwarding:
         svc = _get_remember_service(db)
 
         svc.remember_entity(
-            name="Ford Perry",
+            name="Dana Walsh",
             entity_type="person",
-            _precomputed_embedding=_fake_embedding("Ford Perry"),
+            _precomputed_embedding=_fake_embedding("Dana Walsh"),
         )
         svc.remember_entity(
             name="Acme Corp",
@@ -398,7 +398,7 @@ class TestBatchRelateForwarding:
 
         # Create initial relationship
         rel1 = svc.relate_entities(
-            source_name="Ford Perry",
+            source_name="Dana Walsh",
             target_name="Acme Corp",
             relationship_type="works_at",
             origin_type="extracted",
@@ -406,7 +406,7 @@ class TestBatchRelateForwarding:
 
         # Supersede it
         rel2 = svc.relate_entities(
-            source_name="Ford Perry",
+            source_name="Dana Walsh",
             target_name="Acme Corp",
             relationship_type="works_at",
             supersedes=True,
@@ -428,20 +428,20 @@ class TestBatchRelateForwarding:
         svc = _get_remember_service(db)
 
         svc.remember_entity(
-            name="Ford Perry",
+            name="Dana Walsh",
             entity_type="person",
-            _precomputed_embedding=_fake_embedding("Ford Perry"),
+            _precomputed_embedding=_fake_embedding("Dana Walsh"),
         )
         svc.remember_entity(
-            name="Beemok Capital",
+            name="Summit Capital",
             entity_type="organization",
-            _precomputed_embedding=_fake_embedding("Beemok Capital"),
+            _precomputed_embedding=_fake_embedding("Summit Capital"),
         )
 
         # Create with inferred origin (ceiling 0.5)
         rel_id = svc.relate_entities(
-            source_name="Ford Perry",
-            target_name="Beemok Capital",
+            source_name="Dana Walsh",
+            target_name="Summit Capital",
             relationship_type="works_at",
             origin_type="inferred",
         )
@@ -452,8 +452,8 @@ class TestBatchRelateForwarding:
 
         # Re-encounter with user_stated (should upgrade origin and lift ceiling)
         rel_id2 = svc.relate_entities(
-            source_name="Ford Perry",
-            target_name="Beemok Capital",
+            source_name="Dana Walsh",
+            target_name="Summit Capital",
             relationship_type="works_at",
             origin_type="user_stated",
         )

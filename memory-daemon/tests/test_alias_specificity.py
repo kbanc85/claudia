@@ -7,7 +7,7 @@ by few entities) should score higher than common ones.
 Scoring formula:
   specificity = 1.0 / total_entities_sharing_alias
   score = 0.70 + 0.25 * specificity
-  bonus: +0.10 for multi-token aliases (e.g. "joel martinez")
+  bonus: +0.10 for multi-token aliases (e.g. "marcus webb")
   clamped to [0.70, 0.95]
 """
 import pytest
@@ -63,13 +63,13 @@ class TestAliasSpecificityScoring:
 
     def test_two_entities_shared_alias_score(self, db):
         """Two entities sharing a unique multi-token alias should get a high score."""
-        eid1 = _insert_entity(db, "Joel Martinez")
-        eid2 = _insert_entity(db, "Joel Martinez (Beemok)")
-        _insert_alias(db, eid1, "joel martinez")
-        _insert_alias(db, eid2, "joel martinez")
+        eid1 = _insert_entity(db, "Marcus Webb")
+        eid2 = _insert_entity(db, "Marcus Webb (Summit)")
+        _insert_alias(db, eid1, "marcus webb")
+        _insert_alias(db, eid2, "marcus webb")
 
         results = _run_dedupe(db)
-        alias_results = [r for r in results if r.get("shared_alias") == "joel martinez"]
+        alias_results = [r for r in results if r.get("shared_alias") == "marcus webb"]
         assert len(alias_results) == 1
         score = alias_results[0]["similarity"]
         # Multi-token alias shared by 2: specificity=0.5, base=0.70+0.25*0.5=0.825, +0.10 bonus = 0.925

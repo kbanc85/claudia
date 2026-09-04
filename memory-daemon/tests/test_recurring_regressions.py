@@ -91,8 +91,8 @@ def test_remember_with_entities_creates_entity_records(db):
     svc = _get_remember_service(db)
 
     memory_id = svc.remember_fact(
-        content="Matt Blumberg said the placement angle should be the operator track.",
-        about_entities=["Matt Blumberg"],
+        content="Alex Rivera said the enterprise track should be the primary offer.",
+        about_entities=["Alex Rivera"],
     )
     assert memory_id is not None, "remember_fact must return a memory id"
 
@@ -100,9 +100,9 @@ def test_remember_with_entities_creates_entity_records(db):
     matt = db.get_one(
         "entities",
         where="canonical_name = ?",
-        where_params=("matt blumberg",),
+        where_params=("alex rivera",),
     )
-    assert matt is not None, "Matt Blumberg entity should be created"
+    assert matt is not None, "Alex Rivera entity should be created"
 
     # Memory is linked to the entity via memory_entities.
     links = db.execute(
@@ -112,8 +112,8 @@ def test_remember_with_entities_creates_entity_records(db):
     ) or []
     linked_ids = {row["entity_id"] for row in links}
     assert matt["id"] in linked_ids, (
-        "memory_entities must contain a row linking the memory to Matt Blumberg. "
-        "Without this link, memory_about('Matt Blumberg') silently misses the fact."
+        "memory_entities must contain a row linking the memory to Alex Rivera. "
+        "Without this link, memory_about('Alex Rivera') silently misses the fact."
     )
 
 

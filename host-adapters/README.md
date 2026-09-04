@@ -27,7 +27,7 @@ Telegram/etc  ──┘
 # 1. Write a tiny transcript
 mkdir -p ~/.claudia/sessions
 cat > ~/.claudia/sessions/demo-host-session.jsonl <<'EOF'
-{"role":"user","content":"Demo: my default printer is Brother HL-L2460DW black and white laser."}
+{"role":"user","content":"Demo: my default printer is HP LaserJet Pro black and white laser."}
 {"role":"assistant","content":"Noted. Printables will assume B&W laser."}
 EOF
 
@@ -39,7 +39,7 @@ python3 host-adapters/shared/enqueue.py \
   --host demo
 
 # 3. Wait for daemon process_sessions (or trigger consolidation cycle)
-# Then: memory_recall "Brother HL-L2460DW" via MCP
+# Then: memory_recall "HP LaserJet Pro" via MCP
 ```
 
 ## Grok operator checklist

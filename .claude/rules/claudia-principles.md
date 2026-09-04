@@ -227,7 +227,7 @@ MEMORY.md persists across sessions automatically. Because of this convenience, i
 | Category | Example | Why It's Safe |
 |----------|---------|---------------|
 | Structural facts | "User's archetype is Consultant" | Doesn't change between sessions |
-| File locations | "Interview files live in workspaces/beemok/interviews/" | Stable reference |
+| File locations | "Interview files live in workspaces/acme-corp/interviews/" | Stable reference |
 | Process knowledge | "Interviews follow the capture-interview skill" | Process, not status |
 | Preferences | "User prefers detailed briefs over minimal ones" | Slow-changing |
 | Tool configuration | "Gmail MCP is connected, Otter.ai integration enabled" | Infrastructure |
@@ -246,8 +246,8 @@ MEMORY.md persists across sessions automatically. Because of this convenience, i
 
 When you need to reference something volatile, store a pointer instead of a value:
 
-**Bad:** "Beemok has 9 completed interviews"
-**Good:** "Beemok interview files are at workspaces/beemok/interviews/. Count files for current total."
+**Bad:** "Acme Corp has 9 completed interviews"
+**Good:** "Acme Corp interview files are at workspaces/acme-corp/interviews/. Count files for current total."
 
 **Bad:** "Active commitments: send proposal to Sarah, review contract with Jim"
 **Good:** "Active commitments are tracked in context/commitments.md and via the `memory_recall` MCP tool"

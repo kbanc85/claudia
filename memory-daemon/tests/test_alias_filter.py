@@ -51,25 +51,25 @@ class TestSingleTokenAliasFilter:
     """Single-token aliases with divergent full names should not be flagged."""
 
     def test_single_token_alias_divergent_names_skipped(self, db):
-        """'Joel Salinas' and 'Joel Hart' sharing alias 'joel' should NOT be flagged."""
-        id1 = _insert_entity(db, "Joel Salinas")
-        id2 = _insert_entity(db, "Joel Hart")
-        _add_alias(db, id1, "joel")
-        _add_alias(db, id2, "joel")
+        """'Nina Blake' and 'Nina Cole' sharing alias 'nina' should NOT be flagged."""
+        id1 = _insert_entity(db, "Nina Blake")
+        id2 = _insert_entity(db, "Nina Cole")
+        _add_alias(db, id1, "nina")
+        _add_alias(db, id2, "nina")
 
         svc = _get_consolidation_service(db)
         candidates = svc.auto_dedupe_entities()
 
         alias_candidates = [c for c in candidates if c["method"] == "alias_overlap"]
         pair_names = [{c["entity_1"]["name"], c["entity_2"]["name"]} for c in alias_candidates]
-        assert {"Joel Salinas", "Joel Hart"} not in pair_names
+        assert {"Nina Blake", "Nina Cole"} not in pair_names
 
     def test_multi_token_alias_still_flagged(self, db):
-        """Two entities sharing multi-token alias 'joel hart' should be flagged."""
-        id1 = _insert_entity(db, "Joel Hart")
-        id2 = _insert_entity(db, "J. Hart")
-        _add_alias(db, id1, "joel hart")
-        _add_alias(db, id2, "joel hart")
+        """Two entities sharing multi-token alias 'nina cole' should be flagged."""
+        id1 = _insert_entity(db, "Nina Cole")
+        id2 = _insert_entity(db, "N. Cole")
+        _add_alias(db, id1, "nina cole")
+        _add_alias(db, id2, "nina cole")
 
         svc = _get_consolidation_service(db)
         candidates = svc.auto_dedupe_entities()
@@ -78,24 +78,24 @@ class TestSingleTokenAliasFilter:
         assert len(alias_candidates) >= 1
 
     def test_single_token_alias_overlapping_names_caught_by_other_method(self, db):
-        """'J. Hart' and 'Joel Hart' sharing alias 'hart' are skipped by alias
+        """'N. Cole' and 'Nina Cole' sharing alias 'cole' are skipped by alias
         filter (divergent first names), but caught by fuzzy_name or prefix methods."""
-        id1 = _insert_entity(db, "J. Hart")
-        id2 = _insert_entity(db, "Joel Hart")
-        _add_alias(db, id1, "hart")
-        _add_alias(db, id2, "hart")
+        id1 = _insert_entity(db, "N. Cole")
+        id2 = _insert_entity(db, "Nina Cole")
+        _add_alias(db, id1, "cole")
+        _add_alias(db, id2, "cole")
 
         svc = _get_consolidation_service(db)
         candidates = svc.auto_dedupe_entities()
 
-        # Alias overlap correctly skips this (single-token "hart", names diverge)
+        # Alias overlap correctly skips this (single-token "cole", names diverge)
         alias_candidates = [c for c in candidates if c["method"] == "alias_overlap"]
         pair_names = [{c["entity_1"]["name"], c["entity_2"]["name"]} for c in alias_candidates]
-        assert {"J. Hart", "Joel Hart"} not in pair_names
+        assert {"N. Cole", "Nina Cole"} not in pair_names
 
-        # But fuzzy_name_prefix catches it ("j. hart" starts with... no, wait)
+        # But fuzzy_name_prefix catches it ("n. cole" starts with... no, wait)
         # Actually these names are different enough that no other method catches them either.
-        # That's correct behavior: "J. Hart" and "Joel Hart" are ambiguous without more context.
+        # That's correct behavior: "N. Cole" and "Nina Cole" are ambiguous without more context.
 
     def test_two_token_alias_not_filtered(self, db):
         """Two-token alias like 'sarah chen' bypasses the single-token filter."""
@@ -113,8 +113,8 @@ class TestSingleTokenAliasFilter:
 
     def test_filter_does_not_affect_other_methods(self, db):
         """Fuzzy name and embedding methods should not be affected by alias filter."""
-        _insert_entity(db, "Kris Krisko")
-        _insert_entity(db, "Kris Krisco")
+        _insert_entity(db, "Chris Brisko")
+        _insert_entity(db, "Chris Brisco")
 
         svc = _get_consolidation_service(db)
         candidates = svc.auto_dedupe_entities()

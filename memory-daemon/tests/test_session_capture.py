@@ -492,8 +492,8 @@ class TestProcessSessions:
         # Write a fake transcript with a clear fact and commitment
         transcript = tmp_path / "session.jsonl"
         _write_jsonl(transcript, [
-            {"role": "user", "content": "What is Kamil's rate?"},
-            {"role": "assistant", "content": "Kamil's rate is $10k/month"},
+            {"role": "user", "content": "What is Alex's rate?"},
+            {"role": "assistant", "content": "Alex's rate is $5k/month"},
             {"role": "user", "content": "Can you send the proposal by Friday?"},
             {"role": "assistant", "content": "I'll send the proposal by Friday."},
         ])
@@ -512,13 +512,13 @@ class TestProcessSessions:
             "source_type": "session",
             "data": {
                 "facts": [
-                    {"content": "Kamil's rate is $10k/month", "type": "fact", "about": ["Kamil"], "importance": 0.9},
+                    {"content": "Alex's rate is $5k/month", "type": "fact", "about": ["Alex"], "importance": 0.9},
                 ],
                 "commitments": [
                     {"content": "Send proposal by Friday", "who": None, "deadline": "Friday", "importance": 0.8},
                 ],
                 "decisions": [],
-                "entities": [{"name": "Kamil", "type": "person", "description": None}],
+                "entities": [{"name": "Alex", "type": "person", "description": None}],
                 "relationships": [],
                 "key_topics": ["rate", "proposal"],
                 "summary": "Discussion about rate and proposal deadline.",
@@ -604,7 +604,7 @@ class TestProcessSessions:
 
         transcript = tmp_path / "grok-session.jsonl"
         _write_jsonl(transcript, [
-            {"role": "user", "content": "Printer is Brother HL-L2460DW B&W laser."},
+            {"role": "user", "content": "Printer is HP LaserJet Pro B&W laser."},
             {"role": "assistant", "content": "Noted for printables."},
         ])
         queue_file = self._make_queue_dir(tmp_path)
@@ -622,7 +622,7 @@ class TestProcessSessions:
             "data": {
                 "facts": [
                     {
-                        "content": "Default printer is Brother HL-L2460DW B&W laser",
+                        "content": "Default printer is HP LaserJet Pro B&W laser",
                         "type": "fact",
                         "about": ["Kamil"],
                         "importance": 0.9,

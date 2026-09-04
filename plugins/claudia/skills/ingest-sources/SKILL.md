@@ -42,7 +42,7 @@ User provides one of:
 | # | Filename | Type | Date | Size | Likely Entities |
 |---|----------|------|------|------|-----------------|
 | 1 | call-with-sarah.md | transcript | 2026-01-15 | 4.2KB | Sarah Chen |
-| 2 | jim-partnership-email.md | email | 2026-01-16 | 1.8KB | Jim Ferry |
+| 2 | chris-partnership-email.md | email | 2026-01-16 | 1.8KB | Chris Lang |
 | 3 | acme-contract.pdf | document | 2026-01-17 | 52KB | Acme Corp |
 ...
 
@@ -137,7 +137,7 @@ Entity: Sarah Chen
 | Entity | Dedicated Sources | Total Mentions | Sources |
 |--------|-------------------|----------------|---------|
 | Sarah Chen | 4 | 12 | #1, #5, #12, #18, ... |
-| Jim Ferry | 2 | 6 | #2, #15, ... |
+| Chris Lang | 2 | 6 | #2, #15, ... |
 | Acme Corp | 3 | 8 | #3, #7, #22, ... |
 | Project Alpha | 0 | 4 | #4, #8, #11, #19 |
 
@@ -145,7 +145,7 @@ Entity: Sarah Chen
 
 **Any entity with 2+ dedicated sources MUST appear proportionally in the final output.**
 
-If Jim Ferry has 2 transcripts dedicated to him but doesn't show up in the entity coverage summary, that's a verification failure. Stop and investigate.
+If Chris Lang has 2 transcripts dedicated to him but doesn't show up in the entity coverage summary, that's a verification failure. Stop and investigate.
 
 ### Gaps Detected
 
@@ -185,7 +185,7 @@ Files are auto-routed to entity folders:
 claudia memory batch --project-dir "$PWD" <<'EOF'
 [
   { "op": "entity", "name": "Sarah Chen", "type": "person", "description": "Product lead at Acme Corp" },
-  { "op": "entity", "name": "Jim Ferry", "type": "person", "description": "Partnership contact" },
+  { "op": "entity", "name": "Chris Lang", "type": "person", "description": "Partnership contact" },
   { "op": "entity", "name": "Acme Corp", "type": "organization", "description": "Client company" }
 ]
 EOF
@@ -242,7 +242,7 @@ Proceed with extraction? [y/n]
 
 **Dedicated Source Check:**
 ✓ Sarah Chen: 4 dedicated sources, appears in 12 total
-✓ Jim Ferry: 2 dedicated sources, appears in 6 total
+✓ Chris Lang: 2 dedicated sources, appears in 6 total
 ✓ Acme Corp: 3 dedicated sources, appears in 8 total
 
 **Gaps:**
@@ -262,7 +262,7 @@ Ready to store? [y/n]
 All sources linked to entities. Provenance chain complete.
 
 **Query examples:**
-- "What do I know about Jim Ferry?" → will surface all 6 source memories
+- "What do I know about Chris Lang?" → will surface all 6 source memories
 - "Show me Sarah's transcripts" → will list all 4 dedicated files
 - "Where did I learn about Acme's timeline?" → will cite exact source
 

@@ -38,9 +38,9 @@ def _create_entities(db):
         "importance": 1.0,
     })
     casey_id = db.insert("entities", {
-        "name": "Casey Potenzone",
+        "name": "Casey Lang",
         "type": "person",
-        "canonical_name": "casey potenzone",
+        "canonical_name": "casey lang",
         "importance": 1.0,
     })
     return sarah_id, acme_id, beta_id, casey_id

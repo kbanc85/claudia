@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS memories (
     confidence REAL DEFAULT 1.0,  -- How sure we are about this
     source TEXT,  -- Where this came from (conversation, document, etc.)
     source_id TEXT,  -- Reference to source (episode_id, etc.)
-    source_context TEXT,  -- One-line breadcrumb (e.g., "Email from Jim re: Forum V+, 2025-01-28")
+    source_context TEXT,  -- One-line breadcrumb (e.g., "Email from Chris re: Forum Alpha, 2025-01-28")
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     last_accessed_at TEXT,  -- For rehearsal-based importance boost

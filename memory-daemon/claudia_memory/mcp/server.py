@@ -1979,7 +1979,7 @@ async def list_tools() -> ListToolsResult:
                     },
                     "source_context": {
                         "type": "string",
-                        "description": "One-line breadcrumb describing origin (e.g., 'Email from Jim Ferry re: Forum V+, 2025-01-28')",
+                        "description": "One-line breadcrumb describing origin (e.g., 'Email from Chris Lang re: Forum Alpha, 2025-01-28')",
                     },
                     "source_material": {
                         "type": "string",

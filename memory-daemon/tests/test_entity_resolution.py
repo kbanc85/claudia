@@ -1,15 +1,15 @@
 """Tests for entity resolution on memory.remember (Proposal #51).
 
 Confirmed bug from 2026-05-13:
-    memory_remember(content="Matt Blumberg said X",
-                    entities=["Matt Blumberg", "Markup AI"])
+    memory_remember(content="Alex Rivera said X",
+                    entities=["Alex Rivera", "Nimbus AI"])
 
 Behaviour observed:
-    - Matt Blumberg got linked correctly (a "person").
-    - Markup AI was auto-created with type="person" because the
+    - Alex Rivera got linked correctly (a "person").
+    - Nimbus AI was auto-created with type="person" because the
       _infer_entity_type heuristic does not recognise the "AI" suffix
       as a corporate indicator.
-    - memory_about("Markup AI") therefore surfaces a misclassified entity.
+    - memory_about("Nimbus AI") therefore surfaces a misclassified entity.
 
 These tests pin the fix: entities passed via about_entities must be
 created if missing, linked to the memory, and given a sensible type
@@ -66,31 +66,31 @@ class TestProposal51Repro:
 
         memory_remember with entities=[...] must:
           1. create an entity row for each name (if missing)
-          2. classify the type sensibly (Markup AI -> organization, not person)
+          2. classify the type sensibly (Nimbus AI -> organization, not person)
           3. link the memory to each entity via memory_entities
 
-        Before the fix, "Markup AI" was created as type="person" because the
+        Before the fix, "Nimbus AI" was created as type="person" because the
         _infer_entity_type heuristic did not recognise the "AI" corporate
         suffix. This test fails on main and passes after the fix.
         """
         svc = _get_remember_service(db)
 
         memory_id = svc.remember_fact(
-            content="Matt Blumberg said the placement angle should be the operator track.",
-            about_entities=["Matt Blumberg", "Markup AI"],
+            content="Alex Rivera said the enterprise track should be the primary offer.",
+            about_entities=["Alex Rivera", "Nimbus AI"],
         )
         assert memory_id is not None, "memory should have been created"
 
         # 1. Both entities exist.
-        matt = _entity_by_name(db, "Matt Blumberg")
-        markup = _entity_by_name(db, "Markup AI")
-        assert matt is not None, "Matt Blumberg entity should be created"
-        assert markup is not None, "Markup AI entity should be created"
+        matt = _entity_by_name(db, "Alex Rivera")
+        markup = _entity_by_name(db, "Nimbus AI")
+        assert matt is not None, "Alex Rivera entity should be created"
+        assert markup is not None, "Nimbus AI entity should be created"
 
         # 2. Types are correct.
-        assert matt["type"] == "person", "Matt Blumberg should be a person"
+        assert matt["type"] == "person", "Alex Rivera should be a person"
         assert markup["type"] == "organization", (
-            f"Markup AI should be an organization (got {markup['type']!r}). "
+            f"Nimbus AI should be an organization (got {markup['type']!r}). "
             "Proposal #51: AI suffix indicates a company, not a person."
         )
 
@@ -101,8 +101,8 @@ class TestProposal51Repro:
             fetch=True,
         ) or []
         linked_ids = {row["entity_id"] for row in links}
-        assert matt["id"] in linked_ids, "memory should be linked to Matt Blumberg"
-        assert markup["id"] in linked_ids, "memory should be linked to Markup AI"
+        assert matt["id"] in linked_ids, "memory should be linked to Alex Rivera"
+        assert markup["id"] in linked_ids, "memory should be linked to Nimbus AI"
 
 
 # ---------------------------------------------------------------------------
@@ -126,14 +126,14 @@ class TestInferEntityTypeHeuristics:
     # Organization signals -------------------------------------------------
 
     def test_ai_suffix_is_organization(self):
-        """'Markup AI' must classify as organization (Proposal #51 core)."""
-        assert self._infer("Markup AI") == "organization"
+        """'Nimbus AI' must classify as organization (Proposal #51 core)."""
+        assert self._infer("Nimbus AI") == "organization"
 
     def test_dot_ai_suffix_is_organization(self):
         assert self._infer("Hugging.ai") == "organization"
 
     def test_co_suffix_is_organization(self):
-        assert self._infer("Banc Co.") == "organization"
+        assert self._infer("Pinnacle Co.") == "organization"
 
     def test_inc_suffix_is_organization(self):
         assert self._infer("Acme Inc.") == "organization"
@@ -151,7 +151,7 @@ class TestInferEntityTypeHeuristics:
 
     def test_first_last_name_is_person(self):
         """Two capitalised words (no corporate suffix) -> person."""
-        assert self._infer("Matt Blumberg") == "person"
+        assert self._infer("Alex Rivera") == "person"
 
     def test_three_name_pattern_is_person(self):
         """Three capitalised words with no suffix -> still a person."""
@@ -193,17 +193,17 @@ class TestRelateUsesTypeInference:
     """relate_entities auto-creates source/target with inferred types."""
 
     def test_relate_creates_org_when_target_has_ai_suffix(self, db):
-        """memory.relate(source='Matt Blumberg', target='Markup AI', ...) creates
-        Markup AI as type=organization, not person.
+        """memory.relate(source='Alex Rivera', target='Nimbus AI', ...) creates
+        Nimbus AI as type=organization, not person.
         """
         svc = _get_remember_service(db)
         svc.relate_entities(
-            source_name="Matt Blumberg",
-            target_name="Markup AI",
+            source_name="Alex Rivera",
+            target_name="Nimbus AI",
             relationship_type="ceo_of",
         )
 
-        markup = _entity_by_name(db, "Markup AI")
+        markup = _entity_by_name(db, "Nimbus AI")
         assert markup is not None
         assert markup["type"] == "organization"
 
@@ -211,12 +211,12 @@ class TestRelateUsesTypeInference:
         """Plain first+last name still defaults to person."""
         svc = _get_remember_service(db)
         svc.relate_entities(
-            source_name="Matt Blumberg",
-            target_name="Holly Smith",
+            source_name="Alex Rivera",
+            target_name="Jordan Hale",
             relationship_type="works_with",
         )
 
-        holly = _entity_by_name(db, "Holly Smith")
+        holly = _entity_by_name(db, "Jordan Hale")
         assert holly is not None
         assert holly["type"] == "person"
 
@@ -256,7 +256,7 @@ class TestBackfillCommand:
         from claudia_memory.services.backfill import plan_backfill
 
         # Seed an orphan memory mentioning a known name.
-        _seed_orphan_memory(db, "Matt Blumberg ran the meeting.", "Matt Blumberg")
+        _seed_orphan_memory(db, "Alex Rivera ran the meeting.", "Alex Rivera")
 
         entities_before = db.execute(
             "SELECT COUNT(*) AS n FROM entities", fetch=True
@@ -280,13 +280,13 @@ class TestBackfillCommand:
 
         # Plan reports something to do.
         assert plan.orphan_count >= 1
-        assert any(p["name"].lower() == "matt blumberg" for p in plan.proposed_entities)
+        assert any(p["name"].lower() == "alex rivera" for p in plan.proposed_entities)
 
     def test_apply_requires_backup(self, db, tmp_path):
         """apply_backfill creates a SQLite backup before any writes."""
         from claudia_memory.services.backfill import apply_backfill, plan_backfill
 
-        _seed_orphan_memory(db, "Matt Blumberg owns the deal.", "Matt Blumberg")
+        _seed_orphan_memory(db, "Alex Rivera owns the deal.", "Alex Rivera")
         plan = plan_backfill(db)
 
         backup_path = tmp_path / "backups" / "memory-2026-05-13.db"
@@ -302,7 +302,7 @@ class TestBackfillCommand:
         from claudia_memory.services import backfill as backfill_mod
         from claudia_memory.services.backfill import apply_backfill, plan_backfill
 
-        _seed_orphan_memory(db, "Matt Blumberg signed off.", "Matt Blumberg")
+        _seed_orphan_memory(db, "Alex Rivera signed off.", "Alex Rivera")
         plan = plan_backfill(db)
 
         entities_before = db.execute(
@@ -330,7 +330,7 @@ class TestBackfillCommand:
         """Running --apply twice in a row produces no new writes the second time."""
         from claudia_memory.services.backfill import apply_backfill, plan_backfill
 
-        _seed_orphan_memory(db, "Matt Blumberg signed the SOW.", "Matt Blumberg")
+        _seed_orphan_memory(db, "Alex Rivera signed the SOW.", "Alex Rivera")
 
         first_plan = plan_backfill(db)
         first_backup = tmp_path / "backups" / "memory-first.db"
@@ -381,8 +381,8 @@ class TestLatencyBudget:
 
         start = time.perf_counter()
         svc.remember_fact(
-            content="Matt Blumberg and Holly Smith met with Markup AI's board.",
-            about_entities=["Matt Blumberg", "Holly Smith", "Markup AI"],
+            content="Alex Rivera and Jordan Hale met with Nimbus AI's board.",
+            about_entities=["Alex Rivera", "Jordan Hale", "Nimbus AI"],
         )
         elapsed_ms = (time.perf_counter() - start) * 1000.0
 
@@ -410,7 +410,7 @@ class TestEndSessionInfersEntityType:
 
     Passing "person" explicitly bypasses the inference branch in
     remember_entity() (which only fires when entity_type is empty), so
-    organisations like "Markup AI" were silently misclassified as
+    organisations like "Nimbus AI" were silently misclassified as
     persons. The fix: default to "" instead of "person", which lets
     remember_entity() route through _infer_entity_type() exactly like
     the about_entities path already does.
@@ -429,21 +429,21 @@ class TestEndSessionInfersEntityType:
         )
 
     def test_end_session_infers_organization_for_ai_suffix(self, db):
-        """Untyped entity 'Markup AI' must be stored as organization."""
+        """Untyped entity 'Nimbus AI' must be stored as organization."""
         svc = _get_remember_service(db)
         episode_id = self._make_episode(db)
 
         result = svc.end_session(
             episode_id=episode_id,
-            narrative="Discussed AIAC sponsorship with Markup AI's CEO.",
-            entities=[{"name": "Markup AI"}],
+            narrative="Discussed AIAC sponsorship with Nimbus AI's CEO.",
+            entities=[{"name": "Nimbus AI"}],
         )
 
         assert result["entities_stored"] == 1
-        markup = _entity_by_name(db, "Markup AI")
-        assert markup is not None, "Markup AI entity should be created"
+        markup = _entity_by_name(db, "Nimbus AI")
+        assert markup is not None, "Nimbus AI entity should be created"
         assert markup["type"] == "organization", (
-            f"Markup AI should be inferred as organization, got {markup['type']!r}. "
+            f"Nimbus AI should be inferred as organization, got {markup['type']!r}. "
             "This is the Proposal #51 B2 regression."
         )
 
@@ -454,12 +454,12 @@ class TestEndSessionInfersEntityType:
 
         result = svc.end_session(
             episode_id=episode_id,
-            narrative="Met with Matt Blumberg about Q3 plans.",
-            entities=[{"name": "Matt Blumberg", "type": "person"}],
+            narrative="Met with Alex Rivera about Q3 plans.",
+            entities=[{"name": "Alex Rivera", "type": "person"}],
         )
 
         assert result["entities_stored"] == 1
-        matt = _entity_by_name(db, "Matt Blumberg")
+        matt = _entity_by_name(db, "Alex Rivera")
         assert matt is not None
         assert matt["type"] == "person"
 
@@ -470,15 +470,15 @@ class TestEndSessionInfersEntityType:
 
         result = svc.end_session(
             episode_id=episode_id,
-            narrative="Markup AI and Stanford University both expressed interest.",
+            narrative="Nimbus AI and Stanford University both expressed interest.",
             entities=[
-                {"name": "Markup AI"},
+                {"name": "Nimbus AI"},
                 {"name": "Stanford University"},
-                {"name": "Matt Blumberg"},
+                {"name": "Alex Rivera"},
             ],
         )
 
         assert result["entities_stored"] == 3
-        assert _entity_by_name(db, "Markup AI")["type"] == "organization"
+        assert _entity_by_name(db, "Nimbus AI")["type"] == "organization"
         assert _entity_by_name(db, "Stanford University")["type"] == "organization"
-        assert _entity_by_name(db, "Matt Blumberg")["type"] == "person"
+        assert _entity_by_name(db, "Alex Rivera")["type"] == "person"

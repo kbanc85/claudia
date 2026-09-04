@@ -138,34 +138,34 @@ When Claudia dispatches you with `extraction_type: "memory_operations"`, return 
 ```json
 {
   "extraction_type": "memory_operations",
-  "source_summary": "Extracted 7 memories from call with Ford Perry",
+  "source_summary": "Extracted 7 memories from call with Dana Walsh",
   "memory_operations": [
     {
       "op": "remember",
-      "content": "Ford Perry prefers async communication over calls",
+      "content": "Dana Walsh prefers async communication over calls",
       "type": "preference",
       "importance": 0.7,
-      "about": ["Ford Perry"],
-      "source_context": "2026-02-04 call with Ford Perry re: partnership"
+      "about": ["Dana Walsh"],
+      "source_context": "2026-02-04 call with Dana Walsh re: partnership"
     },
     {
       "op": "remember",
-      "content": "Ford committed to sending the revised proposal by Friday Feb 7",
+      "content": "Dana committed to sending the revised proposal by Friday Feb 7",
       "type": "commitment",
       "importance": 0.9,
-      "about": ["Ford Perry"],
-      "source_context": "2026-02-04 call with Ford Perry re: partnership"
+      "about": ["Dana Walsh"],
+      "source_context": "2026-02-04 call with Dana Walsh re: partnership"
     },
     {
       "op": "entity",
-      "name": "Ford Perry",
+      "name": "Dana Walsh",
       "type": "person",
-      "description": "Potential partner, CEO of Perry Ventures"
+      "description": "Potential partner, CEO of Northstar Ventures"
     },
     {
       "op": "relate",
       "source": "Kamil Banc",
-      "target": "Ford Perry",
+      "target": "Dana Walsh",
       "relationship": "potential_partner",
       "strength": 0.6
     }

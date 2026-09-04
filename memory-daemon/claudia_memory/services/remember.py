@@ -1840,7 +1840,7 @@ class RememberService:
         """Find entity by name or create if not exists.
 
         When ``entity_type`` is not supplied, the smarter heuristic in
-        ``services/entities.py`` is used so that names like "Markup AI"
+        ``services/entities.py`` is used so that names like "Nimbus AI"
         get typed as ``organization`` instead of the legacy
         ``person`` fallback. Proposal #51 (2026-05-13).
 

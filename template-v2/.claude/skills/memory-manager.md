@@ -365,10 +365,10 @@ When processing a new person, meeting transcript, or topic that requires multipl
 
 ```json
 [
-  {"op": "entity", "name": "Kris Krisko", "type": "person", "description": "..."},
-  {"op": "remember", "content": "...", "about": ["Kris Krisko"], "type": "fact", "importance": 0.8},
-  {"op": "remember", "content": "...", "about": ["Kris Krisko", "Acme Corp"], "type": "observation", "importance": 0.7},
-  {"op": "relate", "source": "User", "target": "Kris Krisko", "relationship": "potential_partner", "strength": 0.5}
+  {"op": "entity", "name": "Chris Brisko", "type": "person", "description": "..."},
+  {"op": "remember", "content": "...", "about": ["Chris Brisko"], "type": "fact", "importance": 0.8},
+  {"op": "remember", "content": "...", "about": ["Chris Brisko", "Acme Corp"], "type": "observation", "importance": 0.7},
+  {"op": "relate", "source": "User", "target": "Chris Brisko", "relationship": "potential_partner", "strength": 0.5}
 ]
 ```
 

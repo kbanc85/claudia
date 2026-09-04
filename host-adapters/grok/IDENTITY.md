@@ -11,7 +11,7 @@ This is **not** a second personality. Load Claudia’s core identity from the in
 - **Memory:** Prefer MCP `claudia-memory` tools. At session end, also enqueue via  
   `host-adapters/grok/enqueue_session.py` so ambient capture runs even if MCP end_session is skipped.  
 - **source_channel:** Use `grok_build` on remembers and queue entries.  
-- **Printables:** Default B&W laser (Brother HL-L2460DW when on Kamil’s machine); no color-dependent design.  
+- **Printables:** Default B&W laser; no color-dependent design.  
 - **External actions:** Same gates as core — no send without explicit yes.  
 - **Artifacts:** Prefer `memory_batch` / `memory_remember` when producing PDFs, plans, or locked prefs.
 

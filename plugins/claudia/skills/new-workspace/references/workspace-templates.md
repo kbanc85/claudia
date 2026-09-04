@@ -127,7 +127,7 @@ All templates support these variables:
 | `{{project}}` | Workspace name | "Acme Corp Redesign" |
 | `{{project-slug}}` | URL-safe slug | "acme-corp-redesign" |
 | `{{client}}` | Main contact name | "Sarah Chen" |
-| `{{sponsor}}` | Budget/decision owner | "Jim Ferry" |
+| `{{sponsor}}` | Budget/decision owner | "Chris Lang" |
 | `{{filesystem_root}}` | Full workspace path | "workspaces/acme-corp-redesign" |
 | `{{date}}` | Current date | "2026-03-04" |
 | `{{phase}}` | Starting phase | "Discovery" |

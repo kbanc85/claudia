@@ -4,7 +4,7 @@ Centralised home for the entity-type inference heuristic and (eventually)
 shared resolution logic. Pure-function module: no DB access, no I/O.
 
 Proposal #51 (2026-05-13) traced a real bug where memory.remember +
-memory.relate were both classifying organisations like "Markup AI" as
+memory.relate were both classifying organisations like "Nimbus AI" as
 type="person" because the heuristic in services/remember.py did not
 recognise the "AI" corporate suffix and silently defaulted to person.
 
@@ -52,7 +52,7 @@ _ORG_WORD_SUFFIXES = frozenset(
         "group",
         "partners",
         # "AI" as a standalone token has become a near-universal corporate
-        # marker (Anthropic AI, OpenAI, Markup AI, Hugging AI, etc.). Worth
+        # marker (Anthropic AI, OpenAI, Nimbus AI, Hugging AI, etc.). Worth
         # the rare false positive for a person literally named "AI".
         "ai",
     }
@@ -75,7 +75,7 @@ _LOCATION_KEYWORDS = frozenset(
 )
 
 # Two-or-more capitalised words separated by spaces, no digits or punctuation,
-# e.g. "Matt Blumberg", "Mary Anne Smith". A reliable person signal when
+# e.g. "Alex Rivera", "Mary Anne Smith". A reliable person signal when
 # no other classification fires.
 _PERSON_NAME_RE = re.compile(r"^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+$")
 
@@ -89,12 +89,12 @@ def infer_entity_type(name: str, content: str = "") -> str:
        first so "Company HQ" is a location, not an organisation.
     2. **Organisation signals** -- whole-word corporate tokens like ``inc``,
        ``llc``, ``corp``, ``ai``, ``foundation``, or domain-style suffixes
-       (``.ai``, ``.io``) on the trailing token. Catches "Markup AI",
+       (``.ai``, ``.io``) on the trailing token. Catches "Nimbus AI",
        "Hugging.ai", "Acme Inc.".
     3. **Project keywords** ("project", "sprint", "mvp"). Matches "Project
        Phoenix" and "Phoenix Project" alike.
     4. **Concept keywords** ("methodology", "framework", "strategy").
-    5. **Person pattern** -- two-or-more capitalised words ("Matt Blumberg",
+    5. **Person pattern** -- two-or-more capitalised words ("Alex Rivera",
        "Mary Anne Smith") with no other classification signal.
     6. **Fallback: concept**, never ``person``. Proposal #51 explicitly
        rejected ``person`` as the default because a single ambiguous token

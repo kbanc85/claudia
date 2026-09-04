@@ -70,8 +70,8 @@ class TestMergeExpiresPredictions:
 
     def test_merge_expires_prediction_for_pair(self, db):
         """After merging, predictions referencing the source entity are expired."""
-        id1 = _insert_entity(db, "Kris Krisko")
-        id2 = _insert_entity(db, "Kris Krisco")
+        id1 = _insert_entity(db, "Chris Brisko")
+        id2 = _insert_entity(db, "Chris Brisco")
         pred_id = _insert_dedupe_prediction(db, id1, id2)
 
         svc = _get_remember_service(db)
@@ -83,8 +83,8 @@ class TestMergeExpiresPredictions:
 
     def test_merge_does_not_affect_unrelated_predictions(self, db):
         """Predictions about other entity pairs remain untouched."""
-        id1 = _insert_entity(db, "Kris Krisko")
-        id2 = _insert_entity(db, "Kris Krisco")
+        id1 = _insert_entity(db, "Chris Brisko")
+        id2 = _insert_entity(db, "Chris Brisco")
         id3 = _insert_entity(db, "Sarah Chen")
         id4 = _insert_entity(db, "Sarah Johnson")
 
@@ -100,8 +100,8 @@ class TestMergeExpiresPredictions:
 
     def test_merge_does_not_affect_non_dedupe_predictions(self, db):
         """Non-dedupe predictions are not expired."""
-        id1 = _insert_entity(db, "Kris Krisko")
-        id2 = _insert_entity(db, "Kris Krisco")
+        id1 = _insert_entity(db, "Chris Brisko")
+        id2 = _insert_entity(db, "Chris Brisco")
         non_dedupe_id = _insert_non_dedupe_prediction(db)
         _insert_dedupe_prediction(db, id1, id2)
 
@@ -117,8 +117,8 @@ class TestDeleteExpiresPredictions:
 
     def test_delete_expires_prediction_referencing_entity(self, db):
         """After deleting, predictions referencing the entity are expired."""
-        id1 = _insert_entity(db, "Kris Krisko")
-        id2 = _insert_entity(db, "Kris Krisco")
+        id1 = _insert_entity(db, "Chris Brisko")
+        id2 = _insert_entity(db, "Chris Brisco")
         pred_id = _insert_dedupe_prediction(db, id1, id2)
 
         svc = _get_remember_service(db)
@@ -129,8 +129,8 @@ class TestDeleteExpiresPredictions:
 
     def test_delete_does_not_affect_unrelated_predictions(self, db):
         """Predictions about other entities remain untouched."""
-        id1 = _insert_entity(db, "Kris Krisko")
-        id2 = _insert_entity(db, "Kris Krisco")
+        id1 = _insert_entity(db, "Chris Brisko")
+        id2 = _insert_entity(db, "Chris Brisco")
         id3 = _insert_entity(db, "Sarah Chen")
         id4 = _insert_entity(db, "Sarah Johnson")
 

@@ -1,6 +1,6 @@
 """Tests for fuzzy entity dedup on write.
 
-When storing a memory about "Kris Krisco" and "Kris Krisko" already exists
+When storing a memory about "Chris Brisco" and "Chris Brisko" already exists
 (same type), the system should return the existing entity instead of creating
 a duplicate. Uses SequenceMatcher with threshold > 0.90.
 """
@@ -38,11 +38,11 @@ class TestFuzzyEntityDedup:
     """Tests for fuzzy matching in _ensure_entity and _find_or_create_entity."""
 
     def test_fuzzy_match_typo_variant(self, db):
-        """'Kris Krisco' matches existing 'Kris Krisko' (same type)."""
-        existing_id = _insert_entity(db, "Kris Krisko", "person")
+        """'Chris Brisco' matches existing 'Chris Brisko' (same type)."""
+        existing_id = _insert_entity(db, "Chris Brisko", "person")
 
         svc = _get_remember_service(db)
-        result_id = svc._find_or_create_entity("Kris Krisco", "person")
+        result_id = svc._find_or_create_entity("Chris Brisco", "person")
 
         assert result_id == existing_id
 
@@ -86,13 +86,13 @@ class TestFuzzyEntityDedup:
         """_ensure_entity also fuzzy-matches typo variants."""
         from claudia_memory.extraction.entity_extractor import ExtractedEntity
 
-        existing_id = _insert_entity(db, "Kris Krisko", "person")
+        existing_id = _insert_entity(db, "Chris Brisko", "person")
 
         svc = _get_remember_service(db)
         extracted = ExtractedEntity(
-            name="Kris Krisco",
+            name="Chris Brisco",
             type="person",
-            canonical_name="kris krisco",
+            canonical_name="chris brisco",
             confidence=0.8,
             span=(0, 12),
         )
@@ -111,7 +111,7 @@ class TestFuzzyEntityDedup:
 
     def test_fuzzy_respects_deleted_entities(self, db):
         """Fuzzy matching should skip deleted entities."""
-        existing_id = _insert_entity(db, "Kris Krisko", "person")
+        existing_id = _insert_entity(db, "Chris Brisko", "person")
         db.update(
             "entities",
             {"deleted_at": datetime.utcnow().isoformat()},
@@ -120,7 +120,7 @@ class TestFuzzyEntityDedup:
         )
 
         svc = _get_remember_service(db)
-        result_id = svc._find_or_create_entity("Kris Krisco", "person")
+        result_id = svc._find_or_create_entity("Chris Brisco", "person")
 
         # Should create new since the match is deleted
         assert result_id != existing_id

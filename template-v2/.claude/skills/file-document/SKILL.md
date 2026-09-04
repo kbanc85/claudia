@@ -107,19 +107,19 @@ If no entity linked:
 
 ### Email
 ```
-User: "Here's an email from Jim about the partnership terms. Save it."
+User: "Here's an email from Chris about the partnership terms. Save it."
 
 claudia memory document store \
-  --filename "2026-02-04-jim-ferry-partnership.md" \
+  --filename "2026-02-04-chris-lang-partnership.md" \
   --source-type "gmail" \
-  --summary "Jim Ferry re: partnership terms and next steps" \
-  --about "Jim Ferry" \
+  --summary "Chris Lang re: partnership terms and next steps" \
+  --about "Chris Lang" \
   --project-dir "$PWD" < email.md
 
 Response:
-"Filed Jim's email about partnership terms.
-Saved to: people/jim-ferry/emails/2026-02-04-partnership.md
-You can find it later by asking about Jim's documents."
+"Filed Chris's email about partnership terms.
+Saved to: people/chris-lang/emails/2026-02-04-partnership.md
+You can find it later by asking about Chris's documents."
 ```
 
 ### Research

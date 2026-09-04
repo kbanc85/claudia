@@ -44,9 +44,9 @@ class TestFuzzyNameDedup:
     """Method 3: fuzzy name comparison across same-type entity pairs."""
 
     def test_typo_detected_as_candidate(self, db):
-        """'Kris Krisko' vs 'Kris Krisco' should be detected (similarity >= 0.90)."""
-        _insert_entity(db, "Kris Krisko", "person")
-        _insert_entity(db, "Kris Krisco", "person")
+        """'Chris Brisko' vs 'Chris Brisco' should be detected (similarity >= 0.90)."""
+        _insert_entity(db, "Chris Brisko", "person")
+        _insert_entity(db, "Chris Brisco", "person")
 
         svc = _get_consolidation_service(db)
         candidates = svc.auto_dedupe_entities()
@@ -54,7 +54,7 @@ class TestFuzzyNameDedup:
         fuzzy_candidates = [c for c in candidates if c["method"] == "fuzzy_name"]
         assert len(fuzzy_candidates) >= 1
         names = {fuzzy_candidates[0]["entity_1"]["name"], fuzzy_candidates[0]["entity_2"]["name"]}
-        assert names == {"Kris Krisko", "Kris Krisco"}
+        assert names == {"Chris Brisko", "Chris Brisco"}
 
     def test_different_names_not_detected(self, db):
         """'Sarah Johnson' vs 'Sarah Chen' should NOT be detected."""
@@ -85,8 +85,8 @@ class TestFuzzyNameDedup:
 
     def test_deleted_entities_excluded(self, db):
         """Deleted entities should not be considered for fuzzy matching."""
-        _insert_entity(db, "Kris Krisko", "person")
-        _insert_entity(db, "Kris Krisco", "person", deleted=True)
+        _insert_entity(db, "Chris Brisko", "person")
+        _insert_entity(db, "Chris Brisco", "person", deleted=True)
 
         svc = _get_consolidation_service(db)
         candidates = svc.auto_dedupe_entities()
@@ -122,8 +122,8 @@ class TestFuzzyNameDedup:
 
     def test_candidates_stored_as_predictions(self, db):
         """Fuzzy name candidates should be stored in predictions table for review."""
-        _insert_entity(db, "Kris Krisko", "person")
-        _insert_entity(db, "Kris Krisco", "person")
+        _insert_entity(db, "Chris Brisko", "person")
+        _insert_entity(db, "Chris Brisco", "person")
 
         svc = _get_consolidation_service(db)
         svc.auto_dedupe_entities()
@@ -137,8 +137,8 @@ class TestFuzzyNameDedup:
 
     def test_no_auto_merge(self, db):
         """Fuzzy dedup is advisory only: entities remain separate."""
-        id1 = _insert_entity(db, "Kris Krisko", "person")
-        id2 = _insert_entity(db, "Kris Krisco", "person")
+        id1 = _insert_entity(db, "Chris Brisko", "person")
+        id2 = _insert_entity(db, "Chris Brisco", "person")
 
         svc = _get_consolidation_service(db)
         svc.auto_dedupe_entities()

@@ -161,7 +161,7 @@ def test_export_single_entity(db, vault_svc, vault_dir):
 def test_export_entity_with_relationships(db, vault_svc, vault_dir):
     """Relationships render as a table with [[wikilinks]]."""
     sarah_id = _seed_entity(db, "Sarah Chen", "person")
-    jim_id = _seed_entity(db, "Jim Ferry", "person")
+    jim_id = _seed_entity(db, "Chris Lang", "person")
     _seed_relationship(db, sarah_id, jim_id, "works_with", 0.9)
 
     entity = db.execute(
@@ -171,7 +171,7 @@ def test_export_entity_with_relationships(db, vault_svc, vault_dir):
     content = path.read_text()
 
     assert "## Relationships" in content
-    assert "[[Jim Ferry]]" in content
+    assert "[[Chris Lang]]" in content
     assert "works_with" in content
     # Table format
     assert "| Connection | Type | Strength |" in content
@@ -588,14 +588,14 @@ def test_status_callout_person(db, vault_svc, vault_dir):
 def test_relationship_table(db, vault_svc, vault_dir):
     """Relationships render as a markdown table."""
     sarah_id = _seed_entity(db, "Sarah Chen", "person")
-    jim_id = _seed_entity(db, "Jim Ferry", "person")
+    jim_id = _seed_entity(db, "Chris Lang", "person")
     _seed_relationship(db, sarah_id, jim_id, "works_with", 0.9)
 
     entity = db.execute("SELECT * FROM entities WHERE id = ?", (sarah_id,), fetch=True)[0]
     path = vault_svc.export_entity(entity)
     content = path.read_text()
 
-    assert "| [[Jim Ferry]] | works_with | 0.9 |" in content
+    assert "| [[Chris Lang]] | works_with | 0.9 |" in content
 
 
 def test_verification_grouping(db, vault_svc, vault_dir):
@@ -666,14 +666,14 @@ def test_moc_indices_created(db, vault_svc, vault_dir):
 def test_attention_items_in_dashboard(db, vault_svc, vault_dir):
     """Dashboard shows entities needing attention."""
     _seed_entity(
-        db, "Jim Ferry", "person", importance=0.7,
+        db, "Chris Lang", "person", importance=0.7,
         attention_tier="watchlist", contact_trend="dormant",
         last_contact_at="2026-01-01T10:00:00",
     )
     vault_svc.export_all()
 
     content = (vault_dir / "Home.md").read_text()
-    assert "[[Jim Ferry]]" in content
+    assert "[[Chris Lang]]" in content
     assert "dormant" in content
 
 
