@@ -667,17 +667,26 @@ async function installPython() {
  * Returns true if Ollama API responds within ~15 seconds.
  */
 async function startOllama() {
+  // Made with Grok Bot: a detached spawn of a missing binary emits 'error'
+  // (ENOENT) asynchronously; without a listener Node throws and kills the
+  // installer. Listen for it and stop polling early instead.
+  let spawnFailed = false;
+  const launch = (cmd, args) => {
+    const child = spawn(cmd, args, { stdio: 'pipe', detached: true });
+    child.on('error', () => { spawnFailed = true; });
+    child.unref();
+  };
   try {
     if (process.platform === 'darwin') {
       // Try macOS app first (installed by brew cask or .dmg), fall back to serve
       const appExists = existsSync('/Applications/Ollama.app');
       if (appExists) {
-        spawn('open', ['-a', 'Ollama'], { stdio: 'pipe', detached: true }).unref();
+        launch('open', ['-a', 'Ollama']);
       } else {
-        spawn('ollama', ['serve'], { stdio: 'pipe', detached: true }).unref();
+        launch('ollama', ['serve']);
       }
     } else if (!isWindows) {
-      spawn('ollama', ['serve'], { stdio: 'pipe', detached: true }).unref();
+      launch('ollama', ['serve']);
     } else {
       return false;
     }
@@ -688,6 +697,7 @@ async function startOllama() {
   // Poll until API responds (up to 15 seconds)
   for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 1000));
+    if (spawnFailed) return false;
     try {
       const resp = await fetch('http://127.0.0.1:11434/api/version');
       if (resp.ok) return true;
@@ -1016,6 +1026,7 @@ async function main() {
 
   // Run CLI-based setup (no Python daemon needed)
   let memoryOk = false;
+  let ollamaMissing = false; // Made with Grok Bot: drives the post-install Ollama hint
   let rootCause = null;
   let dbScan = null;
 
@@ -1039,23 +1050,23 @@ async function main() {
 
     // Phase 2: If not running, is it installed?
     if (!ollamaOk) {
-      const ollamaInstalled = await isOllamaInstalled();
+      let ollamaInstalled = await isOllamaInstalled();
 
       if (!ollamaInstalled) {
         // Phase 3: Not installed at all. Install it.
         renderer.update('environment', 'active', 'installing Ollama...');
-        const installed = await installOllama();
-        if (!installed) {
-          renderer.update('environment', 'warn', `Node ${nodeVersion}, no Ollama`);
-          if (!supportsInPlace) renderer.appendLine('environment', 'warn', `Node ${nodeVersion}, no Ollama`);
-        }
+        ollamaInstalled = await installOllama();
+        // Made with Grok Bot: on failure, fall through; the warn line is printed once below.
       }
 
       // Phase 4: Installed (or just installed). Try starting it.
-      if (!ollamaOk) {
+      // Made with Grok Bot: never spawn `ollama serve` when no Ollama binary exists.
+      if (!ollamaOk && ollamaInstalled) {
         renderer.update('environment', 'active', 'starting Ollama...');
         ollamaOk = await startOllama();
       }
+      // Made with Grok Bot: re-check, since the install script can exit 0 without leaving a binary.
+      if (!ollamaOk) ollamaMissing = !(await isOllamaInstalled());
     }
 
     if (ollamaOk) {
@@ -1602,6 +1613,10 @@ async function main() {
     runVaultStep(renderer, () => {
       renderer.render();
       showDbScanResults(dbScan);
+      // Made with Grok Bot: explain the missing-Ollama skip once rendering is done.
+      if (ollamaMissing) {
+        console.log(`\n ${colors.yellow}○${colors.reset} Ollama isn't installed, so it was skipped: memory recall will use keyword (full-text) search without vector embeddings. To add it later, install Ollama from https://ollama.com, then run \`npx get-claudia upgrade\` in your Claudia folder.`);
+      }
       showCompletion(
         targetDir,
         isCurrentDir,
